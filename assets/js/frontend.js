@@ -10,28 +10,39 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   function setCookie(name, val, days){
     var d = new Date(); d.setTime(d.getTime() + (days*24*60*60*1000));
-    document.cookie = name + "=" + val + "; path=/; SameSite=Lax";
+    document.cookie = name + "=" + val + "; expires=" + d.toUTCString() + "; path=/; SameSite=Lax";
   }
 
   // Assicura un SID anche per traffico non-ads
   var sid = getCookie('hic_sid');
   if (!sid) { sid = uuidv4(); setCookie('hic_sid', sid, 90); }
 
+  // Helper function to validate SID format (basic validation)
+  function isValidSid(sid) {
+    return sid && typeof sid === 'string' && sid.length > 8 && sid.length < 256;
+  }
+
+  // Helper function to add SID to a link on click
+  function addSidToLink(link) {
+    link.addEventListener('click', function(){
+      var s = getCookie('hic_sid');
+      if (s && isValidSid(s)) {
+        try {
+          var url = new URL(link.href);
+          url.searchParams.set('sid', s);
+          link.href = url.toString();
+        } catch(e){
+          // Log error for debugging
+          console.warn('HIC: Failed to add SID to link', link.href, e);
+        }
+      }
+    });
+  }
+
   // Funzione per appendere SID ai link
   function appendSidToLinks() {
     var links = document.querySelectorAll('a.js-book, a[href*="booking.hotelincloud.com"]');
-    links.forEach(function(link){
-      link.addEventListener('click', function(){
-        var s = getCookie('hic_sid');
-        if (s) {
-          try {
-            var url = new URL(link.href);
-            url.searchParams.set('sid', s);
-            link.href = url.toString();
-          } catch(e){}
-        }
-      });
-    });
+    links.forEach(addSidToLink);
   }
 
   // Appendi sid ai link nel documento principale
@@ -47,18 +58,7 @@ document.addEventListener('DOMContentLoaded', function(){
               // Controlla se il nodo aggiunto contiene link booking
               var newLinks = node.querySelectorAll ? node.querySelectorAll('a.js-book, a[href*="booking.hotelincloud.com"]') : [];
               if (newLinks.length > 0) {
-                newLinks.forEach(function(link){
-                  link.addEventListener('click', function(){
-                    var s = getCookie('hic_sid');
-                    if (s) {
-                      try {
-                        var url = new URL(link.href);
-                        url.searchParams.set('sid', s);
-                        link.href = url.toString();
-                      } catch(e){}
-                    }
-                  });
-                });
+                newLinks.forEach(addSidToLink);
               }
             }
           });
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // Ascolta messaggi da iframe
   window.addEventListener('message', function(event) {
-    if (event.data && event.data.type === 'hic_sid_sync' && event.data.sid) {
+    if (event.data && event.data.type === 'hic_sid_sync' && event.data.sid && isValidSid(event.data.sid)) {
       setCookie('hic_sid', event.data.sid, 90);
     }
   });
