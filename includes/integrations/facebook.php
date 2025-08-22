@@ -11,8 +11,36 @@ function hic_send_to_fb($data, $gclid, $fbclid){
     hic_log('FB Pixel non configurato.');
     return;
   }
+  
+  // Validate required data
+  if (empty($data['email'])) {
+    hic_log('FB: email mancante, evento non inviato');
+    return;
+  }
+  
   $bucket   = hic_get_bucket($gclid, $fbclid); // gads | fbads | organic
   $event_id = $data['reservation_id'] ?? uniqid();
+
+  // Validate and sanitize amount
+  $amount = 0;
+  if (isset($data['amount']) && is_numeric($data['amount'])) {
+    $amount = floatval($data['amount']);
+  }
+
+  $user_data = [
+    'em' => [ hash('sha256', strtolower(trim($data['email']))) ]
+  ];
+  
+  // Add optional user data if available and not empty
+  if (!empty($data['first_name'])) {
+    $user_data['fn'] = [ hash('sha256', strtolower(trim($data['first_name']))) ];
+  }
+  if (!empty($data['last_name'])) {
+    $user_data['ln'] = [ hash('sha256', strtolower(trim($data['last_name']))) ];
+  }
+  if (!empty($data['whatsapp'])) {
+    $user_data['ph'] = [ hash('sha256', preg_replace('/\D/','', $data['whatsapp'])) ];
+  }
 
   $payload = [
     'data' => [[
@@ -21,16 +49,10 @@ function hic_send_to_fb($data, $gclid, $fbclid){
       'event_id'         => $event_id,
       'action_source'    => 'website',
       'event_source_url' => home_url(),
-      'user_data' => [
-        'em' => [ hash('sha256', strtolower(trim($data['email']      ?? ''))) ],
-        'fn' => [ hash('sha256', strtolower(trim($data['first_name'] ?? ''))) ],
-        'ln' => [ hash('sha256', strtolower(trim($data['last_name']  ?? ''))) ],
-        // opzionale: usa whatsapp come telefono, normalizzato numerico
-        'ph' => !empty($data['whatsapp']) ? [ hash('sha256', preg_replace('/\D/','', $data['whatsapp'])) ] : []
-      ],
+      'user_data' => $user_data,
       'custom_data' => [
         'currency'     => $data['currency'] ?? 'EUR',
-        'value'        => isset($data['amount']) ? floatval($data['amount']) : 0,
+        'value'        => $amount,
         'order_id'     => $event_id,
         'bucket'       => $bucket,           // per creare custom conversions per fbads/organic/gads
         'content_name' => $data['room'] ?? 'Prenotazione'

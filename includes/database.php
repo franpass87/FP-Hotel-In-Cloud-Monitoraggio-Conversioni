@@ -30,19 +30,52 @@ function hic_capture_tracking_params(){
   global $wpdb;
   $table = $wpdb->prefix . 'hic_gclids';
 
+  // Get existing SID or create new one if it doesn't exist
+  $existing_sid = isset($_COOKIE['hic_sid']) ? sanitize_text_field($_COOKIE['hic_sid']) : null;
+  
   if (!empty($_GET['gclid'])) {
     $gclid = sanitize_text_field($_GET['gclid']);
-    setcookie('hic_sid', $gclid, time() + 60*60*24*30, '/', '', is_ssl(), true);
-    $_COOKIE['hic_sid'] = $gclid;
-    $wpdb->insert($table, ['gclid'=>$gclid, 'sid'=>$gclid]);
-    hic_log("GCLID salvato → $gclid");
+    
+    // Use existing SID if available, otherwise use gclid as SID
+    $sid_to_use = $existing_sid ?: $gclid;
+    
+    // Only update cookie if we don't have an existing SID or if existing SID was the gclid
+    if (!$existing_sid || $existing_sid === $gclid) {
+      setcookie('hic_sid', $gclid, time() + 60*60*24*90, '/', '', is_ssl(), true);
+      $_COOKIE['hic_sid'] = $gclid;
+    }
+    
+    // Store the association between gclid and SID (avoid duplicates)
+    $existing = $wpdb->get_var($wpdb->prepare(
+      "SELECT id FROM $table WHERE gclid = %s AND sid = %s LIMIT 1", 
+      $gclid, $sid_to_use
+    ));
+    if (!$existing) {
+      $wpdb->insert($table, ['gclid'=>$gclid, 'sid'=>$sid_to_use]);
+    }
+    hic_log("GCLID salvato → $gclid (SID: $sid_to_use)");
   }
 
   if (!empty($_GET['fbclid'])) {
     $fbclid = sanitize_text_field($_GET['fbclid']);
-    setcookie('hic_sid', $fbclid, time() + 60*60*24*30, '/', '', is_ssl(), true);
-    $_COOKIE['hic_sid'] = $fbclid;
-    $wpdb->insert($table, ['fbclid'=>$fbclid, 'sid'=>$fbclid]);
-    hic_log("FBCLID salvato → $fbclid");
+    
+    // Use existing SID if available, otherwise use fbclid as SID
+    $sid_to_use = $existing_sid ?: $fbclid;
+    
+    // Only update cookie if we don't have an existing SID or if existing SID was the fbclid
+    if (!$existing_sid || $existing_sid === $fbclid) {
+      setcookie('hic_sid', $fbclid, time() + 60*60*24*90, '/', '', is_ssl(), true);
+      $_COOKIE['hic_sid'] = $fbclid;
+    }
+    
+    // Store the association between fbclid and SID (avoid duplicates)
+    $existing = $wpdb->get_var($wpdb->prepare(
+      "SELECT id FROM $table WHERE fbclid = %s AND sid = %s LIMIT 1", 
+      $fbclid, $sid_to_use
+    ));
+    if (!$existing) {
+      $wpdb->insert($table, ['fbclid'=>$fbclid, 'sid'=>$sid_to_use]);
+    }
+    hic_log("FBCLID salvato → $fbclid (SID: $sid_to_use)");
   }
 }
