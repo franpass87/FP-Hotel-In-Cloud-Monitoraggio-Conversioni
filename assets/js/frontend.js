@@ -83,14 +83,46 @@ document.addEventListener('DOMContentLoaded', function(){
         sid: sid
       }, '*');
     } catch(e) {
-      // Cross-origin, non possiamo comunicare
+      // Cross-origin, non possiamo comunicare con il parent
+      console.warn('HIC: Cannot communicate with parent frame:', e.message);
     }
   }
 
-  // Ascolta messaggi da iframe
+  // Ascolta messaggi da iframe - supporta sia parent->iframe che iframe->parent
   window.addEventListener('message', function(event) {
     if (event.data && event.data.type === 'hic_sid_sync' && event.data.sid && isValidSid(event.data.sid)) {
-      setCookie('hic_sid', event.data.sid, 90);
+      var currentSid = getCookie('hic_sid');
+      if (currentSid !== event.data.sid) {
+        setCookie('hic_sid', event.data.sid, 90);
+        // Re-applica SID ai link esistenti con il nuovo SID
+        appendSidToLinks();
+      }
     }
   });
+
+  // Monitora per iframe caricati dinamicamente e invia loro il SID
+  if (window.MutationObserver) {
+    var iframeObserver = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1 && node.tagName === 'IFRAME') {
+              // Invia SID ai nuovi iframe dopo un breve delay per assicurarsi che siano carichi
+              setTimeout(function() {
+                try {
+                  node.contentWindow.postMessage({
+                    type: 'hic_sid_sync',
+                    sid: getCookie('hic_sid')
+                  }, '*');
+                } catch(e) {
+                  // Cross-origin o iframe non accessibile
+                }
+              }, 500);
+            }
+          });
+        }
+      });
+    });
+    iframeObserver.observe(document.body, { childList: true, subtree: true });
+  }
 });
