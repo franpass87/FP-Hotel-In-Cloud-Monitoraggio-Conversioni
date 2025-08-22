@@ -50,20 +50,27 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // Supporto per iframe - monitora per nuovi link aggiunti dinamicamente
   if (window.MutationObserver) {
+    var mutationThrottleTimer;
     var observer = new MutationObserver(function(mutations) {
-      mutations.forEach(function(mutation) {
-        if (mutation.type === 'childList') {
-          mutation.addedNodes.forEach(function(node) {
-            if (node.nodeType === 1) { // Element node
-              // Controlla se il nodo aggiunto contiene link booking
-              var newLinks = node.querySelectorAll ? node.querySelectorAll('a.js-book, a[href*="booking.hotelincloud.com"]') : [];
-              if (newLinks.length > 0) {
-                newLinks.forEach(addSidToLink);
+      // Throttle mutations to avoid performance issues
+      if (mutationThrottleTimer) return;
+      mutationThrottleTimer = setTimeout(function() {
+        mutationThrottleTimer = null;
+        
+        mutations.forEach(function(mutation) {
+          if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach(function(node) {
+              if (node.nodeType === 1) { // Element node
+                // Controlla se il nodo aggiunto contiene link booking
+                var newLinks = node.querySelectorAll ? node.querySelectorAll('a.js-book, a[href*="booking.hotelincloud.com"]') : [];
+                if (newLinks.length > 0) {
+                  newLinks.forEach(addSidToLink);
+                }
               }
-            }
-          });
-        }
-      });
+            });
+          }
+        });
+      }, 100); // 100ms throttle
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }

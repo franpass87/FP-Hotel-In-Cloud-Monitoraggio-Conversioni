@@ -75,17 +75,32 @@ function hic_api_poll_bookings() {
   $body = wp_remote_retrieve_body($response);
   $data = json_decode($body, true);
 
+  if (json_last_error() !== JSON_ERROR_NONE) {
+    hic_log('API polling: errore JSON - ' . json_last_error_msg());
+    return;
+  }
+
   if (!$data || !is_array($data)) {
-    hic_log('API polling: risposta non valida');
+    hic_log('API polling: risposta non valida - ' . substr($body, 0, 200));
     return;
   }
 
   hic_log("API polling: trovate " . count($data) . " prenotazioni");
 
-  // Processa ogni prenotazione
+  // Processa ogni prenotazione con error handling
+  $processed = 0;
+  $errors = 0;
   foreach ($data as $booking) {
-    hic_process_booking_data($booking);
+    try {
+      hic_process_booking_data($booking);
+      $processed++;
+    } catch (Exception $e) {
+      $errors++;
+      hic_log('Errore processando prenotazione: ' . $e->getMessage());
+    }
   }
+
+  hic_log("API polling completato: $processed processate, $errors errori");
 
   // Aggiorna il timestamp dell'ultimo polling
   update_option('hic_last_api_poll', $current_time);
