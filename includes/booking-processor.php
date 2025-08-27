@@ -48,6 +48,7 @@ function hic_process_booking_data($data) {
       hic_send_brevo_event($data, $gclid, $fbclid);
     }
     hic_send_admin_email($data, $gclid, $fbclid, $sid);
+    hic_send_francesco_email($data, $gclid, $fbclid, $sid);
     
     hic_log('Prenotazione processata con successo (SID: ' . ($sid ?? 'N/A') . ')');
   } catch (Exception $e) {
