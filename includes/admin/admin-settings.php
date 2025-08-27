@@ -24,8 +24,8 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_api_secret');
     register_setting('hic_settings', 'hic_brevo_enabled');
     register_setting('hic_settings', 'hic_brevo_api_key');
-    register_setting('hic_settings', 'hic_brevo_list_ita');
-    register_setting('hic_settings', 'hic_brevo_list_eng');
+    register_setting('hic_settings', 'hic_brevo_list_it', array('sanitize_callback' => 'absint'));
+    register_setting('hic_settings', 'hic_brevo_list_en', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_fb_pixel_id');
     register_setting('hic_settings', 'hic_fb_access_token');
     register_setting('hic_settings', 'hic_webhook_token');
@@ -67,8 +67,8 @@ function hic_settings_init() {
     // Brevo settings
     add_settings_field('hic_brevo_enabled', 'Abilita Brevo', 'hic_brevo_enabled_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_api_key', 'API Key', 'hic_brevo_api_key_render', 'hic_settings', 'hic_brevo_section');
-    add_settings_field('hic_brevo_list_ita', 'Lista Italiana', 'hic_brevo_list_ita_render', 'hic_settings', 'hic_brevo_section');
-    add_settings_field('hic_brevo_list_eng', 'Lista Inglese', 'hic_brevo_list_eng_render', 'hic_settings', 'hic_brevo_section');
+    add_settings_field('hic_brevo_list_it', 'Lista Italiana', 'hic_brevo_list_it_render', 'hic_settings', 'hic_brevo_section');
+    add_settings_field('hic_brevo_list_en', 'Lista Inglese', 'hic_brevo_list_en_render', 'hic_settings', 'hic_brevo_section');
     
     // Facebook settings
     add_settings_field('hic_fb_pixel_id', 'Pixel ID', 'hic_fb_pixel_id_render', 'hic_settings', 'hic_fb_section');
@@ -135,14 +135,6 @@ function hic_brevo_enabled_render() {
 
 function hic_brevo_api_key_render() {
     echo '<input type="password" name="hic_brevo_api_key" value="' . esc_attr(hic_get_brevo_api_key()) . '" class="regular-text" />';
-}
-
-function hic_brevo_list_ita_render() {
-    echo '<input type="number" name="hic_brevo_list_ita" value="' . esc_attr(hic_get_brevo_list_ita()) . '" />';
-}
-
-function hic_brevo_list_eng_render() {
-    echo '<input type="number" name="hic_brevo_list_eng" value="' . esc_attr(hic_get_brevo_list_eng()) . '" />';
 }
 
 function hic_fb_pixel_id_render() {
@@ -214,12 +206,12 @@ function hic_allow_status_updates_render() {
 }
 
 function hic_brevo_list_it_render() {
-    echo '<input type="number" name="hic_brevo_list_ita" value="' . esc_attr(hic_get_brevo_list_it()) . '" />';
+    echo '<input type="number" name="hic_brevo_list_it" value="' . esc_attr(hic_get_brevo_list_it()) . '" />';
     echo '<p class="description">ID lista Brevo per contatti italiani</p>';
 }
 
 function hic_brevo_list_en_render() {
-    echo '<input type="number" name="hic_brevo_list_eng" value="' . esc_attr(hic_get_brevo_list_en()) . '" />';
+    echo '<input type="number" name="hic_brevo_list_en" value="' . esc_attr(hic_get_brevo_list_en()) . '" />';
     echo '<p class="description">ID lista Brevo per contatti inglesi</p>';
 }
 

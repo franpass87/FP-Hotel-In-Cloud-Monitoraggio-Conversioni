@@ -114,10 +114,11 @@ function hic_dispatch_pixel_reservation($data) {
 
   // Add contents array if value > 0
   if ($value > 0) {
+    $item_price = $data['guests'] > 0 ? $value / $data['guests'] : $value;
     $custom_data['contents'] = [[
       'id' => $data['accommodation_id'],
       'quantity' => $data['guests'],
-      'item_price' => $value
+      'item_price' => $item_price
     ]];
   }
 

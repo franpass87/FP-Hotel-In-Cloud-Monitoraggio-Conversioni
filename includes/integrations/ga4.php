@@ -87,8 +87,7 @@ function hic_dispatch_ga4_reservation($data) {
     'items' => [[
       'item_id' => $data['accommodation_id'],
       'item_name' => $data['accommodation_name'],
-      'quantity' => $data['guests'],
-      'item_category' => !empty($data['room_name']) ? $data['room_name'] : null,
+      'quantity' => $data['guests']
     ]],
     'checkin' => $data['from_date'],
     'checkout' => $data['to_date'],
@@ -96,6 +95,11 @@ function hic_dispatch_ga4_reservation($data) {
     'presence' => $data['presence'],
     'unpaid_balance' => $data['unpaid_balance']
   ];
+
+  // Add optional item_category only if room_name is available
+  if (!empty($data['room_name'])) {
+    $params['items'][0]['item_category'] = $data['room_name'];
+  }
 
   // Remove null values to clean up the payload
   $params = array_filter($params, function($value) {

@@ -15,7 +15,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid){
   // Lista in base alla lingua (supporta sia 'lingua' sia 'lang')
   $lang = $data['lingua'] ?? ($data['lang'] ?? '');
   $list_ids = [];
-  if (strtolower($lang) === 'en') { $list_ids[] = intval(hic_get_brevo_list_eng()); } else { $list_ids[] = intval(hic_get_brevo_list_ita()); }
+  if (strtolower($lang) === 'en') { $list_ids[] = intval(hic_get_brevo_list_en()); } else { $list_ids[] = intval(hic_get_brevo_list_it()); }
 
   $body = [
     'email' => $email,

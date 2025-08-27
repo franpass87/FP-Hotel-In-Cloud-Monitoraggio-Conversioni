@@ -161,9 +161,11 @@ function hic_transform_reservation($reservation) {
     
     // Normalize language
     $language = '';
-    if (!empty($reservation['language'])) {
-        $lang = strtolower($reservation['language']);
-        $language = substr($lang, 0, 2); // Extract first 2 chars
+    if (!empty($reservation['language']) && is_string($reservation['language'])) {
+        $lang = strtolower(trim($reservation['language']));
+        if (strlen($lang) >= 2) {
+            $language = substr($lang, 0, 2); // Extract first 2 chars
+        }
     }
     
     return [
