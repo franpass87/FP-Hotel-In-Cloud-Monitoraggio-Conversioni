@@ -37,6 +37,33 @@ function hic_get_property_id() {
     return defined('HIC_PROPERTY_ID') ? HIC_PROPERTY_ID : hic_get_option('property_id',''); 
 }
 
+/* ============ New Extended HIC Integration Functions ============ */
+function hic_get_currency() { return hic_get_option('currency', 'EUR'); }
+function hic_use_net_value() { return hic_get_option('ga4_use_net_value', '0') === '1'; }
+function hic_process_invalid() { return hic_get_option('process_invalid', '0') === '1'; }
+function hic_allow_status_updates() { return hic_get_option('allow_status_updates', '1') === '1'; }
+function hic_get_brevo_list_it() { return hic_get_option('brevo_list_it', '20'); }
+function hic_get_brevo_list_en() { return hic_get_option('brevo_list_en', '21'); }
+function hic_get_brevo_list_default() { return hic_get_option('brevo_list_default', '20'); }
+function hic_get_brevo_optin_default() { return hic_get_option('brevo_optin_default', '0') === '1'; }
+function hic_is_debug_verbose() { return hic_get_option('debug_verbose', '0') === '1'; }
+
+/* ============ New Helper Functions ============ */
+function hic_normalize_price($value) {
+    if (empty($value)) return 0.0;
+    // Convert comma to dot and ensure numeric
+    $normalized = str_replace(',', '.', (string) $value);
+    return floatval($normalized);
+}
+
+function hic_is_valid_email($email) {
+    return !empty($email) && is_email($email);
+}
+
+function hic_booking_uid($reservation) {
+    return $reservation['id'] ?? '';
+}
+
 /* ============ Helpers ============ */
 function hic_log($msg){
   $date = date('Y-m-d H:i:s');
