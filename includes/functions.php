@@ -14,17 +14,17 @@ function hic_get_option($key, $default = '') {
 function hic_get_measurement_id() { return hic_get_option('measurement_id', ''); }
 function hic_get_api_secret() { return hic_get_option('api_secret', ''); }
 function hic_get_brevo_api_key() { return hic_get_option('brevo_api_key', ''); }
-function hic_get_brevo_list_it() { return hic_get_option('hic_brevo_list_it', '20'); }
-function hic_get_brevo_list_en() { return hic_get_option('hic_brevo_list_en', '21'); }
-function hic_get_brevo_list_default() { return hic_get_option('hic_brevo_list_default', '20'); }
-function hic_get_brevo_optin_default() { return hic_get_option('hic_brevo_optin_default', '0') === '1'; }
+function hic_get_brevo_list_it() { return hic_get_option('brevo_list_it', '20'); }
+function hic_get_brevo_list_en() { return hic_get_option('brevo_list_en', '21'); }
+function hic_get_brevo_list_default() { return hic_get_option('brevo_list_default', '20'); }
+function hic_get_brevo_optin_default() { return hic_get_option('brevo_optin_default', '0') === '1'; }
 function hic_is_brevo_enabled() { return hic_get_option('brevo_enabled', '0') === '1'; }
-function hic_is_debug_verbose() { return hic_get_option('hic_debug_verbose', '0') === '1'; }
+function hic_is_debug_verbose() { return hic_get_option('debug_verbose', '0') === '1'; }
 
 // New email enrichment settings
-function hic_updates_enrich_contacts() { return hic_get_option('hic_updates_enrich_contacts', '1') === '1'; }
-function hic_get_brevo_list_alias() { return hic_get_option('hic_brevo_list_alias', ''); }
-function hic_brevo_double_optin_on_enrich() { return hic_get_option('hic_brevo_double_optin_on_enrich', '0') === '1'; }
+function hic_updates_enrich_contacts() { return hic_get_option('updates_enrich_contacts', '1') === '1'; }
+function hic_get_brevo_list_alias() { return hic_get_option('brevo_list_alias', ''); }
+function hic_brevo_double_optin_on_enrich() { return hic_get_option('brevo_double_optin_on_enrich', '0') === '1'; }
 
 // Admin and General Settings
 function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
@@ -44,10 +44,10 @@ function hic_get_api_password() { return hic_get_option('api_password', ''); }
 function hic_get_property_id() { return hic_get_option('property_id', ''); }
 
 // HIC Extended Integration Settings
-function hic_get_currency() { return hic_get_option('hic_currency', 'EUR'); }
-function hic_use_net_value() { return hic_get_option('hic_ga4_use_net_value', '0') === '1'; }
-function hic_process_invalid() { return hic_get_option('hic_process_invalid', '0') === '1'; }
-function hic_allow_status_updates() { return hic_get_option('hic_allow_status_updates', '0') === '1'; }
+function hic_get_currency() { return hic_get_option('currency', 'EUR'); }
+function hic_use_net_value() { return hic_get_option('ga4_use_net_value', '0') === '1'; }
+function hic_process_invalid() { return hic_get_option('process_invalid', '0') === '1'; }
+function hic_allow_status_updates() { return hic_get_option('allow_status_updates', '0') === '1'; }
 
 /* ============ New Helper Functions ============ */
 function hic_normalize_price($value) {
