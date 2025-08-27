@@ -247,7 +247,7 @@ function hic_dispatch_reservation($transformed, $original) {
  */
 function hic_is_reservation_already_processed($uid) {
     if (empty($uid)) return false;
-    $synced = get_option('hic_synced_res_ids', []);
+    $synced = get_option('hic_synced_res_ids', array());
     return in_array($uid, $synced);
 }
 
@@ -255,7 +255,7 @@ function hic_mark_reservation_processed($reservation) {
     $uid = hic_booking_uid($reservation);
     if (empty($uid)) return;
     
-    $synced = get_option('hic_synced_res_ids', []);
+    $synced = get_option('hic_synced_res_ids', array());
     if (!in_array($uid, $synced)) {
         $synced[] = $uid;
         
@@ -452,12 +452,15 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
  */
 function hic_process_update(array $u){
     // $u ha struttura simile a reservation o include solo delta (gestire entrambi)
-    $id = $u['id'] ?? null;
-    if (!$id) return;
+    $id = isset($u['id']) ? $u['id'] : null;
+    if (!$id) {
+        hic_log('hic_process_update: missing reservation id');
+        return;
+    }
 
     // carica record locale (dedup store/opzione) se presente
-    $email = $u['email'] ?? null;
-    $is_alias = hic_is_ota_alias_email($email);
+    $email = isset($u['email']) ? $u['email'] : null;
+    $is_alias = $email ? hic_is_ota_alias_email($email) : false;
 
     // Se c'è un'email reale nuova che sostituisce un alias
     if ($email && !$is_alias) {

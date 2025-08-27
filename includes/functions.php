@@ -64,14 +64,18 @@ function hic_is_valid_email($email) {
 }
 
 function hic_is_ota_alias_email($e){
-    if (!$e) return false;
+    if (empty($e) || !is_string($e)) return false;
     $e = strtolower(trim($e));
+    
+    // Validate email format first
+    if (!filter_var($e, FILTER_VALIDATE_EMAIL)) return false;
+    
     $domains = [
       'guest.booking.com', 'message.booking.com',
       'guest.airbnb.com','airbnb.com',
       'expedia.com','stay.expedia.com','guest.expediapartnercentral.com'
     ];
-    if (!filter_var($e, FILTER_VALIDATE_EMAIL)) return false;
+    
     foreach ($domains as $d) {
         if (substr($e, -strlen('@'.$d)) === '@'.$d) return true;
     }
@@ -126,7 +130,12 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
 
 /* ============ Email Enrichment Functions ============ */
 function hic_mark_email_enriched($reservation_id, $real_email) {
-    $email_map = get_option('hic_res_email_map', []);
+    if (empty($reservation_id) || empty($real_email)) {
+        hic_log('hic_mark_email_enriched: reservation_id or real_email is empty');
+        return false;
+    }
+    
+    $email_map = get_option('hic_res_email_map', array());
     $email_map[$reservation_id] = $real_email;
     
     // Keep only last 5k entries (FIFO) to prevent bloat
@@ -134,10 +143,11 @@ function hic_mark_email_enriched($reservation_id, $real_email) {
         $email_map = array_slice($email_map, -5000, null, true);
     }
     
-    update_option('hic_res_email_map', $email_map, false); // autoload=false
+    return update_option('hic_res_email_map', $email_map, false); // autoload=false
 }
 
 function hic_get_reservation_email($reservation_id) {
-    $email_map = get_option('hic_res_email_map', []);
-    return $email_map[$reservation_id] ?? null;
+    if (empty($reservation_id)) return null;
+    $email_map = get_option('hic_res_email_map', array());
+    return isset($email_map[$reservation_id]) ? $email_map[$reservation_id] : null;
 }
