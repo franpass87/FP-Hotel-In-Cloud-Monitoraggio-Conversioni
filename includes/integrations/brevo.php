@@ -65,7 +65,8 @@ function hic_send_brevo_event($data, $gclid, $fbclid){
       'lingua'         => isset($data['lingua']) ? $data['lingua'] : (isset($data['lang']) ? $data['lang'] : ''),
       'firstname'      => isset($data['first_name']) ? $data['first_name'] : '',
       'lastname'       => isset($data['last_name']) ? $data['last_name'] : '',
-      'bucket'         => $bucket
+      'bucket'         => $bucket,
+      'vertical'       => 'hotel'
     )
   );
 

@@ -36,6 +36,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
     ]],
     'bucket'         => $bucket,         // <-- crea dimensione evento "bucket" in GA4
     'method'         => 'HotelInCloud',
+    'vertical'       => 'hotel',
   ];
   if (!empty($gclid))  { $params['gclid']  = $gclid; }
   if (!empty($fbclid)) { $params['fbclid'] = $fbclid; }
@@ -93,7 +94,8 @@ function hic_dispatch_ga4_reservation($data) {
     'checkout' => $data['to_date'],
     'reservation_code' => $data['reservation_code'],
     'presence' => $data['presence'],
-    'unpaid_balance' => $data['unpaid_balance']
+    'unpaid_balance' => $data['unpaid_balance'],
+    'vertical' => 'hotel'
   ];
 
   // Add optional item_category only if room_name is available

@@ -55,7 +55,8 @@ function hic_send_to_fb($data, $gclid, $fbclid){
         'value'        => $amount,
         'order_id'     => $event_id,
         'bucket'       => $bucket,           // per creare custom conversions per fbads/organic/gads
-        'content_name' => $data['room'] ?? 'Prenotazione'
+        'content_name' => $data['room'] ?? 'Prenotazione',
+        'vertical'     => 'hotel'
       ]
     ]]
   ];
@@ -109,7 +110,8 @@ function hic_dispatch_pixel_reservation($data) {
     'value' => $value,
     'content_ids' => [$data['accommodation_id']],
     'content_name' => $data['accommodation_name'],
-    'num_items' => $data['guests']
+    'num_items' => $data['guests'],
+    'vertical' => 'hotel'
   ];
 
   // Add contents array if value > 0

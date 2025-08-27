@@ -89,3 +89,67 @@ GET /reservations_updates/{propId}?since={timestamp}
 - **Autenticazione**: Basic Auth con le stesse credenziali API
 - **Frequenza**: Stessa del polling principale (5 minuti)
 - **Deduplicazione**: Nessun evento duplicato GA4/Pixel per stessa reservation.id
+
+## Parametro Vertical per Segmentazione
+
+Il plugin include automaticamente il parametro `vertical: 'hotel'` in tutti gli eventi `purchase` inviati a:
+
+- **Google Analytics 4**: Parametro personalizzato nell'evento purchase
+- **Meta CAPI**: Parametro nel custom_data dell'evento Purchase  
+- **Brevo**: Proprietà dell'evento purchase
+
+### Utilizzo del parametro vertical
+
+Il parametro `vertical` consente di:
+
+1. **Distinguere conversioni hotel da ristorante** in Google Analytics 4
+2. **Creare eventi derivati** in GA4 (es. `purchase_hotel` con condizione: event_name = purchase AND vertical = hotel)
+3. **Separare campagne pubblicitarie** in Google Ads importando eventi derivati come conversioni distinte
+4. **Segmentare audience** in Meta e Brevo per campagne mirate
+
+### Esempio payload eventi
+
+**GA4 Measurement Protocol:**
+```json
+{
+  "client_id": "...",
+  "events": [{
+    "name": "purchase",
+    "params": {
+      "transaction_id": "12345",
+      "currency": "EUR",
+      "value": 150.00,
+      "bucket": "organic",
+      "vertical": "hotel"
+    }
+  }]
+}
+```
+
+**Meta CAPI:**
+```json
+{
+  "data": [{
+    "event_name": "Purchase",
+    "custom_data": {
+      "currency": "EUR", 
+      "value": 150.00,
+      "bucket": "organic",
+      "vertical": "hotel"
+    }
+  }]
+}
+```
+
+**Brevo Event:**
+```json
+{
+  "event": "purchase",
+  "properties": {
+    "amount": 150.00,
+    "currency": "EUR", 
+    "bucket": "organic",
+    "vertical": "hotel"
+  }
+}
+```
