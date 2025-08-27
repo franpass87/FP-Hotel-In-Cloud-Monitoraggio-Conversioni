@@ -21,8 +21,13 @@ function hic_process_booking_data($data) {
   if ($sid) {
     global $wpdb;
     $table = $wpdb->prefix . 'hic_gclids';
-    $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
-    if ($row) { $gclid = $row->gclid; $fbclid = $row->fbclid; }
+    
+    // Check if table exists before querying
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+    if ($table_exists) {
+      $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
+      if ($row) { $gclid = $row->gclid; $fbclid = $row->fbclid; }
+    }
   }
 
   // Validate required fields

@@ -26,7 +26,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid){
       'GCLID'     => isset($gclid) ? $gclid : '',
       'FBCLID'    => isset($fbclid) ? $fbclid : '',
       'DATE'      => isset($data['date']) ? $data['date'] : date('Y-m-d'),
-      'AMOUNT'    => isset($data['amount']) ? floatval($data['amount']) : 0,
+      'AMOUNT'    => isset($data['amount']) ? hic_normalize_price($data['amount']) : 0,
       'CURRENCY'  => isset($data['currency']) ? $data['currency'] : 'EUR',
       'WHATSAPP'  => isset($data['whatsapp']) ? $data['whatsapp'] : '',
       'LINGUA'    => $lang
@@ -58,7 +58,7 @@ function hic_send_brevo_event($data, $gclid, $fbclid){
     'email' => isset($data['email']) ? $data['email'] : '',
     'properties' => array(
       'reservation_id' => isset($data['reservation_id']) ? $data['reservation_id'] : (isset($data['id']) ? $data['id'] : ''),
-      'amount'         => isset($data['amount']) ? floatval($data['amount']) : 0,
+      'amount'         => isset($data['amount']) ? hic_normalize_price($data['amount']) : 0,
       'currency'       => isset($data['currency']) ? $data['currency'] : 'EUR',
       'date'           => isset($data['date']) ? $data['date'] : date('Y-m-d'),
       'whatsapp'       => isset($data['whatsapp']) ? $data['whatsapp'] : '',
@@ -124,24 +124,62 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false) {
     }
   }
 
+  // Get gclid/fbclid for legacy compatibility
+  // Note: In API polling mode, these values are only available if the reservation
+  // was originally tracked through the website with tracking parameters
+  $gclid = '';
+  $fbclid = '';
+  if (!empty($data['transaction_id'])) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'hic_gclids';
+    
+    // Check if table exists before querying
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+    if ($table_exists) {
+      // Try to find tracking data using transaction_id as sid
+      $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
+      if ($row) { 
+        $gclid = $row->gclid ?: ''; 
+        $fbclid = $row->fbclid ?: ''; 
+      }
+    }
+  }
+
   $attributes = array(
+    // Standard contact attributes (shared)
     'FIRSTNAME' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
     'LASTNAME' => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
     'PHONE' => isset($data['phone']) ? $data['phone'] : '',
     'LANGUAGE' => $language,
+    
+    // Modern HIC attributes
     'HIC_RES_ID' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
     'HIC_RES_CODE' => isset($data['reservation_code']) ? $data['reservation_code'] : '',
     'HIC_FROM' => isset($data['from_date']) ? $data['from_date'] : '',
     'HIC_TO' => isset($data['to_date']) ? $data['to_date'] : '',
     'HIC_GUESTS' => isset($data['guests']) ? $data['guests'] : '',
     'HIC_ROOM' => isset($data['accommodation_name']) ? $data['accommodation_name'] : '',
-    'HIC_PRICE' => isset($data['original_price']) ? $data['original_price'] : ''
+    'HIC_PRICE' => isset($data['original_price']) ? $data['original_price'] : '',
+    
+    // Legacy webhook attributes (for backward compatibility)
+    'RESVID' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
+    'GCLID' => $gclid,
+    'FBCLID' => $fbclid,
+    'DATE' => isset($data['from_date']) ? $data['from_date'] : date('Y-m-d'),
+    'AMOUNT' => isset($data['original_price']) ? hic_normalize_price($data['original_price']) : 0,
+    'CURRENCY' => isset($data['currency']) ? $data['currency'] : 'EUR',
+    'WHATSAPP' => isset($data['phone']) ? $data['phone'] : '',
+    'LINGUA' => $language
   );
 
-  // Remove empty values to clean up
-  $attributes = array_filter($attributes, function($value) {
+  // Remove empty values but keep valid zeros for numeric fields
+  $attributes = array_filter($attributes, function($value, $key) {
+    // Keep numeric zero values for AMOUNT and HIC_PRICE
+    if (in_array($key, ['AMOUNT', 'HIC_PRICE']) && is_numeric($value)) {
+      return true;
+    }
     return $value !== null && $value !== '';
-  });
+  }, ARRAY_FILTER_USE_BOTH);
 
   $body = array(
     'email' => $email,
