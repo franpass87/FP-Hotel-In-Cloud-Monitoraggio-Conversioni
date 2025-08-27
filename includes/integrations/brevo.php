@@ -97,19 +97,32 @@ function hic_dispatch_brevo_reservation($data) {
     return; 
   }
 
-  // Determine list based on language
+  $is_alias = hic_is_ota_alias_email($email);
+
+  // Determine list based on language and alias status
   $language = $data['language'];
   $list_ids = [];
   
-  if (in_array($language, ['it'])) {
-    $list_id = intval(hic_get_brevo_list_it());
-    if ($list_id > 0) $list_ids[] = $list_id;
-  } elseif (in_array($language, ['en'])) {
-    $list_id = intval(hic_get_brevo_list_en());
-    if ($list_id > 0) $list_ids[] = $list_id;
+  if ($is_alias) {
+    // Handle alias emails - only add to alias list if configured
+    $alias_list_id = intval(hic_get_brevo_list_alias());
+    if ($alias_list_id > 0) {
+      $list_ids[] = $alias_list_id;
+    }
+    // Save in email mapping for future enrichment
+    hic_mark_email_enriched($data['transaction_id'], $email);
   } else {
-    $list_id = intval(hic_get_brevo_list_default());
-    if ($list_id > 0) $list_ids[] = $list_id;
+    // Handle real emails - add to language-specific lists
+    if (in_array($language, ['it'])) {
+      $list_id = intval(hic_get_brevo_list_it());
+      if ($list_id > 0) $list_ids[] = $list_id;
+    } elseif (in_array($language, ['en'])) {
+      $list_id = intval(hic_get_brevo_list_en());
+      if ($list_id > 0) $list_ids[] = $list_id;
+    } else {
+      $list_id = intval(hic_get_brevo_list_default());
+      if ($list_id > 0) $list_ids[] = $list_id;
+    }
   }
 
   $attributes = [
@@ -138,8 +151,8 @@ function hic_dispatch_brevo_reservation($data) {
     'updateEnabled' => true
   ];
 
-  // Add marketing opt-in only if default is enabled
-  if (hic_get_brevo_optin_default()) {
+  // Add marketing opt-in only if not alias and default is enabled
+  if (!$is_alias && hic_get_brevo_optin_default()) {
     $body['emailBlacklisted'] = false;
   }
 
@@ -154,5 +167,5 @@ function hic_dispatch_brevo_reservation($data) {
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  hic_log(['Brevo HIC contact sent' => ['email' => $email, 'res_id' => $data['transaction_id'], 'lists' => $list_ids], 'HTTP' => $code]);
+  hic_log(['Brevo HIC contact sent' => ['email' => $email, 'res_id' => $data['transaction_id'], 'lists' => $list_ids, 'alias' => $is_alias], 'HTTP' => $code]);
 }

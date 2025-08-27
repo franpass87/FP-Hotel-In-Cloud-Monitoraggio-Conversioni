@@ -47,6 +47,11 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_brevo_list_default', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_brevo_optin_default');
     register_setting('hic_settings', 'hic_debug_verbose');
+    
+    // New email enrichment settings
+    register_setting('hic_settings', 'hic_updates_enrich_contacts');
+    register_setting('hic_settings', 'hic_brevo_list_alias', array('sanitize_callback' => 'absint'));
+    register_setting('hic_settings', 'hic_brevo_double_optin_on_enrich');
 
     add_settings_section('hic_main_section', 'Configurazione Principale', null, 'hic_settings');
     add_settings_section('hic_ga4_section', 'Google Analytics 4', null, 'hic_settings');
@@ -89,6 +94,12 @@ function hic_settings_init() {
     add_settings_field('hic_allow_status_updates', 'Gestisci aggiornamenti stato', 'hic_allow_status_updates_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_brevo_list_default', 'Lista Brevo Default', 'hic_brevo_list_default_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_optin_default', 'Opt-in marketing di default', 'hic_brevo_optin_default_render', 'hic_settings', 'hic_brevo_section');
+    
+    // Email enrichment settings
+    add_settings_field('hic_updates_enrich_contacts', 'Aggiorna contatti da updates', 'hic_updates_enrich_contacts_render', 'hic_settings', 'hic_brevo_section');
+    add_settings_field('hic_brevo_list_alias', 'Lista alias Brevo', 'hic_brevo_list_alias_render', 'hic_settings', 'hic_brevo_section');
+    add_settings_field('hic_brevo_double_optin_on_enrich', 'Double opt-in quando arriva email reale', 'hic_brevo_double_optin_on_enrich_render', 'hic_settings', 'hic_brevo_section');
+    
     add_settings_field('hic_debug_verbose', 'Log debug verboso', 'hic_debug_verbose_render', 'hic_settings', 'hic_main_section');
 }
 
@@ -224,4 +235,20 @@ function hic_brevo_optin_default_render() {
 function hic_debug_verbose_render() {
     $checked = hic_is_debug_verbose() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_debug_verbose" value="1" ' . $checked . ' /> Abilita log debug estesi (solo per test)';
+}
+
+// Email enrichment render functions
+function hic_updates_enrich_contacts_render() {
+    $checked = hic_updates_enrich_contacts() ? 'checked' : '';
+    echo '<input type="checkbox" name="hic_updates_enrich_contacts" value="1" ' . $checked . ' /> Aggiorna contatti Brevo quando arriva email reale da updates';
+}
+
+function hic_brevo_list_alias_render() {
+    echo '<input type="number" name="hic_brevo_list_alias" value="' . esc_attr(hic_get_brevo_list_alias()) . '" />';
+    echo '<p class="description">ID lista Brevo per contatti con email alias (Booking/Airbnb/OTA). Lascia vuoto per non iscriverli a nessuna lista.</p>';
+}
+
+function hic_brevo_double_optin_on_enrich_render() {
+    $checked = hic_brevo_double_optin_on_enrich() ? 'checked' : '';
+    echo '<input type="checkbox" name="hic_brevo_double_optin_on_enrich" value="1" ' . $checked . ' /> Invia double opt-in quando arriva email reale';
 }

@@ -43,6 +43,30 @@ add_filter('cron_schedules', function($schedules) {
 // Funzione di polling API
 add_action('hic_api_poll_event', 'hic_api_poll_bookings');
 
+// New updates polling system
+add_action('init', function() {
+  $should_schedule_updates = false;
+  
+  if (hic_get_connection_type() === 'api' && hic_get_api_url() && hic_updates_enrich_contacts()) {
+    $has_basic_auth = hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+    $should_schedule_updates = $has_basic_auth;
+  }
+  
+  if ($should_schedule_updates) {
+    if (!wp_next_scheduled('hic_api_updates_event')) {
+      wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event');
+    }
+  } else {
+    $timestamp = wp_next_scheduled('hic_api_updates_event');
+    if ($timestamp) {
+      wp_unschedule_event($timestamp, 'hic_api_updates_event');
+    }
+  }
+});
+
+// Updates polling function
+add_action('hic_api_updates_event', 'hic_api_poll_updates');
+
 /**
  * Chiama HIC: GET /reservations/{propId}
  */
@@ -349,4 +373,192 @@ function hic_legacy_api_poll_bookings() {
 
   // Aggiorna il timestamp dell'ultimo polling
   update_option('hic_last_api_poll', $current_time);
+}
+
+/**
+ * New updates polling wrapper function
+ */
+function hic_api_poll_updates(){
+    $prop = hic_get_property_id();
+    $since = get_option('hic_last_updates_since', time() - DAY_IN_SECONDS);
+    $out = hic_fetch_reservations_updates($prop, $since, 200); // limit opzionale se supportato
+    if (!is_wp_error($out)) {
+        update_option('hic_last_updates_since', time());
+    }
+}
+
+/**
+ * Fetch reservation updates from HIC API
+ */
+function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
+    $base = rtrim(hic_get_api_url(), '/'); // .../api/partner
+    $email = hic_get_api_email(); 
+    $pass = hic_get_api_password();
+    if (!$base || !$email || !$pass || !$prop_id) {
+        return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti per updates');
+    }
+    
+    $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
+    $args = ['since' => $since];
+    if ($limit) $args['limit'] = $limit;
+    $url = add_query_arg($args, $endpoint);
+    
+    $res = wp_remote_get($url, [
+      'timeout'=>30,
+      'headers'=>['Authorization'=>'Basic '.base64_encode("$email:$pass"), 'Accept'=>'application/json']
+    ]);
+    
+    if (is_wp_error($res)) { 
+        hic_log('HIC updates connessione fallita: '.$res->get_error_message()); 
+        return $res; 
+    }
+    
+    $code = wp_remote_retrieve_response_code($res);
+    if ($code !== 200) { 
+        hic_log("HIC updates HTTP $code"); 
+        return new WP_Error('hic_http', "HTTP $code"); 
+    }
+
+    $body = wp_remote_retrieve_body($res);
+    $data = json_decode($body, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        hic_log('HIC updates JSON error: '.json_last_error_msg());
+        return new WP_Error('hic_json', 'JSON malformato');
+    }
+
+    // Log di debug iniziale
+    hic_log(['hic_updates_count' => is_array($data) ? count($data) : 0]);
+
+    // Process each update
+    if (is_array($data)) {
+        foreach ($data as $u) {
+            try {
+                hic_process_update($u);
+            } catch (Exception $e) { 
+                hic_log('Process update error: '.$e->getMessage()); 
+            }
+        }
+    }
+    
+    return $data;
+}
+
+/**
+ * Process a single reservation update
+ */
+function hic_process_update(array $u){
+    // $u ha struttura simile a reservation o include solo delta (gestire entrambi)
+    $id = $u['id'] ?? null;
+    if (!$id) return;
+
+    // carica record locale (dedup store/opzione) se presente
+    $email = $u['email'] ?? null;
+    $is_alias = hic_is_ota_alias_email($email);
+
+    // Se c'è un'email reale nuova che sostituisce un alias
+    if ($email && !$is_alias) {
+        // upsert Brevo con vera email + liste by language
+        $t = hic_transform_reservation($u); // riusa normalizzazioni
+        if ($t !== false) {
+            hic_dispatch_brevo($t); // aggiorna contatto
+            // aggiorna store locale per id -> true_email
+            hic_mark_email_enriched($id, $email);
+            hic_log("Enriched email for reservation $id");
+        }
+    }
+
+    // Se cambia presence e impostazione consente aggiornamenti:
+    if (hic_allow_status_updates() && !empty($u['presence'])) {
+        hic_log("Reservation $id presence update: ".$u['presence']);
+        // opzionale: dispatch evento custom (no purchase)
+    }
+}
+
+/**
+ * Special Brevo dispatcher that handles alias emails properly
+ */
+function hic_dispatch_brevo($data) {
+    if (!hic_get_brevo_api_key()) { 
+        hic_log('Brevo disabilitato (API key vuota).'); 
+        return; 
+    }
+
+    $email = $data['email'];
+    if (!hic_is_valid_email($email)) { 
+        hic_log('Brevo: email mancante o non valida, skip contatto.'); 
+        return; 
+    }
+
+    $is_alias = hic_is_ota_alias_email($email);
+    
+    // Determine list based on language and alias status
+    $language = $data['language'];
+    $list_ids = [];
+    
+    if ($is_alias) {
+        // Handle alias emails
+        $alias_list_id = intval(hic_get_brevo_list_alias());
+        if ($alias_list_id > 0) {
+            $list_ids[] = $alias_list_id;
+        }
+        // Don't add to regular language lists for aliases
+    } else {
+        // Handle real emails
+        if (in_array($language, ['it'])) {
+            $list_id = intval(hic_get_brevo_list_it());
+            if ($list_id > 0) $list_ids[] = $list_id;
+        } elseif (in_array($language, ['en'])) {
+            $list_id = intval(hic_get_brevo_list_en());
+            if ($list_id > 0) $list_ids[] = $list_id;
+        } else {
+            $list_id = intval(hic_get_brevo_list_default());
+            if ($list_id > 0) $list_ids[] = $list_id;
+        }
+    }
+
+    $attributes = [
+        'FIRSTNAME' => $data['guest_first_name'] ?? '',
+        'LASTNAME' => $data['guest_last_name'] ?? '',
+        'PHONE' => $data['phone'] ?? '',
+        'LANGUAGE' => $language,
+        'HIC_RES_ID' => $data['transaction_id'] ?? $data['id'],
+        'HIC_RES_CODE' => $data['reservation_code'] ?? '',
+        'HIC_FROM' => $data['from_date'] ?? '',
+        'HIC_TO' => $data['to_date'] ?? '',
+        'HIC_GUESTS' => $data['guests'] ?? '',
+        'HIC_ROOM' => $data['accommodation_name'] ?? '',
+        'HIC_PRICE' => $data['original_price'] ?? $data['value']
+    ];
+
+    // Remove empty values to clean up
+    $attributes = array_filter($attributes, function($value) {
+        return $value !== null && $value !== '';
+    });
+
+    $body = [
+        'email' => $email,
+        'attributes' => $attributes,
+        'listIds' => $list_ids,
+        'updateEnabled' => true
+    ];
+
+    // Add marketing opt-in only if not alias and default is enabled, or if enrichment opt-in is enabled
+    if (!$is_alias) {
+        if (hic_get_brevo_optin_default() || hic_brevo_double_optin_on_enrich()) {
+            $body['emailBlacklisted'] = false;
+        }
+    }
+
+    $res = wp_remote_post('https://api.brevo.com/v3/contacts', [
+        'headers' => [
+            'accept' => 'application/json',
+            'api-key' => hic_get_brevo_api_key(),
+            'content-type' => 'application/json'
+        ],
+        'body' => wp_json_encode($body),
+        'timeout' => 15
+    ]);
+    
+    $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
+    hic_log(['Brevo contact sent' => ['email' => $email, 'res_id' => $data['transaction_id'] ?? $data['id'], 'lists' => $list_ids, 'alias' => $is_alias], 'HTTP' => $code]);
 }

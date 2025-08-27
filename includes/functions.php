@@ -21,6 +21,11 @@ function hic_get_brevo_optin_default() { return hic_get_option('hic_brevo_optin_
 function hic_is_brevo_enabled() { return hic_get_option('brevo_enabled', '0') === '1'; }
 function hic_is_debug_verbose() { return hic_get_option('hic_debug_verbose', '0') === '1'; }
 
+// New email enrichment settings
+function hic_updates_enrich_contacts() { return hic_get_option('hic_updates_enrich_contacts', '1') === '1'; }
+function hic_get_brevo_list_alias() { return hic_get_option('hic_brevo_list_alias', ''); }
+function hic_brevo_double_optin_on_enrich() { return hic_get_option('hic_brevo_double_optin_on_enrich', '0') === '1'; }
+
 // Admin and General Settings
 function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
 function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR . '/hic-log.txt'); }
@@ -56,6 +61,22 @@ function hic_normalize_price($value) {
 
 function hic_is_valid_email($email) {
     return !empty($email) && is_email($email);
+}
+
+function hic_is_ota_alias_email($e){
+    if (!$e) return false;
+    $e = strtolower(trim($e));
+    $domains = [
+      'guest.booking.com', 'message.booking.com',
+      'booking.com@guest', // a volte formati strani
+      'guest.airbnb.com','airbnb.com',
+      'expedia.com','stay.expedia.com','guest.expediapartnercentral.com'
+    ];
+    if (!filter_var($e, FILTER_VALIDATE_EMAIL)) return false;
+    foreach ($domains as $d) {
+        if (str_ends_with($e, '@'.$d)) return true;
+    }
+    return false;
 }
 
 function hic_booking_uid($reservation) {
@@ -102,4 +123,22 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   remove_filter('wp_mail_content_type', $content_type_filter);
 
   hic_log('Email admin inviata (bucket='.$bucket.') a '.$to);
+}
+
+/* ============ Email Enrichment Functions ============ */
+function hic_mark_email_enriched($reservation_id, $real_email) {
+    $email_map = get_option('hic_res_email_map', []);
+    $email_map[$reservation_id] = $real_email;
+    
+    // Keep only last 5k entries (FIFO) to prevent bloat
+    if (count($email_map) > 5000) {
+        $email_map = array_slice($email_map, -5000, null, true);
+    }
+    
+    update_option('hic_res_email_map', $email_map, false); // autoload=false
+}
+
+function hic_get_reservation_email($reservation_id) {
+    $email_map = get_option('hic_res_email_map', []);
+    return $email_map[$reservation_id] ?? null;
 }
