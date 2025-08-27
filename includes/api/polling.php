@@ -78,13 +78,22 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     }
 
     // Log di debug iniziale (ridotto)
-    hic_log(['hic_reservations_count' => is_array($data)? count($data): 0]);
+    hic_log(['hic_reservations_count' => is_array($data) ? count($data) : 0]);
 
-    // Processa singole prenotazioni con la pipeline esistente
+    // Processa singole prenotazioni con la nuova pipeline
     if (is_array($data)) {
-        foreach ($data as $booking) {
-            try { hic_process_booking_data($booking); }
-            catch (Exception $e) { hic_log('Process booking error: '.$e->getMessage()); }
+        foreach ($data as $reservation) {
+            try {
+                if (hic_should_process_reservation($reservation)) {
+                    $transformed = hic_transform_reservation($reservation);
+                    if ($transformed !== false) {
+                        hic_dispatch_reservation($transformed, $reservation);
+                        hic_mark_reservation_processed($reservation);
+                    }
+                }
+            } catch (Exception $e) { 
+                hic_log('Process reservation error: '.$e->getMessage()); 
+            }
         }
     }
     return $data;
@@ -94,6 +103,146 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
 add_action('hic_fetch_reservations', function($prop_id, $date_type, $from_date, $to_date, $limit = null){
     return hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $limit);
 }, 10, 5);
+
+/**
+ * Validates if a reservation should be processed
+ */
+function hic_should_process_reservation($reservation) {
+    // Check required fields
+    $required = ['id', 'from_date', 'to_date', 'accommodation_id', 'accommodation_name'];
+    foreach ($required as $field) {
+        if (empty($reservation[$field])) {
+            hic_log("Reservation skipped: missing required field '$field'");
+            return false;
+        }
+    }
+    
+    // Check valid flag
+    $valid = isset($reservation['valid']) ? intval($reservation['valid']) : 1;
+    if ($valid === 0 && !hic_process_invalid()) {
+        hic_log("Reservation skipped: valid=0 and process_invalid=false");
+        return false;
+    }
+    
+    // Check deduplication
+    $uid = hic_booking_uid($reservation);
+    if (hic_is_reservation_already_processed($uid)) {
+        // Check if status update is allowed
+        if (hic_allow_status_updates()) {
+            $presence = $reservation['presence'] ?? '';
+            if (in_array($presence, ['arrived', 'departed'])) {
+                hic_log("Reservation $uid: status update allowed for presence=$presence");
+                return true;
+            }
+        }
+        hic_log("Reservation $uid already processed, skipping");
+        return false;
+    }
+    
+    return true;
+}
+
+/**
+ * Transform reservation data to standardized format
+ */
+function hic_transform_reservation($reservation) {
+    $currency = hic_get_currency();
+    $price = hic_normalize_price($reservation['price'] ?? 0);
+    $unpaid_balance = hic_normalize_price($reservation['unpaid_balance'] ?? 0);
+    
+    // Calculate value (use net value if configured)
+    $value = $price;
+    if (hic_use_net_value() && $unpaid_balance > 0) {
+        $value = max(0, $price - $unpaid_balance);
+    }
+    
+    // Normalize guests
+    $guests = max(1, intval($reservation['guests'] ?? 1));
+    
+    // Normalize language
+    $language = '';
+    if (!empty($reservation['language']) && is_string($reservation['language'])) {
+        $lang = strtolower(trim($reservation['language']));
+        if (strlen($lang) >= 2) {
+            $language = substr($lang, 0, 2); // Extract first 2 chars
+        }
+    }
+    
+    return [
+        'transaction_id' => $reservation['id'],
+        'reservation_code' => $reservation['reservation_code'] ?? '',
+        'value' => $value,
+        'currency' => $currency,
+        'accommodation_id' => $reservation['accommodation_id'],
+        'accommodation_name' => $reservation['accommodation_name'],
+        'room_name' => $reservation['room_name'] ?? '',
+        'guests' => $guests,
+        'from_date' => $reservation['from_date'],
+        'to_date' => $reservation['to_date'],
+        'presence' => $reservation['presence'] ?? '',
+        'unpaid_balance' => $unpaid_balance,
+        'guest_first_name' => $reservation['guest_first_name'] ?? '',
+        'guest_last_name' => $reservation['guest_last_name'] ?? '',
+        'email' => $reservation['email'] ?? '',
+        'phone' => $reservation['phone'] ?? '',
+        'language' => $language,
+        'original_price' => $price
+    ];
+}
+
+/**
+ * Dispatch transformed reservation to all services
+ */
+function hic_dispatch_reservation($transformed, $original) {
+    $uid = hic_booking_uid($original);
+    $is_status_update = hic_is_reservation_already_processed($uid);
+    
+    try {
+        // GA4 - only send once unless it's a status update we want to track
+        if (!$is_status_update) {
+            hic_dispatch_ga4_reservation($transformed);
+        }
+        
+        // Meta Pixel - only send once unless it's a status update we want to track  
+        if (!$is_status_update) {
+            hic_dispatch_pixel_reservation($transformed);
+        }
+        
+        // Brevo - always update contact info
+        hic_dispatch_brevo_reservation($transformed);
+        
+        hic_log("Reservation $uid dispatched successfully");
+    } catch (Exception $e) {
+        hic_log("Error dispatching reservation $uid: " . $e->getMessage());
+        throw $e;
+    }
+}
+
+/**
+ * Deduplication functions
+ */
+function hic_is_reservation_already_processed($uid) {
+    if (empty($uid)) return false;
+    $synced = get_option('hic_synced_res_ids', []);
+    return in_array($uid, $synced);
+}
+
+function hic_mark_reservation_processed($reservation) {
+    $uid = hic_booking_uid($reservation);
+    if (empty($uid)) return;
+    
+    $synced = get_option('hic_synced_res_ids', []);
+    if (!in_array($uid, $synced)) {
+        $synced[] = $uid;
+        
+        // Keep only last 10k entries (FIFO)
+        if (count($synced) > 10000) {
+            $synced = array_slice($synced, -10000);
+        }
+        
+        update_option('hic_synced_res_ids', $synced, false); // autoload=false
+    }
+}
 
 // Wrapper cron function
 function hic_api_poll_bookings(){
