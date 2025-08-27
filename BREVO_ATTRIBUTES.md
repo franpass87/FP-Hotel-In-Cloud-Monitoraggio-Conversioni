@@ -6,9 +6,10 @@ Questo documento elenca tutti gli attributi che devi configurare nel tuo account
 
 Il plugin invia i seguenti attributi per ogni contatto creato o aggiornato in Brevo:
 
-### Attributi Principali del Sistema HIC (Versione Attuale)
-Questi sono gli attributi utilizzati dal sistema di polling API moderno:
+### Attributi del Sistema HIC Moderno
+Il sistema di polling API moderno (versione attuale) invia **ENTRAMBI** i set di attributi per massima compatibilità:
 
+#### Attributi Moderni (Nuovi)
 | Attributo | Tipo | Descrizione | Fonte Dati |
 |-----------|------|-------------|-------------|
 | `FIRSTNAME` | Testo | Nome del cliente | `guest_first_name` dalla prenotazione |
@@ -23,21 +24,26 @@ Questi sono gli attributi utilizzati dal sistema di polling API moderno:
 | `HIC_ROOM` | Testo | Nome dell'alloggio/camera | `accommodation_name` dalla prenotazione |
 | `HIC_PRICE` | Numero | Prezzo originale della prenotazione | `price` dalla prenotazione |
 
-### Attributi Legacy (Sistema Webhook)
-Questi attributi sono utilizzati dal sistema webhook legacy e potrebbero ancora essere presenti:
+#### Attributi Legacy (Compatibilità)
+Il sistema moderno invia **ANCHE** questi attributi legacy per garantire la retrocompatibilità:
 
 | Attributo | Tipo | Descrizione | Fonte Dati |
 |-----------|------|-------------|-------------|
-| `FIRSTNAME` | Testo | Nome del cliente | `first_name` |
-| `LASTNAME` | Testo | Cognome del cliente | `last_name` |
-| `RESVID` | Testo | ID prenotazione | `reservation_id` o `id` |
-| `GCLID` | Testo | Google Click ID (tracciamento Google Ads) | Tracciamento automatico |
-| `FBCLID` | Testo | Facebook Click ID (tracciamento Meta) | Tracciamento automatico |
-| `DATE` | Data | Data della prenotazione | `date` o data corrente |
-| `AMOUNT` | Numero | Importo della prenotazione | `amount` |
-| `CURRENCY` | Testo | Valuta (es. "EUR", "USD") | `currency` |
-| `WHATSAPP` | Testo | Numero WhatsApp | `whatsapp` |
-| `LINGUA` | Testo | Lingua | `lingua` o `lang` |
+| `RESVID` | Testo | ID prenotazione | Mappato da `transaction_id` |
+| `GCLID` | Testo | Google Click ID (tracciamento Google Ads) | Recuperato automaticamente dal database* |
+| `FBCLID` | Testo | Facebook Click ID (tracciamento Meta) | Recuperato automaticamente dal database* |
+| `DATE` | Data | Data della prenotazione | Mappato da `from_date` |
+| `AMOUNT` | Numero | Importo della prenotazione | Mappato da `original_price` |
+| `CURRENCY` | Testo | Valuta (es. "EUR", "USD") | `currency` dalla prenotazione |
+| `WHATSAPP` | Testo | Numero WhatsApp | Mappato da `phone` |
+| `LINGUA` | Testo | Lingua | Mappato da `language` |
+
+**\*Nota sui tracking ID**: Nel sistema API moderno, `GCLID` e `FBCLID` sono disponibili solo se la prenotazione è stata originariamente tracciata attraverso il sito web con parametri di tracking. Se la prenotazione è stata creata direttamente in Hotel in Cloud senza passare dal sito web, questi campi saranno vuoti.
+
+### Solo Sistema Webhook Legacy
+Il vecchio sistema webhook (ancora supportato) utilizza solo gli attributi legacy sopra elencati, con la mappatura diretta dai campi webhook originali.
+
+**✅ Compatibilità Completa**: Ora il sistema API moderno invia **ENTRAMBI** i set di attributi, quindi puoi utilizzare sia i vecchi nomi attributi che i nuovi in Brevo, indipendentemente dal sistema di connessione scelto.
 
 ## Eventi Brevo (Brevo Events)
 
