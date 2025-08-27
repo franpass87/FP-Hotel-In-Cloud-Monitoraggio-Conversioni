@@ -28,16 +28,13 @@ function hic_get_api_key() { return hic_get_option('api_key', ''); }
 
 // New API Basic Auth functions with PHP constant support
 function hic_get_api_email() { 
-    $v = hic_get_option('api_email',''); 
-    return $v ?: (defined('HIC_API_EMAIL') ? HIC_API_EMAIL : ''); 
+    return defined('HIC_API_EMAIL') ? HIC_API_EMAIL : hic_get_option('api_email',''); 
 }
 function hic_get_api_password() { 
-    $v = hic_get_option('api_password',''); 
-    return $v ?: (defined('HIC_API_PASSWORD') ? HIC_API_PASSWORD : ''); 
+    return defined('HIC_API_PASSWORD') ? HIC_API_PASSWORD : hic_get_option('api_password',''); 
 }
 function hic_get_property_id() { 
-    $v = hic_get_option('property_id',''); 
-    return $v ?: (defined('HIC_PROPERTY_ID') ? HIC_PROPERTY_ID : ''); 
+    return defined('HIC_PROPERTY_ID') ? HIC_PROPERTY_ID : hic_get_option('property_id',''); 
 }
 
 /* ============ Helpers ============ */

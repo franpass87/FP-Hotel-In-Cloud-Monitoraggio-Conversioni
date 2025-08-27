@@ -31,12 +31,12 @@ Le costanti PHP hanno priorità sui valori inseriti nell'interfaccia admin.
 Per testare l'integrazione API, puoi eseguire manualmente una chiamata:
 
 ```php
-do_action('hic_fetch_reservations', 355787, 'presence', '2025-08-01', '2025-08-31', 50);
+do_action('hic_fetch_reservations', 355787, 'checkin', '2025-08-01', '2025-08-31', 50);
 ```
 
 Parametri:
 - `propId`: ID della struttura
-- `date_type`: Tipo di data (`checkin`, `checkout`, `presence`)
+- `date_type`: Tipo di data (`checkin`, `checkout`) - default: `checkin`
 - `from_date`: Data inizio (formato Y-m-d)
 - `to_date`: Data fine (formato Y-m-d)  
 - `limit`: Numero massimo di risultati (opzionale)
