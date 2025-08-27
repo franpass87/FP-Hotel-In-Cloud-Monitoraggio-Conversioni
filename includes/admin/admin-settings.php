@@ -214,12 +214,12 @@ function hic_allow_status_updates_render() {
 }
 
 function hic_brevo_list_it_render() {
-    echo '<input type="number" name="hic_brevo_list_it" value="' . esc_attr(hic_get_brevo_list_it()) . '" />';
+    echo '<input type="number" name="hic_brevo_list_ita" value="' . esc_attr(hic_get_brevo_list_it()) . '" />';
     echo '<p class="description">ID lista Brevo per contatti italiani</p>';
 }
 
 function hic_brevo_list_en_render() {
-    echo '<input type="number" name="hic_brevo_list_en" value="' . esc_attr(hic_get_brevo_list_en()) . '" />';
+    echo '<input type="number" name="hic_brevo_list_eng" value="' . esc_attr(hic_get_brevo_list_en()) . '" />';
     echo '<p class="description">ID lista Brevo per contatti inglesi</p>';
 }
 
