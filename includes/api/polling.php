@@ -502,3 +502,134 @@ function hic_process_update(array $u){
         // opzionale: dispatch evento custom (no purchase)
     }
 }
+
+/**
+ * Test API connection with Basic Auth credentials
+ */
+function hic_test_api_connection($prop_id = null, $email = null, $password = null) {
+    // Use provided credentials or fall back to settings
+    $prop_id = $prop_id ?: hic_get_property_id();
+    $email = $email ?: hic_get_api_email();
+    $password = $password ?: hic_get_api_password();
+    $base_url = hic_get_api_url();
+    
+    // Validate required parameters
+    if (empty($base_url)) {
+        return array(
+            'success' => false,
+            'message' => 'API URL mancante. Configura l\'URL delle API Hotel in Cloud.'
+        );
+    }
+    
+    if (empty($prop_id)) {
+        return array(
+            'success' => false,
+            'message' => 'ID Struttura (propId) mancante. Inserisci l\'ID della tua struttura.'
+        );
+    }
+    
+    if (empty($email)) {
+        return array(
+            'success' => false,
+            'message' => 'API Email mancante. Inserisci l\'email del tuo account Hotel in Cloud.'
+        );
+    }
+    
+    if (empty($password)) {
+        return array(
+            'success' => false,
+            'message' => 'API Password mancante. Inserisci la password del tuo account Hotel in Cloud.'
+        );
+    }
+    
+    // Build test endpoint URL
+    $base = rtrim($base_url, '/');
+    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+    
+    // Use a small date range to minimize data transfer
+    $test_args = array(
+        'date_type' => 'checkin',
+        'from_date' => date('Y-m-d', strtotime('-7 days')),
+        'to_date' => date('Y-m-d'),
+        'limit' => 1
+    );
+    $test_url = add_query_arg($test_args, $endpoint);
+    
+    // Make the API request
+    $response = wp_remote_get($test_url, array(
+        'timeout' => 15,
+        'headers' => array(
+            'Authorization' => 'Basic ' . base64_encode("$email:$password"),
+            'Accept' => 'application/json',
+            'User-Agent' => 'WP/FP-HIC-Plugin-Test'
+        ),
+    ));
+    
+    // Check for connection errors
+    if (is_wp_error($response)) {
+        return array(
+            'success' => false,
+            'message' => 'Errore di connessione: ' . $response->get_error_message()
+        );
+    }
+    
+    $http_code = wp_remote_retrieve_response_code($response);
+    $response_body = wp_remote_retrieve_body($response);
+    
+    // Handle different HTTP response codes
+    switch ($http_code) {
+        case 200:
+            // Validate JSON response
+            $data = json_decode($response_body, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return array(
+                    'success' => false,
+                    'message' => 'Risposta API non valida (JSON malformato)'
+                );
+            }
+            
+            return array(
+                'success' => true,
+                'message' => 'Connessione API riuscita! Credenziali valide.',
+                'data_count' => is_array($data) ? count($data) : 0
+            );
+            
+        case 401:
+            return array(
+                'success' => false,
+                'message' => 'Credenziali non valide. Verifica email e password.'
+            );
+            
+        case 403:
+            return array(
+                'success' => false,
+                'message' => 'Accesso negato. L\'account potrebbe non avere permessi per questa struttura.'
+            );
+            
+        case 404:
+            return array(
+                'success' => false,
+                'message' => 'Struttura non trovata. Verifica l\'ID Struttura (propId).'
+            );
+            
+        case 429:
+            return array(
+                'success' => false,
+                'message' => 'Troppe richieste. Riprova tra qualche minuto.'
+            );
+            
+        case 500:
+        case 502:
+        case 503:
+            return array(
+                'success' => false,
+                'message' => 'Errore del server Hotel in Cloud. Riprova più tardi.'
+            );
+            
+        default:
+            return array(
+                'success' => false,
+                'message' => "Errore HTTP $http_code. Verifica la configurazione."
+            );
+    }
+}

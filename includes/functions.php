@@ -34,14 +34,35 @@ function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR .
 function hic_get_fb_pixel_id() { return hic_get_option('fb_pixel_id', ''); }
 function hic_get_fb_access_token() { return hic_get_option('fb_access_token', ''); }
 
-// Hotel in Cloud Connection Settings
+// Hotel in Cloud Connection Settings (with wp-config.php constants support)
 function hic_get_connection_type() { return hic_get_option('connection_type', 'webhook'); }
 function hic_get_webhook_token() { return hic_get_option('webhook_token', ''); }
 function hic_get_api_url() { return hic_get_option('api_url', ''); }
 function hic_get_api_key() { return hic_get_option('api_key', ''); }
-function hic_get_api_email() { return hic_get_option('api_email', ''); }
-function hic_get_api_password() { return hic_get_option('api_password', ''); }
-function hic_get_property_id() { return hic_get_option('property_id', ''); }
+
+function hic_get_api_email() { 
+    // Check for wp-config.php constant first, then fall back to option
+    if (defined('HIC_API_EMAIL') && !empty(HIC_API_EMAIL)) {
+        return HIC_API_EMAIL;
+    }
+    return hic_get_option('api_email', ''); 
+}
+
+function hic_get_api_password() { 
+    // Check for wp-config.php constant first, then fall back to option
+    if (defined('HIC_API_PASSWORD') && !empty(HIC_API_PASSWORD)) {
+        return HIC_API_PASSWORD;
+    }
+    return hic_get_option('api_password', ''); 
+}
+
+function hic_get_property_id() { 
+    // Check for wp-config.php constant first, then fall back to option
+    if (defined('HIC_PROPERTY_ID') && !empty(HIC_PROPERTY_ID)) {
+        return HIC_PROPERTY_ID;
+    }
+    return hic_get_option('property_id', ''); 
+}
 
 // HIC Extended Integration Settings
 function hic_get_currency() { return hic_get_option('currency', 'EUR'); }
