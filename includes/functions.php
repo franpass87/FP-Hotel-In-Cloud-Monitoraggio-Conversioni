@@ -74,7 +74,7 @@ function hic_is_ota_alias_email($e){
     ];
     if (!filter_var($e, FILTER_VALIDATE_EMAIL)) return false;
     foreach ($domains as $d) {
-        if (str_ends_with($e, '@'.$d)) return true;
+        if (substr($e, -strlen('@'.$d)) === '@'.$d) return true;
     }
     return false;
 }
