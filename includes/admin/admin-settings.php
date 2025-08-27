@@ -44,8 +44,6 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_ga4_use_net_value');
     register_setting('hic_settings', 'hic_process_invalid');
     register_setting('hic_settings', 'hic_allow_status_updates');
-    register_setting('hic_settings', 'hic_brevo_list_it', array('sanitize_callback' => 'absint'));
-    register_setting('hic_settings', 'hic_brevo_list_en', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_brevo_list_default', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_brevo_optin_default');
     register_setting('hic_settings', 'hic_debug_verbose');
@@ -89,8 +87,6 @@ function hic_settings_init() {
     add_settings_field('hic_ga4_use_net_value', 'Usa valore netto per GA4/Pixel', 'hic_ga4_use_net_value_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_process_invalid', 'Processa prenotazioni non valide', 'hic_process_invalid_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_allow_status_updates', 'Gestisci aggiornamenti stato', 'hic_allow_status_updates_render', 'hic_settings', 'hic_hic_section');
-    add_settings_field('hic_brevo_list_it', 'Lista Brevo IT', 'hic_brevo_list_it_render', 'hic_settings', 'hic_brevo_section');
-    add_settings_field('hic_brevo_list_en', 'Lista Brevo EN', 'hic_brevo_list_en_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_list_default', 'Lista Brevo Default', 'hic_brevo_list_default_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_optin_default', 'Opt-in marketing di default', 'hic_brevo_optin_default_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_debug_verbose', 'Log debug verboso', 'hic_debug_verbose_render', 'hic_settings', 'hic_main_section');
