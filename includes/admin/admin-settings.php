@@ -34,6 +34,10 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_connection_type');
     register_setting('hic_settings', 'hic_api_url');
     register_setting('hic_settings', 'hic_api_key');
+    // New Basic Auth settings
+    register_setting('hic_settings', 'hic_api_email', array('sanitize_callback' => 'sanitize_email'));
+    register_setting('hic_settings', 'hic_api_password', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_property_id', array('sanitize_callback' => 'absint'));
 
     add_settings_section('hic_main_section', 'Configurazione Principale', null, 'hic_settings');
     add_settings_section('hic_ga4_section', 'Google Analytics 4', null, 'hic_settings');
@@ -64,6 +68,10 @@ function hic_settings_init() {
     add_settings_field('hic_webhook_token', 'Webhook Token', 'hic_webhook_token_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_api_url', 'API URL', 'hic_api_url_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_api_key', 'API Key', 'hic_api_key_render', 'hic_settings', 'hic_hic_section');
+    // New Basic Auth settings
+    add_settings_field('hic_api_email', 'API Email', 'hic_api_email_render', 'hic_settings', 'hic_hic_section');
+    add_settings_field('hic_api_password', 'API Password', 'hic_api_password_render', 'hic_settings', 'hic_hic_section');
+    add_settings_field('hic_property_id', 'ID Struttura (propId)', 'hic_property_id_render', 'hic_settings', 'hic_hic_section');
 }
 
 function hic_options_page() {
@@ -144,4 +152,20 @@ function hic_api_url_render() {
 function hic_api_key_render() {
     echo '<input type="password" name="hic_api_key" value="' . esc_attr(hic_get_api_key()) . '" class="regular-text" />';
     echo '<p class="description">API Key per Hotel in Cloud (solo se si usa API Polling)</p>';
+}
+
+// New Basic Auth render functions
+function hic_api_email_render() {
+    echo '<input type="email" name="hic_api_email" value="' . esc_attr(hic_get_api_email()) . '" class="regular-text" />';
+    echo '<p class="description">Email per autenticazione Basic Auth alle API Hotel in Cloud</p>';
+}
+
+function hic_api_password_render() {
+    echo '<input type="password" name="hic_api_password" value="' . esc_attr(hic_get_api_password()) . '" class="regular-text" />';
+    echo '<p class="description">Password per autenticazione Basic Auth alle API Hotel in Cloud</p>';
+}
+
+function hic_property_id_render() {
+    echo '<input type="number" name="hic_property_id" value="' . esc_attr(hic_get_property_id()) . '" class="regular-text" />';
+    echo '<p class="description">ID della struttura (propId) per le chiamate API</p>';
 }

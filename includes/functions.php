@@ -26,6 +26,17 @@ function hic_get_connection_type() { return hic_get_option('connection_type', 'w
 function hic_get_api_url() { return hic_get_option('api_url', ''); }
 function hic_get_api_key() { return hic_get_option('api_key', ''); }
 
+// New API Basic Auth functions with PHP constant support
+function hic_get_api_email() { 
+    return defined('HIC_API_EMAIL') ? HIC_API_EMAIL : hic_get_option('api_email',''); 
+}
+function hic_get_api_password() { 
+    return defined('HIC_API_PASSWORD') ? HIC_API_PASSWORD : hic_get_option('api_password',''); 
+}
+function hic_get_property_id() { 
+    return defined('HIC_PROPERTY_ID') ? HIC_PROPERTY_ID : hic_get_option('property_id',''); 
+}
+
 /* ============ Helpers ============ */
 function hic_log($msg){
   $date = date('Y-m-d H:i:s');
