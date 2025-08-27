@@ -18,7 +18,25 @@ function hic_get_brevo_list_it() { return hic_get_option('hic_brevo_list_it', '2
 function hic_get_brevo_list_en() { return hic_get_option('hic_brevo_list_en', '21'); }
 function hic_get_brevo_list_default() { return hic_get_option('hic_brevo_list_default', '20'); }
 function hic_get_brevo_optin_default() { return hic_get_option('hic_brevo_optin_default', '0') === '1'; }
+function hic_is_brevo_enabled() { return hic_get_option('brevo_enabled', '0') === '1'; }
 function hic_is_debug_verbose() { return hic_get_option('hic_debug_verbose', '0') === '1'; }
+
+// Admin and General Settings
+function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
+function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR . '/hic-log.txt'); }
+
+// Facebook Settings
+function hic_get_fb_pixel_id() { return hic_get_option('fb_pixel_id', ''); }
+function hic_get_fb_access_token() { return hic_get_option('fb_access_token', ''); }
+
+// Hotel in Cloud Connection Settings
+function hic_get_connection_type() { return hic_get_option('connection_type', 'webhook'); }
+function hic_get_webhook_token() { return hic_get_option('webhook_token', ''); }
+function hic_get_api_url() { return hic_get_option('api_url', ''); }
+function hic_get_api_key() { return hic_get_option('api_key', ''); }
+function hic_get_api_email() { return hic_get_option('api_email', ''); }
+function hic_get_api_password() { return hic_get_option('api_password', ''); }
+function hic_get_property_id() { return hic_get_option('property_id', ''); }
 
 // HIC Extended Integration Settings
 function hic_get_currency() { return hic_get_option('hic_currency', 'EUR'); }
