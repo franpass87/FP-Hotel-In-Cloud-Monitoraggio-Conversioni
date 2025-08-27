@@ -8,7 +8,17 @@ if (!defined('ABSPATH')) exit;
 /* ============ API Polling HIC ============ */
 // Se selezionato API Polling, configura il cron
 add_action('init', function() {
-  if (hic_get_connection_type() === 'api' && hic_get_api_url() && hic_get_api_key()) {
+  $should_schedule = false;
+  
+  if (hic_get_connection_type() === 'api' && hic_get_api_url()) {
+    // Check if we have Basic Auth credentials or legacy API key
+    $has_basic_auth = hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+    $has_legacy_key = hic_get_api_key(); // backward compatibility
+    
+    $should_schedule = $has_basic_auth || $has_legacy_key;
+  }
+  
+  if ($should_schedule) {
     if (!wp_next_scheduled('hic_api_poll_event')) {
       wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event');
     }
@@ -33,7 +43,93 @@ add_filter('cron_schedules', function($schedules) {
 // Funzione di polling API
 add_action('hic_api_poll_event', 'hic_api_poll_bookings');
 
-function hic_api_poll_bookings() {
+/**
+ * Chiama HIC: GET /reservations/{propId}
+ */
+function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $limit = null){
+    $base = rtrim(hic_get_api_url(), '/'); // es: https://api.hotelincloud.com/api/partner
+    $email = hic_get_api_email();
+    $pass  = hic_get_api_password();
+    if (!$base || !$email || !$pass || !$prop_id) {
+        return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
+    }
+    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+    $args = array('date_type'=>$date_type,'from_date'=>$from_date,'to_date'=>$to_date);
+    if ($limit) $args['limit'] = (int)$limit;
+    $url = add_query_arg($args, $endpoint);
+
+    $res = wp_remote_get($url, array(
+        'timeout' => 30,
+        'headers' => array(
+            'Authorization' => 'Basic ' . base64_encode("$email:$pass"),
+            'Accept'        => 'application/json',
+            'User-Agent'    => 'WP/FP-HIC-Plugin'
+        ),
+    ));
+    if (is_wp_error($res)) { hic_log('HIC connessione fallita: '.$res->get_error_message()); return $res; }
+    $code = wp_remote_retrieve_response_code($res);
+    if ($code !== 200) { hic_log("HIC HTTP $code"); return new WP_Error('hic_http', "HTTP $code"); }
+
+    $body = wp_remote_retrieve_body($res);
+    $data = json_decode($body, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        hic_log('HIC JSON error: '.json_last_error_msg());
+        return new WP_Error('hic_json', 'JSON malformato');
+    }
+
+    // Log di debug iniziale (ridotto)
+    hic_log(['hic_reservations_count' => is_array($data)? count($data): 0]);
+
+    // Processa singole prenotazioni con la pipeline esistente
+    if (is_array($data)) {
+        foreach ($data as $booking) {
+            try { hic_process_booking_data($booking); }
+            catch (Exception $e) { hic_log('Process booking error: '.$e->getMessage()); }
+        }
+    }
+    return $data;
+}
+
+// Hook pubblico per esecuzione manuale
+add_action('hic_fetch_reservations', function($prop_id, $date_type, $from_date, $to_date, $limit = null){
+    return hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $limit);
+}, 10, 5);
+
+// Wrapper cron function
+function hic_api_poll_bookings(){
+    $prop = hic_get_property_id();
+    $email = hic_get_api_email();
+    $password = hic_get_api_password();
+    
+    // Try new Basic Auth method first
+    if ($prop && $email && $password) {
+        $last = get_option('hic_last_api_poll', strtotime('-1 day'));
+        $now  = time();
+        $from = date('Y-m-d', $last);
+        $to   = date('Y-m-d', $now);
+        $date_type = 'checkin'; // default; in futuro rendere configurabile
+        $out = hic_fetch_reservations($prop, $date_type, $from, $to, 100);
+        if (!is_wp_error($out)) {
+            update_option('hic_last_api_poll', $now);
+        }
+        return;
+    }
+    
+    // Fall back to legacy API key method for backward compatibility
+    $api_url = hic_get_api_url();
+    $api_key = hic_get_api_key();
+    
+    if (!$api_url || !$api_key) {
+        hic_log('Cron: propId mancante per Basic Auth e URL/API key mancanti per legacy');
+        return;
+    }
+
+    // Legacy polling logic (unchanged)
+    hic_legacy_api_poll_bookings();
+}
+
+// Legacy API polling function for backward compatibility
+function hic_legacy_api_poll_bookings() {
   $api_url = hic_get_api_url();
   $api_key = hic_get_api_key();
   
