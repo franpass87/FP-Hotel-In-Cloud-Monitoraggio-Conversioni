@@ -102,7 +102,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     }
 
     // Log di debug iniziale (ridotto)
-    hic_log(['hic_reservations_count' => is_array($data) ? count($data) : 0]);
+    hic_log(array('hic_reservations_count' => is_array($data) ? count($data) : 0));
 
     // Processa singole prenotazioni con la nuova pipeline
     if (is_array($data)) {
@@ -171,8 +171,8 @@ function hic_should_process_reservation($reservation) {
  */
 function hic_transform_reservation($reservation) {
     $currency = hic_get_currency();
-    $price = hic_normalize_price($reservation['price'] ?? 0);
-    $unpaid_balance = hic_normalize_price($reservation['unpaid_balance'] ?? 0);
+    $price = hic_normalize_price(isset($reservation['price']) ? $reservation['price'] : 0);
+    $unpaid_balance = hic_normalize_price(isset($reservation['unpaid_balance']) ? $reservation['unpaid_balance'] : 0);
     
     // Calculate value (use net value if configured)
     $value = $price;
@@ -181,37 +181,46 @@ function hic_transform_reservation($reservation) {
     }
     
     // Normalize guests
-    $guests = max(1, intval($reservation['guests'] ?? 1));
+    $guests = max(1, intval(isset($reservation['guests']) ? $reservation['guests'] : 1));
     
-    // Normalize language
+    // Normalize language - check all possible fields
     $language = '';
+    $lang_value = '';
     if (!empty($reservation['language']) && is_string($reservation['language'])) {
-        $lang = strtolower(trim($reservation['language']));
+        $lang_value = $reservation['language'];
+    } elseif (!empty($reservation['lang']) && is_string($reservation['lang'])) {
+        $lang_value = $reservation['lang']; 
+    } elseif (!empty($reservation['lingua']) && is_string($reservation['lingua'])) {
+        $lang_value = $reservation['lingua'];
+    }
+    
+    if (!empty($lang_value)) {
+        $lang = strtolower(trim($lang_value));
         if (strlen($lang) >= 2) {
             $language = substr($lang, 0, 2); // Extract first 2 chars
         }
     }
     
-    return [
+    return array(
         'transaction_id' => $reservation['id'],
-        'reservation_code' => $reservation['reservation_code'] ?? '',
+        'reservation_code' => isset($reservation['reservation_code']) ? $reservation['reservation_code'] : '',
         'value' => $value,
         'currency' => $currency,
         'accommodation_id' => $reservation['accommodation_id'],
         'accommodation_name' => $reservation['accommodation_name'],
-        'room_name' => $reservation['room_name'] ?? '',
+        'room_name' => isset($reservation['room_name']) ? $reservation['room_name'] : '',
         'guests' => $guests,
         'from_date' => $reservation['from_date'],
         'to_date' => $reservation['to_date'],
-        'presence' => $reservation['presence'] ?? '',
+        'presence' => isset($reservation['presence']) ? $reservation['presence'] : '',
         'unpaid_balance' => $unpaid_balance,
-        'guest_first_name' => $reservation['guest_first_name'] ?? '',
-        'guest_last_name' => $reservation['guest_last_name'] ?? '',
-        'email' => $reservation['email'] ?? '',
-        'phone' => $reservation['phone'] ?? '',
+        'guest_first_name' => isset($reservation['guest_first_name']) ? $reservation['guest_first_name'] : '',
+        'guest_last_name' => isset($reservation['guest_last_name']) ? $reservation['guest_last_name'] : '',
+        'email' => isset($reservation['email']) ? $reservation['email'] : '',
+        'phone' => isset($reservation['phone']) ? $reservation['phone'] : '',
         'language' => $language,
         'original_price' => $price
-    ];
+    );
 }
 
 /**
@@ -399,18 +408,18 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
     }
     
     $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
-    $args = ['since' => $since];
+    $args = array('since' => $since);
     if ($limit) $args['limit'] = $limit;
     $url = add_query_arg($args, $endpoint);
     
-    $res = wp_remote_get($url, [
+    $res = wp_remote_get($url, array(
       'timeout'=>30,
-      'headers'=>[
+      'headers'=>array(
         'Authorization'=>'Basic '.base64_encode("$email:$pass"), 
         'Accept'=>'application/json',
         'User-Agent'=>'WP/FP-HIC-Plugin'
-      ]
-    ]);
+      )
+    ));
     
     if (is_wp_error($res)) { 
         hic_log('HIC updates connessione fallita: '.$res->get_error_message()); 
@@ -431,7 +440,7 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
     }
 
     // Log di debug iniziale
-    hic_log(['hic_updates_count' => is_array($data) ? count($data) : 0]);
+    hic_log(array('hic_updates_count' => is_array($data) ? count($data) : 0));
 
     // Process each update
     if (is_array($data)) {
@@ -451,26 +460,39 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
  * Process a single reservation update
  */
 function hic_process_update(array $u){
-    // $u ha struttura simile a reservation o include solo delta (gestire entrambi)
+    // Validate input array
+    if (!is_array($u) || empty($u)) {
+        hic_log('hic_process_update: invalid or empty update array');
+        return;
+    }
+    
+    // Get reservation ID with proper validation
     $id = isset($u['id']) ? $u['id'] : null;
-    if (!$id) {
-        hic_log('hic_process_update: missing reservation id');
+    if (empty($id) || !is_scalar($id)) {
+        hic_log('hic_process_update: missing or invalid reservation id');
         return;
     }
 
-    // carica record locale (dedup store/opzione) se presente
+    // Validate and get email
     $email = isset($u['email']) ? $u['email'] : null;
-    $is_alias = $email ? hic_is_ota_alias_email($email) : false;
+    if (empty($email) || !is_string($email)) {
+        hic_log("hic_process_update: no valid email in update for reservation $id");
+        return;
+    }
+    
+    $is_alias = hic_is_ota_alias_email($email);
 
     // Se c'è un'email reale nuova che sostituisce un alias
-    if ($email && !$is_alias) {
+    if (!$is_alias && hic_is_valid_email($email)) {
         // upsert Brevo con vera email + liste by language
         $t = hic_transform_reservation($u); // riusa normalizzazioni
-        if ($t !== false) {
+        if ($t !== false && is_array($t)) {
             hic_dispatch_brevo_reservation($t, true); // aggiorna contatto with enrichment flag
             // aggiorna store locale per id -> true_email
             hic_mark_email_enriched($id, $email);
             hic_log("Enriched email for reservation $id");
+        } else {
+            hic_log("hic_process_update: failed to transform reservation $id");
         }
     }
 

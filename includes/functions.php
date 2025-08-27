@@ -70,11 +70,11 @@ function hic_is_ota_alias_email($e){
     // Validate email format first
     if (!filter_var($e, FILTER_VALIDATE_EMAIL)) return false;
     
-    $domains = [
+    $domains = array(
       'guest.booking.com', 'message.booking.com',
       'guest.airbnb.com','airbnb.com',
       'expedia.com','stay.expedia.com','guest.expediapartnercentral.com'
-    ];
+    );
     
     foreach ($domains as $d) {
         if (substr($e, -strlen('@'.$d)) === '@'.$d) return true;
@@ -130,12 +130,21 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
 
 /* ============ Email Enrichment Functions ============ */
 function hic_mark_email_enriched($reservation_id, $real_email) {
-    if (empty($reservation_id) || empty($real_email)) {
-        hic_log('hic_mark_email_enriched: reservation_id or real_email is empty');
+    if (empty($reservation_id) || !is_scalar($reservation_id)) {
+        hic_log('hic_mark_email_enriched: reservation_id is empty or not scalar');
+        return false;
+    }
+    
+    if (empty($real_email) || !is_string($real_email) || !hic_is_valid_email($real_email)) {
+        hic_log('hic_mark_email_enriched: real_email is empty, not string, or invalid email format');
         return false;
     }
     
     $email_map = get_option('hic_res_email_map', array());
+    if (!is_array($email_map)) {
+        $email_map = array(); // Reset if corrupted
+    }
+    
     $email_map[$reservation_id] = $real_email;
     
     // Keep only last 5k entries (FIFO) to prevent bloat
@@ -147,7 +156,14 @@ function hic_mark_email_enriched($reservation_id, $real_email) {
 }
 
 function hic_get_reservation_email($reservation_id) {
-    if (empty($reservation_id)) return null;
+    if (empty($reservation_id) || !is_scalar($reservation_id)) {
+        return null;
+    }
+    
     $email_map = get_option('hic_res_email_map', array());
+    if (!is_array($email_map)) {
+        return null; // Corrupted data
+    }
+    
     return isset($email_map[$reservation_id]) ? $email_map[$reservation_id] : null;
 }
