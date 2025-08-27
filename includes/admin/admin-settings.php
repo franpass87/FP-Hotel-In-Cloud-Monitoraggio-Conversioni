@@ -9,6 +9,38 @@ if (!defined('ABSPATH')) exit;
 add_action('admin_menu', 'hic_add_admin_menu');
 add_action('admin_init', 'hic_settings_init');
 
+// Add AJAX handler for API connection test
+add_action('wp_ajax_hic_test_api_connection', 'hic_ajax_test_api_connection');
+
+function hic_ajax_test_api_connection() {
+    // Verify nonce for security
+    if (!check_ajax_referer('hic_test_api_nonce', 'nonce', false)) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'Nonce di sicurezza non valido.'
+        )));
+    }
+    
+    // Check user permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'Permessi insufficienti.'
+        )));
+    }
+    
+    // Get credentials from AJAX request or settings
+    $prop_id = sanitize_text_field($_POST['prop_id'] ?? '');
+    $email = sanitize_email($_POST['email'] ?? '');
+    $password = sanitize_text_field($_POST['password'] ?? '');
+    
+    // Test the API connection
+    $result = hic_test_api_connection($prop_id, $email, $password);
+    
+    // Return JSON response
+    wp_die(json_encode($result));
+}
+
 function hic_add_admin_menu() {
     add_options_page(
         'HIC Monitoring Settings',
@@ -114,7 +146,102 @@ function hic_options_page() {
             submit_button();
             ?>
         </form>
+        
+        <!-- API Connection Test Section -->
+        <?php if (hic_get_connection_type() === 'api'): ?>
+        <div class="hic-api-test-section" style="margin-top: 30px; padding: 20px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
+            <h2>Test Connessione API</h2>
+            <p>Testa la connessione alle API Hotel in Cloud con le credenziali Basic Auth configurate.</p>
+            
+            <button type="button" id="hic-test-api-btn" class="button button-secondary">
+                <span class="dashicons dashicons-admin-tools" style="margin-top: 3px;"></span>
+                Testa Connessione API
+            </button>
+            
+            <div id="hic-test-result" style="margin-top: 15px; display: none;"></div>
+            
+            <div id="hic-test-loading" style="margin-top: 15px; display: none;">
+                <span class="spinner is-active" style="float: left; margin: 0 10px 0 0;"></span>
+                <span>Test in corso... attendere...</span>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
+    
+    <script type="text/javascript">
+    jQuery(document).ready(function($) {
+        $('#hic-test-api-btn').click(function() {
+            var $btn = $(this);
+            var $result = $('#hic-test-result');
+            var $loading = $('#hic-test-loading');
+            
+            // Show loading state
+            $btn.prop('disabled', true);
+            $result.hide();
+            $loading.show();
+            
+            // Get current form values
+            var data = {
+                action: 'hic_test_api_connection',
+                nonce: '<?php echo wp_create_nonce('hic_test_api_nonce'); ?>',
+                prop_id: $('input[name="hic_property_id"]').val(),
+                email: $('input[name="hic_api_email"]').val(),
+                password: $('input[name="hic_api_password"]').val()
+            };
+            
+            $.post(ajaxurl, data, function(response) {
+                $loading.hide();
+                $btn.prop('disabled', false);
+                
+                try {
+                    var result = typeof response === 'string' ? JSON.parse(response) : response;
+                    
+                    var messageClass = result.success ? 'notice-success' : 'notice-error';
+                    var icon = result.success ? 'dashicons-yes-alt' : 'dashicons-dismiss';
+                    
+                    var html = '<div class="notice ' + messageClass + ' inline">' +
+                               '<p><span class="dashicons ' + icon + '"></span> ' + result.message;
+                    
+                    if (result.success && result.data_count !== undefined) {
+                        html += ' (' + result.data_count + ' prenotazioni trovate negli ultimi 7 giorni)';
+                    }
+                    
+                    html += '</p></div>';
+                    
+                    $result.html(html).show();
+                    
+                } catch (e) {
+                    $result.html('<div class="notice notice-error inline">' +
+                               '<p><span class="dashicons dashicons-dismiss"></span> Errore nel parsing della risposta</p>' +
+                               '</div>').show();
+                }
+            }).fail(function(xhr, status, error) {
+                $loading.hide();
+                $btn.prop('disabled', false);
+                $result.html('<div class="notice notice-error inline">' +
+                           '<p><span class="dashicons dashicons-dismiss"></span> Errore di comunicazione: ' + error + '</p>' +
+                           '</div>').show();
+            });
+        });
+    });
+    </script>
+    
+    <style>
+    .hic-api-test-section .dashicons {
+        vertical-align: middle;
+        margin-right: 5px;
+    }
+    .hic-api-test-section .notice {
+        margin: 0;
+        padding: 10px;
+    }
+    .hic-api-test-section .notice p {
+        margin: 0;
+    }
+    .hic-api-test-section .spinner {
+        visibility: visible;
+    }
+    </style>
     <?php
 }
 
@@ -177,18 +304,45 @@ function hic_api_key_render() {
 
 // New Basic Auth render functions
 function hic_api_email_render() {
-    echo '<input type="email" name="hic_api_email" value="' . esc_attr(hic_get_api_email()) . '" class="regular-text" />';
-    echo '<p class="description">Email per autenticazione Basic Auth alle API Hotel in Cloud</p>';
+    $value = hic_get_api_email();
+    $is_constant = defined('HIC_API_EMAIL') && !empty(HIC_API_EMAIL);
+    
+    if ($is_constant) {
+        echo '<input type="email" value="' . esc_attr($value) . '" class="regular-text" disabled />';
+        echo '<p class="description"><strong>Configurato tramite costante PHP HIC_API_EMAIL in wp-config.php</strong></p>';
+        echo '<input type="hidden" name="hic_api_email" value="' . esc_attr(hic_get_option('api_email', '')) . '" />';
+    } else {
+        echo '<input type="email" name="hic_api_email" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">Email per autenticazione Basic Auth alle API Hotel in Cloud</p>';
+    }
 }
 
 function hic_api_password_render() {
-    echo '<input type="password" name="hic_api_password" value="' . esc_attr(hic_get_api_password()) . '" class="regular-text" />';
-    echo '<p class="description">Password per autenticazione Basic Auth alle API Hotel in Cloud</p>';
+    $value = hic_get_api_password();
+    $is_constant = defined('HIC_API_PASSWORD') && !empty(HIC_API_PASSWORD);
+    
+    if ($is_constant) {
+        echo '<input type="password" value="********" class="regular-text" disabled />';
+        echo '<p class="description"><strong>Configurato tramite costante PHP HIC_API_PASSWORD in wp-config.php</strong></p>';
+        echo '<input type="hidden" name="hic_api_password" value="' . esc_attr(hic_get_option('api_password', '')) . '" />';
+    } else {
+        echo '<input type="password" name="hic_api_password" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">Password per autenticazione Basic Auth alle API Hotel in Cloud</p>';
+    }
 }
 
 function hic_property_id_render() {
-    echo '<input type="number" name="hic_property_id" value="' . esc_attr(hic_get_property_id()) . '" class="regular-text" />';
-    echo '<p class="description">ID della struttura (propId) per le chiamate API</p>';
+    $value = hic_get_property_id();
+    $is_constant = defined('HIC_PROPERTY_ID') && !empty(HIC_PROPERTY_ID);
+    
+    if ($is_constant) {
+        echo '<input type="number" value="' . esc_attr($value) . '" class="regular-text" disabled />';
+        echo '<p class="description"><strong>Configurato tramite costante PHP HIC_PROPERTY_ID in wp-config.php</strong></p>';
+        echo '<input type="hidden" name="hic_property_id" value="' . esc_attr(hic_get_option('property_id', '')) . '" />';
+    } else {
+        echo '<input type="number" name="hic_property_id" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">ID della struttura (propId) per le chiamate API</p>';
+    }
 }
 
 // Extended HIC Integration render functions
