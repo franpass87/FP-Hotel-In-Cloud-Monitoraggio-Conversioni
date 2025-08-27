@@ -405,7 +405,11 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
     
     $res = wp_remote_get($url, [
       'timeout'=>30,
-      'headers'=>['Authorization'=>'Basic '.base64_encode("$email:$pass"), 'Accept'=>'application/json']
+      'headers'=>[
+        'Authorization'=>'Basic '.base64_encode("$email:$pass"), 
+        'Accept'=>'application/json',
+        'User-Agent'=>'WP/FP-HIC-Plugin'
+      ]
     ]);
     
     if (is_wp_error($res)) { 
@@ -460,7 +464,7 @@ function hic_process_update(array $u){
         // upsert Brevo con vera email + liste by language
         $t = hic_transform_reservation($u); // riusa normalizzazioni
         if ($t !== false) {
-            hic_dispatch_brevo($t); // aggiorna contatto
+            hic_dispatch_brevo_reservation($t, true); // aggiorna contatto with enrichment flag
             // aggiorna store locale per id -> true_email
             hic_mark_email_enriched($id, $email);
             hic_log("Enriched email for reservation $id");
@@ -472,93 +476,4 @@ function hic_process_update(array $u){
         hic_log("Reservation $id presence update: ".$u['presence']);
         // opzionale: dispatch evento custom (no purchase)
     }
-}
-
-/**
- * Special Brevo dispatcher that handles alias emails properly
- */
-function hic_dispatch_brevo($data) {
-    if (!hic_get_brevo_api_key()) { 
-        hic_log('Brevo disabilitato (API key vuota).'); 
-        return; 
-    }
-
-    $email = $data['email'];
-    if (!hic_is_valid_email($email)) { 
-        hic_log('Brevo: email mancante o non valida, skip contatto.'); 
-        return; 
-    }
-
-    $is_alias = hic_is_ota_alias_email($email);
-    
-    // Determine list based on language and alias status
-    $language = $data['language'];
-    $list_ids = [];
-    
-    if ($is_alias) {
-        // Handle alias emails
-        $alias_list_id = intval(hic_get_brevo_list_alias());
-        if ($alias_list_id > 0) {
-            $list_ids[] = $alias_list_id;
-        }
-        // Don't add to regular language lists for aliases
-    } else {
-        // Handle real emails
-        if (in_array($language, ['it'])) {
-            $list_id = intval(hic_get_brevo_list_it());
-            if ($list_id > 0) $list_ids[] = $list_id;
-        } elseif (in_array($language, ['en'])) {
-            $list_id = intval(hic_get_brevo_list_en());
-            if ($list_id > 0) $list_ids[] = $list_id;
-        } else {
-            $list_id = intval(hic_get_brevo_list_default());
-            if ($list_id > 0) $list_ids[] = $list_id;
-        }
-    }
-
-    $attributes = [
-        'FIRSTNAME' => $data['guest_first_name'] ?? '',
-        'LASTNAME' => $data['guest_last_name'] ?? '',
-        'PHONE' => $data['phone'] ?? '',
-        'LANGUAGE' => $language,
-        'HIC_RES_ID' => $data['transaction_id'] ?? $data['id'],
-        'HIC_RES_CODE' => $data['reservation_code'] ?? '',
-        'HIC_FROM' => $data['from_date'] ?? '',
-        'HIC_TO' => $data['to_date'] ?? '',
-        'HIC_GUESTS' => $data['guests'] ?? '',
-        'HIC_ROOM' => $data['accommodation_name'] ?? '',
-        'HIC_PRICE' => $data['original_price'] ?? $data['value']
-    ];
-
-    // Remove empty values to clean up
-    $attributes = array_filter($attributes, function($value) {
-        return $value !== null && $value !== '';
-    });
-
-    $body = [
-        'email' => $email,
-        'attributes' => $attributes,
-        'listIds' => $list_ids,
-        'updateEnabled' => true
-    ];
-
-    // Add marketing opt-in only if not alias and default is enabled, or if enrichment opt-in is enabled
-    if (!$is_alias) {
-        if (hic_get_brevo_optin_default() || hic_brevo_double_optin_on_enrich()) {
-            $body['emailBlacklisted'] = false;
-        }
-    }
-
-    $res = wp_remote_post('https://api.brevo.com/v3/contacts', [
-        'headers' => [
-            'accept' => 'application/json',
-            'api-key' => hic_get_brevo_api_key(),
-            'content-type' => 'application/json'
-        ],
-        'body' => wp_json_encode($body),
-        'timeout' => 15
-    ]);
-    
-    $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-    hic_log(['Brevo contact sent' => ['email' => $email, 'res_id' => $data['transaction_id'] ?? $data['id'], 'lists' => $list_ids, 'alias' => $is_alias], 'HTTP' => $code]);
 }

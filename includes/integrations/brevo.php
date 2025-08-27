@@ -85,7 +85,7 @@ function hic_send_brevo_event($data, $gclid, $fbclid){
 /**
  * Brevo dispatcher for HIC reservation schema
  */
-function hic_dispatch_brevo_reservation($data) {
+function hic_dispatch_brevo_reservation($data, $is_enrichment = false) {
   if (!hic_get_brevo_api_key()) { 
     hic_log('Brevo disabilitato (API key vuota).'); 
     return; 
@@ -109,8 +109,7 @@ function hic_dispatch_brevo_reservation($data) {
     if ($alias_list_id > 0) {
       $list_ids[] = $alias_list_id;
     }
-    // Save in email mapping for future enrichment
-    hic_mark_email_enriched($data['transaction_id'], $email);
+    // Don't mark alias emails as enriched - they need to be enriched later
   } else {
     // Handle real emails - add to language-specific lists
     if (in_array($language, ['it'])) {
@@ -151,9 +150,11 @@ function hic_dispatch_brevo_reservation($data) {
     'updateEnabled' => true
   ];
 
-  // Add marketing opt-in only if not alias and default is enabled
-  if (!$is_alias && hic_get_brevo_optin_default()) {
-    $body['emailBlacklisted'] = false;
+  // Add marketing opt-in only if not alias and default is enabled, or if enrichment is happening and double opt-in is enabled
+  if (!$is_alias) {
+    if (hic_get_brevo_optin_default() || ($is_enrichment && hic_brevo_double_optin_on_enrich())) {
+      $body['emailBlacklisted'] = false;
+    }
   }
 
   $res = wp_remote_post('https://api.brevo.com/v3/contacts', [

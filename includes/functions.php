@@ -68,7 +68,6 @@ function hic_is_ota_alias_email($e){
     $e = strtolower(trim($e));
     $domains = [
       'guest.booking.com', 'message.booking.com',
-      'booking.com@guest', // a volte formati strani
       'guest.airbnb.com','airbnb.com',
       'expedia.com','stay.expedia.com','guest.expediapartnercentral.com'
     ];
