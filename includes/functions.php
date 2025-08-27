@@ -21,6 +21,11 @@ function hic_get_brevo_optin_default() { return hic_get_option('hic_brevo_optin_
 function hic_is_brevo_enabled() { return hic_get_option('brevo_enabled', '0') === '1'; }
 function hic_is_debug_verbose() { return hic_get_option('hic_debug_verbose', '0') === '1'; }
 
+// New email enrichment settings
+function hic_updates_enrich_contacts() { return hic_get_option('hic_updates_enrich_contacts', '1') === '1'; }
+function hic_get_brevo_list_alias() { return hic_get_option('hic_brevo_list_alias', ''); }
+function hic_brevo_double_optin_on_enrich() { return hic_get_option('hic_brevo_double_optin_on_enrich', '0') === '1'; }
+
 // Admin and General Settings
 function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
 function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR . '/hic-log.txt'); }
@@ -56,6 +61,25 @@ function hic_normalize_price($value) {
 
 function hic_is_valid_email($email) {
     return !empty($email) && is_email($email);
+}
+
+function hic_is_ota_alias_email($e){
+    if (empty($e) || !is_string($e)) return false;
+    $e = strtolower(trim($e));
+    
+    // Validate email format first
+    if (!filter_var($e, FILTER_VALIDATE_EMAIL)) return false;
+    
+    $domains = array(
+      'guest.booking.com', 'message.booking.com',
+      'guest.airbnb.com','airbnb.com',
+      'expedia.com','stay.expedia.com','guest.expediapartnercentral.com'
+    );
+    
+    foreach ($domains as $d) {
+        if (substr($e, -strlen('@'.$d)) === '@'.$d) return true;
+    }
+    return false;
 }
 
 function hic_booking_uid($reservation) {
@@ -102,4 +126,44 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   remove_filter('wp_mail_content_type', $content_type_filter);
 
   hic_log('Email admin inviata (bucket='.$bucket.') a '.$to);
+}
+
+/* ============ Email Enrichment Functions ============ */
+function hic_mark_email_enriched($reservation_id, $real_email) {
+    if (empty($reservation_id) || !is_scalar($reservation_id)) {
+        hic_log('hic_mark_email_enriched: reservation_id is empty or not scalar');
+        return false;
+    }
+    
+    if (empty($real_email) || !is_string($real_email) || !hic_is_valid_email($real_email)) {
+        hic_log('hic_mark_email_enriched: real_email is empty, not string, or invalid email format');
+        return false;
+    }
+    
+    $email_map = get_option('hic_res_email_map', array());
+    if (!is_array($email_map)) {
+        $email_map = array(); // Reset if corrupted
+    }
+    
+    $email_map[$reservation_id] = $real_email;
+    
+    // Keep only last 5k entries (FIFO) to prevent bloat
+    if (count($email_map) > 5000) {
+        $email_map = array_slice($email_map, -5000, null, true);
+    }
+    
+    return update_option('hic_res_email_map', $email_map, false); // autoload=false
+}
+
+function hic_get_reservation_email($reservation_id) {
+    if (empty($reservation_id) || !is_scalar($reservation_id)) {
+        return null;
+    }
+    
+    $email_map = get_option('hic_res_email_map', array());
+    if (!is_array($email_map)) {
+        return null; // Corrupted data
+    }
+    
+    return isset($email_map[$reservation_id]) ? $email_map[$reservation_id] : null;
 }

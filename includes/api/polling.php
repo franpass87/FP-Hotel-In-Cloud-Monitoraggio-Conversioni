@@ -43,6 +43,30 @@ add_filter('cron_schedules', function($schedules) {
 // Funzione di polling API
 add_action('hic_api_poll_event', 'hic_api_poll_bookings');
 
+// New updates polling system
+add_action('init', function() {
+  $should_schedule_updates = false;
+  
+  if (hic_get_connection_type() === 'api' && hic_get_api_url() && hic_updates_enrich_contacts()) {
+    $has_basic_auth = hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+    $should_schedule_updates = $has_basic_auth;
+  }
+  
+  if ($should_schedule_updates) {
+    if (!wp_next_scheduled('hic_api_updates_event')) {
+      wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event');
+    }
+  } else {
+    $timestamp = wp_next_scheduled('hic_api_updates_event');
+    if ($timestamp) {
+      wp_unschedule_event($timestamp, 'hic_api_updates_event');
+    }
+  }
+});
+
+// Updates polling function
+add_action('hic_api_updates_event', 'hic_api_poll_updates');
+
 /**
  * Chiama HIC: GET /reservations/{propId}
  */
@@ -78,7 +102,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     }
 
     // Log di debug iniziale (ridotto)
-    hic_log(['hic_reservations_count' => is_array($data) ? count($data) : 0]);
+    hic_log(array('hic_reservations_count' => is_array($data) ? count($data) : 0));
 
     // Processa singole prenotazioni con la nuova pipeline
     if (is_array($data)) {
@@ -147,8 +171,8 @@ function hic_should_process_reservation($reservation) {
  */
 function hic_transform_reservation($reservation) {
     $currency = hic_get_currency();
-    $price = hic_normalize_price($reservation['price'] ?? 0);
-    $unpaid_balance = hic_normalize_price($reservation['unpaid_balance'] ?? 0);
+    $price = hic_normalize_price(isset($reservation['price']) ? $reservation['price'] : 0);
+    $unpaid_balance = hic_normalize_price(isset($reservation['unpaid_balance']) ? $reservation['unpaid_balance'] : 0);
     
     // Calculate value (use net value if configured)
     $value = $price;
@@ -157,37 +181,46 @@ function hic_transform_reservation($reservation) {
     }
     
     // Normalize guests
-    $guests = max(1, intval($reservation['guests'] ?? 1));
+    $guests = max(1, intval(isset($reservation['guests']) ? $reservation['guests'] : 1));
     
-    // Normalize language
+    // Normalize language - check all possible fields
     $language = '';
+    $lang_value = '';
     if (!empty($reservation['language']) && is_string($reservation['language'])) {
-        $lang = strtolower(trim($reservation['language']));
+        $lang_value = $reservation['language'];
+    } elseif (!empty($reservation['lang']) && is_string($reservation['lang'])) {
+        $lang_value = $reservation['lang']; 
+    } elseif (!empty($reservation['lingua']) && is_string($reservation['lingua'])) {
+        $lang_value = $reservation['lingua'];
+    }
+    
+    if (!empty($lang_value)) {
+        $lang = strtolower(trim($lang_value));
         if (strlen($lang) >= 2) {
             $language = substr($lang, 0, 2); // Extract first 2 chars
         }
     }
     
-    return [
+    return array(
         'transaction_id' => $reservation['id'],
-        'reservation_code' => $reservation['reservation_code'] ?? '',
+        'reservation_code' => isset($reservation['reservation_code']) ? $reservation['reservation_code'] : '',
         'value' => $value,
         'currency' => $currency,
         'accommodation_id' => $reservation['accommodation_id'],
         'accommodation_name' => $reservation['accommodation_name'],
-        'room_name' => $reservation['room_name'] ?? '',
+        'room_name' => isset($reservation['room_name']) ? $reservation['room_name'] : '',
         'guests' => $guests,
         'from_date' => $reservation['from_date'],
         'to_date' => $reservation['to_date'],
-        'presence' => $reservation['presence'] ?? '',
+        'presence' => isset($reservation['presence']) ? $reservation['presence'] : '',
         'unpaid_balance' => $unpaid_balance,
-        'guest_first_name' => $reservation['guest_first_name'] ?? '',
-        'guest_last_name' => $reservation['guest_last_name'] ?? '',
-        'email' => $reservation['email'] ?? '',
-        'phone' => $reservation['phone'] ?? '',
+        'guest_first_name' => isset($reservation['guest_first_name']) ? $reservation['guest_first_name'] : '',
+        'guest_last_name' => isset($reservation['guest_last_name']) ? $reservation['guest_last_name'] : '',
+        'email' => isset($reservation['email']) ? $reservation['email'] : '',
+        'phone' => isset($reservation['phone']) ? $reservation['phone'] : '',
         'language' => $language,
         'original_price' => $price
-    ];
+    );
 }
 
 /**
@@ -223,7 +256,7 @@ function hic_dispatch_reservation($transformed, $original) {
  */
 function hic_is_reservation_already_processed($uid) {
     if (empty($uid)) return false;
-    $synced = get_option('hic_synced_res_ids', []);
+    $synced = get_option('hic_synced_res_ids', array());
     return in_array($uid, $synced);
 }
 
@@ -231,7 +264,7 @@ function hic_mark_reservation_processed($reservation) {
     $uid = hic_booking_uid($reservation);
     if (empty($uid)) return;
     
-    $synced = get_option('hic_synced_res_ids', []);
+    $synced = get_option('hic_synced_res_ids', array());
     if (!in_array($uid, $synced)) {
         $synced[] = $uid;
         
@@ -349,4 +382,123 @@ function hic_legacy_api_poll_bookings() {
 
   // Aggiorna il timestamp dell'ultimo polling
   update_option('hic_last_api_poll', $current_time);
+}
+
+/**
+ * New updates polling wrapper function
+ */
+function hic_api_poll_updates(){
+    $prop = hic_get_property_id();
+    $since = get_option('hic_last_updates_since', time() - DAY_IN_SECONDS);
+    $out = hic_fetch_reservations_updates($prop, $since, 200); // limit opzionale se supportato
+    if (!is_wp_error($out)) {
+        update_option('hic_last_updates_since', time());
+    }
+}
+
+/**
+ * Fetch reservation updates from HIC API
+ */
+function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
+    $base = rtrim(hic_get_api_url(), '/'); // .../api/partner
+    $email = hic_get_api_email(); 
+    $pass = hic_get_api_password();
+    if (!$base || !$email || !$pass || !$prop_id) {
+        return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti per updates');
+    }
+    
+    $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
+    $args = array('since' => $since);
+    if ($limit) $args['limit'] = $limit;
+    $url = add_query_arg($args, $endpoint);
+    
+    $res = wp_remote_get($url, array(
+      'timeout'=>30,
+      'headers'=>array(
+        'Authorization'=>'Basic '.base64_encode("$email:$pass"), 
+        'Accept'=>'application/json',
+        'User-Agent'=>'WP/FP-HIC-Plugin'
+      )
+    ));
+    
+    if (is_wp_error($res)) { 
+        hic_log('HIC updates connessione fallita: '.$res->get_error_message()); 
+        return $res; 
+    }
+    
+    $code = wp_remote_retrieve_response_code($res);
+    if ($code !== 200) { 
+        hic_log("HIC updates HTTP $code"); 
+        return new WP_Error('hic_http', "HTTP $code"); 
+    }
+
+    $body = wp_remote_retrieve_body($res);
+    $data = json_decode($body, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        hic_log('HIC updates JSON error: '.json_last_error_msg());
+        return new WP_Error('hic_json', 'JSON malformato');
+    }
+
+    // Log di debug iniziale
+    hic_log(array('hic_updates_count' => is_array($data) ? count($data) : 0));
+
+    // Process each update
+    if (is_array($data)) {
+        foreach ($data as $u) {
+            try {
+                hic_process_update($u);
+            } catch (Exception $e) { 
+                hic_log('Process update error: '.$e->getMessage()); 
+            }
+        }
+    }
+    
+    return $data;
+}
+
+/**
+ * Process a single reservation update
+ */
+function hic_process_update(array $u){
+    // Validate input array
+    if (!is_array($u) || empty($u)) {
+        hic_log('hic_process_update: invalid or empty update array');
+        return;
+    }
+    
+    // Get reservation ID with proper validation
+    $id = isset($u['id']) ? $u['id'] : null;
+    if (empty($id) || !is_scalar($id)) {
+        hic_log('hic_process_update: missing or invalid reservation id');
+        return;
+    }
+
+    // Validate and get email
+    $email = isset($u['email']) ? $u['email'] : null;
+    if (empty($email) || !is_string($email)) {
+        hic_log("hic_process_update: no valid email in update for reservation $id");
+        return;
+    }
+    
+    $is_alias = hic_is_ota_alias_email($email);
+
+    // Se c'è un'email reale nuova che sostituisce un alias
+    if (!$is_alias && hic_is_valid_email($email)) {
+        // upsert Brevo con vera email + liste by language
+        $t = hic_transform_reservation($u); // riusa normalizzazioni
+        if ($t !== false && is_array($t)) {
+            hic_dispatch_brevo_reservation($t, true); // aggiorna contatto with enrichment flag
+            // aggiorna store locale per id -> true_email
+            hic_mark_email_enriched($id, $email);
+            hic_log("Enriched email for reservation $id");
+        } else {
+            hic_log("hic_process_update: failed to transform reservation $id");
+        }
+    }
+
+    // Se cambia presence e impostazione consente aggiornamenti:
+    if (hic_allow_status_updates() && !empty($u['presence'])) {
+        hic_log("Reservation $id presence update: ".$u['presence']);
+        // opzionale: dispatch evento custom (no purchase)
+    }
 }
