@@ -41,6 +41,21 @@ Parametri:
 - `to_date`: Data fine (formato Y-m-d)  
 - `limit`: Numero massimo di risultati (opzionale)
 
+### Diagnostici e Test
+
+Il plugin include una pagina di diagnostici completa accessibile da **WordPress Admin > Impostazioni > HIC Monitoring** (scheda "Diagnostics").
+
+#### Funzione Test Dispatch
+La funzione "Test Dispatch Funzioni" permette di testare tutte le integrazioni con dati di esempio:
+
+- **GA4**: Invio evento purchase di test
+- **Facebook Meta**: Invio evento Purchase di test  
+- **Brevo**: Creazione contatto di test
+- **Email Admin**: Invio email di notifica all'amministratore
+- **Email Francesco**: Invio email a francesco.passeri@gmail.com (se abilitato)
+
+**Nota**: Le email di test vengono inviate agli indirizzi configurati nelle impostazioni del plugin, permettendo di verificare che il sistema di notifiche email funzioni correttamente.
+
 ## Note su Privacy e Rate Limits
 
 - Il plugin rispetta i rate limits delle API Hotel in Cloud
