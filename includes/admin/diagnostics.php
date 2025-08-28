@@ -189,42 +189,103 @@ function hic_execute_manual_cron($event_name) {
  * Test dispatch functions with sample data
  */
 function hic_test_dispatch_functions() {
+    // Test data for webhook-style integrations (legacy format)
     $test_data = array(
-        'transaction_id' => 'TEST_' . time(),
-        'value' => 100.00,
+        'reservation_id' => 'TEST_' . time(),
+        'id' => 'TEST_' . time(),
+        'amount' => 100.00,
         'currency' => 'EUR',
         'email' => 'test@example.com',
-        'accommodation_name' => 'Test Hotel',
-        'guest_first_name' => 'John',
-        'guest_last_name' => 'Doe',
-        'language' => 'en'
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+        'lingua' => 'it',
+        'room' => 'Standard Room',
+        'checkin' => date('Y-m-d', strtotime('+7 days')),
+        'checkout' => date('Y-m-d', strtotime('+10 days'))
     );
     
     $results = array();
     
     try {
-        // Test GA4
+        // Test with both organic (manual) and paid (gads) scenarios
+        
+        // === TEST SCENARIO 1: Organic/Manual (no tracking IDs) ===
+        $organic_gclid = null;
+        $organic_fbclid = null;
+        $organic_sid = 'test_organic_' . time();
+        
+        // Test GA4 (Organic)
         if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
-            hic_dispatch_ga4_reservation($test_data);
-            $results['ga4'] = 'Test event sent to GA4';
+            hic_send_to_ga4($test_data, $organic_gclid, $organic_fbclid);
+            $results['ga4_organic'] = 'Test organic event sent to GA4';
         } else {
-            $results['ga4'] = 'GA4 not configured';
+            $results['ga4_organic'] = 'GA4 not configured';
         }
         
-        // Test Facebook
+        // Test Facebook (Organic)
         if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
-            hic_dispatch_pixel_reservation($test_data);
-            $results['facebook'] = 'Test event sent to Facebook';
+            hic_send_to_fb($test_data, $organic_gclid, $organic_fbclid);
+            $results['facebook_organic'] = 'Test organic event sent to Facebook';
         } else {
-            $results['facebook'] = 'Facebook not configured';
+            $results['facebook_organic'] = 'Facebook not configured';
         }
         
-        // Test Brevo
+        // Test Brevo (Organic)
         if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
-            hic_dispatch_brevo_reservation($test_data);
-            $results['brevo'] = 'Test contact sent to Brevo';
+            hic_send_brevo_contact($test_data, $organic_gclid, $organic_fbclid);
+            hic_send_brevo_event($test_data, $organic_gclid, $organic_fbclid);
+            $results['brevo_organic'] = 'Test organic contact sent to Brevo';
         } else {
-            $results['brevo'] = 'Brevo not configured or disabled';
+            $results['brevo_organic'] = 'Brevo not configured or disabled';
+        }
+        
+        // === TEST SCENARIO 2: Paid Traffic (Google Ads) ===
+        $paid_gclid = 'test_gclid_' . time();
+        $paid_fbclid = null;
+        $paid_sid = 'test_gads_' . time();
+        
+        // Test GA4 (Paid)
+        if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
+            hic_send_to_ga4($test_data, $paid_gclid, $paid_fbclid);
+            $results['ga4_paid'] = 'Test paid (gads) event sent to GA4';
+        } else {
+            $results['ga4_paid'] = 'GA4 not configured';
+        }
+        
+        // Test Facebook (Paid)
+        if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
+            hic_send_to_fb($test_data, $paid_gclid, $paid_fbclid);
+            $results['facebook_paid'] = 'Test paid (gads) event sent to Facebook';
+        } else {
+            $results['facebook_paid'] = 'Facebook not configured';
+        }
+        
+        // Test Brevo (Paid)
+        if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
+            hic_send_brevo_contact($test_data, $paid_gclid, $paid_fbclid);
+            hic_send_brevo_event($test_data, $paid_gclid, $paid_fbclid);
+            $results['brevo_paid'] = 'Test paid (gads) contact sent to Brevo';
+        } else {
+            $results['brevo_paid'] = 'Brevo not configured or disabled';
+        }
+        
+        // === EMAIL TESTS (Both scenarios use same email functions) ===
+        
+        // Test Admin Email
+        $admin_email = hic_get_admin_email();
+        if (!empty($admin_email)) {
+            hic_send_admin_email($test_data, $organic_gclid, $organic_fbclid, $organic_sid);
+            $results['admin_email'] = 'Test email sent to admin: ' . $admin_email . ' (bucket: organic)';
+        } else {
+            $results['admin_email'] = 'Admin email not configured';
+        }
+        
+        // Test Francesco Email
+        if (hic_francesco_email_enabled()) {
+            hic_send_francesco_email($test_data, $paid_gclid, $paid_fbclid, $paid_sid);
+            $results['francesco_email'] = 'Test email sent to Francesco (bucket: gads)';
+        } else {
+            $results['francesco_email'] = 'Francesco email disabled in settings';
         }
         
         return array('success' => true, 'results' => $results);
@@ -520,6 +581,124 @@ function hic_diagnostics_page() {
                 </p>
             </div>
             
+            <!-- Manual Booking Diagnostics Section -->
+            <div class="card">
+                <h2>Diagnostica Prenotazioni Manuali</h2>
+                <?php 
+                $connection_type = hic_get_connection_type();
+                $webhook_token = hic_get_webhook_token();
+                $manual_booking_issues = array();
+                
+                // Check for manual booking configuration issues
+                if ($connection_type === 'webhook') {
+                    if (empty($webhook_token)) {
+                        $manual_booking_issues[] = array(
+                            'type' => 'error',
+                            'message' => 'Webhook token non configurato: le prenotazioni manuali potrebbero non essere inviate automaticamente.'
+                        );
+                    }
+                    $manual_booking_issues[] = array(
+                        'type' => 'warning', 
+                        'message' => 'Modalità Webhook: Hotel in Cloud deve inviare webhook per TUTTE le prenotazioni, incluse quelle manuali.'
+                    );
+                } elseif ($connection_type === 'api') {
+                    if (!$cron_status['poll_event']['scheduled']) {
+                        $manual_booking_issues[] = array(
+                            'type' => 'error',
+                            'message' => 'API Polling non schedulato: le prenotazioni manuali non verranno recuperate automaticamente.'
+                        );
+                    } else {
+                        $manual_booking_issues[] = array(
+                            'type' => 'info',
+                            'message' => 'Modalità API Polling: le prenotazioni manuali vengono recuperate automaticamente ogni 5 minuti.'
+                        );
+                    }
+                }
+                ?>
+                
+                <table class="widefat">
+                    <tr>
+                        <td>Modalità Connessione</td>
+                        <td>
+                            <strong><?php echo ucfirst(esc_html($connection_type)); ?></strong>
+                            <?php if ($connection_type === 'api'): ?>
+                                <span class="status ok">✓ Migliore per prenotazioni manuali</span>
+                            <?php else: ?>
+                                <span class="status warning">⚠ Dipende dalla configurazione webhook</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    
+                    <?php if ($connection_type === 'webhook'): ?>
+                    <tr>
+                        <td>Webhook Token</td>
+                        <td>
+                            <?php if (!empty($webhook_token)): ?>
+                                <span class="status ok">✓ Configurato</span>
+                            <?php else: ?>
+                                <span class="status error">✗ NON configurato</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>URL Webhook</td>
+                        <td>
+                            <code><?php 
+                            if (!empty($webhook_token)) {
+                                echo home_url('/wp-json/hic/v1/conversion?token=***'); 
+                            } else {
+                                echo home_url('/wp-json/hic/v1/conversion?token=CONFIGURA_TOKEN_PRIMA');
+                            }
+                            ?></code>
+                            <?php if (empty($webhook_token)): ?>
+                                <br><small style="color: #dc3232;">⚠ Configura il token nelle impostazioni prima di usare questo URL</small>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                    
+                    <?php if ($connection_type === 'api'): ?>
+                    <tr>
+                        <td>Prossimo Polling</td>
+                        <td>
+                            <?php if ($cron_status['poll_event']['scheduled']): ?>
+                                <span class="status ok"><?php echo esc_html($cron_status['poll_event']['next_run_human']); ?></span>
+                            <?php else: ?>
+                                <span class="status error">Non schedulato</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
+                
+                <?php if (!empty($manual_booking_issues)): ?>
+                <div class="manual-booking-alerts">
+                    <h3>Avvisi e Raccomandazioni</h3>
+                    <?php foreach ($manual_booking_issues as $issue): ?>
+                        <div class="notice notice-<?php echo $issue['type'] === 'error' ? 'error' : ($issue['type'] === 'warning' ? 'warning' : 'info'); ?> inline">
+                            <p><?php echo esc_html($issue['message']); ?></p>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                
+                <div class="manual-booking-recommendations">
+                    <h3>Raccomandazioni per Prenotazioni Manuali</h3>
+                    <ul>
+                        <?php if ($connection_type === 'webhook'): ?>
+                            <li><strong>Verifica configurazione Hotel in Cloud:</strong> Assicurati che i webhook siano configurati per inviare TUTTE le prenotazioni</li>
+                            <li><strong>Considera API Polling:</strong> Per maggiore affidabilità, valuta il passaggio alla modalità "API Polling"</li>
+                            <li><strong>Test webhook:</strong> Usa il pulsante "Test Dispatch Funzioni" per verificare che le integrazioni funzionino</li>
+                        <?php else: ?>
+                            <li><strong>Modalità consigliata:</strong> API Polling è la modalità migliore per catturare automaticamente le prenotazioni manuali</li>
+                            <li><strong>Frequenza polling:</strong> Il sistema controlla nuove prenotazioni ogni 5 minuti</li>
+                            <li><strong>Verifica credenziali:</strong> Assicurati che le credenziali API siano corrette</li>
+                        <?php endif; ?>
+                        <li><strong>Monitoraggio log:</strong> Controlla la sezione "Log Recenti" per errori o problemi</li>
+                    </ul>
+                </div>
+            </div>
+            
             <!-- System Cron Section -->
             <div class="card">
                 <h2>Configurazione Cron di Sistema</h2>
@@ -709,8 +888,36 @@ function hic_diagnostics_page() {
         }
         .status.ok { color: #46b450; font-weight: bold; }
         .status.error { color: #dc3232; font-weight: bold; }
+        .status.warning { color: #ffb900; font-weight: bold; }
         .status.scheduled { color: #0073aa; font-weight: bold; }
         .status.not-scheduled { color: #ffb900; font-weight: bold; }
+        .manual-booking-alerts {
+            margin-top: 15px;
+        }
+        .manual-booking-alerts h3 {
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .manual-booking-recommendations {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f7f7f7;
+            border-left: 4px solid #0073aa;
+        }
+        .manual-booking-recommendations h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .manual-booking-recommendations ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .manual-booking-recommendations li {
+            margin-bottom: 8px;
+        }
         #hic-recent-logs div { 
             margin-bottom: 2px; 
             padding: 2px 0;
