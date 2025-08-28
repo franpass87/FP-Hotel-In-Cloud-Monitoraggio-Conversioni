@@ -189,6 +189,7 @@ function hic_execute_manual_cron($event_name) {
  * Test dispatch functions with sample data
  */
 function hic_test_dispatch_functions() {
+    // Test data for integrations (GA4/Facebook/Brevo)
     $test_data = array(
         'transaction_id' => 'TEST_' . time(),
         'value' => 100.00,
@@ -198,6 +199,21 @@ function hic_test_dispatch_functions() {
         'guest_first_name' => 'John',
         'guest_last_name' => 'Doe',
         'language' => 'en'
+    );
+    
+    // Test data for email functions (legacy format)
+    $email_test_data = array(
+        'reservation_id' => 'TEST_' . time(),
+        'id' => 'TEST_' . time(),
+        'amount' => 100.00,
+        'currency' => 'EUR',
+        'email' => 'test@example.com',
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+        'lingua' => 'it',
+        'room' => 'Standard Room',
+        'checkin' => date('Y-m-d', strtotime('+7 days')),
+        'checkout' => date('Y-m-d', strtotime('+10 days'))
     );
     
     $results = array();
@@ -225,6 +241,31 @@ function hic_test_dispatch_functions() {
             $results['brevo'] = 'Test contact sent to Brevo';
         } else {
             $results['brevo'] = 'Brevo not configured or disabled';
+        }
+        
+        // Test Admin Email
+        $admin_email = hic_get_admin_email();
+        if (!empty($admin_email)) {
+            $test_gclid = 'test_gclid_' . time();
+            $test_fbclid = null;
+            $test_sid = 'test_sid_' . time();
+            
+            hic_send_admin_email($email_test_data, $test_gclid, $test_fbclid, $test_sid);
+            $results['admin_email'] = 'Test email sent to admin: ' . $admin_email;
+        } else {
+            $results['admin_email'] = 'Admin email not configured';
+        }
+        
+        // Test Francesco Email
+        if (hic_francesco_email_enabled()) {
+            $test_gclid = 'test_gclid_' . time();
+            $test_fbclid = null;
+            $test_sid = 'test_sid_' . time();
+            
+            hic_send_francesco_email($email_test_data, $test_gclid, $test_fbclid, $test_sid);
+            $results['francesco_email'] = 'Test email sent to Francesco';
+        } else {
+            $results['francesco_email'] = 'Francesco email disabled in settings';
         }
         
         return array('success' => true, 'results' => $results);
