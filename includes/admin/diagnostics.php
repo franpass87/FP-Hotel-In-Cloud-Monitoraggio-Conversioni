@@ -189,20 +189,8 @@ function hic_execute_manual_cron($event_name) {
  * Test dispatch functions with sample data
  */
 function hic_test_dispatch_functions() {
-    // Test data for integrations (GA4/Facebook/Brevo)
+    // Test data for webhook-style integrations (legacy format)
     $test_data = array(
-        'transaction_id' => 'TEST_' . time(),
-        'value' => 100.00,
-        'currency' => 'EUR',
-        'email' => 'test@example.com',
-        'accommodation_name' => 'Test Hotel',
-        'guest_first_name' => 'John',
-        'guest_last_name' => 'Doe',
-        'language' => 'en'
-    );
-    
-    // Test data for email functions (legacy format)
-    $email_test_data = array(
         'reservation_id' => 'TEST_' . time(),
         'id' => 'TEST_' . time(),
         'amount' => 100.00,
@@ -219,51 +207,83 @@ function hic_test_dispatch_functions() {
     $results = array();
     
     try {
-        // Test GA4
+        // Test with both organic (manual) and paid (gads) scenarios
+        
+        // === TEST SCENARIO 1: Organic/Manual (no tracking IDs) ===
+        $organic_gclid = null;
+        $organic_fbclid = null;
+        $organic_sid = 'test_organic_' . time();
+        
+        // Test GA4 (Organic)
         if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
-            hic_dispatch_ga4_reservation($test_data);
-            $results['ga4'] = 'Test event sent to GA4';
+            hic_send_to_ga4($test_data, $organic_gclid, $organic_fbclid);
+            $results['ga4_organic'] = 'Test organic event sent to GA4';
         } else {
-            $results['ga4'] = 'GA4 not configured';
+            $results['ga4_organic'] = 'GA4 not configured';
         }
         
-        // Test Facebook
+        // Test Facebook (Organic)
         if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
-            hic_dispatch_pixel_reservation($test_data);
-            $results['facebook'] = 'Test event sent to Facebook';
+            hic_send_to_fb($test_data, $organic_gclid, $organic_fbclid);
+            $results['facebook_organic'] = 'Test organic event sent to Facebook';
         } else {
-            $results['facebook'] = 'Facebook not configured';
+            $results['facebook_organic'] = 'Facebook not configured';
         }
         
-        // Test Brevo
+        // Test Brevo (Organic)
         if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
-            hic_dispatch_brevo_reservation($test_data);
-            $results['brevo'] = 'Test contact sent to Brevo';
+            hic_send_brevo_contact($test_data, $organic_gclid, $organic_fbclid);
+            hic_send_brevo_event($test_data, $organic_gclid, $organic_fbclid);
+            $results['brevo_organic'] = 'Test organic contact sent to Brevo';
         } else {
-            $results['brevo'] = 'Brevo not configured or disabled';
+            $results['brevo_organic'] = 'Brevo not configured or disabled';
         }
+        
+        // === TEST SCENARIO 2: Paid Traffic (Google Ads) ===
+        $paid_gclid = 'test_gclid_' . time();
+        $paid_fbclid = null;
+        $paid_sid = 'test_gads_' . time();
+        
+        // Test GA4 (Paid)
+        if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
+            hic_send_to_ga4($test_data, $paid_gclid, $paid_fbclid);
+            $results['ga4_paid'] = 'Test paid (gads) event sent to GA4';
+        } else {
+            $results['ga4_paid'] = 'GA4 not configured';
+        }
+        
+        // Test Facebook (Paid)
+        if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
+            hic_send_to_fb($test_data, $paid_gclid, $paid_fbclid);
+            $results['facebook_paid'] = 'Test paid (gads) event sent to Facebook';
+        } else {
+            $results['facebook_paid'] = 'Facebook not configured';
+        }
+        
+        // Test Brevo (Paid)
+        if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
+            hic_send_brevo_contact($test_data, $paid_gclid, $paid_fbclid);
+            hic_send_brevo_event($test_data, $paid_gclid, $paid_fbclid);
+            $results['brevo_paid'] = 'Test paid (gads) contact sent to Brevo';
+        } else {
+            $results['brevo_paid'] = 'Brevo not configured or disabled';
+        }
+        
+        // === EMAIL TESTS (Both scenarios use same email functions) ===
         
         // Test Admin Email
         $admin_email = hic_get_admin_email();
         if (!empty($admin_email)) {
-            $test_gclid = 'test_gclid_' . time();
-            $test_fbclid = null;
-            $test_sid = 'test_sid_' . time();
-            
-            hic_send_admin_email($email_test_data, $test_gclid, $test_fbclid, $test_sid);
-            $results['admin_email'] = 'Test email sent to admin: ' . $admin_email;
+            hic_send_admin_email($test_data, $organic_gclid, $organic_fbclid, $organic_sid);
+            $results['admin_email'] = 'Test email sent to admin: ' . $admin_email . ' (bucket: organic)';
         } else {
             $results['admin_email'] = 'Admin email not configured';
         }
         
         // Test Francesco Email
         if (hic_francesco_email_enabled()) {
-            $test_gclid = 'test_gclid_' . time();
-            $test_fbclid = null;
-            $test_sid = 'test_sid_' . time();
-            
-            hic_send_francesco_email($email_test_data, $test_gclid, $test_fbclid, $test_sid);
-            $results['francesco_email'] = 'Test email sent to Francesco';
+            hic_send_francesco_email($test_data, $paid_gclid, $paid_fbclid, $paid_sid);
+            $results['francesco_email'] = 'Test email sent to Francesco (bucket: gads)';
         } else {
             $results['francesco_email'] = 'Francesco email disabled in settings';
         }
