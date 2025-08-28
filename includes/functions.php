@@ -123,8 +123,8 @@ function hic_log($msg){
  * @return string One of: 'gads', 'fbads', 'organic'
  */
 function fp_normalize_bucket($gclid, $fbclid){
-  if (!empty($gclid))  return 'gads';
-  if (!empty($fbclid)) return 'fbads';
+  if (!empty($gclid) && trim($gclid) !== '')  return 'gads';
+  if (!empty($fbclid) && trim($fbclid) !== '') return 'fbads';
   return 'organic';
 }
 
