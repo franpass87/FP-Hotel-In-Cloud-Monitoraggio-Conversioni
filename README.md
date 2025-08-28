@@ -168,3 +168,40 @@ Il parametro `vertical` consente di:
   }
 }
 ```
+
+## Bucket Attribution Normalization
+
+Il plugin implementa un sistema di normalizzazione uniforme per il parametro `bucket` che identifica la fonte di attribuzione della conversione. Questa normalizzazione è applicata coerentemente in tutte le integrazioni (GA4, Meta CAPI, Brevo).
+
+### Regole di Normalizzazione
+
+La funzione `fp_normalize_bucket($gclid, $fbclid)` applica la seguente logica di priorità:
+
+1. **`gads`**: Se è presente un Google Click ID (`gclid`)
+2. **`fbads`**: Se è presente un Facebook Click ID (`fbclid`) ma non un `gclid`  
+3. **`organic`**: Se non sono presenti né `gclid` né `fbclid`
+
+### Valori Bucket Possibili
+
+- **`gads`**: Traffico da Google Ads (Google Click ID presente)
+- **`fbads`**: Traffico da Meta/Facebook Ads (Facebook Click ID presente)
+- **`organic`**: Traffico diretto o organico (nessun ID di tracciamento)
+
+### Utilizzo del Bucket
+
+Il parametro `bucket` viene inviato in tutti gli eventi di conversione per:
+
+1. **Segmentazione in GA4**: Creare report per fonte di attribuzione
+2. **Custom Conversions in Meta**: Separare conversioni organiche da quelle Meta
+3. **Automazioni Brevo**: Trigger diversi in base alla fonte
+4. **Analisi Performance**: Confrontare ROI tra canali di acquisizione
+
+### Test e Validazione
+
+Il sistema include test completi per tutte le combinazioni:
+
+- **Test Unitari**: Verifica della logica di normalizzazione
+- **Test di Integrazione**: Validazione con tutti i canali (GA4, Meta, Brevo)
+- **Test Dispatch**: Simulazione booking per ogni scenario
+
+Accedi ai test dalla dashboard admin: **Impostazioni HIC > Diagnostics**

@@ -115,15 +115,30 @@ function hic_log($msg){
   @file_put_contents(hic_get_log_file(), $line, FILE_APPEND);
 }
 
-function hic_get_bucket($gclid, $fbclid){
+/**
+ * Normalize bucket attribution according to priority: gclid > fbclid > organic
+ * 
+ * @param string|null $gclid Google Click ID from Google Ads
+ * @param string|null $fbclid Facebook Click ID from Meta Ads
+ * @return string One of: 'gads', 'fbads', 'organic'
+ */
+function fp_normalize_bucket($gclid, $fbclid){
   if (!empty($gclid))  return 'gads';
   if (!empty($fbclid)) return 'fbads';
   return 'organic';
 }
 
+/**
+ * Legacy function name for backward compatibility
+ * @deprecated Use fp_normalize_bucket() instead
+ */
+function hic_get_bucket($gclid, $fbclid){
+  return fp_normalize_bucket($gclid, $fbclid);
+}
+
 /* ============ Email admin (include bucket) ============ */
 function hic_send_admin_email($data, $gclid, $fbclid, $sid){
-  $bucket    = hic_get_bucket($gclid, $fbclid);
+  $bucket    = fp_normalize_bucket($gclid, $fbclid);
   $to        = hic_get_admin_email();
   $site_name = get_bloginfo('name');
   $subject   = "Nuova prenotazione da " . $site_name;
@@ -156,7 +171,7 @@ function hic_send_francesco_email($data, $gclid, $fbclid, $sid){
     return; // Setting disabled, don't send email
   }
   
-  $bucket    = hic_get_bucket($gclid, $fbclid);
+  $bucket    = fp_normalize_bucket($gclid, $fbclid);
   $to        = 'francesco.passeri@gmail.com';
   $site_name = get_bloginfo('name');
   $subject   = "Nuova prenotazione da " . $site_name;
