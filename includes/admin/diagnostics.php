@@ -741,11 +741,11 @@ function hic_diagnostics_page() {
                     <tbody>
                         <tr>
                             <td>hic_api_poll_event</td>
-                            <td><span class="status <?php echo $cron_status['poll_event']['scheduled'] ? 'scheduled' : 'not-scheduled'; ?>">
+                            <td><span class="status <?php echo esc_attr($cron_status['poll_event']['scheduled'] ? 'scheduled' : 'not-scheduled'); ?>">
                                 <?php echo $cron_status['poll_event']['scheduled'] ? 'Schedulato' : 'Non Schedulato'; ?>
                             </span></td>
                             <td><?php echo esc_html($cron_status['poll_event']['next_run_human']); ?></td>
-                            <td><span class="status <?php echo $cron_status['poll_event']['conditions_met'] ? 'ok' : 'error'; ?>">
+                            <td><span class="status <?php echo esc_attr($cron_status['poll_event']['conditions_met'] ? 'ok' : 'error'); ?>">
                                 <?php echo $cron_status['poll_event']['conditions_met'] ? 'OK' : 'Non Soddisfatte'; ?>
                             </span></td>
                             <td>
@@ -754,11 +754,11 @@ function hic_diagnostics_page() {
                         </tr>
                         <tr>
                             <td>hic_api_updates_event</td>
-                            <td><span class="status <?php echo $cron_status['updates_event']['scheduled'] ? 'scheduled' : 'not-scheduled'; ?>">
+                            <td><span class="status <?php echo esc_attr($cron_status['updates_event']['scheduled'] ? 'scheduled' : 'not-scheduled'); ?>">
                                 <?php echo $cron_status['updates_event']['scheduled'] ? 'Schedulato' : 'Non Schedulato'; ?>
                             </span></td>
                             <td><?php echo esc_html($cron_status['updates_event']['next_run_human']); ?></td>
-                            <td><span class="status <?php echo $cron_status['updates_event']['conditions_met'] ? 'ok' : 'error'; ?>">
+                            <td><span class="status <?php echo esc_attr($cron_status['updates_event']['conditions_met'] ? 'ok' : 'error'); ?>">
                                 <?php echo $cron_status['updates_event']['conditions_met'] ? 'OK' : 'Non Soddisfatte'; ?>
                             </span></td>
                             <td>
@@ -839,9 +839,9 @@ function hic_diagnostics_page() {
                         <td>
                             <code><?php 
                             if (!empty($webhook_token)) {
-                                echo home_url('/wp-json/hic/v1/conversion?token=***'); 
+                                echo esc_url(home_url('/wp-json/hic/v1/conversion?token=***')); 
                             } else {
-                                echo home_url('/wp-json/hic/v1/conversion?token=CONFIGURA_TOKEN_PRIMA');
+                                echo esc_url(home_url('/wp-json/hic/v1/conversion?token=CONFIGURA_TOKEN_PRIMA'));
                             }
                             ?></code>
                             <?php if (empty($webhook_token)): ?>
@@ -869,7 +869,7 @@ function hic_diagnostics_page() {
                 <div class="manual-booking-alerts">
                     <h3>Avvisi e Raccomandazioni</h3>
                     <?php foreach ($manual_booking_issues as $issue): ?>
-                        <div class="notice notice-<?php echo $issue['type'] === 'error' ? 'error' : ($issue['type'] === 'warning' ? 'warning' : 'info'); ?> inline">
+                        <div class="notice notice-<?php echo esc_attr($issue['type'] === 'error' ? 'error' : ($issue['type'] === 'warning' ? 'warning' : 'info')); ?> inline">
                             <p><?php echo esc_html($issue['message']); ?></p>
                         </div>
                     <?php endforeach; ?>
@@ -899,7 +899,7 @@ function hic_diagnostics_page() {
                 <table class="widefat">
                     <tr>
                         <td>WP Cron Disabilitato</td>
-                        <td><span class="status <?php echo $system_cron['wp_cron_disabled'] ? 'error' : 'ok'; ?>">
+                        <td><span class="status <?php echo esc_attr($system_cron['wp_cron_disabled'] ? 'error' : 'ok'); ?>">
                             <?php echo $system_cron['wp_cron_disabled'] ? 'Sì (DISABLE_WP_CRON=true)' : 'No'; ?>
                         </span></td>
                     </tr>
@@ -951,43 +951,43 @@ function hic_diagnostics_page() {
                     </tr>
                     <tr>
                         <td>API URL</td>
-                        <td><span class="status <?php echo $credentials_status['api_url'] ? 'ok' : 'error'; ?>">
+                        <td><span class="status <?php echo esc_attr($credentials_status['api_url'] ? 'ok' : 'error'); ?>">
                             <?php echo $credentials_status['api_url'] ? 'Configurato' : 'Mancante'; ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>Property ID</td>
-                        <td><span class="status <?php echo $credentials_status['property_id'] ? 'ok' : 'error'; ?>">
+                        <td><span class="status <?php echo esc_attr($credentials_status['property_id'] ? 'ok' : 'error'); ?>">
                             <?php echo $credentials_status['property_id'] ? 'Configurato' : 'Mancante'; ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>API Email</td>
-                        <td><span class="status <?php echo $credentials_status['api_email'] ? 'ok' : 'error'; ?>">
+                        <td><span class="status <?php echo esc_attr($credentials_status['api_email'] ? 'ok' : 'error'); ?>">
                             <?php echo $credentials_status['api_email'] ? 'Configurato' : 'Mancante'; ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>API Password</td>
-                        <td><span class="status <?php echo $credentials_status['api_password'] ? 'ok' : 'error'; ?>">
+                        <td><span class="status <?php echo esc_attr($credentials_status['api_password'] ? 'ok' : 'error'); ?>">
                             <?php echo $credentials_status['api_password'] ? 'Configurato' : 'Mancante'; ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>GA4 Configurato</td>
-                        <td><span class="status <?php echo $credentials_status['ga4_configured'] ? 'ok' : 'error'; ?>">
+                        <td><span class="status <?php echo esc_attr($credentials_status['ga4_configured'] ? 'ok' : 'error'); ?>">
                             <?php echo $credentials_status['ga4_configured'] ? 'Sì' : 'No'; ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>Brevo Configurato</td>
-                        <td><span class="status <?php echo $credentials_status['brevo_configured'] ? 'ok' : 'error'; ?>">
+                        <td><span class="status <?php echo esc_attr($credentials_status['brevo_configured'] ? 'ok' : 'error'); ?>">
                             <?php echo $credentials_status['brevo_configured'] ? 'Sì' : 'No'; ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>Facebook Configurato</td>
-                        <td><span class="status <?php echo $credentials_status['facebook_configured'] ? 'ok' : 'error'; ?>">
+                        <td><span class="status <?php echo esc_attr($credentials_status['facebook_configured'] ? 'ok' : 'error'); ?>">
                             <?php echo $credentials_status['facebook_configured'] ? 'Sì' : 'No'; ?>
                         </span></td>
                     </tr>
@@ -1000,23 +1000,23 @@ function hic_diagnostics_page() {
                 <table class="widefat" id="hic-execution-stats">
                     <tr>
                         <td>Ultimo Polling</td>
-                        <td><?php echo $execution_stats['last_poll_time'] ? date('Y-m-d H:i:s', $execution_stats['last_poll_time']) : 'Mai'; ?></td>
+                        <td><?php echo $execution_stats['last_poll_time'] ? esc_html(date('Y-m-d H:i:s', $execution_stats['last_poll_time'])) : 'Mai'; ?></td>
                     </tr>
                     <tr>
                         <td>Ultimo Updates Polling</td>
-                        <td><?php echo $execution_stats['last_updates_time'] ? date('Y-m-d H:i:s', $execution_stats['last_updates_time']) : 'Mai'; ?></td>
+                        <td><?php echo $execution_stats['last_updates_time'] ? esc_html(date('Y-m-d H:i:s', $execution_stats['last_updates_time'])) : 'Mai'; ?></td>
                     </tr>
                     <tr>
                         <td>Prenotazioni Elaborate</td>
-                        <td><?php echo number_format($execution_stats['processed_reservations']); ?></td>
+                        <td><?php echo esc_html(number_format($execution_stats['processed_reservations'])); ?></td>
                     </tr>
                     <tr>
                         <td>Email Arricchite</td>
-                        <td><?php echo number_format($execution_stats['enriched_emails']); ?></td>
+                        <td><?php echo esc_html(number_format($execution_stats['enriched_emails'])); ?></td>
                     </tr>
                     <tr>
                         <td>File di Log</td>
-                        <td><?php echo $execution_stats['log_file_exists'] ? 'Esiste (' . size_format($execution_stats['log_file_size']) . ')' : 'Non trovato'; ?></td>
+                        <td><?php echo $execution_stats['log_file_exists'] ? esc_html('Esiste (' . size_format($execution_stats['log_file_size']) . ')') : 'Non trovato'; ?></td>
                     </tr>
                 </table>
             </div>
@@ -1027,8 +1027,8 @@ function hic_diagnostics_page() {
                 <table class="widefat">
                     <tr>
                         <td>Errori Recenti (ultimi 1000 log)</td>
-                        <td><span class="status <?php echo $error_stats['error_count'] > 0 ? 'error' : 'ok'; ?>">
-                            <?php echo number_format($error_stats['error_count']); ?>
+                        <td><span class="status <?php echo esc_attr($error_stats['error_count'] > 0 ? 'error' : 'ok'); ?>">
+                            <?php echo esc_html(number_format($error_stats['error_count'])); ?>
                         </span></td>
                     </tr>
                     <?php if ($error_stats['last_error']): ?>
@@ -1039,9 +1039,9 @@ function hic_diagnostics_page() {
                     <?php endif; ?>
                     <tr>
                         <td>Intervallo Polling Configurato</td>
-                        <td><span class="status <?php echo $wp_cron_schedules['hic_interval_exists'] ? 'ok' : 'error'; ?>">
+                        <td><span class="status <?php echo esc_attr($wp_cron_schedules['hic_interval_exists'] ? 'ok' : 'error'); ?>">
                             <?php echo $wp_cron_schedules['hic_interval_exists'] ? 
-                                ($wp_cron_schedules['hic_interval_seconds'] . ' secondi') : 'Non configurato'; ?>
+                                esc_html($wp_cron_schedules['hic_interval_seconds'] . ' secondi') : 'Non configurato'; ?>
                         </span></td>
                     </tr>
                 </table>
