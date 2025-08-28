@@ -581,6 +581,124 @@ function hic_diagnostics_page() {
                 </p>
             </div>
             
+            <!-- Manual Booking Diagnostics Section -->
+            <div class="card">
+                <h2>Diagnostica Prenotazioni Manuali</h2>
+                <?php 
+                $connection_type = hic_get_connection_type();
+                $webhook_token = hic_get_webhook_token();
+                $manual_booking_issues = array();
+                
+                // Check for manual booking configuration issues
+                if ($connection_type === 'webhook') {
+                    if (empty($webhook_token)) {
+                        $manual_booking_issues[] = array(
+                            'type' => 'error',
+                            'message' => 'Webhook token non configurato: le prenotazioni manuali potrebbero non essere inviate automaticamente.'
+                        );
+                    }
+                    $manual_booking_issues[] = array(
+                        'type' => 'warning', 
+                        'message' => 'Modalità Webhook: Hotel in Cloud deve inviare webhook per TUTTE le prenotazioni, incluse quelle manuali.'
+                    );
+                } elseif ($connection_type === 'api') {
+                    if (!$cron_status['poll_event']['scheduled']) {
+                        $manual_booking_issues[] = array(
+                            'type' => 'error',
+                            'message' => 'API Polling non schedulato: le prenotazioni manuali non verranno recuperate automaticamente.'
+                        );
+                    } else {
+                        $manual_booking_issues[] = array(
+                            'type' => 'info',
+                            'message' => 'Modalità API Polling: le prenotazioni manuali vengono recuperate automaticamente ogni 5 minuti.'
+                        );
+                    }
+                }
+                ?>
+                
+                <table class="widefat">
+                    <tr>
+                        <td>Modalità Connessione</td>
+                        <td>
+                            <strong><?php echo ucfirst(esc_html($connection_type)); ?></strong>
+                            <?php if ($connection_type === 'api'): ?>
+                                <span class="status ok">✓ Migliore per prenotazioni manuali</span>
+                            <?php else: ?>
+                                <span class="status warning">⚠ Dipende dalla configurazione webhook</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    
+                    <?php if ($connection_type === 'webhook'): ?>
+                    <tr>
+                        <td>Webhook Token</td>
+                        <td>
+                            <?php if (!empty($webhook_token)): ?>
+                                <span class="status ok">✓ Configurato</span>
+                            <?php else: ?>
+                                <span class="status error">✗ NON configurato</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>URL Webhook</td>
+                        <td>
+                            <code><?php 
+                            if (!empty($webhook_token)) {
+                                echo home_url('/wp-json/hic/v1/conversion?token=***'); 
+                            } else {
+                                echo home_url('/wp-json/hic/v1/conversion?token=CONFIGURA_TOKEN_PRIMA');
+                            }
+                            ?></code>
+                            <?php if (empty($webhook_token)): ?>
+                                <br><small style="color: #dc3232;">⚠ Configura il token nelle impostazioni prima di usare questo URL</small>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                    
+                    <?php if ($connection_type === 'api'): ?>
+                    <tr>
+                        <td>Prossimo Polling</td>
+                        <td>
+                            <?php if ($cron_status['poll_event']['scheduled']): ?>
+                                <span class="status ok"><?php echo esc_html($cron_status['poll_event']['next_run_human']); ?></span>
+                            <?php else: ?>
+                                <span class="status error">Non schedulato</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
+                
+                <?php if (!empty($manual_booking_issues)): ?>
+                <div class="manual-booking-alerts">
+                    <h3>Avvisi e Raccomandazioni</h3>
+                    <?php foreach ($manual_booking_issues as $issue): ?>
+                        <div class="notice notice-<?php echo $issue['type'] === 'error' ? 'error' : ($issue['type'] === 'warning' ? 'warning' : 'info'); ?> inline">
+                            <p><?php echo esc_html($issue['message']); ?></p>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                
+                <div class="manual-booking-recommendations">
+                    <h3>Raccomandazioni per Prenotazioni Manuali</h3>
+                    <ul>
+                        <?php if ($connection_type === 'webhook'): ?>
+                            <li><strong>Verifica configurazione Hotel in Cloud:</strong> Assicurati che i webhook siano configurati per inviare TUTTE le prenotazioni</li>
+                            <li><strong>Considera API Polling:</strong> Per maggiore affidabilità, valuta il passaggio alla modalità "API Polling"</li>
+                            <li><strong>Test webhook:</strong> Usa il pulsante "Test Dispatch Funzioni" per verificare che le integrazioni funzionino</li>
+                        <?php else: ?>
+                            <li><strong>Modalità consigliata:</strong> API Polling è la modalità migliore per catturare automaticamente le prenotazioni manuali</li>
+                            <li><strong>Frequenza polling:</strong> Il sistema controlla nuove prenotazioni ogni 5 minuti</li>
+                            <li><strong>Verifica credenziali:</strong> Assicurati che le credenziali API siano corrette</li>
+                        <?php endif; ?>
+                        <li><strong>Monitoraggio log:</strong> Controlla la sezione "Log Recenti" per errori o problemi</li>
+                    </ul>
+                </div>
+            </div>
+            
             <!-- System Cron Section -->
             <div class="card">
                 <h2>Configurazione Cron di Sistema</h2>
@@ -770,8 +888,36 @@ function hic_diagnostics_page() {
         }
         .status.ok { color: #46b450; font-weight: bold; }
         .status.error { color: #dc3232; font-weight: bold; }
+        .status.warning { color: #ffb900; font-weight: bold; }
         .status.scheduled { color: #0073aa; font-weight: bold; }
         .status.not-scheduled { color: #ffb900; font-weight: bold; }
+        .manual-booking-alerts {
+            margin-top: 15px;
+        }
+        .manual-booking-alerts h3 {
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .manual-booking-recommendations {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f7f7f7;
+            border-left: 4px solid #0073aa;
+        }
+        .manual-booking-recommendations h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .manual-booking-recommendations ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .manual-booking-recommendations li {
+            margin-bottom: 8px;
+        }
         #hic-recent-logs div { 
             margin-bottom: 2px; 
             padding: 2px 0;
