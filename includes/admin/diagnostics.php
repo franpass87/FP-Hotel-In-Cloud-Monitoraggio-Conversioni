@@ -742,11 +742,11 @@ function hic_diagnostics_page() {
                         <tr>
                             <td>hic_api_poll_event</td>
                             <td><span class="status <?php echo esc_attr($cron_status['poll_event']['scheduled'] ? 'scheduled' : 'not-scheduled'); ?>">
-                                <?php echo $cron_status['poll_event']['scheduled'] ? 'Schedulato' : 'Non Schedulato'; ?>
+                                <?php echo esc_html($cron_status['poll_event']['scheduled'] ? 'Schedulato' : 'Non Schedulato'); ?>
                             </span></td>
                             <td><?php echo esc_html($cron_status['poll_event']['next_run_human']); ?></td>
                             <td><span class="status <?php echo esc_attr($cron_status['poll_event']['conditions_met'] ? 'ok' : 'error'); ?>">
-                                <?php echo $cron_status['poll_event']['conditions_met'] ? 'OK' : 'Non Soddisfatte'; ?>
+                                <?php echo esc_html($cron_status['poll_event']['conditions_met'] ? 'OK' : 'Non Soddisfatte'); ?>
                             </span></td>
                             <td>
                                 <button class="button manual-cron-test" data-event="hic_api_poll_event">Test Manuale</button>
@@ -755,11 +755,11 @@ function hic_diagnostics_page() {
                         <tr>
                             <td>hic_api_updates_event</td>
                             <td><span class="status <?php echo esc_attr($cron_status['updates_event']['scheduled'] ? 'scheduled' : 'not-scheduled'); ?>">
-                                <?php echo $cron_status['updates_event']['scheduled'] ? 'Schedulato' : 'Non Schedulato'; ?>
+                                <?php echo esc_html($cron_status['updates_event']['scheduled'] ? 'Schedulato' : 'Non Schedulato'); ?>
                             </span></td>
                             <td><?php echo esc_html($cron_status['updates_event']['next_run_human']); ?></td>
                             <td><span class="status <?php echo esc_attr($cron_status['updates_event']['conditions_met'] ? 'ok' : 'error'); ?>">
-                                <?php echo $cron_status['updates_event']['conditions_met'] ? 'OK' : 'Non Soddisfatte'; ?>
+                                <?php echo esc_html($cron_status['updates_event']['conditions_met'] ? 'OK' : 'Non Soddisfatte'); ?>
                             </span></td>
                             <td>
                                 <button class="button manual-cron-test" data-event="hic_api_updates_event">Test Manuale</button>
@@ -900,7 +900,7 @@ function hic_diagnostics_page() {
                     <tr>
                         <td>WP Cron Disabilitato</td>
                         <td><span class="status <?php echo esc_attr($system_cron['wp_cron_disabled'] ? 'error' : 'ok'); ?>">
-                            <?php echo $system_cron['wp_cron_disabled'] ? 'Sì (DISABLE_WP_CRON=true)' : 'No'; ?>
+                            <?php echo esc_html($system_cron['wp_cron_disabled'] ? 'Sì (DISABLE_WP_CRON=true)' : 'No'); ?>
                         </span></td>
                     </tr>
                     <tr>
@@ -952,43 +952,43 @@ function hic_diagnostics_page() {
                     <tr>
                         <td>API URL</td>
                         <td><span class="status <?php echo esc_attr($credentials_status['api_url'] ? 'ok' : 'error'); ?>">
-                            <?php echo $credentials_status['api_url'] ? 'Configurato' : 'Mancante'; ?>
+                            <?php echo esc_html($credentials_status['api_url'] ? 'Configurato' : 'Mancante'); ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>Property ID</td>
                         <td><span class="status <?php echo esc_attr($credentials_status['property_id'] ? 'ok' : 'error'); ?>">
-                            <?php echo $credentials_status['property_id'] ? 'Configurato' : 'Mancante'; ?>
+                            <?php echo esc_html($credentials_status['property_id'] ? 'Configurato' : 'Mancante'); ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>API Email</td>
                         <td><span class="status <?php echo esc_attr($credentials_status['api_email'] ? 'ok' : 'error'); ?>">
-                            <?php echo $credentials_status['api_email'] ? 'Configurato' : 'Mancante'; ?>
+                            <?php echo esc_html($credentials_status['api_email'] ? 'Configurato' : 'Mancante'); ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>API Password</td>
                         <td><span class="status <?php echo esc_attr($credentials_status['api_password'] ? 'ok' : 'error'); ?>">
-                            <?php echo $credentials_status['api_password'] ? 'Configurato' : 'Mancante'; ?>
+                            <?php echo esc_html($credentials_status['api_password'] ? 'Configurato' : 'Mancante'); ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>GA4 Configurato</td>
                         <td><span class="status <?php echo esc_attr($credentials_status['ga4_configured'] ? 'ok' : 'error'); ?>">
-                            <?php echo $credentials_status['ga4_configured'] ? 'Sì' : 'No'; ?>
+                            <?php echo esc_html($credentials_status['ga4_configured'] ? 'Sì' : 'No'); ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>Brevo Configurato</td>
                         <td><span class="status <?php echo esc_attr($credentials_status['brevo_configured'] ? 'ok' : 'error'); ?>">
-                            <?php echo $credentials_status['brevo_configured'] ? 'Sì' : 'No'; ?>
+                            <?php echo esc_html($credentials_status['brevo_configured'] ? 'Sì' : 'No'); ?>
                         </span></td>
                     </tr>
                     <tr>
                         <td>Facebook Configurato</td>
                         <td><span class="status <?php echo esc_attr($credentials_status['facebook_configured'] ? 'ok' : 'error'); ?>">
-                            <?php echo $credentials_status['facebook_configured'] ? 'Sì' : 'No'; ?>
+                            <?php echo esc_html($credentials_status['facebook_configured'] ? 'Sì' : 'No'); ?>
                         </span></td>
                     </tr>
                 </table>
@@ -1041,7 +1041,7 @@ function hic_diagnostics_page() {
                         <td>Intervallo Polling Configurato</td>
                         <td><span class="status <?php echo esc_attr($wp_cron_schedules['hic_interval_exists'] ? 'ok' : 'error'); ?>">
                             <?php echo $wp_cron_schedules['hic_interval_exists'] ? 
-                                esc_html($wp_cron_schedules['hic_interval_seconds'] . ' secondi') : 'Non configurato'; ?>
+                                esc_html($wp_cron_schedules['hic_interval_seconds'] . ' secondi') : esc_html('Non configurato'); ?>
                         </span></td>
                     </tr>
                 </table>
