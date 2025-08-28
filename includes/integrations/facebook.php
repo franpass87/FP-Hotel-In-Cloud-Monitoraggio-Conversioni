@@ -68,7 +68,11 @@ function hic_send_to_fb($data, $gclid, $fbclid){
     'timeout' => 15
   ]);
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  hic_log(['FB inviato: Purchase (bucket='.$bucket.')' => $payload, 'HTTP'=>$code]);
+  $log_msg = "FB dispatch: Purchase (bucket=$bucket) event_id=$event_id value=$amount HTTP=$code";
+  if (is_wp_error($res)) {
+    $log_msg .= " ERROR: " . $res->get_error_message();
+  }
+  hic_log($log_msg);
 }
 
 /**
@@ -76,7 +80,7 @@ function hic_send_to_fb($data, $gclid, $fbclid){
  */
 function hic_dispatch_pixel_reservation($data) {
   if (!hic_get_fb_pixel_id() || !hic_get_fb_access_token()) {
-    hic_log('FB Pixel non configurato.');
+    hic_log('FB HIC dispatch SKIPPED: Pixel ID o Access Token mancanti');
     return;
   }
   
