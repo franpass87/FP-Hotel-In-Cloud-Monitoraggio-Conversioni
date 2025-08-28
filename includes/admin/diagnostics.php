@@ -269,6 +269,36 @@ function hic_test_dispatch_functions() {
             $results['brevo_paid'] = 'Brevo not configured or disabled';
         }
         
+        // === TEST SCENARIO 3: Facebook Ads Traffic (fbads) ===
+        $fb_gclid = null;
+        $fb_fbclid = 'test_fbclid_' . time();
+        $fb_sid = 'test_fbads_' . time();
+        
+        // Test GA4 (Facebook Ads)
+        if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
+            hic_send_to_ga4($test_data, $fb_gclid, $fb_fbclid);
+            $results['ga4_fbads'] = 'Test fbads event sent to GA4';
+        } else {
+            $results['ga4_fbads'] = 'GA4 not configured';
+        }
+        
+        // Test Facebook (Facebook Ads)
+        if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
+            hic_send_to_fb($test_data, $fb_gclid, $fb_fbclid);
+            $results['facebook_fbads'] = 'Test fbads event sent to Facebook';
+        } else {
+            $results['facebook_fbads'] = 'Facebook not configured';
+        }
+        
+        // Test Brevo (Facebook Ads)
+        if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
+            hic_send_brevo_contact($test_data, $fb_gclid, $fb_fbclid);
+            hic_send_brevo_event($test_data, $fb_gclid, $fb_fbclid);
+            $results['brevo_fbads'] = 'Test fbads contact sent to Brevo';
+        } else {
+            $results['brevo_fbads'] = 'Brevo not configured or disabled';
+        }
+        
         // === EMAIL TESTS (Both scenarios use same email functions) ===
         
         // Test Admin Email
@@ -293,6 +323,170 @@ function hic_test_dispatch_functions() {
     } catch (Exception $e) {
         return array('success' => false, 'message' => 'Error: ' . $e->getMessage());
     }
+}
+
+/**
+ * Test bucket normalization function with all combinations
+ */
+function hic_test_bucket_normalization() {
+    $test_cases = array(
+        // Test case format: [gclid, fbclid, expected_bucket, description]
+        array(null, null, 'organic', 'No tracking IDs (organic traffic)'),
+        array('', '', 'organic', 'Empty tracking IDs (organic traffic)'),
+        array('test_gclid_123', null, 'gads', 'Google Ads only (gclid priority)'),
+        array('test_gclid_123', '', 'gads', 'Google Ads with empty fbclid (gclid priority)'),
+        array(null, 'test_fbclid_456', 'fbads', 'Facebook Ads only (fbclid)'),
+        array('', 'test_fbclid_456', 'fbads', 'Facebook Ads with empty gclid (fbclid)'),
+        array('test_gclid_123', 'test_fbclid_456', 'gads', 'Both tracking IDs (gclid takes priority)'),
+        array('0', null, 'organic', 'String zero gclid (should be treated as empty)'),
+        array(null, '0', 'organic', 'String zero fbclid (should be treated as empty)'),
+        array('false', null, 'gads', 'String "false" gclid (non-empty string)'),
+        array(null, 'false', 'fbads', 'String "false" fbclid (non-empty string)')
+    );
+    
+    $results = array();
+    $passed = 0;
+    $failed = 0;
+    
+    foreach ($test_cases as $index => $test_case) {
+        list($gclid, $fbclid, $expected, $description) = $test_case;
+        
+        $actual = fp_normalize_bucket($gclid, $fbclid);
+        $test_passed = ($actual === $expected);
+        
+        if ($test_passed) {
+            $passed++;
+            $status = 'PASS';
+        } else {
+            $failed++;
+            $status = 'FAIL';
+        }
+        
+        $results[] = array(
+            'test' => $index + 1,
+            'description' => $description,
+            'gclid' => $gclid === null ? 'null' : "'" . $gclid . "'",
+            'fbclid' => $fbclid === null ? 'null' : "'" . $fbclid . "'",
+            'expected' => $expected,
+            'actual' => $actual,
+            'status' => $status
+        );
+    }
+    
+    // Test that legacy function still works
+    $legacy_result = hic_get_bucket('test_gclid', null);
+    if ($legacy_result === 'gads') {
+        $passed++;
+        $results[] = array(
+            'test' => 'legacy',
+            'description' => 'Legacy hic_get_bucket() function compatibility',
+            'gclid' => "'test_gclid'",
+            'fbclid' => 'null',
+            'expected' => 'gads',
+            'actual' => $legacy_result,
+            'status' => 'PASS'
+        );
+    } else {
+        $failed++;
+        $results[] = array(
+            'test' => 'legacy',
+            'description' => 'Legacy hic_get_bucket() function compatibility',
+            'gclid' => "'test_gclid'",
+            'fbclid' => 'null',
+            'expected' => 'gads',
+            'actual' => $legacy_result,
+            'status' => 'FAIL'
+        );
+    }
+    
+    return array(
+        'success' => $failed === 0,
+        'summary' => "Bucket normalization tests: {$passed} passed, {$failed} failed",
+        'passed' => $passed,
+        'failed' => $failed,
+        'results' => $results
+    );
+}
+
+/**
+ * Test bucket normalization with actual dispatch functions
+ */
+function hic_test_bucket_integration() {
+    $test_data = array(
+        'reservation_id' => 'BUCKET_TEST_' . time(),
+        'amount' => 100.00,
+        'currency' => 'EUR',
+        'email' => 'bucket-test@example.com',
+        'first_name' => 'Test',
+        'last_name' => 'Bucket',
+        'room' => 'Bucket Test Room'
+    );
+    
+    $test_scenarios = array(
+        array('scenario' => 'organic', 'gclid' => null, 'fbclid' => null),
+        array('scenario' => 'gads', 'gclid' => 'test_gclid_' . time(), 'fbclid' => null),
+        array('scenario' => 'fbads', 'gclid' => null, 'fbclid' => 'test_fbclid_' . time()),
+        array('scenario' => 'priority_test', 'gclid' => 'test_gclid_' . time(), 'fbclid' => 'test_fbclid_' . time())
+    );
+    
+    $results = array();
+    
+    foreach ($test_scenarios as $scenario) {
+        $expected_bucket = $scenario['scenario'] === 'priority_test' ? 'gads' : $scenario['scenario'];
+        $actual_bucket = fp_normalize_bucket($scenario['gclid'], $scenario['fbclid']);
+        
+        $test_result = array(
+            'scenario' => $scenario['scenario'],
+            'gclid' => $scenario['gclid'],
+            'fbclid' => $scenario['fbclid'],
+            'expected_bucket' => $expected_bucket,
+            'actual_bucket' => $actual_bucket,
+            'bucket_correct' => $actual_bucket === $expected_bucket,
+            'integrations' => array()
+        );
+        
+        // Test each integration with this scenario
+        $integrations = array(
+            'ga4' => function($data, $gclid, $fbclid) {
+                if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
+                    hic_send_to_ga4($data, $gclid, $fbclid);
+                    return 'sent';
+                }
+                return 'not_configured';
+            },
+            'facebook' => function($data, $gclid, $fbclid) {
+                if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
+                    hic_send_to_fb($data, $gclid, $fbclid);
+                    return 'sent';
+                }
+                return 'not_configured';
+            },
+            'brevo' => function($data, $gclid, $fbclid) {
+                if (!empty(hic_get_brevo_api_key())) {
+                    hic_send_brevo_event($data, $gclid, $fbclid);
+                    return 'sent';
+                }
+                return 'not_configured';
+            }
+        );
+        
+        foreach ($integrations as $name => $func) {
+            try {
+                $status = $func($test_data, $scenario['gclid'], $scenario['fbclid']);
+                $test_result['integrations'][$name] = $status;
+            } catch (Exception $e) {
+                $test_result['integrations'][$name] = 'error: ' . $e->getMessage();
+            }
+        }
+        
+        $results[] = $test_result;
+    }
+    
+    return array(
+        'success' => true,
+        'message' => 'Bucket integration tests completed',
+        'results' => $results
+    );
 }
 
 /**

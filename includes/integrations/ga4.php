@@ -16,7 +16,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
     return;
   }
 
-  $bucket    = hic_get_bucket($gclid, $fbclid); // gads | fbads | organic
+  $bucket    = fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
   $client_id = $gclid ?: ($fbclid ?: (string) wp_generate_uuid4());
 
   // Validate amount is numeric

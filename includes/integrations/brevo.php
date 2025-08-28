@@ -58,7 +58,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid){
 /* ============ Brevo: evento personalizzato (purchase + bucket) ============ */
 function hic_send_brevo_event($data, $gclid, $fbclid){
   if (!hic_get_brevo_api_key()) { return; }
-  $bucket = hic_get_bucket($gclid, $fbclid);
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
 
   $body = array(
     'event' => 'purchase', // puoi rinominare in 'hic_booking' se preferisci

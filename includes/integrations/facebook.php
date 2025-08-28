@@ -18,7 +18,7 @@ function hic_send_to_fb($data, $gclid, $fbclid){
     return;
   }
   
-  $bucket   = hic_get_bucket($gclid, $fbclid); // gads | fbads | organic
+  $bucket   = fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
   $event_id = $data['reservation_id'] ?? uniqid();
 
   // Validate and sanitize amount
