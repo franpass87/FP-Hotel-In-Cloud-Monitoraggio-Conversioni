@@ -177,6 +177,8 @@ Il plugin implementa un sistema di normalizzazione uniforme per il parametro `bu
 
 La funzione `fp_normalize_bucket($gclid, $fbclid)` applica la seguente logica di priorità:
 
+**Priority order: gclid > fbclid > organic**
+
 1. **`gads`**: Se è presente un Google Click ID (`gclid`)
 2. **`fbads`**: Se è presente un Facebook Click ID (`fbclid`) ma non un `gclid`  
 3. **`organic`**: Se non sono presenti né `gclid` né `fbclid`
