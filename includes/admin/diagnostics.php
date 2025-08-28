@@ -186,6 +186,96 @@ function hic_execute_manual_cron($event_name) {
 }
 
 /**
+ * Test dispatch functions with sample data
+ */
+function hic_test_dispatch_functions() {
+    $test_data = array(
+        'transaction_id' => 'TEST_' . time(),
+        'value' => 100.00,
+        'currency' => 'EUR',
+        'email' => 'test@example.com',
+        'accommodation_name' => 'Test Hotel',
+        'guest_first_name' => 'John',
+        'guest_last_name' => 'Doe',
+        'language' => 'en'
+    );
+    
+    $results = array();
+    
+    try {
+        // Test GA4
+        if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
+            hic_dispatch_ga4_reservation($test_data);
+            $results['ga4'] = 'Test event sent to GA4';
+        } else {
+            $results['ga4'] = 'GA4 not configured';
+        }
+        
+        // Test Facebook
+        if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
+            hic_dispatch_pixel_reservation($test_data);
+            $results['facebook'] = 'Test event sent to Facebook';
+        } else {
+            $results['facebook'] = 'Facebook not configured';
+        }
+        
+        // Test Brevo
+        if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
+            hic_dispatch_brevo_reservation($test_data);
+            $results['brevo'] = 'Test contact sent to Brevo';
+        } else {
+            $results['brevo'] = 'Brevo not configured or disabled';
+        }
+        
+        return array('success' => true, 'results' => $results);
+        
+    } catch (Exception $e) {
+        return array('success' => false, 'message' => 'Error: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Force rescheduling of cron events
+ */
+function hic_force_reschedule_crons() {
+    // Clear existing schedules
+    $poll_timestamp = wp_next_scheduled('hic_api_poll_event');
+    if ($poll_timestamp) {
+        wp_unschedule_event($poll_timestamp, 'hic_api_poll_event');
+    }
+    
+    $updates_timestamp = wp_next_scheduled('hic_api_updates_event');
+    if ($updates_timestamp) {
+        wp_unschedule_event($updates_timestamp, 'hic_api_updates_event');
+    }
+    
+    // Reschedule if conditions are met
+    $results = array();
+    
+    if (hic_should_schedule_poll_event()) {
+        if (wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event')) {
+            $results['poll_event'] = 'Successfully rescheduled';
+        } else {
+            $results['poll_event'] = 'Failed to reschedule';
+        }
+    } else {
+        $results['poll_event'] = 'Conditions not met for scheduling';
+    }
+    
+    if (hic_should_schedule_updates_event()) {
+        if (wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event')) {
+            $results['updates_event'] = 'Successfully rescheduled';
+        } else {
+            $results['updates_event'] = 'Failed to reschedule';
+        }
+    } else {
+        $results['updates_event'] = 'Conditions not met for scheduling';
+    }
+    
+    return $results;
+}
+
+/**
  * Check system cron setup
  */
 function hic_check_system_cron() {
@@ -195,7 +285,9 @@ function hic_check_system_cron() {
     $status = array(
         'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
         'suggested_crontab' => hic_get_suggested_crontab_entry(),
-        'last_cron_check' => get_option('hic_last_cron_check', 0)
+        'suggested_crontab_with_test' => hic_get_suggested_crontab_with_test(),
+        'last_cron_check' => get_option('hic_last_cron_check', 0),
+        'cron_test_url' => hic_get_cron_test_url()
     );
     
     // Update last check time
@@ -212,11 +304,75 @@ function hic_get_suggested_crontab_entry() {
     return "*/5 * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1";
 }
 
+/**
+ * Get suggested crontab entry with test script
+ */
+function hic_get_suggested_crontab_with_test() {
+    $test_url = hic_get_cron_test_url();
+    $wp_cron_url = site_url('wp-cron.php');
+    return "*/5 * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1 && wget -q -O - \"$test_url\" >/dev/null 2>&1";
+}
+
+/**
+ * Get cron test URL
+ */
+function hic_get_cron_test_url() {
+    return plugin_dir_url(dirname(dirname(__FILE__))) . 'cron-test.php';
+}
+
+/**
+ * Get WordPress cron schedules info
+ */
+function hic_get_wp_cron_schedules() {
+    $schedules = wp_get_schedules();
+    return array(
+        'available_schedules' => $schedules,
+        'hic_interval_exists' => isset($schedules['hic_poll_interval']),
+        'hic_interval_seconds' => isset($schedules['hic_poll_interval']) ? $schedules['hic_poll_interval']['interval'] : null
+    );
+}
+
+/**
+ * Get recent error count from logs
+ */
+function hic_get_error_stats() {
+    $log_file = hic_get_log_file();
+    if (!file_exists($log_file)) {
+        return array('error_count' => 0, 'last_error' => null);
+    }
+    
+    $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (!$lines) {
+        return array('error_count' => 0, 'last_error' => null);
+    }
+    
+    // Count errors in last 1000 lines
+    $recent_lines = array_slice($lines, -1000);
+    $error_count = 0;
+    $last_error = null;
+    
+    foreach (array_reverse($recent_lines) as $line) {
+        if (preg_match('/(error|errore|fallita|failed|HTTP [45]\d\d)/i', $line)) {
+            $error_count++;
+            if (!$last_error) {
+                $last_error = $line;
+            }
+        }
+    }
+    
+    return array(
+        'error_count' => $error_count,
+        'last_error' => $last_error
+    );
+}
+
 /* ============ AJAX Handlers ============ */
 
 // Add AJAX handlers
 add_action('wp_ajax_hic_manual_cron_test', 'hic_ajax_manual_cron_test');
 add_action('wp_ajax_hic_refresh_diagnostics', 'hic_ajax_refresh_diagnostics');
+add_action('wp_ajax_hic_test_dispatch', 'hic_ajax_test_dispatch');
+add_action('wp_ajax_hic_force_reschedule', 'hic_ajax_force_reschedule');
 
 function hic_ajax_manual_cron_test() {
     // Verify nonce
@@ -251,10 +407,42 @@ function hic_ajax_refresh_diagnostics() {
         'credentials_status' => hic_get_credentials_status(),
         'execution_stats' => hic_get_execution_stats(),
         'recent_logs' => hic_get_recent_log_entries(20),
-        'system_cron' => hic_check_system_cron()
+        'system_cron' => hic_check_system_cron(),
+        'wp_cron_schedules' => hic_get_wp_cron_schedules(),
+        'error_stats' => hic_get_error_stats()
     );
     
     wp_die(json_encode(array('success' => true, 'data' => $data)));
+}
+
+function hic_ajax_test_dispatch() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    $result = hic_test_dispatch_functions();
+    wp_die(json_encode($result));
+}
+
+function hic_ajax_force_reschedule() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    $results = hic_force_reschedule_crons();
+    wp_die(json_encode(array('success' => true, 'results' => $results)));
 }
 
 /* ============ Diagnostics Admin Page ============ */
@@ -273,6 +461,8 @@ function hic_diagnostics_page() {
     $execution_stats = hic_get_execution_stats();
     $recent_logs = hic_get_recent_log_entries(20);
     $system_cron = hic_check_system_cron();
+    $wp_cron_schedules = hic_get_wp_cron_schedules();
+    $error_stats = hic_get_error_stats();
     
     ?>
     <div class="wrap">
@@ -323,7 +513,11 @@ function hic_diagnostics_page() {
                     </tbody>
                 </table>
                 
-                <p><button class="button button-secondary" id="refresh-diagnostics">Aggiorna Dati</button></p>
+                <p>
+                    <button class="button button-secondary" id="refresh-diagnostics">Aggiorna Dati</button>
+                    <button class="button" id="force-reschedule">Forza Rischedulazione</button>
+                    <button class="button" id="test-dispatch">Test Dispatch Funzioni</button>
+                </p>
             </div>
             
             <!-- System Cron Section -->
@@ -337,8 +531,16 @@ function hic_diagnostics_page() {
                         </span></td>
                     </tr>
                     <tr>
-                        <td>Crontab Suggerito</td>
+                        <td>Crontab Base</td>
                         <td><code><?php echo esc_html($system_cron['suggested_crontab']); ?></code></td>
+                    </tr>
+                    <tr>
+                        <td>Crontab con Test</td>
+                        <td><code><?php echo esc_html($system_cron['suggested_crontab_with_test']); ?></code></td>
+                    </tr>
+                    <tr>
+                        <td>URL Test Cron</td>
+                        <td><a href="<?php echo esc_url($system_cron['cron_test_url']); ?>" target="_blank"><?php echo esc_html($system_cron['cron_test_url']); ?></a></td>
                     </tr>
                 </table>
                 
@@ -353,8 +555,17 @@ function hic_diagnostics_page() {
                     <li>Accedere al server via SSH</li>
                     <li>Eseguire: <code>crontab -e</code></li>
                     <li>Aggiungere la riga: <code><?php echo esc_html($system_cron['suggested_crontab']); ?></code></li>
+                    <li>Per monitoraggio aggiuntivo, usare: <code><?php echo esc_html($system_cron['suggested_crontab_with_test']); ?></code></li>
                     <li>Salvare e uscire dall'editor</li>
                 </ol>
+                
+                <h3>Verifica Funzionamento</h3>
+                <p>Per verificare che il cron di sistema funzioni:</p>
+                <ul>
+                    <li>Attendere 5-10 minuti dopo la configurazione</li>
+                    <li>Controllare i log di questo plugin per confermare l'esecuzione</li>
+                    <li>Testare l'URL di test: <a href="<?php echo esc_url($system_cron['cron_test_url']); ?>" target="_blank">Clicca qui per testare</a></li>
+                </ul>
             </div>
             
             <!-- Credentials Status Section -->
@@ -433,6 +644,32 @@ function hic_diagnostics_page() {
                     <tr>
                         <td>File di Log</td>
                         <td><?php echo $execution_stats['log_file_exists'] ? 'Esiste (' . size_format($execution_stats['log_file_size']) . ')' : 'Non trovato'; ?></td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- Error Summary Section -->
+            <div class="card">
+                <h2>Riepilogo Errori</h2>
+                <table class="widefat">
+                    <tr>
+                        <td>Errori Recenti (ultimi 1000 log)</td>
+                        <td><span class="status <?php echo $error_stats['error_count'] > 0 ? 'error' : 'ok'; ?>">
+                            <?php echo number_format($error_stats['error_count']); ?>
+                        </span></td>
+                    </tr>
+                    <?php if ($error_stats['last_error']): ?>
+                    <tr>
+                        <td>Ultimo Errore</td>
+                        <td><small><?php echo esc_html($error_stats['last_error']); ?></small></td>
+                    </tr>
+                    <?php endif; ?>
+                    <tr>
+                        <td>Intervallo Polling Configurato</td>
+                        <td><span class="status <?php echo $wp_cron_schedules['hic_interval_exists'] ? 'ok' : 'error'; ?>">
+                            <?php echo $wp_cron_schedules['hic_interval_exists'] ? 
+                                ($wp_cron_schedules['hic_interval_seconds'] . ' secondi') : 'Non configurato'; ?>
+                        </span></td>
                     </tr>
                 </table>
             </div>
@@ -526,6 +763,77 @@ function hic_diagnostics_page() {
                     alert('Errore nell\'aggiornamento dati');
                 }
                 $btn.prop('disabled', false).text('Aggiorna Dati');
+            });
+        });
+        
+        // Force reschedule handler
+        $('#force-reschedule').click(function() {
+            var $btn = $(this);
+            var $results = $('#hic-test-results');
+            
+            if (!confirm('Vuoi forzare la rischedulazione dei cron jobs?')) {
+                return;
+            }
+            
+            $btn.prop('disabled', true).text('Rischedulando...');
+            
+            $.post(ajaxurl, {
+                action: 'hic_force_reschedule',
+                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
+            }, function(response) {
+                var result = JSON.parse(response);
+                var html = '<div class="notice notice-info inline"><p><strong>Risultati Rischedulazione:</strong><br>';
+                
+                if (result.success) {
+                    Object.keys(result.results).forEach(function(key) {
+                        html += key + ': ' + result.results[key] + '<br>';
+                    });
+                } else {
+                    html += 'Errore: ' + (result.message || 'Unknown error');
+                }
+                
+                html += '</p></div>';
+                $results.html(html);
+                $btn.prop('disabled', false).text('Forza Rischedulazione');
+                
+                // Refresh page after 2 seconds
+                setTimeout(function() {
+                    location.reload();
+                }, 2000);
+            });
+        });
+        
+        // Test dispatch handler
+        $('#test-dispatch').click(function() {
+            var $btn = $(this);
+            var $results = $('#hic-test-results');
+            
+            if (!confirm('Vuoi testare le funzioni di dispatch con dati di esempio?')) {
+                return;
+            }
+            
+            $btn.prop('disabled', true).text('Testando...');
+            
+            $.post(ajaxurl, {
+                action: 'hic_test_dispatch',
+                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
+            }, function(response) {
+                var result = JSON.parse(response);
+                var messageClass = result.success ? 'notice-success' : 'notice-error';
+                var html = '<div class="notice ' + messageClass + ' inline"><p><strong>Test Dispatch:</strong><br>';
+                
+                if (result.success) {
+                    Object.keys(result.results).forEach(function(key) {
+                        html += key.toUpperCase() + ': ' + result.results[key] + '<br>';
+                    });
+                    html += '<br><em>Controlla i log per i dettagli.</em>';
+                } else {
+                    html += 'Errore: ' + (result.message || 'Unknown error');
+                }
+                
+                html += '</p></div>';
+                $results.html(html);
+                $btn.prop('disabled', false).text('Test Dispatch Funzioni');
             });
         });
     });
