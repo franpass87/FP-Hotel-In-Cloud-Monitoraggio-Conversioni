@@ -60,7 +60,11 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
     'timeout' => 15
   ]);
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  hic_log(['GA4 inviato: purchase (bucket='.$bucket.')' => $payload, 'HTTP'=>$code]);
+  $log_msg = "GA4 dispatch: purchase (bucket=$bucket) transaction_id={$params['transaction_id']} HTTP=$code";
+  if (is_wp_error($res)) {
+    $log_msg .= " ERROR: " . $res->get_error_message();
+  }
+  hic_log($log_msg);
 }
 
 /**
@@ -72,7 +76,7 @@ function hic_dispatch_ga4_reservation($data) {
   $api_secret = hic_get_api_secret();
   
   if (empty($measurement_id) || empty($api_secret)) {
-    hic_log('GA4: measurement ID o API secret mancanti');
+    hic_log('GA4 HIC dispatch SKIPPED: measurement ID o API secret mancanti');
     return;
   }
 
@@ -128,5 +132,9 @@ function hic_dispatch_ga4_reservation($data) {
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  hic_log(['GA4 HIC reservation sent' => ['transaction_id' => $transaction_id, 'value' => $value, 'currency' => $currency], 'HTTP' => $code]);
+  $log_msg = "GA4 HIC dispatch: transaction_id=$transaction_id value=$value $currency HTTP=$code";
+  if (is_wp_error($res)) {
+    $log_msg .= " ERROR: " . $res->get_error_message();
+  }
+  hic_log($log_msg);
 }

@@ -49,6 +49,15 @@ function hic_add_admin_menu() {
         'hic-monitoring',
         'hic_options_page'
     );
+    
+    // Add diagnostics submenu
+    add_options_page(
+        'HIC Diagnostics',
+        'HIC Diagnostics',
+        'manage_options',
+        'hic-diagnostics',
+        'hic_diagnostics_page'
+    );
 }
 
 function hic_settings_init() {

@@ -279,6 +279,8 @@ function hic_mark_reservation_processed($reservation) {
 
 // Wrapper cron function
 function hic_api_poll_bookings(){
+    hic_log('Cron: hic_api_poll_bookings execution started');
+    
     $prop = hic_get_property_id();
     $email = hic_get_api_email();
     $password = hic_get_api_password();
@@ -290,9 +292,13 @@ function hic_api_poll_bookings(){
         $from = date('Y-m-d', $last);
         $to   = date('Y-m-d', $now);
         $date_type = 'checkin'; // default; in futuro rendere configurabile
+        hic_log("Cron: polling reservations from $from to $to for property $prop");
         $out = hic_fetch_reservations($prop, $date_type, $from, $to, 100);
         if (!is_wp_error($out)) {
             update_option('hic_last_api_poll', $now);
+            hic_log('Cron: hic_api_poll_bookings completed successfully');
+        } else {
+            hic_log('Cron: hic_api_poll_bookings failed: ' . $out->get_error_message());
         }
         return;
     }
@@ -307,6 +313,7 @@ function hic_api_poll_bookings(){
     }
 
     // Legacy polling logic (unchanged)
+    hic_log('Cron: using legacy API key method');
     hic_legacy_api_poll_bookings();
 }
 
@@ -388,11 +395,17 @@ function hic_legacy_api_poll_bookings() {
  * New updates polling wrapper function
  */
 function hic_api_poll_updates(){
+    hic_log('Cron: hic_api_poll_updates execution started');
+    
     $prop = hic_get_property_id();
     $since = get_option('hic_last_updates_since', time() - DAY_IN_SECONDS);
+    hic_log("Cron: polling updates since " . date('Y-m-d H:i:s', $since) . " for property $prop");
     $out = hic_fetch_reservations_updates($prop, $since, 200); // limit opzionale se supportato
     if (!is_wp_error($out)) {
         update_option('hic_last_updates_since', time());
+        hic_log('Cron: hic_api_poll_updates completed successfully');
+    } else {
+        hic_log('Cron: hic_api_poll_updates failed: ' . $out->get_error_message());
     }
 }
 

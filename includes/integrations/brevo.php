@@ -7,7 +7,10 @@ if (!defined('ABSPATH')) exit;
 
 /* ============ Brevo: aggiorna contatto ============ */
 function hic_send_brevo_contact($data, $gclid, $fbclid){
-  if (!hic_get_brevo_api_key()) { hic_log('Brevo disabilitato (API key vuota).'); return; }
+  if (!hic_get_brevo_api_key()) { 
+    hic_log('Brevo dispatch SKIPPED: API key mancante'); 
+    return; 
+  }
 
   $email = isset($data['email']) ? $data['email'] : null;
   if (!$email) { hic_log('Nessuna email nel payload → skip Brevo contact.'); return; }
@@ -45,7 +48,11 @@ function hic_send_brevo_contact($data, $gclid, $fbclid){
     'timeout' => 15
   ));
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  hic_log(array('Brevo contact inviato' => $body, 'HTTP'=>$code));
+  $log_msg = "Brevo contact dispatch: email=$email lists=" . implode(',', $list_ids) . " HTTP=$code";
+  if (is_wp_error($res)) {
+    $log_msg .= " ERROR: " . $res->get_error_message();
+  }
+  hic_log($log_msg);
 }
 
 /* ============ Brevo: evento personalizzato (purchase + bucket) ============ */
