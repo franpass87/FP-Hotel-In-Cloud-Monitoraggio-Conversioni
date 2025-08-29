@@ -500,6 +500,14 @@ function hic_test_bucket_integration() {
  * Force rescheduling of cron events
  */
 function hic_force_reschedule_crons() {
+    hic_log('Force reschedule: Starting cron rescheduling process');
+    
+    // Use the new implementation from polling.php
+    if (function_exists('hic_force_reschedule_cron_events')) {
+        return hic_force_reschedule_cron_events();
+    }
+    
+    // Fallback to original implementation if new function doesn't exist
     // Clear existing schedules
     $poll_timestamp = wp_next_scheduled('hic_api_poll_event');
     if ($poll_timestamp) {
@@ -517,21 +525,27 @@ function hic_force_reschedule_crons() {
     if (hic_should_schedule_poll_event()) {
         if (wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event')) {
             $results['poll_event'] = 'Successfully rescheduled';
+            hic_log('Force reschedule: hic_api_poll_event rescheduled successfully');
         } else {
             $results['poll_event'] = 'Failed to reschedule';
+            hic_log('Force reschedule: Failed to reschedule hic_api_poll_event');
         }
     } else {
         $results['poll_event'] = 'Conditions not met for scheduling';
+        hic_log('Force reschedule: Conditions not met for hic_api_poll_event');
     }
     
     if (hic_should_schedule_updates_event()) {
         if (wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event')) {
             $results['updates_event'] = 'Successfully rescheduled';
+            hic_log('Force reschedule: hic_api_updates_event rescheduled successfully');
         } else {
             $results['updates_event'] = 'Failed to reschedule';
+            hic_log('Force reschedule: Failed to reschedule hic_api_updates_event');
         }
     } else {
         $results['updates_event'] = 'Conditions not met for scheduling';
+        hic_log('Force reschedule: Conditions not met for hic_api_updates_event');
     }
     
     return $results;
@@ -635,6 +649,7 @@ add_action('wp_ajax_hic_manual_cron_test', 'hic_ajax_manual_cron_test');
 add_action('wp_ajax_hic_refresh_diagnostics', 'hic_ajax_refresh_diagnostics');
 add_action('wp_ajax_hic_test_dispatch', 'hic_ajax_test_dispatch');
 add_action('wp_ajax_hic_force_reschedule', 'hic_ajax_force_reschedule');
+add_action('wp_ajax_hic_backfill_reservations', 'hic_ajax_backfill_reservations');
 
 function hic_ajax_manual_cron_test() {
     // Verify nonce
@@ -705,6 +720,39 @@ function hic_ajax_force_reschedule() {
     
     $results = hic_force_reschedule_crons();
     wp_die(json_encode(array('success' => true, 'results' => $results)));
+}
+
+function hic_ajax_backfill_reservations() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    // Get and validate input parameters
+    $from_date = sanitize_text_field($_POST['from_date'] ?? '');
+    $to_date = sanitize_text_field($_POST['to_date'] ?? '');
+    $date_type = sanitize_text_field($_POST['date_type'] ?? 'checkin');
+    $limit = isset($_POST['limit']) ? intval($_POST['limit']) : null;
+    
+    // Validate date type
+    if (!in_array($date_type, array('checkin', 'created'))) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Tipo di data non valido')));
+    }
+    
+    // Validate required fields
+    if (empty($from_date) || empty($to_date)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Date di inizio e fine sono obbligatorie')));
+    }
+    
+    // Call the backfill function
+    $result = hic_backfill_reservations($from_date, $to_date, $date_type, $limit);
+    
+    wp_die(json_encode($result));
 }
 
 /* ============ Diagnostics Admin Page ============ */
@@ -800,6 +848,83 @@ function hic_diagnostics_page() {
                     <button class="button" id="force-reschedule">Forza Rischedulazione</button>
                     <button class="button" id="test-dispatch">Test Dispatch Funzioni</button>
                 </p>
+            </div>
+            
+            <!-- Backfill Section -->
+            <div class="card">
+                <h2>Scarico Storico Prenotazioni (Backfill)</h2>
+                <p>Usa questa funzione per scaricare prenotazioni di un intervallo temporale specifico. Utile per recuperare dati persi o per il primo setup.</p>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="backfill-from-date">Data Inizio</label>
+                        </th>
+                        <td>
+                            <input type="date" id="backfill-from-date" name="backfill_from_date" 
+                                   value="<?php echo esc_attr(date('Y-m-d', strtotime('-7 days'))); ?>" />
+                            <p class="description">Data di inizio per il recupero prenotazioni</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="backfill-to-date">Data Fine</label>
+                        </th>
+                        <td>
+                            <input type="date" id="backfill-to-date" name="backfill_to_date" 
+                                   value="<?php echo esc_attr(date('Y-m-d')); ?>" />
+                            <p class="description">Data di fine per il recupero prenotazioni</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="backfill-date-type">Tipo Data</label>
+                        </th>
+                        <td>
+                            <select id="backfill-date-type" name="backfill_date_type">
+                                <option value="checkin">Data Check-in</option>
+                                <option value="created">Data Creazione</option>
+                            </select>
+                            <p class="description">
+                                <strong>Check-in:</strong> Prenotazioni per arrivi in questo periodo<br>
+                                <strong>Creazione:</strong> Prenotazioni create in questo periodo (migliore per recuperare prenotazioni manuali)
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="backfill-limit">Limite (opzionale)</label>
+                        </th>
+                        <td>
+                            <input type="number" id="backfill-limit" name="backfill_limit" 
+                                   min="1" max="1000" placeholder="Nessun limite" />
+                            <p class="description">Numero massimo di prenotazioni da recuperare (lascia vuoto per tutte)</p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <p>
+                    <button class="button button-primary" id="start-backfill">
+                        <span class="dashicons dashicons-download" style="margin-top: 3px;"></span>
+                        Avvia Backfill
+                    </button>
+                    <span id="backfill-status" style="margin-left: 10px; font-weight: bold;"></span>
+                </p>
+                
+                <div id="backfill-results" style="display: none; margin-top: 15px; padding: 10px; background: #f7f7f7; border-left: 4px solid #0073aa;">
+                    <h4>Risultati Backfill:</h4>
+                    <div id="backfill-results-content"></div>
+                </div>
+                
+                <div class="notice notice-info inline" style="margin-top: 15px;">
+                    <p><strong>Note:</strong></p>
+                    <ul>
+                        <li>Il backfill elabora solo prenotazioni non già presenti nel sistema</li>
+                        <li>L'intervallo massimo consentito è di 6 mesi</li>
+                        <li>Le prenotazioni duplicate vengono automaticamente saltate</li>
+                        <li>Tutti gli eventi di backfill vengono registrati nei log</li>
+                    </ul>
+                </div>
             </div>
             
             <!-- Manual Booking Diagnostics Section -->
@@ -1289,6 +1414,105 @@ function hic_diagnostics_page() {
                 html += '</p></div>';
                 $results.html(html);
                 $btn.prop('disabled', false).text('Test Dispatch Funzioni');
+            });
+        });
+        
+        // Backfill handler
+        $('#start-backfill').click(function() {
+            var $btn = $(this);
+            var $status = $('#backfill-status');
+            var $results = $('#backfill-results');
+            var $resultsContent = $('#backfill-results-content');
+            
+            // Get form values
+            var fromDate = $('#backfill-from-date').val();
+            var toDate = $('#backfill-to-date').val();
+            var dateType = $('#backfill-date-type').val();
+            var limit = $('#backfill-limit').val();
+            
+            // Validate form
+            if (!fromDate || !toDate) {
+                alert('Inserisci entrambe le date di inizio e fine.');
+                return;
+            }
+            
+            if (new Date(fromDate) > new Date(toDate)) {
+                alert('La data di inizio deve essere precedente alla data di fine.');
+                return;
+            }
+            
+            // Confirmation
+            var message = 'Vuoi avviare il backfill delle prenotazioni dal ' + fromDate + ' al ' + toDate + '?';
+            if (limit) {
+                message += '\nLimite: ' + limit + ' prenotazioni';
+            }
+            message += '\nTipo data: ' + (dateType === 'checkin' ? 'Check-in' : 'Creazione');
+            
+            if (!confirm(message)) {
+                return;
+            }
+            
+            // Start backfill
+            $btn.prop('disabled', true);
+            $status.text('Avviando backfill...').css('color', '#0073aa');
+            $results.hide();
+            
+            var postData = {
+                action: 'hic_backfill_reservations',
+                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>',
+                from_date: fromDate,
+                to_date: toDate,
+                date_type: dateType
+            };
+            
+            if (limit) {
+                postData.limit = parseInt(limit);
+            }
+            
+            $.post(ajaxurl, postData, function(response) {
+                var result = JSON.parse(response);
+                
+                if (result.success) {
+                    $status.text('Backfill completato!').css('color', '#46b450');
+                    
+                    var stats = result.stats;
+                    var html = '<p><strong>' + result.message + '</strong></p>' +
+                              '<ul>' +
+                              '<li>Prenotazioni trovate: <strong>' + stats.total_found + '</strong></li>' +
+                              '<li>Prenotazioni processate: <strong>' + stats.total_processed + '</strong></li>' +
+                              '<li>Prenotazioni saltate: <strong>' + stats.total_skipped + '</strong></li>' +
+                              '<li>Errori: <strong>' + stats.total_errors + '</strong></li>' +
+                              '<li>Tempo di esecuzione: <strong>' + stats.execution_time + ' secondi</strong></li>' +
+                              '<li>Intervallo date: <strong>' + stats.date_range + '</strong></li>' +
+                              '<li>Tipo data: <strong>' + stats.date_type + '</strong></li>' +
+                              '</ul>';
+                    
+                    $resultsContent.html(html);
+                    $results.show();
+                    
+                } else {
+                    $status.text('Errore durante il backfill').css('color', '#dc3232');
+                    
+                    var html = '<p><strong>Errore:</strong> ' + result.message + '</p>';
+                    if (result.stats && Object.keys(result.stats).length > 0) {
+                        html += '<p><strong>Statistiche parziali:</strong></p><ul>';
+                        Object.keys(result.stats).forEach(function(key) {
+                            if (result.stats[key] !== null && result.stats[key] !== '') {
+                                html += '<li>' + key + ': ' + result.stats[key] + '</li>';
+                            }
+                        });
+                        html += '</ul>';
+                    }
+                    
+                    $resultsContent.html(html);
+                    $results.show();
+                }
+                
+                $btn.prop('disabled', false);
+                
+            }).fail(function() {
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+                $btn.prop('disabled', false);
             });
         });
     });

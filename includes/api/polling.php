@@ -6,13 +6,14 @@
 if (!defined('ABSPATH')) exit;
 
 // Aggiungi intervallo personalizzato per il polling PRIMA di usarlo
+// Use higher priority to ensure it's registered early
 add_filter('cron_schedules', function($schedules) {
   $schedules['hic_poll_interval'] = array(
     'interval' => 300, // 5 minuti
     'display' => 'Ogni 5 minuti (HIC Polling)'
   );
   return $schedules;
-});
+}, 5); // Higher priority to ensure early registration
 
 /* ============ API Polling HIC ============ */
 // Se selezionato API Polling, configura il cron
@@ -731,4 +732,199 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
                 'message' => "Errore HTTP $http_code. Verifica la configurazione."
             );
     }
+}
+
+/* ============ BACKFILL FUNCTIONALITY ============ */
+
+/**
+ * Backfill reservations for a specific date range
+ * 
+ * @param string $from_date Date in Y-m-d format
+ * @param string $to_date Date in Y-m-d format 
+ * @param string $date_type Either 'checkin' or 'created'
+ * @param int $limit Optional limit for number of reservations to fetch
+ * @return array Result with success status, message, and statistics
+ */
+function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin', $limit = null) {
+    $start_time = microtime(true);
+    
+    hic_log("Backfill: Starting backfill from $from_date to $to_date (type: $date_type)");
+    
+    // Validate dates
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to_date)) {
+        return array(
+            'success' => false,
+            'message' => 'Formato date non valido. Usa YYYY-MM-DD.',
+            'stats' => array()
+        );
+    }
+    
+    // Validate date range
+    if (strtotime($from_date) > strtotime($to_date)) {
+        return array(
+            'success' => false,
+            'message' => 'La data di inizio deve essere precedente alla data di fine.',
+            'stats' => array()
+        );
+    }
+    
+    // Check for reasonable date range (max 6 months)
+    $date_diff = (strtotime($to_date) - strtotime($from_date)) / DAY_IN_SECONDS;
+    if ($date_diff > 180) {
+        return array(
+            'success' => false,
+            'message' => 'Intervallo di date troppo ampio. Massimo 6 mesi.',
+            'stats' => array()
+        );
+    }
+    
+    // Get API credentials
+    $prop_id = hic_get_property_id();
+    $email = hic_get_api_email();
+    $password = hic_get_api_password();
+    
+    if (!$prop_id || !$email || !$password) {
+        return array(
+            'success' => false,
+            'message' => 'Credenziali API mancanti. Configura Property ID, Email e Password.',
+            'stats' => array()
+        );
+    }
+    
+    // Initialize statistics
+    $stats = array(
+        'total_found' => 0,
+        'total_processed' => 0,
+        'total_skipped' => 0,
+        'total_errors' => 0,
+        'execution_time' => 0,
+        'date_range' => "$from_date to $to_date",
+        'date_type' => $date_type
+    );
+    
+    try {
+        // Fetch reservations from API
+        $reservations = hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $limit);
+        
+        if (is_wp_error($reservations)) {
+            return array(
+                'success' => false,
+                'message' => 'Errore API: ' . $reservations->get_error_message(),
+                'stats' => $stats
+            );
+        }
+        
+        if (!is_array($reservations)) {
+            return array(
+                'success' => false,
+                'message' => 'Risposta API non valida.',
+                'stats' => $stats
+            );
+        }
+        
+        $stats['total_found'] = count($reservations);
+        hic_log("Backfill: Found {$stats['total_found']} reservations");
+        
+        // Process each reservation
+        foreach ($reservations as $reservation) {
+            try {
+                // Check if should process (deduplication, validation)
+                if (!hic_should_process_reservation($reservation)) {
+                    $stats['total_skipped']++;
+                    continue;
+                }
+                
+                // Transform and process the reservation
+                $transformed = hic_transform_reservation($reservation);
+                if ($transformed !== false) {
+                    hic_process_booking_data($transformed);
+                    $stats['total_processed']++;
+                } else {
+                    $stats['total_errors']++;
+                    hic_log("Backfill: Failed to transform reservation: " . json_encode($reservation));
+                }
+                
+            } catch (Exception $e) {
+                $stats['total_errors']++;
+                hic_log("Backfill: Error processing reservation: " . $e->getMessage());
+            }
+        }
+        
+        $stats['execution_time'] = round(microtime(true) - $start_time, 2);
+        
+        $message = "Backfill completato: {$stats['total_found']} trovate, {$stats['total_processed']} processate, {$stats['total_skipped']} saltate, {$stats['total_errors']} errori in {$stats['execution_time']}s";
+        hic_log("Backfill: $message");
+        
+        return array(
+            'success' => true,
+            'message' => $message,
+            'stats' => $stats
+        );
+        
+    } catch (Exception $e) {
+        $stats['execution_time'] = round(microtime(true) - $start_time, 2);
+        $error_message = "Errore durante il backfill: " . $e->getMessage();
+        hic_log("Backfill: $error_message");
+        
+        return array(
+            'success' => false,
+            'message' => $error_message,
+            'stats' => $stats
+        );
+    }
+}
+
+/**
+ * Force reschedule cron events to ensure correct interval
+ */
+function hic_force_reschedule_cron_events() {
+    $results = array();
+    
+    // Clear existing events first
+    $poll_timestamp = wp_next_scheduled('hic_api_poll_event');
+    if ($poll_timestamp) {
+        wp_unschedule_event($poll_timestamp, 'hic_api_poll_event');
+        $results['hic_api_poll_event_cleared'] = 'Event cleared';
+    }
+    
+    $updates_timestamp = wp_next_scheduled('hic_api_updates_event');
+    if ($updates_timestamp) {
+        wp_unschedule_event($updates_timestamp, 'hic_api_updates_event');
+        $results['hic_api_updates_event_cleared'] = 'Event cleared';
+    }
+    
+    // Check if we should reschedule based on current configuration
+    $should_schedule_poll = hic_get_connection_type() === 'api' && hic_get_api_url() && 
+                           (hic_get_property_id() && hic_get_api_email() && hic_get_api_password()) || hic_get_api_key();
+    
+    $should_schedule_updates = hic_get_connection_type() === 'api' && hic_get_api_url() && 
+                              hic_updates_enrich_contacts() && hic_get_property_id() && 
+                              hic_get_api_email() && hic_get_api_password();
+    
+    // Reschedule with correct interval
+    if ($should_schedule_poll) {
+        $poll_result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event');
+        $results['hic_api_poll_event_scheduled'] = $poll_result ? 'Successfully scheduled' : 'Failed to schedule';
+        if ($poll_result) {
+            hic_log('Force reschedule: hic_api_poll_event rescheduled successfully');
+        } else {
+            hic_log('Force reschedule: Failed to reschedule hic_api_poll_event');
+        }
+    } else {
+        $results['hic_api_poll_event_scheduled'] = 'Conditions not met, not scheduled';
+    }
+    
+    if ($should_schedule_updates) {
+        $updates_result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event');
+        $results['hic_api_updates_event_scheduled'] = $updates_result ? 'Successfully scheduled' : 'Failed to schedule';
+        if ($updates_result) {
+            hic_log('Force reschedule: hic_api_updates_event rescheduled successfully');
+        } else {
+            hic_log('Force reschedule: Failed to reschedule hic_api_updates_event');
+        }
+    } else {
+        $results['hic_api_updates_event_scheduled'] = 'Conditions not met, not scheduled';
+    }
+    
+    return $results;
 }
