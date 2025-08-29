@@ -117,6 +117,7 @@ function hic_get_execution_stats() {
         'last_updates_time' => get_option('hic_last_updates_since', 0),
         'processed_reservations' => count(get_option('hic_synced_res_ids', array())),
         'enriched_emails' => count(get_option('hic_res_email_map', array())),
+        'last_poll_reservations_found' => get_option('hic_last_poll_count', 0),
         'log_file_exists' => file_exists(hic_get_log_file()),
         'log_file_size' => file_exists(hic_get_log_file()) ? filesize(hic_get_log_file()) : 0
     );
@@ -1009,6 +1010,19 @@ function hic_diagnostics_page() {
                     <tr>
                         <td>Prenotazioni Elaborate</td>
                         <td><?php echo esc_html(number_format($execution_stats['processed_reservations'])); ?></td>
+                    </tr>
+                    <tr>
+                        <td>Ultimo Polling - Prenotazioni Trovate</td>
+                        <td>
+                            <?php 
+                            $last_count = $execution_stats['last_poll_reservations_found'];
+                            if ($last_count > 0) {
+                                echo '<span class="status ok">' . esc_html(number_format($last_count)) . '</span>';
+                            } else {
+                                echo '<span class="status warning">0</span>';
+                            }
+                            ?>
+                        </td>
                     </tr>
                     <tr>
                         <td>Email Arricchite</td>

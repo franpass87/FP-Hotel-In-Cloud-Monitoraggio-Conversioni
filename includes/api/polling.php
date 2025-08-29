@@ -290,15 +290,64 @@ function hic_api_poll_bookings(){
         $last = get_option('hic_last_api_poll', strtotime('-1 day'));
         $now  = time();
         $from = date('Y-m-d', $last);
-        $to   = date('Y-m-d', $now);
-        $date_type = 'checkin'; // default; in futuro rendere configurabile
-        hic_log("Cron: polling reservations from $from to $to for property $prop");
-        $out = hic_fetch_reservations($prop, $date_type, $from, $to, 100);
-        if (!is_wp_error($out)) {
-            update_option('hic_last_api_poll', $now);
+        // Extend date range to catch manual bookings - add 7 days buffer
+        $to   = date('Y-m-d', $now + (7 * DAY_IN_SECONDS));
+        
+        $total_reservations = 0;
+        $polling_errors = array();
+        
+        // First, poll by checkin date (existing logic)
+        $date_type = 'checkin';
+        hic_log("Cron: polling reservations by $date_type from $from to $to for property $prop");
+        $out_checkin = hic_fetch_reservations($prop, $date_type, $from, $to, 100);
+        if (!is_wp_error($out_checkin)) {
+            $checkin_count = is_array($out_checkin) ? count($out_checkin) : 0;
+            $total_reservations += $checkin_count;
+            hic_log("Cron: Found $checkin_count reservations by checkin date");
+        } else {
+            $polling_errors[] = "checkin polling: " . $out_checkin->get_error_message();
+        }
+        
+        // Second, poll by created date to catch recent manual bookings
+        $date_type = 'created';
+        $created_from = date('Y-m-d', $last);
+        $created_to = date('Y-m-d', $now); // Don't extend for created date
+        hic_log("Cron: polling reservations by $date_type from $created_from to $created_to for property $prop");
+        $out_created = hic_fetch_reservations($prop, $date_type, $created_from, $created_to, 100);
+        if (!is_wp_error($out_created)) {
+            $created_count = is_array($out_created) ? count($out_created) : 0;
+            $total_reservations += $created_count;
+            hic_log("Cron: Found $created_count reservations by created date");
+        } else {
+            $polling_errors[] = "created polling: " . $out_created->get_error_message();
+        }
+        
+        // Determine if polling was successful
+        $polling_successful = empty($polling_errors) || (!is_wp_error($out_checkin) || !is_wp_error($out_created));
+        
+        if ($polling_successful) {
+            hic_log("Cron: Total reservations found: $total_reservations");
+            
+            // Store count for diagnostics
+            update_option('hic_last_poll_count', $total_reservations);
+            
+            // Only update timestamp if we actually found reservations OR if enough time has passed
+            // This prevents getting stuck on the same timestamp when no bookings are found
+            $time_since_last_poll = $now - $last;
+            if ($total_reservations > 0) {
+                update_option('hic_last_api_poll', $now);
+                hic_log("Cron: Updated last poll timestamp (found $total_reservations reservations)");
+            } elseif ($time_since_last_poll > DAY_IN_SECONDS) {
+                // If more than 24 hours since last poll and no reservations, advance timestamp
+                // to prevent infinite polling of the same period
+                update_option('hic_last_api_poll', $now);
+                hic_log('Cron: Advanced timestamp after 24+ hours with no reservations');
+            } else {
+                hic_log('Cron: No reservations found, keeping previous timestamp for retry');
+            }
             hic_log('Cron: hic_api_poll_bookings completed successfully');
         } else {
-            hic_log('Cron: hic_api_poll_bookings failed: ' . $out->get_error_message());
+            hic_log('Cron: hic_api_poll_bookings failed: ' . implode('; ', $polling_errors));
         }
         return;
     }
@@ -387,8 +436,20 @@ function hic_legacy_api_poll_bookings() {
 
   hic_log("API polling completato: $processed processate, $errors errori");
 
-  // Aggiorna il timestamp dell'ultimo polling
-  update_option('hic_last_api_poll', $current_time);
+  // Store count for diagnostics
+  update_option('hic_last_poll_count', count($data));
+
+  // Only update timestamp if we found reservations OR if enough time has passed
+  $time_since_last_poll = $current_time - $last_poll;
+  if (count($data) > 0) {
+    update_option('hic_last_api_poll', $current_time);
+    hic_log("Legacy polling: Updated timestamp (found " . count($data) . " reservations)");
+  } elseif ($time_since_last_poll > DAY_IN_SECONDS) {
+    update_option('hic_last_api_poll', $current_time);
+    hic_log('Legacy polling: Advanced timestamp after 24+ hours with no reservations');
+  } else {
+    hic_log('Legacy polling: No reservations found, keeping previous timestamp for retry');
+  }
 }
 
 /**
