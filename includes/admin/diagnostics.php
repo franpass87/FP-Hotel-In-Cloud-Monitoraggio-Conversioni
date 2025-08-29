@@ -113,6 +113,7 @@ function hic_get_credentials_status() {
  */
 function hic_get_execution_stats() {
     return array(
+        'last_cron_execution' => get_option('hic_last_cron_execution', 0),
         'last_poll_time' => get_option('hic_last_api_poll', 0),
         'last_updates_time' => get_option('hic_last_updates_since', 0),
         'processed_reservations' => count(get_option('hic_synced_res_ids', array())),
@@ -999,6 +1000,20 @@ function hic_diagnostics_page() {
             <div class="card">
                 <h2>Statistiche Esecuzione</h2>
                 <table class="widefat" id="hic-execution-stats">
+                    <tr>
+                        <td>Ultima Esecuzione Cron</td>
+                        <td>
+                            <?php 
+                            if ($execution_stats['last_cron_execution']) {
+                                $execution_time = date('Y-m-d H:i:s', $execution_stats['last_cron_execution']);
+                                $time_ago = human_time_diff($execution_stats['last_cron_execution'], time()) . ' fa';
+                                echo '<span class="status ok">' . esc_html($execution_time) . '</span><br><small>(' . esc_html($time_ago) . ')</small>';
+                            } else {
+                                echo '<span class="status warning">Mai</span>';
+                            }
+                            ?>
+                        </td>
+                    </tr>
                     <tr>
                         <td>Ultimo Polling</td>
                         <td><?php echo $execution_stats['last_poll_time'] ? esc_html(date('Y-m-d H:i:s', $execution_stats['last_poll_time'])) : 'Mai'; ?></td>

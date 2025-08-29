@@ -286,6 +286,9 @@ function hic_mark_reservation_processed($reservation) {
 function hic_api_poll_bookings(){
     hic_log('Cron: hic_api_poll_bookings execution started');
     
+    // Always update execution timestamp regardless of results
+    update_option('hic_last_cron_execution', time());
+    
     $prop = hic_get_property_id();
     $email = hic_get_api_email();
     $password = hic_get_api_password();
@@ -382,6 +385,9 @@ function hic_legacy_api_poll_bookings() {
     return;
   }
 
+  // Always update execution timestamp regardless of results
+  update_option('hic_last_cron_execution', time());
+
   // Ottieni l'ultimo timestamp processato
   $last_poll = get_option('hic_last_api_poll', strtotime('-1 hour'));
   $current_time = time();
@@ -463,6 +469,9 @@ function hic_legacy_api_poll_bookings() {
  */
 function hic_api_poll_updates(){
     hic_log('Cron: hic_api_poll_updates execution started');
+    
+    // Always update execution timestamp regardless of results
+    update_option('hic_last_cron_execution', time());
     
     $prop = hic_get_property_id();
     $since = get_option('hic_last_updates_since', time() - DAY_IN_SECONDS);
