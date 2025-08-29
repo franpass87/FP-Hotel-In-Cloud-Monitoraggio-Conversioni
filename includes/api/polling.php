@@ -105,6 +105,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     hic_log(array('hic_reservations_count' => is_array($data) ? count($data) : 0));
 
     // Processa singole prenotazioni con la nuova pipeline
+    $processed_count = 0;
     if (is_array($data)) {
         foreach ($data as $reservation) {
             try {
@@ -113,11 +114,15 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
                     if ($transformed !== false) {
                         hic_dispatch_reservation($transformed, $reservation);
                         hic_mark_reservation_processed($reservation);
+                        $processed_count++;
                     }
                 }
             } catch (Exception $e) { 
                 hic_log('Process reservation error: '.$e->getMessage()); 
             }
+        }
+        if (count($data) > 0) {
+            hic_log("Processed $processed_count out of " . count($data) . " reservations (duplicates/invalid skipped)");
         }
     }
     return $data;
@@ -290,15 +295,16 @@ function hic_api_poll_bookings(){
         $last = get_option('hic_last_api_poll', strtotime('-1 day'));
         $now  = time();
         $from = date('Y-m-d', $last);
-        // Extend date range to catch manual bookings - add 7 days buffer
-        $to   = date('Y-m-d', $now + (7 * DAY_IN_SECONDS));
+        // Extend date range to catch manual bookings - configurable buffer
+        $range_extension_days = hic_get_polling_range_extension_days();
+        $to   = date('Y-m-d', $now + ($range_extension_days * DAY_IN_SECONDS));
         
         $total_reservations = 0;
         $polling_errors = array();
         
         // First, poll by checkin date (existing logic)
         $date_type = 'checkin';
-        hic_log("Cron: polling reservations by $date_type from $from to $to for property $prop");
+        hic_log("Cron: polling reservations by $date_type from $from to $to (+$range_extension_days days) for property $prop");
         $out_checkin = hic_fetch_reservations($prop, $date_type, $from, $to, 100);
         if (!is_wp_error($out_checkin)) {
             $checkin_count = is_array($out_checkin) ? count($out_checkin) : 0;
