@@ -24,6 +24,12 @@ function hic_get_cron_status() {
             'next_run_human' => 'Non schedulato',
             'conditions_met' => false
         ),
+        'retry_event' => array(
+            'scheduled' => false,
+            'next_run' => null,
+            'next_run_human' => 'Non schedulato',
+            'conditions_met' => false
+        ),
         'system_cron_enabled' => false,
         'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
         'custom_interval_registered' => false
@@ -53,10 +59,17 @@ function hic_get_cron_status() {
         $status['retry_event']['next_run_human'] = human_time_diff($next_retry, time()) . ' from now';
     }
     
+    // Check if custom cron interval is registered
+    $schedules = wp_get_schedules();
+    $status['custom_interval_registered'] = isset($schedules['hic_poll_interval']);
+    $status['retry_interval_registered'] = isset($schedules['hic_retry_interval']);
+    
     // Check scheduling conditions
     $status['poll_event']['conditions_met'] = hic_should_schedule_poll_event();
     $status['updates_event']['conditions_met'] = hic_should_schedule_updates_event();
-    $status['retry_event']['conditions_met'] = hic_realtime_brevo_sync_enabled() && hic_get_brevo_api_key();
+    
+    // Check retry event conditions using centralized function
+    $status['retry_event']['conditions_met'] = hic_should_schedule_retry_event();
     
     // Real-time sync stats
     global $wpdb;
@@ -70,12 +83,14 @@ function hic_get_cron_status() {
         $status['realtime_sync']['table_exists'] = false;
     }
     
-    // Check if custom cron interval is registered
-    $schedules = wp_get_schedules();
-    $status['custom_interval_registered'] = isset($schedules['hic_poll_interval']);
-    $status['retry_interval_registered'] = isset($schedules['hic_retry_interval']);
-    
     return $status;
+}
+
+/**
+ * Helper function to check if Basic Auth credentials are configured
+ */
+function hic_has_basic_auth_credentials() {
+    return hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
 }
 
 /**
@@ -91,10 +106,26 @@ function hic_should_schedule_poll_event() {
     }
     
     // Check if we have Basic Auth credentials or legacy API key
-    $has_basic_auth = hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+    $has_basic_auth = hic_has_basic_auth_credentials();
     $has_legacy_key = hic_get_api_key();
     
     return $has_basic_auth || $has_legacy_key;
+}
+
+/**
+ * Check if retry event should be scheduled based on conditions
+ */
+function hic_should_schedule_retry_event() {
+    if (!hic_realtime_brevo_sync_enabled()) {
+        return false;
+    }
+    
+    if (!hic_get_brevo_api_key()) {
+        return false;
+    }
+    
+    $schedules = wp_get_schedules();
+    return isset($schedules['hic_retry_interval']);
 }
 
 /**
@@ -114,7 +145,7 @@ function hic_should_schedule_updates_event() {
     }
     
     // Updates polling requires Basic Auth
-    return hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+    return hic_has_basic_auth_credentials();
 }
 
 /**
@@ -634,6 +665,8 @@ function hic_get_wp_cron_schedules() {
  * Get recent error count from logs
  */
 function hic_get_error_stats() {
+    $log_lines_to_check = 1000; // Configurable number of recent log lines to analyze
+    
     $log_file = hic_get_log_file();
     if (!file_exists($log_file)) {
         return array('error_count' => 0, 'last_error' => null);
@@ -644,8 +677,8 @@ function hic_get_error_stats() {
         return array('error_count' => 0, 'last_error' => null);
     }
     
-    // Count errors in last 1000 lines
-    $recent_lines = array_slice($lines, -1000);
+    // Count errors in recent lines
+    $recent_lines = array_slice($lines, -$log_lines_to_check);
     $error_count = 0;
     $last_error = null;
     
@@ -1161,13 +1194,13 @@ function hic_diagnostics_page() {
                             <?php if ($poll_interval_used): ?>
                                 <?php 
                                 $actual_seconds = isset($schedules[$poll_interval_used]) ? $schedules[$poll_interval_used]['interval'] : 'N/A';
-                                $is_correct = $poll_interval_used === 'hic_poll_interval' && $actual_seconds == 300;
+                                $is_correct = $poll_interval_used === 'hic_poll_interval' && $actual_seconds == HIC_POLL_INTERVAL_SECONDS;
                                 ?>
                                 <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
                                     <?php echo esc_html($poll_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
                                 </span>
                                 <?php if (!$is_correct): ?>
-                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (300 sec)</small>
+                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (<?php echo HIC_POLL_INTERVAL_SECONDS; ?> sec)</small>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <span class="status error">Non schedulato</span>
@@ -1181,13 +1214,13 @@ function hic_diagnostics_page() {
                             <?php if ($updates_interval_used): ?>
                                 <?php 
                                 $actual_seconds = isset($schedules[$updates_interval_used]) ? $schedules[$updates_interval_used]['interval'] : 'N/A';
-                                $is_correct = $updates_interval_used === 'hic_poll_interval' && $actual_seconds == 300;
+                                $is_correct = $updates_interval_used === 'hic_poll_interval' && $actual_seconds == HIC_POLL_INTERVAL_SECONDS;
                                 ?>
                                 <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
                                     <?php echo esc_html($updates_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
                                 </span>
                                 <?php if (!$is_correct): ?>
-                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (300 sec)</small>
+                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (<?php echo HIC_POLL_INTERVAL_SECONDS; ?> sec)</small>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <span class="status error">Non schedulato</span>
@@ -1225,14 +1258,11 @@ function hic_diagnostics_page() {
                             <td>Evento Retry Schedulato</td>
                             <td>
                                 <?php if (isset($status['retry_event']['scheduled']) && $status['retry_event']['scheduled']): ?>
-                                    <span class="status ok">✓ Schedulato (prossima esecuzione: <?php echo esc_html($status['retry_event']['next_run_human']); ?>)</span>
+                                    <span class="status ok">✓ Schedulato (<?php echo esc_html($status['retry_event']['next_run_human']); ?>)</span>
+                                <?php elseif (isset($status['retry_event']['conditions_met']) && $status['retry_event']['conditions_met']): ?>
+                                    <span class="status warning">⚠ Condizioni soddisfatte ma non schedulato</span>
                                 <?php else: ?>
-                                    <span class="status <?php echo isset($status['retry_event']['conditions_met']) && $status['retry_event']['conditions_met'] ? 'warning' : 'error'; ?>">
-                                        ✗ Non schedulato
-                                        <?php if (!isset($status['retry_event']['conditions_met']) || !$status['retry_event']['conditions_met']): ?>
-                                            (condizioni non soddisfatte)
-                                        <?php endif; ?>
-                                    </span>
+                                    <span class="status error">✗ Non attivo (condizioni non soddisfatte)</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -1403,7 +1433,7 @@ function hic_diagnostics_page() {
                 <h2>Riepilogo Errori</h2>
                 <table class="widefat">
                     <tr>
-                        <td>Errori Recenti (ultimi 1000 log)</td>
+                        <td>Errori Recenti (ultimi log)</td>
                         <td><span class="status <?php echo esc_attr($error_stats['error_count'] > 0 ? 'error' : 'ok'); ?>">
                             <?php echo esc_html(number_format($error_stats['error_count'])); ?>
                         </span></td>
