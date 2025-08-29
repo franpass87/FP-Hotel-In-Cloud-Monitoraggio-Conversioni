@@ -1093,6 +1093,114 @@ function hic_diagnostics_page() {
                 </ul>
             </div>
             
+            <!-- Cron Interval Diagnostics Section -->
+            <div class="card">
+                <h2>Diagnostica Intervalli Cron</h2>
+                <?php 
+                // Get detailed cron information
+                $crons = _get_cron_array();
+                $schedules = wp_get_schedules();
+                ?>
+                
+                <table class="widefat">
+                    <tr>
+                        <td>Intervallo Personalizzato Registrato</td>
+                        <td>
+                            <?php if (isset($schedules['hic_poll_interval'])): ?>
+                                <span class="status ok">✓ Registrato (<?php echo esc_html($schedules['hic_poll_interval']['interval']); ?> secondi)</span>
+                            <?php else: ?>
+                                <span class="status error">✗ NON Registrato</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    
+                    <?php 
+                    // Check what interval the scheduled events are actually using
+                    $poll_interval_used = null;
+                    $updates_interval_used = null;
+                    
+                    foreach ($crons as $timestamp => $cron) {
+                        if (isset($cron['hic_api_poll_event'])) {
+                            foreach ($cron['hic_api_poll_event'] as $key => $event) {
+                                $poll_interval_used = $event['schedule'];
+                            }
+                        }
+                        if (isset($cron['hic_api_updates_event'])) {
+                            foreach ($cron['hic_api_updates_event'] as $key => $event) {
+                                $updates_interval_used = $event['schedule'];
+                            }
+                        }
+                    }
+                    ?>
+                    
+                    <tr>
+                        <td>hic_api_poll_event - Intervallo Attuale</td>
+                        <td>
+                            <?php if ($poll_interval_used): ?>
+                                <?php 
+                                $actual_seconds = isset($schedules[$poll_interval_used]) ? $schedules[$poll_interval_used]['interval'] : 'N/A';
+                                $is_correct = $poll_interval_used === 'hic_poll_interval' && $actual_seconds == 300;
+                                ?>
+                                <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
+                                    <?php echo esc_html($poll_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
+                                </span>
+                                <?php if (!$is_correct): ?>
+                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (300 sec)</small>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <span class="status error">Non schedulato</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <td>hic_api_updates_event - Intervallo Attuale</td>
+                        <td>
+                            <?php if ($updates_interval_used): ?>
+                                <?php 
+                                $actual_seconds = isset($schedules[$updates_interval_used]) ? $schedules[$updates_interval_used]['interval'] : 'N/A';
+                                $is_correct = $updates_interval_used === 'hic_poll_interval' && $actual_seconds == 300;
+                                ?>
+                                <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
+                                    <?php echo esc_html($updates_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
+                                </span>
+                                <?php if (!$is_correct): ?>
+                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (300 sec)</small>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <span class="status error">Non schedulato</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </table>
+                
+                <?php if (($poll_interval_used && $poll_interval_used !== 'hic_poll_interval') || ($updates_interval_used && $updates_interval_used !== 'hic_poll_interval')): ?>
+                <div class="notice notice-warning inline">
+                    <p><strong>Avviso:</strong> Gli eventi cron non stanno usando l'intervallo corretto. Usa il pulsante "Forza Rischedulazione" per correggere.</p>
+                </div>
+                <?php endif; ?>
+                
+                <h3>Tutti gli Intervalli Disponibili</h3>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Nome Intervallo</th>
+                            <th>Secondi</th>
+                            <th>Descrizione</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($schedules as $key => $schedule): ?>
+                        <tr>
+                            <td><code><?php echo esc_html($key); ?></code></td>
+                            <td><?php echo esc_html(number_format($schedule['interval'])); ?></td>
+                            <td><?php echo esc_html($schedule['display']); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            
             <!-- Credentials Status Section -->
             <div class="card">
                 <h2>Stato Credenziali e API</h2>

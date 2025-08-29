@@ -8,10 +8,13 @@ if (!defined('ABSPATH')) exit;
 // Aggiungi intervallo personalizzato per il polling PRIMA di usarlo
 // Use higher priority to ensure it's registered early
 add_filter('cron_schedules', function($schedules) {
-  $schedules['hic_poll_interval'] = array(
-    'interval' => 300, // 5 minuti
-    'display' => 'Ogni 5 minuti (HIC Polling)'
-  );
+  if (!isset($schedules['hic_poll_interval'])) {
+    $schedules['hic_poll_interval'] = array(
+      'interval' => 300, // 5 minuti
+      'display' => 'Ogni 5 minuti (HIC Polling)'
+    );
+    hic_log('Cron schedule: hic_poll_interval registered (300 seconds)');
+  }
   return $schedules;
 }, 5); // Higher priority to ensure early registration
 
@@ -34,14 +37,24 @@ add_action('init', function() {
       if (!$result) {
         hic_log('ERROR: Failed to schedule hic_api_poll_event. Check if hic_poll_interval is registered.');
       } else {
-        hic_log('hic_api_poll_event scheduled successfully');
+        hic_log('hic_api_poll_event scheduled successfully with hic_poll_interval');
+        // Verify the scheduled interval
+        $schedules = wp_get_schedules();
+        if (isset($schedules['hic_poll_interval'])) {
+          hic_log('Confirmed: hic_poll_interval = ' . $schedules['hic_poll_interval']['interval'] . ' seconds');
+        }
       }
+    } else {
+      // Log that event is already scheduled and verify its interval
+      $next_run = wp_next_scheduled('hic_api_poll_event');
+      hic_log('hic_api_poll_event already scheduled for: ' . date('Y-m-d H:i:s', $next_run));
     }
   } else {
     // Rimuovi il cron se non è più necessario
     $timestamp = wp_next_scheduled('hic_api_poll_event');
     if ($timestamp) {
       wp_unschedule_event($timestamp, 'hic_api_poll_event');
+      hic_log('hic_api_poll_event unscheduled (conditions not met)');
     }
   }
 });
@@ -64,13 +77,23 @@ add_action('init', function() {
       if (!$result) {
         hic_log('ERROR: Failed to schedule hic_api_updates_event. Check if hic_poll_interval is registered.');
       } else {
-        hic_log('hic_api_updates_event scheduled successfully');
+        hic_log('hic_api_updates_event scheduled successfully with hic_poll_interval');
+        // Verify the scheduled interval
+        $schedules = wp_get_schedules();
+        if (isset($schedules['hic_poll_interval'])) {
+          hic_log('Confirmed: hic_poll_interval = ' . $schedules['hic_poll_interval']['interval'] . ' seconds');
+        }
       }
+    } else {
+      // Log that event is already scheduled
+      $next_run = wp_next_scheduled('hic_api_updates_event');
+      hic_log('hic_api_updates_event already scheduled for: ' . date('Y-m-d H:i:s', $next_run));
     }
   } else {
     $timestamp = wp_next_scheduled('hic_api_updates_event');
     if ($timestamp) {
       wp_unschedule_event($timestamp, 'hic_api_updates_event');
+      hic_log('hic_api_updates_event unscheduled (conditions not met)');
     }
   }
 });
