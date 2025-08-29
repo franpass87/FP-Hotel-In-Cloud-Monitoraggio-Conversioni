@@ -263,7 +263,7 @@ function hic_admin_email_render() {
 
 function hic_francesco_email_enabled_render() {
     $checked = hic_francesco_email_enabled() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_francesco_email_enabled" value="1" ' . $checked . ' /> Invia notifica email a francesco.passeri@gmail.com per ogni prenotazione';
+    echo '<input type="checkbox" name="hic_francesco_email_enabled" value="1" ' . esc_attr($checked) . ' /> Invia notifica email a francesco.passeri@gmail.com per ogni prenotazione';
 }
 
 function hic_log_file_render() {
@@ -280,7 +280,7 @@ function hic_api_secret_render() {
 
 function hic_brevo_enabled_render() {
     $checked = hic_is_brevo_enabled() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_brevo_enabled" value="1" ' . $checked . ' /> Abilita integrazione Brevo';
+    echo '<input type="checkbox" name="hic_brevo_enabled" value="1" ' . esc_attr($checked) . ' /> Abilita integrazione Brevo';
 }
 
 function hic_brevo_api_key_render() {
