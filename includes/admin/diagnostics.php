@@ -45,13 +45,35 @@ function hic_get_cron_status() {
         $status['updates_event']['next_run_human'] = human_time_diff($next_updates, time()) . ' from now';
     }
     
+    // Check real-time retry event
+    $next_retry = wp_next_scheduled('hic_retry_failed_notifications_event');
+    if ($next_retry) {
+        $status['retry_event']['scheduled'] = true;
+        $status['retry_event']['next_run'] = $next_retry;
+        $status['retry_event']['next_run_human'] = human_time_diff($next_retry, time()) . ' from now';
+    }
+    
     // Check scheduling conditions
     $status['poll_event']['conditions_met'] = hic_should_schedule_poll_event();
     $status['updates_event']['conditions_met'] = hic_should_schedule_updates_event();
+    $status['retry_event']['conditions_met'] = hic_realtime_brevo_sync_enabled() && hic_get_brevo_api_key();
+    
+    // Real-time sync stats
+    global $wpdb;
+    $realtime_table = $wpdb->prefix . 'hic_realtime_sync';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$realtime_table'") === $realtime_table) {
+        $status['realtime_sync']['total_tracked'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table");
+        $status['realtime_sync']['notified'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'notified'");
+        $status['realtime_sync']['failed'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'failed'");
+        $status['realtime_sync']['new'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'new'");
+    } else {
+        $status['realtime_sync']['table_exists'] = false;
+    }
     
     // Check if custom cron interval is registered
     $schedules = wp_get_schedules();
     $status['custom_interval_registered'] = isset($schedules['hic_poll_interval']);
+    $status['retry_interval_registered'] = isset($schedules['hic_retry_interval']);
     
     return $status;
 }
@@ -1179,6 +1201,74 @@ function hic_diagnostics_page() {
                     <p><strong>Avviso:</strong> Gli eventi cron non stanno usando l'intervallo corretto. Usa il pulsante "Forza Rischedulazione" per correggere.</p>
                 </div>
                 <?php endif; ?>
+                
+                <h3>Sync Real-time Brevo</h3>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Valore</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Real-time Sync Abilitato</td>
+                            <td>
+                                <?php if (hic_realtime_brevo_sync_enabled()): ?>
+                                    <span class="status ok">✓ Abilitato</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Disabilitato</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Evento Retry Schedulato</td>
+                            <td>
+                                <?php if (isset($status['retry_event']['scheduled']) && $status['retry_event']['scheduled']): ?>
+                                    <span class="status ok">✓ Schedulato (prossima esecuzione: <?php echo esc_html($status['retry_event']['next_run_human']); ?>)</span>
+                                <?php else: ?>
+                                    <span class="status <?php echo isset($status['retry_event']['conditions_met']) && $status['retry_event']['conditions_met'] ? 'warning' : 'error'; ?>">
+                                        ✗ Non schedulato
+                                        <?php if (!isset($status['retry_event']['conditions_met']) || !$status['retry_event']['conditions_met']): ?>
+                                            (condizioni non soddisfatte)
+                                        <?php endif; ?>
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php if (isset($status['realtime_sync']['table_exists']) && $status['realtime_sync']['table_exists'] === false): ?>
+                        <tr>
+                            <td>Tabella Stati Sync</td>
+                            <td><span class="status error">✗ Tabella non esistente</span></td>
+                        </tr>
+                        <?php else: ?>
+                        <tr>
+                            <td>Prenotazioni Tracciate</td>
+                            <td><?php echo isset($status['realtime_sync']['total_tracked']) ? intval($status['realtime_sync']['total_tracked']) : '0'; ?></td>
+                        </tr>
+                        <tr>
+                            <td>Notificate con Successo</td>
+                            <td>
+                                <span class="status ok"><?php echo isset($status['realtime_sync']['notified']) ? intval($status['realtime_sync']['notified']) : '0'; ?></span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Fallite</td>
+                            <td>
+                                <?php $failed = isset($status['realtime_sync']['failed']) ? intval($status['realtime_sync']['failed']) : 0; ?>
+                                <span class="status <?php echo $failed > 0 ? 'warning' : 'ok'; ?>"><?php echo $failed; ?></span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>In Attesa</td>
+                            <td>
+                                <?php $new = isset($status['realtime_sync']['new']) ? intval($status['realtime_sync']['new']) : 0; ?>
+                                <span class="status <?php echo $new > 0 ? 'warning' : 'ok'; ?>"><?php echo $new; ?></span>
+                            </td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
                 
                 <h3>Tutti gli Intervalli Disponibili</h3>
                 <table class="widefat">
