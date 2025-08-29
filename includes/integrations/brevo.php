@@ -216,3 +216,98 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false) {
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
   hic_log(array('Brevo HIC contact sent' => array('email' => $email, 'res_id' => $data['transaction_id'], 'lists' => $list_ids, 'alias' => $is_alias), 'HTTP' => $code));
 }
+
+/**
+ * Send reservation_created event to Brevo for real-time notifications
+ */
+function hic_send_brevo_reservation_created_event($data) {
+  if (!hic_get_brevo_api_key()) { 
+    hic_log('Brevo reservation_created event SKIPPED: API key mancante'); 
+    return false; 
+  }
+
+  if (!hic_realtime_brevo_sync_enabled()) {
+    hic_log('Brevo reservation_created event SKIPPED: real-time sync disabilitato');
+    return false;
+  }
+
+  $email = isset($data['email']) ? $data['email'] : '';
+  if (!hic_is_valid_email($email)) { 
+    hic_log('Brevo reservation_created event SKIPPED: email mancante o non valida'); 
+    return false; 
+  }
+
+  // Get gclid/fbclid for bucket normalization if available
+  $gclid = '';
+  $fbclid = '';
+  if (!empty($data['transaction_id'])) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'hic_gclids';
+    
+    // Check if table exists before querying
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+    if ($table_exists) {
+      // Try to find tracking data using transaction_id as sid
+      $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
+      if ($row) { 
+        $gclid = $row->gclid ?: ''; 
+        $fbclid = $row->fbclid ?: ''; 
+      }
+    }
+  }
+
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
+
+  $body = array(
+    'event' => 'reservation_created',
+    'email' => $email,
+    'properties' => array(
+      'reservation_id' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
+      'reservation_code' => isset($data['reservation_code']) ? $data['reservation_code'] : '',
+      'amount' => isset($data['original_price']) ? hic_normalize_price($data['original_price']) : 0,
+      'currency' => isset($data['currency']) ? $data['currency'] : 'EUR',
+      'from_date' => isset($data['from_date']) ? $data['from_date'] : '',
+      'to_date' => isset($data['to_date']) ? $data['to_date'] : '',
+      'guests' => isset($data['guests']) ? $data['guests'] : '',
+      'accommodation' => isset($data['accommodation_name']) ? $data['accommodation_name'] : '',
+      'phone' => isset($data['phone']) ? $data['phone'] : '',
+      'language' => isset($data['language']) ? $data['language'] : '',
+      'firstname' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
+      'lastname' => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
+      'bucket' => $bucket,
+      'vertical' => 'hotel',
+      'created_at' => current_time('mysql')
+    )
+  );
+
+  $res = wp_remote_post('https://in-automate.brevo.com/api/v2/trackEvent', array(
+    'headers' => array(
+      'accept' => 'application/json',
+      'content-type' => 'application/json',
+      'api-key' => hic_get_brevo_api_key()
+    ),
+    'body' => wp_json_encode($body),
+    'timeout' => 15
+  ));
+  
+  $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
+  $success = !is_wp_error($res) && $code >= 200 && $code < 300;
+  
+  $log_data = array(
+    'event' => 'reservation_created',
+    'email' => $email,
+    'reservation_id' => $body['properties']['reservation_id'],
+    'bucket' => $bucket,
+    'HTTP' => $code
+  );
+  
+  if (!$success) {
+    $error_message = is_wp_error($res) ? $res->get_error_message() : "HTTP $code";
+    $log_data['error'] = $error_message;
+    hic_log(array('Brevo reservation_created event FAILED' => $log_data));
+    return false;
+  }
+
+  hic_log(array('Brevo reservation_created event sent' => $log_data));
+  return true;
+}

@@ -92,6 +92,7 @@ function hic_settings_init() {
     
     // New email enrichment settings
     register_setting('hic_settings', 'hic_updates_enrich_contacts');
+    register_setting('hic_settings', 'hic_realtime_brevo_sync');
     register_setting('hic_settings', 'hic_brevo_list_alias', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_brevo_double_optin_on_enrich');
 
@@ -140,6 +141,7 @@ function hic_settings_init() {
     
     // Email enrichment settings
     add_settings_field('hic_updates_enrich_contacts', 'Aggiorna contatti da updates', 'hic_updates_enrich_contacts_render', 'hic_settings', 'hic_brevo_section');
+    add_settings_field('hic_realtime_brevo_sync', 'Sync real-time a Brevo', 'hic_realtime_brevo_sync_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_list_alias', 'Lista alias Brevo', 'hic_brevo_list_alias_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_double_optin_on_enrich', 'Double opt-in quando arriva email reale', 'hic_brevo_double_optin_on_enrich_render', 'hic_settings', 'hic_brevo_section');
     
@@ -411,6 +413,12 @@ function hic_debug_verbose_render() {
 function hic_updates_enrich_contacts_render() {
     $checked = hic_updates_enrich_contacts() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_updates_enrich_contacts" value="1" ' . $checked . ' /> Aggiorna contatti Brevo quando arriva email reale da updates';
+}
+
+function hic_realtime_brevo_sync_render() {
+    $checked = hic_realtime_brevo_sync_enabled() ? 'checked' : '';
+    echo '<input type="checkbox" name="hic_realtime_brevo_sync" value="1" ' . $checked . ' /> Invia eventi "reservation_created" a Brevo in tempo reale per nuove prenotazioni';
+    echo '<p class="description">Quando abilitato, le nuove prenotazioni rilevate dal polling updates invieranno automaticamente eventi a Brevo per automazioni e tracciamento.</p>';
 }
 
 function hic_brevo_list_alias_render() {

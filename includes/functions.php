@@ -26,6 +26,9 @@ function hic_updates_enrich_contacts() { return hic_get_option('updates_enrich_c
 function hic_get_brevo_list_alias() { return hic_get_option('brevo_list_alias', ''); }
 function hic_brevo_double_optin_on_enrich() { return hic_get_option('brevo_double_optin_on_enrich', '0') === '1'; }
 
+// Real-time sync settings
+function hic_realtime_brevo_sync_enabled() { return hic_get_option('realtime_brevo_sync', '1') === '1'; }
+
 // Admin and General Settings
 function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
 function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR . '/hic-log.txt'); }

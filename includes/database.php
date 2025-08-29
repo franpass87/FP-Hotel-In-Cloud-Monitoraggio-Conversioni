@@ -23,6 +23,32 @@ function hic_create_database_table(){
   require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
   dbDelta($sql);
   hic_log('DB ready: '.$table);
+  
+  // Create real-time sync state table
+  hic_create_realtime_sync_table();
+}
+
+/* ============ DB: tabella stati sync real-time per Brevo ============ */
+function hic_create_realtime_sync_table(){
+  global $wpdb;
+  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $charset = $wpdb->get_charset_collate();
+  $sql = "CREATE TABLE IF NOT EXISTS $table (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    reservation_id VARCHAR(255) NOT NULL,
+    sync_status ENUM('new', 'notified', 'failed') DEFAULT 'new',
+    first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_attempt TIMESTAMP NULL,
+    attempt_count INT DEFAULT 0,
+    last_error TEXT NULL,
+    brevo_event_sent TINYINT(1) DEFAULT 0,
+    UNIQUE KEY unique_reservation (reservation_id),
+    KEY status_idx (sync_status),
+    KEY first_seen_idx (first_seen)
+  ) $charset;";
+  require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+  dbDelta($sql);
+  hic_log('DB ready: '.$table.' (realtime sync states)');
 }
 
 /* ============ Cattura gclid/fbclid → cookie + DB ============ */
@@ -78,4 +104,123 @@ function hic_capture_tracking_params(){
     }
     hic_log("FBCLID salvato → $fbclid (SID: $sid_to_use)");
   }
+}
+
+/* ============ Funzioni per gestione stati sync real-time ============ */
+
+/**
+ * Check if a reservation is new for real-time sync
+ */
+function hic_is_reservation_new_for_realtime($reservation_id) {
+  if (empty($reservation_id)) return false;
+  
+  global $wpdb;
+  $table = $wpdb->prefix . 'hic_realtime_sync';
+  
+  $existing = $wpdb->get_var($wpdb->prepare(
+    "SELECT id FROM $table WHERE reservation_id = %s LIMIT 1",
+    $reservation_id
+  ));
+  
+  return !$existing;
+}
+
+/**
+ * Mark reservation as seen (new) for real-time sync
+ */
+function hic_mark_reservation_new_for_realtime($reservation_id) {
+  if (empty($reservation_id)) return false;
+  
+  global $wpdb;
+  $table = $wpdb->prefix . 'hic_realtime_sync';
+  
+  // Insert if not exists
+  $result = $wpdb->query($wpdb->prepare(
+    "INSERT IGNORE INTO $table (reservation_id, sync_status) VALUES (%s, 'new')",
+    $reservation_id
+  ));
+  
+  return $result !== false;
+}
+
+/**
+ * Mark reservation as successfully notified to Brevo
+ */
+function hic_mark_reservation_notified_to_brevo($reservation_id) {
+  if (empty($reservation_id)) return false;
+  
+  global $wpdb;
+  $table = $wpdb->prefix . 'hic_realtime_sync';
+  
+  $result = $wpdb->update(
+    $table,
+    array(
+      'sync_status' => 'notified',
+      'brevo_event_sent' => 1,
+      'last_attempt' => current_time('mysql'),
+      'last_error' => null
+    ),
+    array('reservation_id' => $reservation_id),
+    array('%s', '%d', '%s', '%s'),
+    array('%s')
+  );
+  
+  return $result !== false;
+}
+
+/**
+ * Mark reservation notification as failed
+ */
+function hic_mark_reservation_notification_failed($reservation_id, $error_message = null) {
+  if (empty($reservation_id)) return false;
+  
+  global $wpdb;
+  $table = $wpdb->prefix . 'hic_realtime_sync';
+  
+  // Get current attempt count
+  $current = $wpdb->get_row($wpdb->prepare(
+    "SELECT attempt_count FROM $table WHERE reservation_id = %s",
+    $reservation_id
+  ));
+  
+  $attempt_count = $current ? ($current->attempt_count + 1) : 1;
+  
+  $result = $wpdb->update(
+    $table,
+    array(
+      'sync_status' => 'failed',
+      'last_attempt' => current_time('mysql'),
+      'attempt_count' => $attempt_count,
+      'last_error' => $error_message
+    ),
+    array('reservation_id' => $reservation_id),
+    array('%s', '%s', '%d', '%s'),
+    array('%s')
+  );
+  
+  return $result !== false;
+}
+
+/**
+ * Get failed reservations that need retry
+ */
+function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_minutes = 30) {
+  global $wpdb;
+  $table = $wpdb->prefix . 'hic_realtime_sync';
+  
+  $retry_time = date('Y-m-d H:i:s', strtotime("-{$retry_delay_minutes} minutes"));
+  
+  $results = $wpdb->get_results($wpdb->prepare(
+    "SELECT reservation_id, attempt_count, last_error 
+     FROM $table 
+     WHERE sync_status = 'failed' 
+     AND attempt_count < %d 
+     AND (last_attempt IS NULL OR last_attempt < %s)
+     ORDER BY first_seen ASC
+     LIMIT 10",
+    $max_attempts,
+    $retry_time
+  ));
+  
+  return $results ? $results : array();
 }
