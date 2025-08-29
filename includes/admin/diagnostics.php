@@ -87,6 +87,13 @@ function hic_get_cron_status() {
 }
 
 /**
+ * Helper function to check if Basic Auth credentials are configured
+ */
+function hic_has_basic_auth_credentials() {
+    return hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+}
+
+/**
  * Check if main polling should be scheduled based on conditions
  */
 function hic_should_schedule_poll_event() {
@@ -99,7 +106,7 @@ function hic_should_schedule_poll_event() {
     }
     
     // Check if we have Basic Auth credentials or legacy API key
-    $has_basic_auth = hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+    $has_basic_auth = hic_has_basic_auth_credentials();
     $has_legacy_key = hic_get_api_key();
     
     return $has_basic_auth || $has_legacy_key;
@@ -138,7 +145,7 @@ function hic_should_schedule_updates_event() {
     }
     
     // Updates polling requires Basic Auth
-    return hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+    return hic_has_basic_auth_credentials();
 }
 
 /**
@@ -658,6 +665,8 @@ function hic_get_wp_cron_schedules() {
  * Get recent error count from logs
  */
 function hic_get_error_stats() {
+    $log_lines_to_check = 1000; // Configurable number of recent log lines to analyze
+    
     $log_file = hic_get_log_file();
     if (!file_exists($log_file)) {
         return array('error_count' => 0, 'last_error' => null);
@@ -668,8 +677,8 @@ function hic_get_error_stats() {
         return array('error_count' => 0, 'last_error' => null);
     }
     
-    // Count errors in last 1000 lines
-    $recent_lines = array_slice($lines, -1000);
+    // Count errors in recent lines
+    $recent_lines = array_slice($lines, -$log_lines_to_check);
     $error_count = 0;
     $last_error = null;
     
@@ -1185,13 +1194,13 @@ function hic_diagnostics_page() {
                             <?php if ($poll_interval_used): ?>
                                 <?php 
                                 $actual_seconds = isset($schedules[$poll_interval_used]) ? $schedules[$poll_interval_used]['interval'] : 'N/A';
-                                $is_correct = $poll_interval_used === 'hic_poll_interval' && $actual_seconds == 300;
+                                $is_correct = $poll_interval_used === 'hic_poll_interval' && $actual_seconds == HIC_POLL_INTERVAL_SECONDS;
                                 ?>
                                 <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
                                     <?php echo esc_html($poll_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
                                 </span>
                                 <?php if (!$is_correct): ?>
-                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (300 sec)</small>
+                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (<?php echo HIC_POLL_INTERVAL_SECONDS; ?> sec)</small>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <span class="status error">Non schedulato</span>
@@ -1205,13 +1214,13 @@ function hic_diagnostics_page() {
                             <?php if ($updates_interval_used): ?>
                                 <?php 
                                 $actual_seconds = isset($schedules[$updates_interval_used]) ? $schedules[$updates_interval_used]['interval'] : 'N/A';
-                                $is_correct = $updates_interval_used === 'hic_poll_interval' && $actual_seconds == 300;
+                                $is_correct = $updates_interval_used === 'hic_poll_interval' && $actual_seconds == HIC_POLL_INTERVAL_SECONDS;
                                 ?>
                                 <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
                                     <?php echo esc_html($updates_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
                                 </span>
                                 <?php if (!$is_correct): ?>
-                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (300 sec)</small>
+                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (<?php echo HIC_POLL_INTERVAL_SECONDS; ?> sec)</small>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <span class="status error">Non schedulato</span>
@@ -1424,7 +1433,7 @@ function hic_diagnostics_page() {
                 <h2>Riepilogo Errori</h2>
                 <table class="widefat">
                     <tr>
-                        <td>Errori Recenti (ultimi 1000 log)</td>
+                        <td>Errori Recenti (ultimi log)</td>
                         <td><span class="status <?php echo esc_attr($error_stats['error_count'] > 0 ? 'error' : 'ok'); ?>">
                             <?php echo esc_html(number_format($error_stats['error_count'])); ?>
                         </span></td>

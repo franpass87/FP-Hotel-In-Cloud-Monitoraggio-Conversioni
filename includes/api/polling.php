@@ -5,25 +5,54 @@
 
 if (!defined('ABSPATH')) exit;
 
+// Define constants for better maintainability
+define('HIC_POLL_INTERVAL_SECONDS', 300);  // 5 minutes
+define('HIC_RETRY_INTERVAL_SECONDS', 900); // 15 minutes
+
 // Aggiungi intervallo personalizzato per il polling PRIMA di usarlo
 // Use higher priority to ensure it's registered early
 add_filter('cron_schedules', function($schedules) {
   if (!isset($schedules['hic_poll_interval'])) {
     $schedules['hic_poll_interval'] = array(
-      'interval' => 300, // 5 minuti
+      'interval' => HIC_POLL_INTERVAL_SECONDS,
       'display' => 'Ogni 5 minuti (HIC Polling)'
     );
   }
   
   if (!isset($schedules['hic_retry_interval'])) {
     $schedules['hic_retry_interval'] = array(
-      'interval' => 900, // 15 minuti
+      'interval' => HIC_RETRY_INTERVAL_SECONDS,
       'display' => 'Ogni 15 minuti (HIC Retry)'
     );
   }
   
   return $schedules;
 }, 5);
+
+/**
+ * Helper function for consistent API error handling
+ */
+function hic_handle_api_response($response, $context = 'API call') {
+  if (is_wp_error($response)) {
+    hic_log("$context failed: " . $response->get_error_message());
+    return $response;
+  }
+  
+  $code = wp_remote_retrieve_response_code($response);
+  if ($code !== 200) {
+    hic_log("$context HTTP $code");
+    return new WP_Error('hic_http', "HTTP $code");
+  }
+  
+  $body = wp_remote_retrieve_body($response);
+  $data = json_decode($body, true);
+  if (json_last_error() !== JSON_ERROR_NONE) {
+    hic_log("$context JSON error: " . json_last_error_msg());
+    return new WP_Error('hic_json', 'Invalid JSON response');
+  }
+  
+  return $data;
+}
 
 /* ============ API Polling HIC ============ */
 // Se selezionato API Polling, configura il cron
@@ -32,7 +61,7 @@ add_action('init', function() {
   
   if (hic_get_connection_type() === 'api' && hic_get_api_url()) {
     // Check if we have Basic Auth credentials or legacy API key
-    $has_basic_auth = hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+    $has_basic_auth = hic_has_basic_auth_credentials();
     $has_legacy_key = hic_get_api_key(); // backward compatibility
     
     $should_schedule = $has_basic_auth || $has_legacy_key;
@@ -74,7 +103,7 @@ add_action('init', function() {
   $should_schedule_updates = false;
   
   if (hic_get_connection_type() === 'api' && hic_get_api_url() && hic_updates_enrich_contacts()) {
-    $has_basic_auth = hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+    $has_basic_auth = hic_has_basic_auth_credentials();
     $should_schedule_updates = $has_basic_auth;
   }
   
@@ -156,15 +185,10 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
             'User-Agent'    => 'WP/FP-HIC-Plugin'
         ),
     ));
-    if (is_wp_error($res)) { hic_log('HIC connessione fallita: '.$res->get_error_message()); return $res; }
-    $code = wp_remote_retrieve_response_code($res);
-    if ($code !== 200) { hic_log("HIC HTTP $code"); return new WP_Error('hic_http', "HTTP $code"); }
-
-    $body = wp_remote_retrieve_body($res);
-    $data = json_decode($body, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        hic_log('HIC JSON error: '.json_last_error_msg());
-        return new WP_Error('hic_json', 'JSON malformato');
+    
+    $data = hic_handle_api_response($res, 'HIC reservations fetch');
+    if (is_wp_error($data)) {
+        return $data;
     }
 
     // Log di debug iniziale (ridotto)
@@ -622,22 +646,9 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
       )
     ));
     
-    if (is_wp_error($res)) { 
-        hic_log('HIC updates connessione fallita: '.$res->get_error_message()); 
-        return $res; 
-    }
-    
-    $code = wp_remote_retrieve_response_code($res);
-    if ($code !== 200) { 
-        hic_log("HIC updates HTTP $code"); 
-        return new WP_Error('hic_http', "HTTP $code"); 
-    }
-
-    $body = wp_remote_retrieve_body($res);
-    $data = json_decode($body, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        hic_log('HIC updates JSON error: '.json_last_error_msg());
-        return new WP_Error('hic_json', 'JSON malformato');
+    $data = hic_handle_api_response($res, 'HIC updates fetch');
+    if (is_wp_error($data)) {
+        return $data;
     }
 
     // Log di debug iniziale
@@ -1048,11 +1059,10 @@ function hic_force_reschedule_cron_events() {
     
     // Check if we should reschedule based on current configuration
     $should_schedule_poll = hic_get_connection_type() === 'api' && hic_get_api_url() && 
-                           (hic_get_property_id() && hic_get_api_email() && hic_get_api_password()) || hic_get_api_key();
+                           (hic_has_basic_auth_credentials() || hic_get_api_key());
     
     $should_schedule_updates = hic_get_connection_type() === 'api' && hic_get_api_url() && 
-                              hic_updates_enrich_contacts() && hic_get_property_id() && 
-                              hic_get_api_email() && hic_get_api_password();
+                              hic_updates_enrich_contacts() && hic_has_basic_auth_credentials();
     
     // Reschedule with correct interval
     if ($should_schedule_poll) {
