@@ -59,6 +59,11 @@ function hic_get_cron_status() {
         $status['retry_event']['next_run_human'] = human_time_diff($next_retry, time()) . ' from now';
     }
     
+    // Check if custom cron interval is registered
+    $schedules = wp_get_schedules();
+    $status['custom_interval_registered'] = isset($schedules['hic_poll_interval']);
+    $status['retry_interval_registered'] = isset($schedules['hic_retry_interval']);
+    
     // Check scheduling conditions
     $status['poll_event']['conditions_met'] = hic_should_schedule_poll_event();
     $status['updates_event']['conditions_met'] = hic_should_schedule_updates_event();
@@ -80,11 +85,6 @@ function hic_get_cron_status() {
     } else {
         $status['realtime_sync']['table_exists'] = false;
     }
-    
-    // Check if custom cron interval is registered
-    $schedules = wp_get_schedules();
-    $status['custom_interval_registered'] = isset($schedules['hic_poll_interval']);
-    $status['retry_interval_registered'] = isset($schedules['hic_retry_interval']);
     
     return $status;
 }
