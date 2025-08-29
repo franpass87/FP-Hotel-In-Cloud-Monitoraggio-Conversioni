@@ -13,20 +13,17 @@ add_filter('cron_schedules', function($schedules) {
       'interval' => 300, // 5 minuti
       'display' => 'Ogni 5 minuti (HIC Polling)'
     );
-    hic_log('Cron schedule: hic_poll_interval registered (300 seconds)');
   }
   
-  // Add retry interval for failed real-time notifications
   if (!isset($schedules['hic_retry_interval'])) {
     $schedules['hic_retry_interval'] = array(
       'interval' => 900, // 15 minuti
       'display' => 'Ogni 15 minuti (HIC Retry)'
     );
-    hic_log('Cron schedule: hic_retry_interval registered (900 seconds)');
   }
   
   return $schedules;
-}, 5); // Higher priority to ensure early registration
+}, 5);
 
 /* ============ API Polling HIC ============ */
 // Se selezionato API Polling, configura il cron
@@ -110,42 +107,22 @@ add_action('init', function() {
 
 // Retry mechanism for failed real-time notifications
 add_action('init', function() {
-  $should_schedule_retry = false;
-  $realtime_enabled = hic_realtime_brevo_sync_enabled();
-  $brevo_api_key = hic_get_brevo_api_key();
-  
-  // Check if retry interval is registered
-  $schedules = wp_get_schedules();
-  $retry_interval_registered = isset($schedules['hic_retry_interval']);
-  
-  // Log condition checks for better debugging
-  hic_log("Retry scheduling conditions - Real-time sync enabled: " . ($realtime_enabled ? 'yes' : 'no') . 
-          ", Brevo API key configured: " . (!empty($brevo_api_key) ? 'yes' : 'no') .
-          ", Retry interval registered: " . ($retry_interval_registered ? 'yes' : 'no'));
-  
-  if ($realtime_enabled && $brevo_api_key && $retry_interval_registered) {
-    $should_schedule_retry = true;
-  }
+  $should_schedule_retry = hic_should_schedule_retry_event();
   
   if ($should_schedule_retry) {
     if (!wp_next_scheduled('hic_retry_failed_notifications_event')) {
       $result = wp_schedule_event(time(), 'hic_retry_interval', 'hic_retry_failed_notifications_event');
       if (!$result) {
-        hic_log('ERROR: Failed to schedule hic_retry_failed_notifications_event - wp_schedule_event returned false');
+        hic_log('ERROR: Failed to schedule hic_retry_failed_notifications_event');
       } else {
-        hic_log('hic_retry_failed_notifications_event scheduled successfully with hic_retry_interval');
+        hic_log('hic_retry_failed_notifications_event scheduled successfully');
       }
-    } else {
-      $next_run = wp_next_scheduled('hic_retry_failed_notifications_event');
-      hic_log('hic_retry_failed_notifications_event already scheduled for: ' . date('Y-m-d H:i:s', $next_run));
     }
   } else {
     $timestamp = wp_next_scheduled('hic_retry_failed_notifications_event');
     if ($timestamp) {
       wp_unschedule_event($timestamp, 'hic_retry_failed_notifications_event');
       hic_log('hic_retry_failed_notifications_event unscheduled (conditions not met)');
-    } else {
-      hic_log('hic_retry_failed_notifications_event not scheduled (conditions not met)');
     }
   }
 });

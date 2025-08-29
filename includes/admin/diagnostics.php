@@ -68,11 +68,8 @@ function hic_get_cron_status() {
     $status['poll_event']['conditions_met'] = hic_should_schedule_poll_event();
     $status['updates_event']['conditions_met'] = hic_should_schedule_updates_event();
     
-    // Check retry event conditions - match the logic in polling.php
-    $retry_conditions_met = hic_realtime_brevo_sync_enabled() && 
-                           hic_get_brevo_api_key() && 
-                           isset($schedules['hic_retry_interval']);
-    $status['retry_event']['conditions_met'] = $retry_conditions_met;
+    // Check retry event conditions using centralized function
+    $status['retry_event']['conditions_met'] = hic_should_schedule_retry_event();
     
     // Real-time sync stats
     global $wpdb;
@@ -106,6 +103,22 @@ function hic_should_schedule_poll_event() {
     $has_legacy_key = hic_get_api_key();
     
     return $has_basic_auth || $has_legacy_key;
+}
+
+/**
+ * Check if retry event should be scheduled based on conditions
+ */
+function hic_should_schedule_retry_event() {
+    if (!hic_realtime_brevo_sync_enabled()) {
+        return false;
+    }
+    
+    if (!hic_get_brevo_api_key()) {
+        return false;
+    }
+    
+    $schedules = wp_get_schedules();
+    return isset($schedules['hic_retry_interval']);
 }
 
 /**
@@ -1236,14 +1249,11 @@ function hic_diagnostics_page() {
                             <td>Evento Retry Schedulato</td>
                             <td>
                                 <?php if (isset($status['retry_event']['scheduled']) && $status['retry_event']['scheduled']): ?>
-                                    <span class="status ok">✓ Schedulato (prossima esecuzione: <?php echo esc_html($status['retry_event']['next_run_human']); ?>)</span>
+                                    <span class="status ok">✓ Schedulato (<?php echo esc_html($status['retry_event']['next_run_human']); ?>)</span>
+                                <?php elseif (isset($status['retry_event']['conditions_met']) && $status['retry_event']['conditions_met']): ?>
+                                    <span class="status warning">⚠ Condizioni soddisfatte ma non schedulato</span>
                                 <?php else: ?>
-                                    <span class="status <?php echo isset($status['retry_event']['conditions_met']) && $status['retry_event']['conditions_met'] ? 'warning' : 'error'; ?>">
-                                        ✗ Non schedulato
-                                        <?php if (!isset($status['retry_event']['conditions_met']) || !$status['retry_event']['conditions_met']): ?>
-                                            (condizioni non soddisfatte)
-                                        <?php endif; ?>
-                                    </span>
+                                    <span class="status error">✗ Non attivo (condizioni non soddisfatte)</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
