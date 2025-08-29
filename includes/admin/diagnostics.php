@@ -25,7 +25,8 @@ function hic_get_cron_status() {
             'conditions_met' => false
         ),
         'system_cron_enabled' => false,
-        'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON
+        'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
+        'custom_interval_registered' => false
     );
     
     // Check main polling event
@@ -47,6 +48,10 @@ function hic_get_cron_status() {
     // Check scheduling conditions
     $status['poll_event']['conditions_met'] = hic_should_schedule_poll_event();
     $status['updates_event']['conditions_met'] = hic_should_schedule_updates_event();
+    
+    // Check if custom cron interval is registered
+    $schedules = wp_get_schedules();
+    $status['custom_interval_registered'] = isset($schedules['hic_poll_interval']);
     
     return $status;
 }
@@ -765,6 +770,26 @@ function hic_diagnostics_page() {
                             </span></td>
                             <td>
                                 <button class="button manual-cron-test" data-event="hic_api_updates_event">Test Manuale</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="5" style="border-top: 2px solid #ddd; padding-top: 10px; font-weight: bold;">
+                                Sistema Cron
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Intervallo Personalizzato</td>
+                            <td><span class="status <?php echo esc_attr($cron_status['custom_interval_registered'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($cron_status['custom_interval_registered'] ? 'Registrato' : 'Non Registrato'); ?>
+                            </span></td>
+                            <td>hic_poll_interval (5 min)</td>
+                            <td><?php echo esc_html($cron_status['wp_cron_disabled'] ? 'WP-Cron Disabilitato' : 'WP-Cron Attivo'); ?></td>
+                            <td>
+                                <?php if (!$cron_status['custom_interval_registered']): ?>
+                                    <span style="color: red; font-weight: bold;">⚠️ Richiede correzione</span>
+                                <?php else: ?>
+                                    ✅ OK
+                                <?php endif; ?>
                             </td>
                         </tr>
                     </tbody>
