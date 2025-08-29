@@ -24,6 +24,12 @@ function hic_get_cron_status() {
             'next_run_human' => 'Non schedulato',
             'conditions_met' => false
         ),
+        'retry_event' => array(
+            'scheduled' => false,
+            'next_run' => null,
+            'next_run_human' => 'Non schedulato',
+            'conditions_met' => false
+        ),
         'system_cron_enabled' => false,
         'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
         'custom_interval_registered' => false
@@ -56,7 +62,12 @@ function hic_get_cron_status() {
     // Check scheduling conditions
     $status['poll_event']['conditions_met'] = hic_should_schedule_poll_event();
     $status['updates_event']['conditions_met'] = hic_should_schedule_updates_event();
-    $status['retry_event']['conditions_met'] = hic_realtime_brevo_sync_enabled() && hic_get_brevo_api_key();
+    
+    // Check retry event conditions - match the logic in polling.php
+    $retry_conditions_met = hic_realtime_brevo_sync_enabled() && 
+                           hic_get_brevo_api_key() && 
+                           isset($schedules['hic_retry_interval']);
+    $status['retry_event']['conditions_met'] = $retry_conditions_met;
     
     // Real-time sync stats
     global $wpdb;
