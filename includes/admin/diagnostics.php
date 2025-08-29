@@ -740,7 +740,7 @@ function hic_ajax_backfill_reservations() {
     $limit = isset($_POST['limit']) ? intval($_POST['limit']) : null;
     
     // Validate date type
-    if (!in_array($date_type, array('checkin', 'created'))) {
+    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
         wp_die(json_encode(array('success' => false, 'message' => 'Tipo di data non valido')));
     }
     
@@ -883,11 +883,13 @@ function hic_diagnostics_page() {
                         <td>
                             <select id="backfill-date-type" name="backfill_date_type">
                                 <option value="checkin">Data Check-in</option>
-                                <option value="created">Data Creazione</option>
+                                <option value="checkout">Data Check-out</option>
+                                <option value="presence">Data Presenza</option>
                             </select>
                             <p class="description">
                                 <strong>Check-in:</strong> Prenotazioni per arrivi in questo periodo<br>
-                                <strong>Creazione:</strong> Prenotazioni create in questo periodo (migliore per recuperare prenotazioni manuali)
+                                <strong>Check-out:</strong> Prenotazioni per partenze in questo periodo<br>
+                                <strong>Presenza:</strong> Prenotazioni con qualsiasi data nel periodo (migliore per recuperare prenotazioni manuali)
                             </p>
                         </td>
                     </tr>
@@ -1554,7 +1556,9 @@ function hic_diagnostics_page() {
             if (limit) {
                 message += '\nLimite: ' + limit + ' prenotazioni';
             }
-            message += '\nTipo data: ' + (dateType === 'checkin' ? 'Check-in' : 'Creazione');
+            var dateTypeText = dateType === 'checkin' ? 'Check-in' : 
+                              dateType === 'checkout' ? 'Check-out' : 'Presenza';
+            message += '\nTipo data: ' + dateTypeText;
             
             if (!confirm(message)) {
                 return;

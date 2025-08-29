@@ -351,18 +351,18 @@ function hic_api_poll_bookings(){
             $polling_errors[] = "checkin polling: " . $out_checkin->get_error_message();
         }
         
-        // Second, poll by created date to catch recent manual bookings
-        $date_type = 'created';
+        // Second, poll by presence date to catch recent manual bookings
+        $date_type = 'presence';
         $created_from = date('Y-m-d', $last);
-        $created_to = date('Y-m-d', $now); // Don't extend for created date
+        $created_to = date('Y-m-d', $now); // Don't extend for presence date
         hic_log("Cron: polling reservations by $date_type from $created_from to $created_to for property $prop");
         $out_created = hic_fetch_reservations($prop, $date_type, $created_from, $created_to, 100);
         if (!is_wp_error($out_created)) {
             $created_count = is_array($out_created) ? count($out_created) : 0;
             $total_reservations += $created_count;
-            hic_log("Cron: Found $created_count reservations by created date");
+            hic_log("Cron: Found $created_count reservations by presence date");
         } else {
-            $polling_errors[] = "created polling: " . $out_created->get_error_message();
+            $polling_errors[] = "presence polling: " . $out_created->get_error_message();
         }
         
         // Determine if polling was successful
@@ -764,7 +764,7 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
  * 
  * @param string $from_date Date in Y-m-d format
  * @param string $to_date Date in Y-m-d format 
- * @param string $date_type Either 'checkin' or 'created'
+ * @param string $date_type Either 'checkin', 'checkout', or 'presence'
  * @param int $limit Optional limit for number of reservations to fetch
  * @return array Result with success status, message, and statistics
  */

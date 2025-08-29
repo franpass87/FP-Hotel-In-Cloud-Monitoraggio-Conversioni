@@ -36,7 +36,7 @@ do_action('hic_fetch_reservations', 355787, 'checkin', '2025-08-01', '2025-08-31
 
 Parametri:
 - `propId`: ID della struttura
-- `date_type`: Tipo di data (`checkin`, `checkout`) - default: `checkin`
+- `date_type`: Tipo di data (`checkin`, `checkout`, `presence`) - default: `checkin`
 - `from_date`: Data inizio (formato Y-m-d)
 - `to_date`: Data fine (formato Y-m-d)  
 - `limit`: Numero massimo di risultati (opzionale)
