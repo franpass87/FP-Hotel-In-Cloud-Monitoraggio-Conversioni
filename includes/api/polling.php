@@ -5,6 +5,15 @@
 
 if (!defined('ABSPATH')) exit;
 
+// Aggiungi intervallo personalizzato per il polling PRIMA di usarlo
+add_filter('cron_schedules', function($schedules) {
+  $schedules['hic_poll_interval'] = array(
+    'interval' => 300, // 5 minuti
+    'display' => 'Ogni 5 minuti (HIC Polling)'
+  );
+  return $schedules;
+});
+
 /* ============ API Polling HIC ============ */
 // Se selezionato API Polling, configura il cron
 add_action('init', function() {
@@ -20,7 +29,12 @@ add_action('init', function() {
   
   if ($should_schedule) {
     if (!wp_next_scheduled('hic_api_poll_event')) {
-      wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event');
+      $result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event');
+      if (!$result) {
+        hic_log('ERROR: Failed to schedule hic_api_poll_event. Check if hic_poll_interval is registered.');
+      } else {
+        hic_log('hic_api_poll_event scheduled successfully');
+      }
     }
   } else {
     // Rimuovi il cron se non è più necessario
@@ -29,15 +43,6 @@ add_action('init', function() {
       wp_unschedule_event($timestamp, 'hic_api_poll_event');
     }
   }
-});
-
-// Aggiungi intervallo personalizzato per il polling
-add_filter('cron_schedules', function($schedules) {
-  $schedules['hic_poll_interval'] = array(
-    'interval' => 300, // 5 minuti
-    'display' => 'Ogni 5 minuti (HIC Polling)'
-  );
-  return $schedules;
 });
 
 // Funzione di polling API
@@ -54,7 +59,12 @@ add_action('init', function() {
   
   if ($should_schedule_updates) {
     if (!wp_next_scheduled('hic_api_updates_event')) {
-      wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event');
+      $result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event');
+      if (!$result) {
+        hic_log('ERROR: Failed to schedule hic_api_updates_event. Check if hic_poll_interval is registered.');
+      } else {
+        hic_log('hic_api_updates_event scheduled successfully');
+      }
     }
   } else {
     $timestamp = wp_next_scheduled('hic_api_updates_event');

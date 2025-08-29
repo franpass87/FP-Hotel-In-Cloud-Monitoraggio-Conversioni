@@ -25,7 +25,8 @@ function hic_get_cron_status() {
             'conditions_met' => false
         ),
         'system_cron_enabled' => false,
-        'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON
+        'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
+        'custom_interval_registered' => false
     );
     
     // Check main polling event
@@ -47,6 +48,10 @@ function hic_get_cron_status() {
     // Check scheduling conditions
     $status['poll_event']['conditions_met'] = hic_should_schedule_poll_event();
     $status['updates_event']['conditions_met'] = hic_should_schedule_updates_event();
+    
+    // Check if custom cron interval is registered
+    $schedules = wp_get_schedules();
+    $status['custom_interval_registered'] = isset($schedules['hic_poll_interval']);
     
     return $status;
 }
