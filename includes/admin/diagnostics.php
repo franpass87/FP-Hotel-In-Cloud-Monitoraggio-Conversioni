@@ -772,6 +772,26 @@ function hic_diagnostics_page() {
                                 <button class="button manual-cron-test" data-event="hic_api_updates_event">Test Manuale</button>
                             </td>
                         </tr>
+                        <tr>
+                            <td colspan="5" style="border-top: 2px solid #ddd; padding-top: 10px; font-weight: bold;">
+                                Sistema Cron
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Intervallo Personalizzato</td>
+                            <td><span class="status <?php echo esc_attr($cron_status['custom_interval_registered'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($cron_status['custom_interval_registered'] ? 'Registrato' : 'Non Registrato'); ?>
+                            </span></td>
+                            <td>hic_poll_interval (5 min)</td>
+                            <td><?php echo esc_html($cron_status['wp_cron_disabled'] ? 'WP-Cron Disabilitato' : 'WP-Cron Attivo'); ?></td>
+                            <td>
+                                <?php if (!$cron_status['custom_interval_registered']): ?>
+                                    <span style="color: red; font-weight: bold;">⚠️ Richiede correzione</span>
+                                <?php else: ?>
+                                    ✅ OK
+                                <?php endif; ?>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
                 
