@@ -53,6 +53,12 @@ function hic_handle_api_response($response, $context = 'API call') {
     return $response;
   }
   
+  // Validate response object
+  if (!is_array($response) && !is_object($response)) {
+    hic_log("$context: Invalid response object");
+    return new WP_Error('hic_invalid_response', 'Invalid response object');
+  }
+  
   $code = wp_remote_retrieve_response_code($response);
   if ($code !== 200) {
     $body = wp_remote_retrieve_body($response);
@@ -80,10 +86,15 @@ function hic_handle_api_response($response, $context = 'API call') {
   }
   
   $body = wp_remote_retrieve_body($response);
+  if (empty($body)) {
+    hic_log("$context: Empty response body");
+    return new WP_Error('hic_empty_response', 'Empty response body');
+  }
+  
   $data = json_decode($body, true);
   if (json_last_error() !== JSON_ERROR_NONE) {
-    hic_log("$context JSON error: " . json_last_error_msg());
-    return new WP_Error('hic_json', 'Invalid JSON response');
+    hic_log("$context JSON error: " . json_last_error_msg() . " - Body: " . substr($body, 0, 200));
+    return new WP_Error('hic_json', 'Invalid JSON response: ' . json_last_error_msg());
   }
   
   return $data;

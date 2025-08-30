@@ -131,15 +131,42 @@ function hic_should_schedule_retry_event() {
 /* ============ New Helper Functions ============ */
 function hic_normalize_price($value) {
     if (empty($value) || (!is_numeric($value) && !is_string($value))) return 0.0;
+    
     // Convert comma to dot and ensure numeric
     $normalized = str_replace(',', '.', (string) $value);
     // Remove any non-numeric characters except dots and minus signs for negative values
     $normalized = preg_replace('/[^0-9.-]/', '', $normalized);
-    return floatval($normalized);
+    
+    // Validate that we still have a numeric value
+    if (!is_numeric($normalized)) {
+        hic_log('hic_normalize_price: Invalid numeric value after normalization: ' . $value);
+        return 0.0;
+    }
+    
+    $result = floatval($normalized);
+    
+    // Validate reasonable price range
+    if ($result < 0) {
+        hic_log('hic_normalize_price: Negative price detected: ' . $result . ' (original: ' . $value . ')');
+        return 0.0;
+    }
+    
+    if ($result > 999999.99) {
+        hic_log('hic_normalize_price: Unusually high price detected: ' . $result . ' (original: ' . $value . ')');
+    }
+    
+    return $result;
 }
 
 function hic_is_valid_email($email) {
-    return !empty($email) && is_email($email);
+    if (empty($email) || !is_string($email)) return false;
+    
+    // Sanitize email first
+    $email = sanitize_email($email);
+    if (empty($email)) return false;
+    
+    // Use WordPress built-in email validation
+    return is_email($email);
 }
 
 function hic_is_ota_alias_email($e){
@@ -162,14 +189,56 @@ function hic_is_ota_alias_email($e){
 }
 
 function hic_booking_uid($reservation) {
-    return $reservation['id'] ?? '';
+    if (!is_array($reservation)) {
+        hic_log('hic_booking_uid: reservation is not an array');
+        return '';
+    }
+    
+    // Try multiple possible ID fields in order of preference
+    $id_fields = ['id', 'reservation_id', 'booking_id', 'transaction_id'];
+    
+    foreach ($id_fields as $field) {
+        if (!empty($reservation[$field]) && is_scalar($reservation[$field])) {
+            return (string) $reservation[$field];
+        }
+    }
+    
+    hic_log('hic_booking_uid: No valid ID found in reservation data');
+    return '';
 }
 
 /* ============ Helpers ============ */
 function hic_log($msg){
   $date = date('Y-m-d H:i:s');
   $line = '['.$date.'] ' . (is_scalar($msg) ? $msg : print_r($msg, true)) . "\n";
-  @file_put_contents(hic_get_log_file(), $line, FILE_APPEND);
+  
+  $log_file = hic_get_log_file();
+  if (empty($log_file)) {
+    error_log('HIC Plugin: Log file path is empty');
+    return false;
+  }
+  
+  // Check if log directory exists and is writable
+  $log_dir = dirname($log_file);
+  if (!is_dir($log_dir)) {
+    if (!wp_mkdir_p($log_dir)) {
+      error_log('HIC Plugin: Cannot create log directory: ' . $log_dir);
+      return false;
+    }
+  }
+  
+  if (!is_writable($log_dir)) {
+    error_log('HIC Plugin: Log directory is not writable: ' . $log_dir);
+    return false;
+  }
+  
+  $result = file_put_contents($log_file, $line, FILE_APPEND | LOCK_EX);
+  if ($result === false) {
+    error_log('HIC Plugin: Failed to write to log file: ' . $log_file);
+    return false;
+  }
+  
+  return true;
 }
 
 /**
@@ -177,24 +246,40 @@ function hic_log($msg){
  */
 function hic_rotate_log_if_needed() {
     $log_file = hic_get_log_file();
-    if (!file_exists($log_file)) {
-        return;
+    if (empty($log_file) || !file_exists($log_file)) {
+        return false;
+    }
+    
+    // Check if filesize() works (file could be locked)
+    $file_size = @filesize($log_file);
+    if ($file_size === false) {
+        error_log('HIC Plugin: Cannot get log file size: ' . $log_file);
+        return false;
     }
     
     $max_size = 5 * 1024 * 1024; // 5MB
-    if (filesize($log_file) > $max_size) {
+    if ($file_size > $max_size) {
         $backup_file = $log_file . '.old';
         
         // Remove old backup if exists
         if (file_exists($backup_file)) {
-            @unlink($backup_file);
+            if (!@unlink($backup_file)) {
+                error_log('HIC Plugin: Cannot remove old backup file: ' . $backup_file);
+                return false;
+            }
         }
         
         // Rotate current log to backup
-        @rename($log_file, $backup_file);
+        if (!@rename($log_file, $backup_file)) {
+            error_log('HIC Plugin: Cannot rotate log file from ' . $log_file . ' to ' . $backup_file);
+            return false;
+        }
         
         hic_log('Log rotated: file exceeded 5MB limit');
+        return true;
     }
+    
+    return true;
 }
 
 /**
@@ -220,14 +305,31 @@ function hic_get_bucket($gclid, $fbclid){
 
 /* ============ Email admin (include bucket) ============ */
 function hic_send_admin_email($data, $gclid, $fbclid, $sid){
-  $bucket    = fp_normalize_bucket($gclid, $fbclid);
-  $to        = hic_get_admin_email();
+  // Validate input data
+  if (!is_array($data)) {
+    hic_log('hic_send_admin_email: data is not an array');
+    return false;
+  }
+  
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
+  $to = hic_get_admin_email();
+  
+  // Validate admin email
+  if (empty($to) || !hic_is_valid_email($to)) {
+    hic_log('hic_send_admin_email: invalid admin email: ' . $to);
+    return false;
+  }
+  
   $site_name = get_bloginfo('name');
-  $subject   = "Nuova prenotazione da " . $site_name;
+  if (empty($site_name)) {
+    $site_name = 'Hotel in Cloud';
+  }
+  
+  $subject = "Nuova prenotazione da " . $site_name;
 
   $body  = "Hai ricevuto una nuova prenotazione da $site_name:\n\n";
   $body .= "Reservation ID: " . ($data['reservation_id'] ?? ($data['id'] ?? 'n/a')) . "\n";
-  $body .= "Importo: " . (isset($data['amount']) ? $data['amount'] : '0') . " " . ($data['currency'] ?? 'EUR') . "\n";
+  $body .= "Importo: " . (isset($data['amount']) ? hic_normalize_price($data['amount']) : '0') . " " . ($data['currency'] ?? 'EUR') . "\n";
   $body .= "Nome: " . trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? '')) . "\n";
   $body .= "Email: " . ($data['email'] ?? 'n/a') . "\n";
   $body .= "Lingua: " . ($data['lingua'] ?? ($data['lang'] ?? 'n/a')) . "\n";
@@ -241,26 +343,51 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
 
   $content_type_filter = function(){ return 'text/plain; charset=UTF-8'; };
   add_filter('wp_mail_content_type', $content_type_filter);
-  wp_mail($to, $subject, $body);
+  
+  $sent = wp_mail($to, $subject, $body);
+  
   remove_filter('wp_mail_content_type', $content_type_filter);
 
-  hic_log('Email admin inviata (bucket='.$bucket.') a '.$to);
+  if ($sent) {
+    hic_log('Email admin inviata (bucket='.$bucket.') a '.$to);
+    return true;
+  } else {
+    hic_log('Errore invio email admin a '.$to);
+    return false;
+  }
 }
 
 /* ============ Francesco email notification ============ */
 function hic_send_francesco_email($data, $gclid, $fbclid, $sid){
   if (!hic_francesco_email_enabled()) {
-    return; // Setting disabled, don't send email
+    return false; // Setting disabled, don't send email
   }
   
-  $bucket    = fp_normalize_bucket($gclid, $fbclid);
-  $to        = 'francesco.passeri@gmail.com';
+  // Validate input data
+  if (!is_array($data)) {
+    hic_log('hic_send_francesco_email: data is not an array');
+    return false;
+  }
+  
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
+  $to = 'francesco.passeri@gmail.com';
+  
+  // Validate email format
+  if (!hic_is_valid_email($to)) {
+    hic_log('hic_send_francesco_email: invalid Francesco email address');
+    return false;
+  }
+  
   $site_name = get_bloginfo('name');
-  $subject   = "Nuova prenotazione da " . $site_name;
+  if (empty($site_name)) {
+    $site_name = 'Hotel in Cloud';
+  }
+  
+  $subject = "Nuova prenotazione da " . $site_name;
 
   $body  = "Hai ricevuto una nuova prenotazione da $site_name:\n\n";
   $body .= "Reservation ID: " . ($data['reservation_id'] ?? ($data['id'] ?? 'n/a')) . "\n";
-  $body .= "Importo: " . (isset($data['amount']) ? $data['amount'] : '0') . " " . ($data['currency'] ?? 'EUR') . "\n";
+  $body .= "Importo: " . (isset($data['amount']) ? hic_normalize_price($data['amount']) : '0') . " " . ($data['currency'] ?? 'EUR') . "\n";
   $body .= "Nome: " . trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? '')) . "\n";
   $body .= "Email: " . ($data['email'] ?? 'n/a') . "\n";
   $body .= "Lingua: " . ($data['lingua'] ?? ($data['lang'] ?? 'n/a')) . "\n";
@@ -274,10 +401,18 @@ function hic_send_francesco_email($data, $gclid, $fbclid, $sid){
 
   $content_type_filter = function(){ return 'text/plain; charset=UTF-8'; };
   add_filter('wp_mail_content_type', $content_type_filter);
-  wp_mail($to, $subject, $body);
+  
+  $sent = wp_mail($to, $subject, $body);
+  
   remove_filter('wp_mail_content_type', $content_type_filter);
 
-  hic_log('Email Francesco inviata (bucket='.$bucket.') a '.$to);
+  if ($sent) {
+    hic_log('Email Francesco inviata (bucket='.$bucket.') a '.$to);
+    return true;
+  } else {
+    hic_log('Errore invio email Francesco a '.$to);
+    return false;
+  }
 }
 
 /* ============ Email Enrichment Functions ============ */
