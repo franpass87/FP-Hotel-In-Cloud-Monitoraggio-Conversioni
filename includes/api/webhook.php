@@ -21,20 +21,37 @@ add_action('rest_api_init', function () {
 });
 
 function hic_webhook_handler(WP_REST_Request $request) {
+  // Validate token
   $token = $request->get_param('token');
-  if ($token !== hic_get_webhook_token()) {
+  $expected_token = hic_get_webhook_token();
+  
+  if (empty($expected_token)) {
+    hic_log('Webhook rifiutato: token webhook non configurato');
+    return new WP_Error('missing_token','Token webhook non configurato',['status'=>500]);
+  }
+  
+  if ($token !== $expected_token) {
     hic_log('Webhook rifiutato: token invalido');
     return new WP_Error('invalid_token','Token non valido',['status'=>403]);
   }
 
+  // Get and validate JSON data
   $data = $request->get_json_params();
-  if (!$data) {
-    hic_log('Webhook senza payload');
-    return new WP_REST_Response(['error'=>'no data'], 400);
+  if (!$data || !is_array($data)) {
+    hic_log('Webhook senza payload valido');
+    return new WP_REST_Response(['error'=>'no valid data'], 400);
   }
-  hic_log(['Webhook ricevuto' => $data]);
+  
+  // Log received data (be careful with sensitive information)
+  hic_log(['Webhook ricevuto' => array_merge($data, ['email' => !empty($data['email']) ? '***HIDDEN***' : 'missing'])]);
 
-  hic_process_booking_data($data);
+  // Process booking data with error handling
+  $result = hic_process_booking_data($data);
+  
+  if ($result === false) {
+    hic_log('Webhook: elaborazione fallita per dati ricevuti');
+    return new WP_REST_Response(['error'=>'processing failed'], 500);
+  }
 
-  return ['status'=>'ok'];
+  return ['status'=>'ok', 'processed' => true];
 }

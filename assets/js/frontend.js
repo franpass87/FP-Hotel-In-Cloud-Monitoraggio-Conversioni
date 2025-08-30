@@ -1,48 +1,125 @@
 document.addEventListener('DOMContentLoaded', function(){
+  // Error handling wrapper
+  function safeExecute(fn, errorContext) {
+    try {
+      return fn();
+    } catch(e) {
+      console.warn('HIC Error in ' + errorContext + ':', e);
+      return null;
+    }
+  }
+
   function uuidv4(){
-    return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-      (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-    );
+    try {
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+          (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+        );
+      } else {
+        // Fallback for environments without crypto
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      }
+    } catch(e) {
+      console.warn('HIC: UUID generation failed:', e);
+      // Ultra-simple fallback
+      return 'hic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
   }
+  
   function getCookie(name){
-    var m = document.cookie.match(new RegExp('(^| )'+name+'=([^;]+)'));
-    return m ? m[2] : null;
+    try {
+      if (!name || typeof name !== 'string') return null;
+      var m = document.cookie.match(new RegExp('(^| )'+name+'=([^;]+)'));
+      return m ? decodeURIComponent(m[2]) : null;
+    } catch(e) {
+      console.warn('HIC: Failed to get cookie ' + name + ':', e);
+      return null;
+    }
   }
+  
   function setCookie(name, val, days){
-    var d = new Date(); d.setTime(d.getTime() + (days*24*60*60*1000));
-    document.cookie = name + "=" + val + "; expires=" + d.toUTCString() + "; path=/; SameSite=Lax";
+    try {
+      if (!name || typeof name !== 'string' || !val) return false;
+      var d = new Date(); 
+      d.setTime(d.getTime() + (days*24*60*60*1000));
+      document.cookie = name + "=" + encodeURIComponent(val) + "; expires=" + d.toUTCString() + "; path=/; SameSite=Lax";
+      return true;
+    } catch(e) {
+      console.warn('HIC: Failed to set cookie ' + name + ':', e);
+      return false;
+    }
   }
 
   // Assicura un SID anche per traffico non-ads
   var sid = getCookie('hic_sid');
-  if (!sid) { sid = uuidv4(); setCookie('hic_sid', sid, 90); }
+  if (!sid) { 
+    sid = uuidv4(); 
+    if (sid && !setCookie('hic_sid', sid, 90)) {
+      console.warn('HIC: Failed to set SID cookie');
+    }
+  }
 
-  // Helper function to validate SID format (basic validation)
+  // Helper function to validate SID format (enhanced validation)
   function isValidSid(sid) {
-    return sid && typeof sid === 'string' && sid.length > 8 && sid.length < 256;
+    try {
+      return sid && 
+             typeof sid === 'string' && 
+             sid.length > 8 && 
+             sid.length < 256 &&
+             /^[a-zA-Z0-9_-]+$/.test(sid); // Only allow safe characters
+    } catch(e) {
+      console.warn('HIC: SID validation error:', e);
+      return false;
+    }
+  }
+
+  // Helper function to validate URL
+  function isValidUrl(url) {
+    try {
+      new URL(url);
+      return true;
+    } catch(e) {
+      return false;
+    }
   }
 
   // Helper function to add SID to a link on click
   function addSidToLink(link) {
+    if (!link || typeof link.addEventListener !== 'function') {
+      console.warn('HIC: Invalid link element provided to addSidToLink');
+      return;
+    }
+    
     link.addEventListener('click', function(){
-      var s = getCookie('hic_sid');
-      if (s && isValidSid(s)) {
-        try {
+      safeExecute(function() {
+        var s = getCookie('hic_sid');
+        if (s && isValidSid(s)) {
+          if (!link.href || !isValidUrl(link.href)) {
+            console.warn('HIC: Invalid link URL:', link.href);
+            return;
+          }
+          
           var url = new URL(link.href);
           url.searchParams.set('sid', s);
           link.href = url.toString();
-        } catch(e){
-          // Log error for debugging
-          console.warn('HIC: Failed to add SID to link', link.href, e);
         }
-      }
+      }, 'addSidToLink');
     });
   }
 
   // Funzione per appendere SID ai link
   function appendSidToLinks() {
-    var links = document.querySelectorAll('a.js-book, a[href*="booking.hotelincloud.com"]');
-    links.forEach(addSidToLink);
+    safeExecute(function() {
+      var links = document.querySelectorAll('a.js-book, a[href*="booking.hotelincloud.com"]');
+      if (links && links.length > 0) {
+        links.forEach(function(link) {
+          if (link) addSidToLink(link);
+        });
+      }
+    }, 'appendSidToLinks');
   }
 
   // Appendi sid ai link nel documento principale
@@ -50,79 +127,99 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // Supporto per iframe - monitora per nuovi link aggiunti dinamicamente
   if (window.MutationObserver) {
-    var mutationThrottleTimer;
-    var observer = new MutationObserver(function(mutations) {
-      // Throttle mutations to avoid performance issues
-      if (mutationThrottleTimer) return;
-      mutationThrottleTimer = setTimeout(function() {
-        mutationThrottleTimer = null;
-        
-        mutations.forEach(function(mutation) {
-          if (mutation.type === 'childList') {
-            mutation.addedNodes.forEach(function(node) {
-              if (node.nodeType === 1) { // Element node
-                // Controlla se il nodo aggiunto contiene link booking
-                var newLinks = node.querySelectorAll ? node.querySelectorAll('a.js-book, a[href*="booking.hotelincloud.com"]') : [];
-                if (newLinks.length > 0) {
-                  newLinks.forEach(addSidToLink);
-                }
+    safeExecute(function() {
+      var mutationThrottleTimer;
+      var observer = new MutationObserver(function(mutations) {
+        // Throttle mutations to avoid performance issues
+        if (mutationThrottleTimer) return;
+        mutationThrottleTimer = setTimeout(function() {
+          mutationThrottleTimer = null;
+          
+          safeExecute(function() {
+            mutations.forEach(function(mutation) {
+              if (mutation.type === 'childList' && mutation.addedNodes) {
+                mutation.addedNodes.forEach(function(node) {
+                  if (node.nodeType === 1) { // Element node
+                    // Controlla se il nodo aggiunto contiene link booking
+                    var newLinks = node.querySelectorAll ? node.querySelectorAll('a.js-book, a[href*="booking.hotelincloud.com"]') : [];
+                    if (newLinks.length > 0) {
+                      newLinks.forEach(function(link) {
+                        if (link) addSidToLink(link);
+                      });
+                    }
+                  }
+                });
               }
             });
-          }
-        });
-      }, 100); // 100ms throttle
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+          }, 'mutationObserver');
+        }, 100); // 100ms throttle
+      });
+      
+      if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+      }
+    }, 'mutationObserver setup');
   }
 
   // Supporto per iframe - comunica con la finestra padre se siamo in un iframe
   if (window !== window.top) {
-    try {
+    safeExecute(function() {
       window.parent.postMessage({
         type: 'hic_sid_sync',
         sid: sid
       }, '*');
-    } catch(e) {
-      // Cross-origin, non possiamo comunicare con il parent
-      console.warn('HIC: Cannot communicate with parent frame:', e.message);
-    }
+    }, 'iframe parent communication');
   }
 
   // Ascolta messaggi da iframe - supporta sia parent->iframe che iframe->parent
   window.addEventListener('message', function(event) {
-    if (event.data && event.data.type === 'hic_sid_sync' && event.data.sid && isValidSid(event.data.sid)) {
-      var currentSid = getCookie('hic_sid');
-      if (currentSid !== event.data.sid) {
-        setCookie('hic_sid', event.data.sid, 90);
-        // Re-applica SID ai link esistenti con il nuovo SID
-        appendSidToLinks();
+    safeExecute(function() {
+      if (event.data && 
+          event.data.type === 'hic_sid_sync' && 
+          event.data.sid && 
+          isValidSid(event.data.sid)) {
+        var currentSid = getCookie('hic_sid');
+        if (currentSid !== event.data.sid) {
+          if (setCookie('hic_sid', event.data.sid, 90)) {
+            // Re-applica SID ai link esistenti con il nuovo SID
+            appendSidToLinks();
+          }
+        }
       }
-    }
+    }, 'message listener');
   });
 
   // Monitora per iframe caricati dinamicamente e invia loro il SID
   if (window.MutationObserver) {
-    var iframeObserver = new MutationObserver(function(mutations) {
-      mutations.forEach(function(mutation) {
-        if (mutation.type === 'childList') {
-          mutation.addedNodes.forEach(function(node) {
-            if (node.nodeType === 1 && node.tagName === 'IFRAME') {
-              // Invia SID ai nuovi iframe dopo un breve delay per assicurarsi che siano carichi
-              setTimeout(function() {
-                try {
-                  node.contentWindow.postMessage({
-                    type: 'hic_sid_sync',
-                    sid: getCookie('hic_sid')
-                  }, '*');
-                } catch(e) {
-                  // Cross-origin o iframe non accessibile
+    safeExecute(function() {
+      var iframeObserver = new MutationObserver(function(mutations) {
+        safeExecute(function() {
+          mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' && mutation.addedNodes) {
+              mutation.addedNodes.forEach(function(node) {
+                if (node.nodeType === 1 && node.tagName === 'IFRAME') {
+                  // Invia SID ai nuovi iframe dopo un breve delay per assicurarsi che siano carichi
+                  setTimeout(function() {
+                    safeExecute(function() {
+                      var currentSid = getCookie('hic_sid');
+                      if (currentSid && node.contentWindow) {
+                        node.contentWindow.postMessage({
+                          type: 'hic_sid_sync',
+                          sid: currentSid
+                        }, '*');
+                      }
+                    }, 'iframe postMessage');
+                  }, 500);
                 }
-              }, 500);
+              });
             }
           });
-        }
+        }, 'iframe mutation observer');
       });
-    });
-    iframeObserver.observe(document.body, { childList: true, subtree: true });
+      
+      if (document.body) {
+        iframeObserver.observe(document.body, { childList: true, subtree: true });
+      }
+    }, 'iframe observer setup');
   }
 });
