@@ -967,6 +967,8 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
             'stats' => array()
         );
     }
+    
+    // Validate dates
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to_date)) {
         return array(
             'success' => false,
@@ -1053,9 +1055,7 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
                 // Transform and process the reservation
                 $transformed = hic_transform_reservation($reservation);
                 if ($transformed !== false) {
-                    // Use the proper dispatch pipeline instead of hic_process_booking_data
                     hic_dispatch_reservation($transformed, $reservation);
-                    hic_mark_reservation_processed($reservation);
                     $stats['total_processed']++;
                 } else {
                     $stats['total_errors']++;

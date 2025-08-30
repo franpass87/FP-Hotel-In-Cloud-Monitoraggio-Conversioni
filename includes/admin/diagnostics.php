@@ -1401,19 +1401,16 @@ function hic_diagnostics_page() {
                     </thead>
                     <tbody>
                         <?php 
-                        // Show only HIC-related intervals
                         $hic_intervals = array();
                         foreach ($schedules as $key => $schedule) {
                             if (strpos($key, 'hic_') === 0) {
                                 $hic_intervals[$key] = $schedule;
                             }
                         }
-                        
                         if (empty($hic_intervals)): ?>
                         <tr>
-                            <td colspan="3" style="text-align: center; color: #dc3232;">
-                                <strong>⚠ Nessun intervallo HIC registrato</strong><br>
-                                <small>Gli intervalli personalizzati potrebbero non essere stati caricati correttamente.</small>
+                            <td colspan="3" style="text-align: center; color: #ffb900; font-weight: bold;">
+                                Nessun intervallo HIC registrato
                             </td>
                         </tr>
                         <?php else: ?>
@@ -1690,22 +1687,6 @@ function hic_diagnostics_page() {
         
         #hic-recent-logs div { 
             margin-bottom: 3px; 
-            padding: 3px 0;
-            border-bottom: 1px solid #eee;
-            word-wrap: break-word;
-        }
-        
-        #backfill-results {
-            margin-top: 15px; 
-            padding: 15px; 
-            background: #f7f7f7; 
-            border-left: 4px solid #0073aa;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        
-        .notice.inline {
-            margin: 15px 0;
             padding: 12px;
         }
         
