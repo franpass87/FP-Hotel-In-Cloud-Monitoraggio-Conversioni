@@ -87,13 +87,6 @@ function hic_get_cron_status() {
 }
 
 /**
- * Helper function to check if Basic Auth credentials are configured
- */
-function hic_has_basic_auth_credentials() {
-    return hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
-}
-
-/**
  * Check if main polling should be scheduled based on conditions
  */
 function hic_should_schedule_poll_event() {
