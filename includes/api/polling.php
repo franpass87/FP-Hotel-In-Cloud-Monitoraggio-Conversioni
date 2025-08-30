@@ -40,8 +40,28 @@ function hic_handle_api_response($response, $context = 'API call') {
   
   $code = wp_remote_retrieve_response_code($response);
   if ($code !== 200) {
-    hic_log("$context HTTP $code");
-    return new WP_Error('hic_http', "HTTP $code");
+    $body = wp_remote_retrieve_body($response);
+    hic_log("$context HTTP $code - Response body: " . substr($body, 0, 500));
+    
+    // Provide more specific error messages for common HTTP codes
+    switch ($code) {
+      case 400:
+        return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Verifica i parametri inviati (date_type deve essere checkin, checkout o presence).");
+      case 401:
+        return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide. Verifica email e password API.");
+      case 403:
+        return new WP_Error('hic_http', "HTTP 403 - Accesso negato. L'account potrebbe non avere permessi per questa struttura.");
+      case 404:
+        return new WP_Error('hic_http', "HTTP 404 - Struttura non trovata. Verifica l'ID Struttura (propId).");
+      case 429:
+        return new WP_Error('hic_http', "HTTP 429 - Troppe richieste. Riprova tra qualche minuto.");
+      case 500:
+      case 502:
+      case 503:
+        return new WP_Error('hic_http', "HTTP $code - Errore del server Hotel in Cloud. Riprova più tardi.");
+      default:
+        return new WP_Error('hic_http', "HTTP $code - Errore API. Verifica la configurazione.");
+    }
   }
   
   $body = wp_remote_retrieve_body($response);
@@ -65,6 +85,13 @@ add_action('init', function() {
     $has_legacy_key = hic_get_api_key(); // backward compatibility
     
     $should_schedule = $has_basic_auth || $has_legacy_key;
+    
+    // Log scheduling conditions for debugging
+    hic_log("Cron scheduling conditions - Connection type: " . hic_get_connection_type() . 
+            ", API URL: " . (hic_get_api_url() ? 'configured' : 'missing') .
+            ", Basic Auth: " . ($has_basic_auth ? 'yes' : 'no') .
+            ", Legacy Key: " . ($has_legacy_key ? 'yes' : 'no') .
+            ", Should schedule: " . ($should_schedule ? 'yes' : 'no'));
   }
   
   if ($should_schedule) {
@@ -176,6 +203,9 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     $args = array('date_type'=>$date_type,'from_date'=>$from_date,'to_date'=>$to_date);
     if ($limit) $args['limit'] = (int)$limit;
     $url = add_query_arg($args, $endpoint);
+    
+    // Log API call details for debugging
+    hic_log("API Call: $url with params: " . json_encode($args));
 
     $res = wp_remote_get($url, array(
         'timeout' => 30,
@@ -375,6 +405,12 @@ function hic_mark_reservation_processed($reservation) {
 // Wrapper cron function
 function hic_api_poll_bookings(){
     hic_log('Cron: hic_api_poll_bookings execution started');
+    
+    // Log current configuration for debugging
+    $prop = hic_get_property_id();
+    $email = hic_get_api_email();
+    $connection_type = hic_get_connection_type();
+    hic_log("Cron: Current config - Connection: $connection_type, PropID: $prop, Email: " . ($email ? 'configured' : 'missing'));
     
     // Always update execution timestamp regardless of results
     update_option('hic_last_cron_execution', time());
@@ -950,7 +986,7 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
  * 
  * @param string $from_date Date in Y-m-d format
  * @param string $to_date Date in Y-m-d format 
- * @param string $date_type Either 'checkin' or 'created'
+ * @param string $date_type Either 'checkin', 'checkout', or 'presence'
  * @param int $limit Optional limit for number of reservations to fetch
  * @return array Result with success status, message, and statistics
  */
@@ -959,11 +995,13 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
     
     hic_log("Backfill: Starting backfill from $from_date to $to_date (date_type: $date_type, limit: " . ($limit ?: 'none') . ")");
     
-    // Validate date type
-    if (!in_array($date_type, array('checkin', 'created'))) {
+    // Validate date type (based on API documentation: only checkin, checkout, presence are supported)
+    // Note: For date_type='created' functionality, use /reservations_updates endpoint with updated_after parameter
+    // (limited to 7 days back due to API constraints)
+    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
         return array(
             'success' => false,
-            'message' => 'Tipo di data non valido. Deve essere "checkin" o "created".',
+            'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence". Per recuperare prenotazioni per data di creazione, utilizza l\'endpoint updates (limitato a 7 giorni).',
             'stats' => array()
         );
     }
