@@ -68,6 +68,13 @@ function hic_get_property_id() {
     return hic_get_option('property_id', ''); 
 }
 
+/**
+ * Helper function to check if Basic Auth credentials are configured
+ */
+function hic_has_basic_auth_credentials() {
+    return hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
+}
+
 // HIC Extended Integration Settings
 function hic_get_currency() { return hic_get_option('currency', 'EUR'); }
 function hic_use_net_value() { return hic_get_option('ga4_use_net_value', '0') === '1'; }

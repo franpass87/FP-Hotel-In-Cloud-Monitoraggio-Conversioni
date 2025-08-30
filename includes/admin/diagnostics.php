@@ -87,13 +87,6 @@ function hic_get_cron_status() {
 }
 
 /**
- * Helper function to check if Basic Auth credentials are configured
- */
-function hic_has_basic_auth_credentials() {
-    return hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
-}
-
-/**
  * Check if main polling should be scheduled based on conditions
  */
 function hic_should_schedule_poll_event() {
@@ -1300,7 +1293,97 @@ function hic_diagnostics_page() {
                     </tbody>
                 </table>
                 
-                <h3>Tutti gli Intervalli Disponibili</h3>
+                <!-- Updates Polling Diagnostics -->
+                <h3>Diagnostica Updates Polling</h3>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Valore</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Updates Enrichment Abilitato</td>
+                            <td>
+                                <?php if (hic_updates_enrich_contacts()): ?>
+                                    <span class="status ok">✓ Abilitato</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Disabilitato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Controlla se il sistema di arricchimento contatti è attivo</td>
+                        </tr>
+                        <tr>
+                            <td>Ultimo Timestamp Updates</td>
+                            <td>
+                                <?php 
+                                $last_updates_since = get_option('hic_last_updates_since', 0);
+                                if ($last_updates_since > 0) {
+                                    $time_ago = human_time_diff($last_updates_since, time()) . ' fa';
+                                    echo '<span class="status ok">' . esc_html(date('Y-m-d H:i:s', $last_updates_since)) . '</span><br>';
+                                    echo '<small>Unix: ' . esc_html($last_updates_since) . ' (' . esc_html($time_ago) . ')</small>';
+                                } else {
+                                    echo '<span class="status warning">Non impostato</span>';
+                                }
+                                ?>
+                            </td>
+                            <td>Timestamp dell'ultimo update processato (con overlap di 5 min)</td>
+                        </tr>
+                        <tr>
+                            <td>Prossimo Polling Range</td>
+                            <td>
+                                <?php 
+                                if ($last_updates_since > 0) {
+                                    $overlap_seconds = 300; // Same as in polling function
+                                    $next_since = max(0, $last_updates_since - $overlap_seconds);
+                                    echo 'Richiederà updates dal: <br>';
+                                    echo '<strong>' . esc_html(date('Y-m-d H:i:s', $next_since)) . '</strong><br>';
+                                    echo '<small>Unix: ' . esc_html($next_since) . ' (overlap: ' . esc_html($overlap_seconds) . 's)</small>';
+                                } else {
+                                    echo '<span class="status warning">Non calcolabile</span>';
+                                }
+                                ?>
+                            </td>
+                            <td>Range che verrà richiesto nel prossimo polling</td>
+                        </tr>
+                        <tr>
+                            <td>Eventi Updates Schedulati</td>
+                            <td>
+                                <?php if (isset($status['updates_event']['scheduled']) && $status['updates_event']['scheduled']): ?>
+                                    <span class="status ok">✓ Schedulato</span><br>
+                                    <small>Prossima: <?php echo esc_html($status['updates_event']['next_run_human']); ?></small>
+                                <?php else: ?>
+                                    <span class="status error">✗ Non schedulato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Verifica schedulazione del cron hic_api_updates_event</td>
+                        </tr>
+                        <tr>
+                            <td>Intervallo Updates Utilizzato</td>
+                            <td>
+                                <?php if ($updates_interval_used): ?>
+                                    <?php 
+                                    $actual_seconds = isset($schedules[$updates_interval_used]) ? $schedules[$updates_interval_used]['interval'] : 'N/A';
+                                    $is_correct = $updates_interval_used === 'hic_poll_interval' && $actual_seconds == HIC_POLL_INTERVAL_SECONDS;
+                                    ?>
+                                    <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
+                                        <?php echo esc_html($updates_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
+                                    </span>
+                                    <?php if (!$is_correct): ?>
+                                        <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (<?php echo HIC_POLL_INTERVAL_SECONDS; ?> sec)</small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="status error">Non schedulato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Intervallo effettivamente utilizzato per updates polling</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>Intervalli HIC</h3>
                 <table class="widefat">
                     <thead>
                         <tr>
@@ -1310,13 +1393,28 @@ function hic_diagnostics_page() {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($schedules as $key => $schedule): ?>
+                        <?php 
+                        $hic_intervals = array();
+                        foreach ($schedules as $key => $schedule) {
+                            if (strpos($key, 'hic_') === 0) {
+                                $hic_intervals[$key] = $schedule;
+                            }
+                        }
+                        if (empty($hic_intervals)): ?>
                         <tr>
-                            <td><code><?php echo esc_html($key); ?></code></td>
-                            <td><?php echo esc_html(number_format($schedule['interval'])); ?></td>
-                            <td><?php echo esc_html($schedule['display']); ?></td>
+                            <td colspan="3" style="text-align: center; color: #ffb900; font-weight: bold;">
+                                Nessun intervallo HIC registrato
+                            </td>
                         </tr>
-                        <?php endforeach; ?>
+                        <?php else: ?>
+                            <?php foreach ($hic_intervals as $key => $schedule): ?>
+                            <tr>
+                                <td><code><?php echo esc_html($key); ?></code></td>
+                                <td><?php echo esc_html(number_format($schedule['interval'])); ?></td>
+                                <td><?php echo esc_html($schedule['display']); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -1475,23 +1573,72 @@ function hic_diagnostics_page() {
     </div>
     
     <style>
+        .wrap {
+            max-width: none !important;
+            margin-right: 20px;
+        }
+        
+        .hic-diagnostics-container {
+            max-width: none;
+            width: 100%;
+        }
+        
         .hic-diagnostics-container .card {
             background: #fff;
             border: 1px solid #ccd0d4;
             box-shadow: 0 1px 1px rgba(0,0,0,.04);
             margin-bottom: 20px;
-            padding: 15px;
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
         }
+        
         .hic-diagnostics-container .card h2 {
             margin-top: 0;
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
+            font-size: 18px;
         }
+        
+        .hic-diagnostics-container .card h3 {
+            margin-top: 20px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #1d2327;
+        }
+        
+        .hic-diagnostics-container .widefat {
+            width: 100%;
+            max-width: none;
+            margin-bottom: 15px;
+        }
+        
+        .hic-diagnostics-container .widefat td,
+        .hic-diagnostics-container .widefat th {
+            padding: 12px 15px;
+            vertical-align: top;
+        }
+        
+        .hic-diagnostics-container .form-table {
+            width: 100%;
+            max-width: none;
+        }
+        
+        .hic-diagnostics-container .form-table th {
+            width: 200px;
+            padding: 15px 10px 15px 0;
+        }
+        
+        .hic-diagnostics-container .form-table td {
+            padding: 15px 10px;
+        }
+        
         .status.ok { color: #46b450; font-weight: bold; }
         .status.error { color: #dc3232; font-weight: bold; }
         .status.warning { color: #ffb900; font-weight: bold; }
         .status.scheduled { color: #0073aa; font-weight: bold; }
         .status.not-scheduled { color: #ffb900; font-weight: bold; }
+        
         .manual-booking-alerts {
             margin-top: 15px;
         }
@@ -1502,7 +1649,7 @@ function hic_diagnostics_page() {
         }
         .manual-booking-recommendations {
             margin-top: 15px;
-            padding: 10px;
+            padding: 15px;
             background: #f7f7f7;
             border-left: 4px solid #0073aa;
         }
@@ -1519,10 +1666,55 @@ function hic_diagnostics_page() {
         .manual-booking-recommendations li {
             margin-bottom: 8px;
         }
+        
+        #hic-recent-logs { 
+            max-height: 300px; 
+            overflow-y: auto; 
+            background: #f9f9f9; 
+            padding: 15px; 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 12px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
         #hic-recent-logs div { 
-            margin-bottom: 2px; 
-            padding: 2px 0;
-            border-bottom: 1px solid #eee;
+            margin-bottom: 3px; 
+            padding: 12px;
+        }
+        
+        .button {
+            margin-right: 10px;
+            margin-bottom: 5px;
+        }
+        
+        /* Responsive improvements */
+        @media (max-width: 782px) {
+            .hic-diagnostics-container .card {
+                padding: 15px;
+            }
+            
+            .hic-diagnostics-container .widefat {
+                font-size: 14px;
+            }
+            
+            .hic-diagnostics-container .widefat td,
+            .hic-diagnostics-container .widefat th {
+                padding: 8px 10px;
+            }
+        }
+        
+        /* Ensure tables don't overflow */
+        .hic-diagnostics-container table {
+            table-layout: auto;
+            word-wrap: break-word;
+        }
+        
+        .hic-diagnostics-container code {
+            word-break: break-all;
+            background: #f1f1f1;
+            padding: 2px 4px;
+            border-radius: 3px;
         }
     </style>
     
