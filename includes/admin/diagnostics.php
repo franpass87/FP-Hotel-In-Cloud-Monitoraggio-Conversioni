@@ -150,10 +150,14 @@ function hic_get_execution_stats() {
     return array(
         'last_cron_execution' => get_option('hic_last_cron_execution', 0),
         'last_poll_time' => get_option('hic_last_api_poll', 0),
+        'last_successful_poll' => get_option('hic_last_successful_poll', 0),
         'last_updates_time' => get_option('hic_last_updates_since', 0),
         'processed_reservations' => count(get_option('hic_synced_res_ids', array())),
         'enriched_emails' => count(get_option('hic_res_email_map', array())),
         'last_poll_reservations_found' => get_option('hic_last_poll_count', 0),
+        'last_poll_skipped' => get_option('hic_last_poll_skipped', 0),
+        'last_poll_duration' => get_option('hic_last_poll_duration', 0),
+        'polling_interval' => hic_get_polling_interval(),
         'log_file_exists' => file_exists(hic_get_log_file()),
         'log_file_size' => file_exists(hic_get_log_file()) ? filesize(hic_get_log_file()) : 0
     );
@@ -607,7 +611,15 @@ function hic_check_system_cron() {
  */
 function hic_get_suggested_crontab_entry() {
     $wp_cron_url = site_url('wp-cron.php');
-    return "*/5 * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1";
+    $polling_interval = hic_get_polling_interval();
+    
+    if ($polling_interval === 'every_minute') {
+        return "* * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1";
+    } elseif ($polling_interval === 'every_two_minutes') {
+        return "*/2 * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1";
+    } else {
+        return "*/5 * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1";
+    }
 }
 
 /**
@@ -615,8 +627,8 @@ function hic_get_suggested_crontab_entry() {
  */
 function hic_get_suggested_crontab_with_test() {
     $test_url = hic_get_cron_test_url();
-    $wp_cron_url = site_url('wp-cron.php');
-    return "*/5 * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1 && wget -q -O - \"$test_url\" >/dev/null 2>&1";
+    $base_cron = hic_get_suggested_crontab_entry();
+    return "$base_cron && wget -q -O - \"$test_url\" >/dev/null 2>&1";
 }
 
 /**
@@ -990,7 +1002,7 @@ function hic_diagnostics_page() {
                     } else {
                         $manual_booking_issues[] = array(
                             'type' => 'info',
-                            'message' => 'Modalità API Polling: le prenotazioni manuali vengono recuperate automaticamente ogni 5 minuti.'
+                            'message' => 'Modalità API Polling: le prenotazioni manuali vengono recuperate automaticamente ogni 1-2 minuti (quasi real-time).'
                         );
                     }
                 }
@@ -1071,7 +1083,7 @@ function hic_diagnostics_page() {
                             <li><strong>Test webhook:</strong> Usa il pulsante "Test Dispatch Funzioni" per verificare che le integrazioni funzionino</li>
                         <?php else: ?>
                             <li><strong>Modalità consigliata:</strong> API Polling è la modalità migliore per catturare automaticamente le prenotazioni manuali</li>
-                            <li><strong>Frequenza polling:</strong> Il sistema controlla nuove prenotazioni ogni 5 minuti</li>
+                            <li><strong>Frequenza polling:</strong> Il sistema controlla nuove prenotazioni ogni 1-2 minuti (quasi real-time)</li>
                             <li><strong>Verifica credenziali:</strong> Assicurati che le credenziali API siano corrette</li>
                         <?php endif; ?>
                         <li><strong>Monitoraggio log:</strong> Controlla la sezione "Log Recenti" per errori o problemi</li>
@@ -1137,6 +1149,37 @@ function hic_diagnostics_page() {
                 ?>
                 
                 <table class="widefat">
+                    <tr>
+                        <td>Intervallo Configurato</td>
+                        <td>
+                            <?php 
+                            $polling_interval = hic_get_polling_interval();
+                            $intervals_map = array(
+                                'every_minute' => 'Ogni minuto (60s)',
+                                'every_two_minutes' => 'Ogni 2 minuti (120s)', 
+                                'hic_poll_interval' => 'Ogni 5 minuti (300s)'
+                            );
+                            echo '<strong>' . esc_html($intervals_map[$polling_interval] ?? $polling_interval) . '</strong>';
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Intervalli Quasi Real-time Registrati</td>
+                        <td>
+                            <?php 
+                            $quasi_realtime_intervals = array('every_minute', 'every_two_minutes');
+                            $registered_count = 0;
+                            foreach ($quasi_realtime_intervals as $interval) {
+                                if (isset($schedules[$interval])) {
+                                    $registered_count++;
+                                    echo '<span class="status ok">✓ ' . esc_html($schedules[$interval]['display']) . ' (' . $schedules[$interval]['interval'] . 's)</span><br>';
+                                } else {
+                                    echo '<span class="status error">✗ ' . esc_html($interval) . ' non registrato</span><br>';
+                                }
+                            }
+                            ?>
+                        </td>
+                    </tr>
                     <tr>
                         <td>Intervallo Personalizzato Registrato</td>
                         <td>
@@ -1497,6 +1540,43 @@ function hic_diagnostics_page() {
                                 echo '<span class="status ok">' . esc_html(number_format($last_count)) . '</span>';
                             } else {
                                 echo '<span class="status warning">0</span>';
+                            }
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Ultimo Polling - Prenotazioni Saltate</td>
+                        <td><?php echo esc_html(number_format($execution_stats['last_poll_skipped'])); ?></td>
+                    </tr>
+                    <tr>
+                        <td>Ultimo Polling - Durata</td>
+                        <td>
+                            <?php 
+                            $duration = $execution_stats['last_poll_duration'];
+                            if ($duration > 0) {
+                                echo '<span class="status ' . ($duration > 10000 ? 'warning' : 'ok') . '">' . esc_html($duration) . ' ms</span>';
+                            } else {
+                                echo '<span class="status neutral">N/A</span>';
+                            }
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Ultimo Polling Riuscito</td>
+                        <td>
+                            <?php 
+                            $last_successful = $execution_stats['last_successful_poll'];
+                            if ($last_successful > 0) {
+                                $time_diff = time() - $last_successful;
+                                if ($time_diff < 300) { // Less than 5 minutes
+                                    echo '<span class="status ok">' . esc_html(human_time_diff($last_successful, time())) . ' fa</span>';
+                                } elseif ($time_diff < 3600) { // Less than 1 hour
+                                    echo '<span class="status warning">' . esc_html(human_time_diff($last_successful, time())) . ' fa</span>';
+                                } else {
+                                    echo '<span class="status error">' . esc_html(human_time_diff($last_successful, time())) . ' fa</span>';
+                                }
+                            } else {
+                                echo '<span class="status error">Mai</span>';
                             }
                             ?>
                         </td>

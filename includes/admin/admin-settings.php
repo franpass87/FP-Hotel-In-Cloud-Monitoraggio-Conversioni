@@ -80,6 +80,7 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_api_email', array('sanitize_callback' => 'sanitize_email'));
     register_setting('hic_settings', 'hic_api_password', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_property_id', array('sanitize_callback' => 'absint'));
+    register_setting('hic_settings', 'hic_polling_interval', array('sanitize_callback' => 'sanitize_text_field'));
     
     // New HIC Extended Integration settings
     register_setting('hic_settings', 'hic_currency', array('sanitize_callback' => 'sanitize_text_field'));
@@ -130,6 +131,7 @@ function hic_settings_init() {
     add_settings_field('hic_api_email', 'API Email', 'hic_api_email_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_api_password', 'API Password', 'hic_api_password_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_property_id', 'ID Struttura (propId)', 'hic_property_id_render', 'hic_settings', 'hic_hic_section');
+    add_settings_field('hic_polling_interval', 'Intervallo Polling', 'hic_polling_interval_render', 'hic_settings', 'hic_hic_section');
     
     // Extended HIC Integration settings
     add_settings_field('hic_currency', 'Valuta (Currency)', 'hic_currency_render', 'hic_settings', 'hic_hic_section');
@@ -361,6 +363,16 @@ function hic_property_id_render() {
         echo '<input type="number" name="hic_property_id" value="' . esc_attr($value) . '" class="regular-text" />';
         echo '<p class="description">ID della struttura (propId) per le chiamate API</p>';
     }
+}
+
+function hic_polling_interval_render() {
+    $interval = hic_get_polling_interval();
+    echo '<select name="hic_polling_interval">';
+    echo '<option value="every_minute"' . selected($interval, 'every_minute', false) . '>Ogni minuto (quasi real-time)</option>';
+    echo '<option value="every_two_minutes"' . selected($interval, 'every_two_minutes', false) . '>Ogni 2 minuti (bilanciato)</option>';
+    echo '<option value="hic_poll_interval"' . selected($interval, 'hic_poll_interval', false) . '>Ogni 5 minuti (compatibilità)</option>';
+    echo '</select>';
+    echo '<p class="description">Frequenza del polling API per prenotazioni quasi real-time. Richiede system cron per risultati ottimali.</p>';
 }
 
 // Extended HIC Integration render functions
