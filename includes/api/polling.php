@@ -85,6 +85,13 @@ add_action('init', function() {
     $has_legacy_key = hic_get_api_key(); // backward compatibility
     
     $should_schedule = $has_basic_auth || $has_legacy_key;
+    
+    // Log scheduling conditions for debugging
+    hic_log("Cron scheduling conditions - Connection type: " . hic_get_connection_type() . 
+            ", API URL: " . (hic_get_api_url() ? 'configured' : 'missing') .
+            ", Basic Auth: " . ($has_basic_auth ? 'yes' : 'no') .
+            ", Legacy Key: " . ($has_legacy_key ? 'yes' : 'no') .
+            ", Should schedule: " . ($should_schedule ? 'yes' : 'no'));
   }
   
   if ($should_schedule) {
@@ -398,6 +405,12 @@ function hic_mark_reservation_processed($reservation) {
 // Wrapper cron function
 function hic_api_poll_bookings(){
     hic_log('Cron: hic_api_poll_bookings execution started');
+    
+    // Log current configuration for debugging
+    $prop = hic_get_property_id();
+    $email = hic_get_api_email();
+    $connection_type = hic_get_connection_type();
+    hic_log("Cron: Current config - Connection: $connection_type, PropID: $prop, Email: " . ($email ? 'configured' : 'missing'));
     
     // Always update execution timestamp regardless of results
     update_option('hic_last_cron_execution', time());
