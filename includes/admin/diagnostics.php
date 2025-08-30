@@ -1390,7 +1390,7 @@ function hic_diagnostics_page() {
                     </tbody>
                 </table>
                 
-                <h3>Tutti gli Intervalli Disponibili</h3>
+                <h3>Intervalli HIC</h3>
                 <table class="widefat">
                     <thead>
                         <tr>
@@ -1400,13 +1400,31 @@ function hic_diagnostics_page() {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($schedules as $key => $schedule): ?>
+                        <?php 
+                        // Show only HIC-related intervals
+                        $hic_intervals = array();
+                        foreach ($schedules as $key => $schedule) {
+                            if (strpos($key, 'hic_') === 0) {
+                                $hic_intervals[$key] = $schedule;
+                            }
+                        }
+                        
+                        if (empty($hic_intervals)): ?>
                         <tr>
-                            <td><code><?php echo esc_html($key); ?></code></td>
-                            <td><?php echo esc_html(number_format($schedule['interval'])); ?></td>
-                            <td><?php echo esc_html($schedule['display']); ?></td>
+                            <td colspan="3" style="text-align: center; color: #dc3232;">
+                                <strong>⚠ Nessun intervallo HIC registrato</strong><br>
+                                <small>Gli intervalli personalizzati potrebbero non essere stati caricati correttamente.</small>
+                            </td>
                         </tr>
-                        <?php endforeach; ?>
+                        <?php else: ?>
+                            <?php foreach ($hic_intervals as $key => $schedule): ?>
+                            <tr>
+                                <td><code><?php echo esc_html($key); ?></code></td>
+                                <td><?php echo esc_html(number_format($schedule['interval'])); ?></td>
+                                <td><?php echo esc_html($schedule['display']); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -1565,23 +1583,72 @@ function hic_diagnostics_page() {
     </div>
     
     <style>
+        .wrap {
+            max-width: none !important;
+            margin-right: 20px;
+        }
+        
+        .hic-diagnostics-container {
+            max-width: none;
+            width: 100%;
+        }
+        
         .hic-diagnostics-container .card {
             background: #fff;
             border: 1px solid #ccd0d4;
             box-shadow: 0 1px 1px rgba(0,0,0,.04);
             margin-bottom: 20px;
-            padding: 15px;
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
         }
+        
         .hic-diagnostics-container .card h2 {
             margin-top: 0;
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
+            font-size: 18px;
         }
+        
+        .hic-diagnostics-container .card h3 {
+            margin-top: 20px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #1d2327;
+        }
+        
+        .hic-diagnostics-container .widefat {
+            width: 100%;
+            max-width: none;
+            margin-bottom: 15px;
+        }
+        
+        .hic-diagnostics-container .widefat td,
+        .hic-diagnostics-container .widefat th {
+            padding: 12px 15px;
+            vertical-align: top;
+        }
+        
+        .hic-diagnostics-container .form-table {
+            width: 100%;
+            max-width: none;
+        }
+        
+        .hic-diagnostics-container .form-table th {
+            width: 200px;
+            padding: 15px 10px 15px 0;
+        }
+        
+        .hic-diagnostics-container .form-table td {
+            padding: 15px 10px;
+        }
+        
         .status.ok { color: #46b450; font-weight: bold; }
         .status.error { color: #dc3232; font-weight: bold; }
         .status.warning { color: #ffb900; font-weight: bold; }
         .status.scheduled { color: #0073aa; font-weight: bold; }
         .status.not-scheduled { color: #ffb900; font-weight: bold; }
+        
         .manual-booking-alerts {
             margin-top: 15px;
         }
@@ -1592,7 +1659,7 @@ function hic_diagnostics_page() {
         }
         .manual-booking-recommendations {
             margin-top: 15px;
-            padding: 10px;
+            padding: 15px;
             background: #f7f7f7;
             border-left: 4px solid #0073aa;
         }
@@ -1609,10 +1676,71 @@ function hic_diagnostics_page() {
         .manual-booking-recommendations li {
             margin-bottom: 8px;
         }
+        
+        #hic-recent-logs { 
+            max-height: 300px; 
+            overflow-y: auto; 
+            background: #f9f9f9; 
+            padding: 15px; 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 12px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
         #hic-recent-logs div { 
-            margin-bottom: 2px; 
-            padding: 2px 0;
+            margin-bottom: 3px; 
+            padding: 3px 0;
             border-bottom: 1px solid #eee;
+            word-wrap: break-word;
+        }
+        
+        #backfill-results {
+            margin-top: 15px; 
+            padding: 15px; 
+            background: #f7f7f7; 
+            border-left: 4px solid #0073aa;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .notice.inline {
+            margin: 15px 0;
+            padding: 12px;
+        }
+        
+        .button {
+            margin-right: 10px;
+            margin-bottom: 5px;
+        }
+        
+        /* Responsive improvements */
+        @media (max-width: 782px) {
+            .hic-diagnostics-container .card {
+                padding: 15px;
+            }
+            
+            .hic-diagnostics-container .widefat {
+                font-size: 14px;
+            }
+            
+            .hic-diagnostics-container .widefat td,
+            .hic-diagnostics-container .widefat th {
+                padding: 8px 10px;
+            }
+        }
+        
+        /* Ensure tables don't overflow */
+        .hic-diagnostics-container table {
+            table-layout: auto;
+            word-wrap: break-word;
+        }
+        
+        .hic-diagnostics-container code {
+            word-break: break-all;
+            background: #f1f1f1;
+            padding: 2px 4px;
+            border-radius: 3px;
         }
     </style>
     

@@ -957,9 +957,16 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
 function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin', $limit = null) {
     $start_time = microtime(true);
     
-    hic_log("Backfill: Starting backfill from $from_date to $to_date (type: $date_type)");
+    hic_log("Backfill: Starting backfill from $from_date to $to_date (date_type: $date_type, limit: " . ($limit ?: 'none') . ")");
     
-    // Validate dates
+    // Validate date type
+    if (!in_array($date_type, array('checkin', 'created'))) {
+        return array(
+            'success' => false,
+            'message' => 'Tipo di data non valido. Deve essere "checkin" o "created".',
+            'stats' => array()
+        );
+    }
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to_date)) {
         return array(
             'success' => false,
@@ -1046,7 +1053,9 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
                 // Transform and process the reservation
                 $transformed = hic_transform_reservation($reservation);
                 if ($transformed !== false) {
-                    hic_process_booking_data($transformed);
+                    // Use the proper dispatch pipeline instead of hic_process_booking_data
+                    hic_dispatch_reservation($transformed, $reservation);
+                    hic_mark_reservation_processed($reservation);
                     $stats['total_processed']++;
                 } else {
                     $stats['total_errors']++;
