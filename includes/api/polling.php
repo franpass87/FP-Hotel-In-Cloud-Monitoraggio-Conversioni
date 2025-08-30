@@ -564,11 +564,56 @@ function hic_api_poll_updates(){
     update_option('hic_last_cron_execution', time());
     
     $prop = hic_get_property_id();
-    $since = get_option('hic_last_updates_since', time() - DAY_IN_SECONDS);
-    hic_log("Cron: polling updates since " . date('Y-m-d H:i:s', $since) . " for property $prop");
+    
+    // Add safety overlap to prevent gaps between polling intervals
+    $overlap_seconds = 300; // 5 minute overlap for safety
+    $last_since = get_option('hic_last_updates_since', time() - DAY_IN_SECONDS);
+    $since = max(0, $last_since - $overlap_seconds);
+    
+    $current_time = time();
+    hic_log("Cron: polling updates for property $prop");
+    hic_log("Cron: last timestamp: " . date('Y-m-d H:i:s', $last_since) . " ($last_since)");
+    hic_log("Cron: requesting since: " . date('Y-m-d H:i:s', $since) . " ($since) [overlap: {$overlap_seconds}s]");
+    
     $out = hic_fetch_reservations_updates($prop, $since, 200); // limit opzionale se supportato
     if (!is_wp_error($out)) {
-        update_option('hic_last_updates_since', time());
+        $updates_count = is_array($out) ? count($out) : 0;
+        hic_log("Cron: Found $updates_count updates");
+        
+        // Calculate new timestamp based on actual updates
+        $new_timestamp = $current_time;
+        if ($updates_count > 0 && is_array($out)) {
+            // Find the maximum updated_at timestamp from the actual updates
+            $max_updated_at = 0;
+            foreach ($out as $update) {
+                if (isset($update['updated_at'])) {
+                    $updated_at = is_numeric($update['updated_at']) ? (int)$update['updated_at'] : strtotime($update['updated_at']);
+                    if ($updated_at > $max_updated_at) {
+                        $max_updated_at = $updated_at;
+                    }
+                }
+            }
+            
+            // Use the max updated_at if found, otherwise use current time
+            if ($max_updated_at > 0) {
+                $new_timestamp = $max_updated_at;
+                hic_log("Cron: Using max updated_at timestamp: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+            } else {
+                hic_log("Cron: No updated_at field found, using current time: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+            }
+        } else {
+            // No updates found - advance timestamp only if enough time has passed to prevent infinite polling
+            $time_since_last_poll = $current_time - $last_since;
+            if ($time_since_last_poll > 3600) { // 1 hour
+                hic_log("Cron: No updates found but 1+ hour passed, advancing timestamp to prevent infinite polling");
+            } else {
+                // Keep previous timestamp for retry, but with small increment to avoid exact same request
+                $new_timestamp = $last_since + 60; // Advance by 1 minute to make progress
+                hic_log("Cron: No updates found, advancing by 1 minute for next retry: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+            }
+        }
+        
+        update_option('hic_last_updates_since', $new_timestamp);
         hic_log('Cron: hic_api_poll_updates completed successfully');
     } else {
         hic_log('Cron: hic_api_poll_updates failed: ' . $out->get_error_message());

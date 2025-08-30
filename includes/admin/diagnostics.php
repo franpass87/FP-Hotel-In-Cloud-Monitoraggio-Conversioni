@@ -1300,6 +1300,96 @@ function hic_diagnostics_page() {
                     </tbody>
                 </table>
                 
+                <!-- Updates Polling Diagnostics -->
+                <h3>Diagnostica Updates Polling</h3>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Valore</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Updates Enrichment Abilitato</td>
+                            <td>
+                                <?php if (hic_updates_enrich_contacts()): ?>
+                                    <span class="status ok">✓ Abilitato</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Disabilitato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Controlla se il sistema di arricchimento contatti è attivo</td>
+                        </tr>
+                        <tr>
+                            <td>Ultimo Timestamp Updates</td>
+                            <td>
+                                <?php 
+                                $last_updates_since = get_option('hic_last_updates_since', 0);
+                                if ($last_updates_since > 0) {
+                                    $time_ago = human_time_diff($last_updates_since, time()) . ' fa';
+                                    echo '<span class="status ok">' . esc_html(date('Y-m-d H:i:s', $last_updates_since)) . '</span><br>';
+                                    echo '<small>Unix: ' . esc_html($last_updates_since) . ' (' . esc_html($time_ago) . ')</small>';
+                                } else {
+                                    echo '<span class="status warning">Non impostato</span>';
+                                }
+                                ?>
+                            </td>
+                            <td>Timestamp dell'ultimo update processato (con overlap di 5 min)</td>
+                        </tr>
+                        <tr>
+                            <td>Prossimo Polling Range</td>
+                            <td>
+                                <?php 
+                                if ($last_updates_since > 0) {
+                                    $overlap_seconds = 300; // Same as in polling function
+                                    $next_since = max(0, $last_updates_since - $overlap_seconds);
+                                    echo 'Richiederà updates dal: <br>';
+                                    echo '<strong>' . esc_html(date('Y-m-d H:i:s', $next_since)) . '</strong><br>';
+                                    echo '<small>Unix: ' . esc_html($next_since) . ' (overlap: ' . esc_html($overlap_seconds) . 's)</small>';
+                                } else {
+                                    echo '<span class="status warning">Non calcolabile</span>';
+                                }
+                                ?>
+                            </td>
+                            <td>Range che verrà richiesto nel prossimo polling</td>
+                        </tr>
+                        <tr>
+                            <td>Eventi Updates Schedulati</td>
+                            <td>
+                                <?php if (isset($status['updates_event']['scheduled']) && $status['updates_event']['scheduled']): ?>
+                                    <span class="status ok">✓ Schedulato</span><br>
+                                    <small>Prossima: <?php echo esc_html($status['updates_event']['next_run_human']); ?></small>
+                                <?php else: ?>
+                                    <span class="status error">✗ Non schedulato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Verifica schedulazione del cron hic_api_updates_event</td>
+                        </tr>
+                        <tr>
+                            <td>Intervallo Updates Utilizzato</td>
+                            <td>
+                                <?php if ($updates_interval_used): ?>
+                                    <?php 
+                                    $actual_seconds = isset($schedules[$updates_interval_used]) ? $schedules[$updates_interval_used]['interval'] : 'N/A';
+                                    $is_correct = $updates_interval_used === 'hic_poll_interval' && $actual_seconds == HIC_POLL_INTERVAL_SECONDS;
+                                    ?>
+                                    <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
+                                        <?php echo esc_html($updates_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
+                                    </span>
+                                    <?php if (!$is_correct): ?>
+                                        <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (<?php echo HIC_POLL_INTERVAL_SECONDS; ?> sec)</small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="status error">Non schedulato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Intervallo effettivamente utilizzato per updates polling</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
                 <h3>Tutti gli Intervalli Disponibili</h3>
                 <table class="widefat">
                     <thead>
