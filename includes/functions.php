@@ -82,6 +82,22 @@ function hic_process_invalid() { return hic_get_option('process_invalid', '0') =
 function hic_allow_status_updates() { return hic_get_option('allow_status_updates', '0') === '1'; }
 function hic_get_polling_range_extension_days() { return intval(hic_get_option('polling_range_extension_days', '7')); }
 
+/**
+ * Check if retry event should be scheduled based on conditions
+ */
+function hic_should_schedule_retry_event() {
+    if (!hic_realtime_brevo_sync_enabled()) {
+        return false;
+    }
+    
+    if (!hic_get_brevo_api_key()) {
+        return false;
+    }
+    
+    $schedules = wp_get_schedules();
+    return isset($schedules['hic_retry_interval']);
+}
+
 /* ============ New Helper Functions ============ */
 function hic_normalize_price($value) {
     if (empty($value) || (!is_numeric($value) && !is_string($value))) return 0.0;
