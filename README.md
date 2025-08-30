@@ -95,15 +95,46 @@ Nel pannello admin, sezione "Brevo Settings":
 
 #### Polling Updates
 
-Il sistema effettua polling automatico ogni 5 minuti sull'endpoint:
+Il sistema effettua polling automatico con intervalli configurabili (quasi real-time) sull'endpoint:
 ```
 GET /reservations_updates/{propId}?since={timestamp}
 ```
 
 - **Parametro `since`**: Unix timestamp dell'ultimo aggiornamento processato
 - **Autenticazione**: Basic Auth con le stesse credenziali API
-- **Frequenza**: Stessa del polling principale (5 minuti)
+- **Frequenza**: Configurabile (1-2 minuti per quasi real-time, 5 minuti per compatibilità)
+- **Finestra mobile**: 15 minuti indietro + 5 minuti avanti per evitare perdite
 - **Deduplicazione**: Nessun evento duplicato GA4/Pixel per stessa reservation.id
+- **Lock anti-overlap**: Previene esecuzioni sovrapposte con transient lock
+
+### Sistema Cron per Polling Quasi Real-time
+
+Per ottenere prestazioni ottimali con polling ogni 1-2 minuti, è consigliabile configurare un cron di sistema:
+
+#### 1. Disabilitare WP Cron
+Aggiungi al file `wp-config.php`:
+```php
+define('DISABLE_WP_CRON', true);
+```
+
+#### 2. Configurare Cron di Sistema
+Esegui `crontab -e` e aggiungi una delle seguenti righe:
+
+**Per polling ogni minuto (massime prestazioni):**
+```bash
+* * * * * /usr/bin/wget -q -O - "https://yoursite.com/wp-cron.php" >/dev/null 2>&1
+```
+
+**Per polling ogni 2 minuti (bilanciato):**
+```bash
+*/2 * * * * /usr/bin/wget -q -O - "https://yoursite.com/wp-cron.php" >/dev/null 2>&1
+```
+
+#### 3. Configurazione Plugin
+Nel pannello admin (**Impostazioni > HIC Monitoring**), configura:
+- **Tipo Connessione**: API Polling
+- **Intervallo Polling**: Every Minute o Every Two Minutes
+- Verifica la diagnostica per confermare il funzionamento
 
 ## Parametro Vertical per Segmentazione
 

@@ -26,6 +26,21 @@ add_filter('cron_schedules', function($schedules) {
     );
   }
   
+  // Add quasi-realtime polling schedules
+  if (!isset($schedules['every_minute'])) {
+    $schedules['every_minute'] = array(
+      'interval' => 60,
+      'display' => 'Every Minute'
+    );
+  }
+  
+  if (!isset($schedules['every_two_minutes'])) {
+    $schedules['every_two_minutes'] = array(
+      'interval' => 120,
+      'display' => 'Every Two Minutes'
+    );
+  }
+  
   return $schedules;
 }, 5);
 
@@ -96,15 +111,17 @@ add_action('init', function() {
   
   if ($should_schedule) {
     if (!wp_next_scheduled('hic_api_poll_event')) {
-      $result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event');
+      // Use configured polling interval for quasi-realtime polling
+      $polling_interval = hic_get_polling_interval();
+      $result = wp_schedule_event(time() + 60, $polling_interval, 'hic_api_poll_event');
       if (!$result) {
-        hic_log('ERROR: Failed to schedule hic_api_poll_event. Check if hic_poll_interval is registered.');
+        hic_log("ERROR: Failed to schedule hic_api_poll_event with interval '$polling_interval'. Check if interval is registered.");
       } else {
-        hic_log('hic_api_poll_event scheduled successfully with hic_poll_interval');
+        hic_log("hic_api_poll_event scheduled successfully with interval '$polling_interval'");
         // Verify the scheduled interval
         $schedules = wp_get_schedules();
-        if (isset($schedules['hic_poll_interval'])) {
-          hic_log('Confirmed: hic_poll_interval = ' . $schedules['hic_poll_interval']['interval'] . ' seconds');
+        if (isset($schedules[$polling_interval])) {
+          hic_log('Confirmed: ' . $polling_interval . ' = ' . $schedules[$polling_interval]['interval'] . ' seconds');
         }
       }
     } else {
@@ -404,101 +421,231 @@ function hic_mark_reservation_processed($reservation) {
 
 // Wrapper cron function
 function hic_api_poll_bookings(){
+    $start_time = microtime(true);
     hic_log('Cron: hic_api_poll_bookings execution started');
     
-    // Log current configuration for debugging
-    $prop = hic_get_property_id();
-    $email = hic_get_api_email();
-    $connection_type = hic_get_connection_type();
-    hic_log("Cron: Current config - Connection: $connection_type, PropID: $prop, Email: " . ($email ? 'configured' : 'missing'));
+    // Rotate log if needed
+    hic_rotate_log_if_needed();
     
-    // Always update execution timestamp regardless of results
-    update_option('hic_last_cron_execution', time());
+    // Try to acquire lock to prevent overlapping executions
+    if (!hic_acquire_polling_lock(300)) {
+        hic_log('Cron: Another polling process is running, skipping execution');
+        return;
+    }
     
-    $prop = hic_get_property_id();
-    $email = hic_get_api_email();
-    $password = hic_get_api_password();
-    
-    // Try new Basic Auth method first
-    if ($prop && $email && $password) {
-        $last = get_option('hic_last_api_poll', strtotime('-1 day'));
-        $now  = time();
-        $from = date('Y-m-d', $last);
-        // Extend date range to catch manual bookings - configurable buffer
-        $range_extension_days = hic_get_polling_range_extension_days();
-        $to   = date('Y-m-d', $now + ($range_extension_days * DAY_IN_SECONDS));
+    try {
+        // Always update execution timestamp regardless of results
+        update_option('hic_last_cron_execution', time());
         
-        $total_reservations = 0;
-        $polling_errors = array();
+        $prop = hic_get_property_id();
+        $email = hic_get_api_email();
+        $password = hic_get_api_password();
+        $connection_type = hic_get_connection_type();
         
-        // First, poll by checkin date (existing logic)
-        $date_type = 'checkin';
-        hic_log("Cron: polling reservations by $date_type from $from to $to (+$range_extension_days days) for property $prop");
-        $out_checkin = hic_fetch_reservations($prop, $date_type, $from, $to, 100);
-        if (!is_wp_error($out_checkin)) {
-            $checkin_count = is_array($out_checkin) ? count($out_checkin) : 0;
-            $total_reservations += $checkin_count;
-            hic_log("Cron: Found $checkin_count reservations by checkin date");
+        hic_log("Cron: Current config - Connection: $connection_type, PropID: $prop, Email: " . ($email ? 'configured' : 'missing'));
+        
+        // Use quasi-realtime approach with Basic Auth
+        if ($prop && $email && $password) {
+            hic_quasi_realtime_poll($prop, $start_time);
         } else {
-            $polling_errors[] = "checkin polling: " . $out_checkin->get_error_message();
-        }
-        
-        // Second, poll by created date to catch recent manual bookings
-        $date_type = 'created';
-        $created_from = date('Y-m-d', $last);
-        $created_to = date('Y-m-d', $now); // Don't extend for created date
-        hic_log("Cron: polling reservations by $date_type from $created_from to $created_to for property $prop");
-        $out_created = hic_fetch_reservations($prop, $date_type, $created_from, $created_to, 100);
-        if (!is_wp_error($out_created)) {
-            $created_count = is_array($out_created) ? count($out_created) : 0;
-            $total_reservations += $created_count;
-            hic_log("Cron: Found $created_count reservations by created date");
-        } else {
-            $polling_errors[] = "created polling: " . $out_created->get_error_message();
-        }
-        
-        // Determine if polling was successful
-        $polling_successful = empty($polling_errors) || (!is_wp_error($out_checkin) || !is_wp_error($out_created));
-        
-        if ($polling_successful) {
-            hic_log("Cron: Total reservations found: $total_reservations");
+            // Fall back to legacy API key method for backward compatibility
+            $api_url = hic_get_api_url();
+            $api_key = hic_get_api_key();
             
-            // Store count for diagnostics
-            update_option('hic_last_poll_count', $total_reservations);
-            
-            // Only update timestamp if we actually found reservations OR if enough time has passed
-            // This prevents getting stuck on the same timestamp when no bookings are found
-            $time_since_last_poll = $now - $last;
-            if ($total_reservations > 0) {
-                update_option('hic_last_api_poll', $now);
-                hic_log("Cron: Updated last poll timestamp (found $total_reservations reservations)");
-            } elseif ($time_since_last_poll > DAY_IN_SECONDS) {
-                // If more than 24 hours since last poll and no reservations, advance timestamp
-                // to prevent infinite polling of the same period
-                update_option('hic_last_api_poll', $now);
-                hic_log('Cron: Advanced timestamp after 24+ hours with no reservations');
-            } else {
-                hic_log('Cron: No reservations found, keeping previous timestamp for retry');
+            if (!$api_url || !$api_key) {
+                hic_log('Cron: No valid credentials found (neither Basic Auth nor legacy API key)');
+                return;
             }
-            hic_log('Cron: hic_api_poll_bookings completed successfully');
-        } else {
-            hic_log('Cron: hic_api_poll_bookings failed: ' . implode('; ', $polling_errors));
+            
+            hic_log('Cron: using legacy API key method');
+            hic_legacy_api_poll_bookings();
         }
-        return;
+    } finally {
+        // Always release the lock
+        hic_release_polling_lock();
     }
-    
-    // Fall back to legacy API key method for backward compatibility
-    $api_url = hic_get_api_url();
-    $api_key = hic_get_api_key();
-    
-    if (!$api_url || !$api_key) {
-        hic_log('Cron: propId mancante per Basic Auth e URL/API key mancanti per legacy');
-        return;
-    }
+}
 
-    // Legacy polling logic (unchanged)
-    hic_log('Cron: using legacy API key method');
-    hic_legacy_api_poll_bookings();
+/**
+ * Quasi-realtime polling with moving window approach
+ */
+function hic_quasi_realtime_poll($prop_id, $start_time) {
+    $current_time = time();
+    
+    // Moving window: 15 minutes back + 5 minutes forward
+    $window_back_minutes = 15;
+    $window_forward_minutes = 5;
+    
+    $from_time = $current_time - ($window_back_minutes * 60);
+    $to_time = $current_time + ($window_forward_minutes * 60);
+    
+    $from_date = date('Y-m-d H:i:s', $from_time);
+    $to_date = date('Y-m-d H:i:s', $to_time);
+    
+    hic_log("Cron: Moving window polling from $from_date to $to_date (property: $prop_id)");
+    
+    $total_new = 0;
+    $total_skipped = 0;
+    $total_errors = 0;
+    $polling_errors = array();
+    
+    // Poll by created date for recent bookings (most important for real-time)
+    $created_from = date('Y-m-d', $from_time);
+    $created_to = date('Y-m-d', $to_time);
+    
+    hic_log("Cron: Polling by created date from $created_from to $created_to");
+    $created_reservations = hic_fetch_reservations($prop_id, 'created', $created_from, $created_to, 100);
+    
+    if (!is_wp_error($created_reservations)) {
+        $created_count = is_array($created_reservations) ? count($created_reservations) : 0;
+        hic_log("Cron: Found $created_count reservations by created date");
+        
+        if ($created_count > 0) {
+            $process_result = hic_process_reservations_batch($created_reservations);
+            $total_new += $process_result['new'];
+            $total_skipped += $process_result['skipped'];
+            $total_errors += $process_result['errors'];
+        }
+    } else {
+        $polling_errors[] = "created date polling: " . $created_reservations->get_error_message();
+        $total_errors++;
+    }
+    
+    // Also poll by checkin date to catch any updates to existing bookings
+    $checkin_from = date('Y-m-d', $from_time);
+    $checkin_to = date('Y-m-d', $to_time + (7 * DAY_IN_SECONDS)); // Extend checkin window
+    
+    hic_log("Cron: Polling by checkin date from $checkin_from to $checkin_to");
+    $checkin_reservations = hic_fetch_reservations($prop_id, 'checkin', $checkin_from, $checkin_to, 100);
+    
+    if (!is_wp_error($checkin_reservations)) {
+        $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
+        hic_log("Cron: Found $checkin_count reservations by checkin date");
+        
+        if ($checkin_count > 0) {
+            $process_result = hic_process_reservations_batch($checkin_reservations);
+            $total_new += $process_result['new'];
+            $total_skipped += $process_result['skipped'];
+            $total_errors += $process_result['errors'];
+        }
+    } else {
+        $polling_errors[] = "checkin date polling: " . $checkin_reservations->get_error_message();
+        $total_errors++;
+    }
+    
+    // Calculate execution time
+    $execution_time = round((microtime(true) - $start_time) * 1000, 2);
+    
+    // Store metrics for diagnostics
+    update_option('hic_last_poll_count', $total_new);
+    update_option('hic_last_poll_skipped', $total_skipped);
+    update_option('hic_last_poll_duration', $execution_time);
+    
+    // Update last successful run only if polling was successful
+    $polling_successful = empty($polling_errors) && $total_errors === 0;
+    if ($polling_successful) {
+        update_option('hic_last_successful_poll', $current_time);
+        hic_log("Cron: Updated last successful poll timestamp");
+    }
+    
+    // Comprehensive logging
+    $log_msg = sprintf(
+        "Cron: Completed in %sms - Window: %s to %s, New: %d, Skipped: %d, Errors: %d",
+        $execution_time,
+        $from_date,
+        $to_date, 
+        $total_new,
+        $total_skipped,
+        $total_errors
+    );
+    
+    if (!empty($polling_errors)) {
+        $log_msg .= " - API Errors: " . implode('; ', $polling_errors);
+    }
+    
+    hic_log($log_msg);
+}
+
+/**
+ * Process a batch of reservations with comprehensive filtering and counting
+ */
+function hic_process_reservations_batch($reservations) {
+    $new_count = 0;
+    $skipped_count = 0;
+    $error_count = 0;
+    
+    if (!is_array($reservations)) {
+        return array('new' => 0, 'skipped' => 0, 'errors' => 1);
+    }
+    
+    foreach ($reservations as $reservation) {
+        try {
+            // Apply minimal filters first
+            if (!hic_should_process_reservation_with_email($reservation)) {
+                $skipped_count++;
+                continue;
+            }
+            
+            // Check deduplication
+            $uid = hic_booking_uid($reservation);
+            if (hic_is_reservation_already_processed($uid)) {
+                // Check if status update is allowed
+                if (hic_allow_status_updates()) {
+                    $presence = $reservation['presence'] ?? '';
+                    if (in_array($presence, ['arrived', 'departed'])) {
+                        hic_log("Reservation $uid: processing status update for presence=$presence");
+                        // Process as status update but don't count as new
+                        hic_process_single_reservation($reservation);
+                        continue;
+                    }
+                }
+                $skipped_count++;
+                hic_log("Reservation $uid: skipped (already processed)");
+                continue;
+            }
+            
+            // Process new reservation
+            hic_process_single_reservation($reservation);
+            hic_mark_reservation_processed($reservation);
+            $new_count++;
+            
+        } catch (Exception $e) {
+            $error_count++;
+            hic_log("Error processing reservation: " . $e->getMessage());
+        }
+    }
+    
+    return array('new' => $new_count, 'skipped' => $skipped_count, 'errors' => $error_count);
+}
+
+/**
+ * Enhanced filtering for reservations (includes email check)
+ */
+function hic_should_process_reservation_with_email($reservation) {
+    // Use existing validation logic
+    if (!hic_should_process_reservation($reservation)) {
+        return false;
+    }
+    
+    // Additional check: Skip reservations without email (minimal filter)
+    if (empty($reservation['email']) || !is_string($reservation['email'])) {
+        hic_log("Reservation skipped: missing or invalid email");
+        return false;
+    }
+    
+    return true;
+}
+
+/**
+ * Process a single reservation (transform and dispatch)
+ */
+function hic_process_single_reservation($reservation) {
+    $transformed = hic_transform_reservation($reservation);
+    if ($transformed !== false && is_array($transformed)) {
+        hic_dispatch_reservation($transformed, $reservation);
+    } else {
+        throw new Exception("Failed to transform reservation " . ($reservation['id'] ?? 'unknown'));
+    }
 }
 
 // Legacy API polling function for backward compatibility

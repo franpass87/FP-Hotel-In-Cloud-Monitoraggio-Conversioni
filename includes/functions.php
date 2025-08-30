@@ -83,6 +83,36 @@ function hic_allow_status_updates() { return hic_get_option('allow_status_update
 function hic_get_polling_range_extension_days() { return intval(hic_get_option('polling_range_extension_days', '7')); }
 
 /**
+ * Get configured polling interval for quasi-realtime polling
+ */
+function hic_get_polling_interval() { 
+    $interval = hic_get_option('polling_interval', 'every_two_minutes'); 
+    $valid_intervals = array('every_minute', 'every_two_minutes', 'hic_poll_interval');
+    return in_array($interval, $valid_intervals) ? $interval : 'every_two_minutes';
+}
+
+/**
+ * Quasi-realtime polling lock functions
+ */
+function hic_acquire_polling_lock($timeout = 300) {
+    $lock_key = 'hic_polling_lock';
+    $lock_value = time();
+    
+    // Check if lock exists and is still valid
+    $existing_lock = get_transient($lock_key);
+    if ($existing_lock && ($lock_value - $existing_lock) < $timeout) {
+        return false; // Lock is held by another process
+    }
+    
+    // Acquire lock
+    return set_transient($lock_key, $lock_value, $timeout);
+}
+
+function hic_release_polling_lock() {
+    return delete_transient('hic_polling_lock');
+}
+
+/**
  * Check if retry event should be scheduled based on conditions
  */
 function hic_should_schedule_retry_event() {
@@ -140,6 +170,31 @@ function hic_log($msg){
   $date = date('Y-m-d H:i:s');
   $line = '['.$date.'] ' . (is_scalar($msg) ? $msg : print_r($msg, true)) . "\n";
   @file_put_contents(hic_get_log_file(), $line, FILE_APPEND);
+}
+
+/**
+ * Rotate log file if it exceeds 5MB
+ */
+function hic_rotate_log_if_needed() {
+    $log_file = hic_get_log_file();
+    if (!file_exists($log_file)) {
+        return;
+    }
+    
+    $max_size = 5 * 1024 * 1024; // 5MB
+    if (filesize($log_file) > $max_size) {
+        $backup_file = $log_file . '.old';
+        
+        // Remove old backup if exists
+        if (file_exists($backup_file)) {
+            @unlink($backup_file);
+        }
+        
+        // Rotate current log to backup
+        @rename($log_file, $backup_file);
+        
+        hic_log('Log rotated: file exceeded 5MB limit');
+    }
 }
 
 /**
