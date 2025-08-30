@@ -106,22 +106,6 @@ function hic_should_schedule_poll_event() {
 }
 
 /**
- * Check if retry event should be scheduled based on conditions
- */
-function hic_should_schedule_retry_event() {
-    if (!hic_realtime_brevo_sync_enabled()) {
-        return false;
-    }
-    
-    if (!hic_get_brevo_api_key()) {
-        return false;
-    }
-    
-    $schedules = wp_get_schedules();
-    return isset($schedules['hic_retry_interval']);
-}
-
-/**
  * Check if updates polling should be scheduled based on conditions
  */
 function hic_should_schedule_updates_event() {
