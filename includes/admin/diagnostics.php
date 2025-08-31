@@ -37,7 +37,7 @@ function hic_get_internal_scheduler_status() {
         hic_reliable_polling_enabled() && 
         hic_get_connection_type() === 'api' && 
         hic_get_api_url() && 
-        (hic_has_basic_auth_credentials() || hic_get_api_key());
+        (hic_has_basic_auth_credentials() || !empty(hic_get_api_key()));
     
     // Get stats from WP-Cron scheduler if available
     if (class_exists('HIC_Booking_Poller')) {
@@ -294,7 +294,7 @@ function hic_force_restart_internal_scheduler() {
     $should_activate = hic_reliable_polling_enabled() && 
                       hic_get_connection_type() === 'api' && 
                       hic_get_api_url() && 
-                      (hic_has_basic_auth_credentials() || hic_get_api_key());
+                      (hic_has_basic_auth_credentials() || !empty(hic_get_api_key()));
     
     if ($should_activate) {
         // Reset polling timestamps to trigger immediate execution
@@ -425,7 +425,7 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     }
     
     // Validate credentials
-    if (!hic_has_basic_auth_credentials() && !hic_get_api_key()) {
+    if (!hic_has_basic_auth_credentials() && empty(hic_get_api_key())) {
         return new WP_Error('missing_credentials', 'Credenziali API non configurate');
     }
     
@@ -1231,7 +1231,7 @@ function hic_diagnostics_page() {
                                     if (!hic_get_api_url()) {
                                         $polling_issues[] = "URL API non configurato";
                                     }
-                                    if (!hic_has_basic_auth_credentials() && !hic_get_api_key()) {
+                                    if (!hic_has_basic_auth_credentials() && empty(hic_get_api_key())) {
                                         $polling_issues[] = "Credenziali API mancanti (serve Property ID + Email + Password oppure API Key)";
                                     }
                                     echo implode('<br>', $polling_issues);
@@ -2171,7 +2171,7 @@ function hic_diagnostics_page() {
             return;
             <?php endif; ?>
             
-            <?php if (!hic_has_basic_auth_credentials() && !hic_get_api_key()): ?>
+            <?php if (!hic_has_basic_auth_credentials() && empty(hic_get_api_key())): ?>
             alert('Credenziali API non configurate. Verifica le impostazioni.');
             return;
             <?php endif; ?>

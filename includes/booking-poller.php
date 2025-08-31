@@ -154,7 +154,7 @@ class HIC_Booking_Poller {
         return hic_reliable_polling_enabled() && 
                hic_get_connection_type() === 'api' && 
                hic_get_api_url() && 
-               (hic_has_basic_auth_credentials() || hic_get_api_key());
+               (hic_has_basic_auth_credentials() || !empty(hic_get_api_key()));
     }
     
     /**
