@@ -60,26 +60,47 @@ function hic_get_internal_scheduler_status() {
             ));
             
             // Calculate next run estimates for both continuous and deep check
-            if ($status['internal_scheduler']['last_continuous_poll'] > 0) {
-                $next_continuous = $status['internal_scheduler']['last_continuous_poll'] + 60; // 1 minute
-                if ($next_continuous > time()) {
-                    $status['internal_scheduler']['next_continuous_human'] = human_time_diff($next_continuous, time()) . ' da ora';
-                } else {
-                    $status['internal_scheduler']['next_continuous_human'] = 'Ora (in attesa Heartbeat)';
-                }
-            } else {
-                $status['internal_scheduler']['next_continuous_human'] = 'In attesa di avvio';
-            }
+            $scheduler_type = $poller_stats['scheduler_type'] ?? 'Unknown';
             
-            if ($status['internal_scheduler']['last_deep_check'] > 0) {
-                $next_deep = $status['internal_scheduler']['last_deep_check'] + 600; // 10 minutes
-                if ($next_deep > time()) {
-                    $status['internal_scheduler']['next_deep_human'] = human_time_diff($next_deep, time()) . ' da ora';
+            if ($poller_stats['wp_cron_working'] ?? false) {
+                // WP-Cron is working - show actual scheduled times
+                $next_continuous = $poller_stats['next_continuous_scheduled'] ?? 0;
+                $next_deep = $poller_stats['next_deep_scheduled'] ?? 0;
+                
+                if ($next_continuous > time()) {
+                    $status['internal_scheduler']['next_continuous_human'] = 'Tra ' . human_time_diff(time(), $next_continuous);
                 } else {
-                    $status['internal_scheduler']['next_deep_human'] = 'Ora (in attesa Heartbeat)';
+                    $status['internal_scheduler']['next_continuous_human'] = 'Ora (WP-Cron)';
+                }
+                
+                if ($next_deep > time()) {
+                    $status['internal_scheduler']['next_deep_human'] = 'Tra ' . human_time_diff(time(), $next_deep);
+                } else {
+                    $status['internal_scheduler']['next_deep_human'] = 'Ora (WP-Cron)';
                 }
             } else {
-                $status['internal_scheduler']['next_deep_human'] = 'In attesa di avvio';
+                // Using Heartbeat fallback
+                if ($status['internal_scheduler']['last_continuous_poll'] > 0) {
+                    $next_continuous = $status['internal_scheduler']['last_continuous_poll'] + 60; // 1 minute
+                    if ($next_continuous > time()) {
+                        $status['internal_scheduler']['next_continuous_human'] = 'Tra ' . human_time_diff(time(), $next_continuous) . ' (Heartbeat)';
+                    } else {
+                        $status['internal_scheduler']['next_continuous_human'] = 'Ora (in attesa Heartbeat)';
+                    }
+                } else {
+                    $status['internal_scheduler']['next_continuous_human'] = 'Heartbeat attivo - eseguirà al prossimo ciclo';
+                }
+                
+                if ($status['internal_scheduler']['last_deep_check'] > 0) {
+                    $next_deep = $status['internal_scheduler']['last_deep_check'] + 600; // 10 minutes
+                    if ($next_deep > time()) {
+                        $status['internal_scheduler']['next_deep_human'] = 'Tra ' . human_time_diff(time(), $next_deep) . ' (Heartbeat)';
+                    } else {
+                        $status['internal_scheduler']['next_deep_human'] = 'Ora (in attesa Heartbeat)';
+                    }
+                } else {
+                    $status['internal_scheduler']['next_deep_human'] = 'Heartbeat attivo - eseguirà al prossimo ciclo';
+                }
             }
         }
     }
@@ -298,7 +319,20 @@ function hic_force_restart_internal_scheduler() {
         // Reset polling timestamps to trigger immediate execution
         delete_option('hic_last_api_poll');
         delete_option('hic_last_successful_poll');
+        delete_option('hic_last_continuous_poll');
+        delete_option('hic_last_deep_check');
         $results['polling_timestamps_reset'] = 'Timestamps reset for immediate execution';
+        
+        // Clear and reschedule WP-Cron events for fresh start
+        if (class_exists('HIC_Booking_Poller')) {
+            $poller = new HIC_Booking_Poller();
+            $poller->clear_all_scheduled_events();
+            
+            // Wait a moment then reschedule
+            sleep(1);
+            $poller->ensure_scheduler_is_active();
+            $results['scheduler_restarted'] = 'WP-Cron events cleared and rescheduled';
+        }
         
         // Trigger an immediate poll if the poller is available
         if (function_exists('hic_api_poll_bookings')) {
@@ -1652,6 +1686,7 @@ function hic_diagnostics_page() {
                                 <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
                                     <span class="status ok">✓ Attivo</span><br>
                                     <small>
+                                        <strong>Sistema:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['scheduler_type'] ?? 'Heartbeat API'); ?><br>
                                         <strong>Polling Continuo (1 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_continuous_human'] ?? 'Mai eseguito'); ?><br>
                                         <strong>Deep Check (10 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_deep_human'] ?? 'Mai eseguito'); ?><br>
                                         <strong>Prossimo continuo:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['next_continuous_human'] ?? 'Sconosciuto'); ?><br>
@@ -1662,7 +1697,7 @@ function hic_diagnostics_page() {
                                     <small>Verificare configurazione API</small>
                                 <?php endif; ?>
                             </td>
-                            <td>Sistema dual-mode: polling continuo ogni minuto + deep check ogni 10 minuti (5 giorni lookback)</td>
+                            <td>Sistema ibrido: WP-Cron principale + Heartbeat fallback. Polling continuo ogni minuto + deep check ogni 10 minuti (5 giorni lookback)</td>
                         </tr>
                     </tbody>
                 </table>
