@@ -18,6 +18,9 @@ class HIC_Booking_Poller {
     public function __construct() {
         add_action('init', array($this, 'init_scheduler'));
         add_action('hic_reliable_poll_event', array($this, 'execute_poll'));
+        
+        // Disable old WP-Cron events when reliable polling is active
+        add_action('init', array($this, 'disable_legacy_cron_events'), 20);
     }
     
     /**
@@ -38,7 +41,8 @@ class HIC_Booking_Poller {
      * Check if polling should be active based on configuration
      */
     private function should_poll() {
-        return hic_get_connection_type() === 'api' && 
+        return hic_reliable_polling_enabled() && 
+               hic_get_connection_type() === 'api' && 
                hic_get_api_url() && 
                (hic_has_basic_auth_credentials() || hic_get_api_key());
     }
@@ -478,6 +482,40 @@ class HIC_Booking_Poller {
         }
         
         return $stats;
+    }
+    
+    /**
+     * Disable legacy WP-Cron events to prevent conflicts
+     */
+    public function disable_legacy_cron_events() {
+        // Only disable if reliable polling should be active
+        if (!$this->should_poll()) {
+            return;
+        }
+        
+        $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event');
+        $disabled_count = 0;
+        
+        foreach ($legacy_events as $event) {
+            $timestamp = wp_next_scheduled($event);
+            if ($timestamp) {
+                wp_unschedule_event($timestamp, $event);
+                $disabled_count++;
+                
+                $this->log_structured('legacy_event_disabled', array(
+                    'event' => $event,
+                    'was_scheduled_for' => $timestamp,
+                    'reason' => 'reliable_polling_active'
+                ));
+            }
+        }
+        
+        if ($disabled_count > 0) {
+            $this->log_structured('legacy_migration', array(
+                'disabled_events' => $disabled_count,
+                'reliable_polling_active' => true
+            ));
+        }
     }
 }
 
