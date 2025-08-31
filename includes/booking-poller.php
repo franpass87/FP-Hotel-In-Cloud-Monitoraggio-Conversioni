@@ -65,8 +65,29 @@ class HIC_Booking_Poller {
             return;
         }
         
+        // Ensure database tables exist
+        $this->ensure_database_tables();
+        
         $this->ensure_scheduled_event();
         $this->run_watchdog_check();
+    }
+    
+    /**
+     * Ensure required database tables exist
+     */
+    private function ensure_database_tables() {
+        global $wpdb;
+        
+        $table = $wpdb->prefix . 'hic_booking_events';
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) {
+            $this->log_structured('database_tables_missing', array(
+                'action' => 'attempting to create database tables'
+            ));
+            
+            if (function_exists('hic_create_database_table')) {
+                hic_create_database_table();
+            }
+        }
     }
     
     /**
@@ -354,8 +375,28 @@ class HIC_Booking_Poller {
         $booking_id = $reservation['id'];
         $version_hash = $this->calculate_version_hash($reservation);
         
-        // Check for duplicate in queue table
+        // Ensure booking events table exists
         $table = $wpdb->prefix . 'hic_booking_events';
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) {
+            $this->log_structured('table_missing_create_attempt', array(
+                'table' => $table,
+                'action' => 'attempting to create database tables'
+            ));
+            
+            // Try to create the database tables
+            if (function_exists('hic_create_database_table')) {
+                hic_create_database_table();
+                
+                // Re-check if table exists after creation attempt
+                if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) {
+                    throw new Exception('Booking events table does not exist and could not be created');
+                }
+            } else {
+                throw new Exception('Booking events table does not exist and hic_create_database_table function not available');
+            }
+        }
+        
+        // Check for duplicate in queue table
         $existing = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$table} WHERE booking_id = %s AND version_hash = %s",
             $booking_id,
