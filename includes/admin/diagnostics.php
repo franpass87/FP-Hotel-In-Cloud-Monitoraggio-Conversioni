@@ -441,8 +441,8 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     $downloaded_ids = $skip_downloaded ? hic_get_downloaded_booking_ids() : array();
     
     // Get bookings from the last 30 days to ensure we get recent ones
-    $to_date = date('Y-m-d H:i:s');
-    $from_date = date('Y-m-d H:i:s', strtotime('-30 days'));
+    $to_date = date('Y-m-d');
+    $from_date = date('Y-m-d', strtotime('-30 days'));
     
     hic_log("Fetching latest $limit bookings for property $prop_id from $from_date to $to_date" . 
             ($skip_downloaded ? " (skipping " . count($downloaded_ids) . " already downloaded)" : ""));
