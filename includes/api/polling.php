@@ -373,10 +373,10 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
                 update_option('hic_last_update_check', $reset_timestamp);
                 hic_log('Quasi-realtime Poll: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $reset_timestamp) . " ($reset_timestamp)");
                 
-                // Also reset heartbeat scheduler timestamps to restart polling immediately
+                // Also reset scheduler timestamps to restart polling immediately
                 update_option('hic_last_continuous_poll', 0);
                 update_option('hic_last_deep_check', 0);
-                hic_log('Quasi-realtime Poll: Reset heartbeat scheduler timestamps to restart polling');
+                hic_log('Quasi-realtime Poll: Reset scheduler timestamps to restart polling');
             }
         }
     
@@ -602,10 +602,10 @@ function hic_api_poll_updates(){
             update_option('hic_last_updates_since', $reset_timestamp);
             hic_log('Internal Scheduler: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $reset_timestamp) . " ($reset_timestamp)");
             
-            // Also reset heartbeat scheduler timestamps to restart polling immediately
+            // Also reset scheduler timestamps to restart polling immediately
             update_option('hic_last_continuous_poll', 0);
             update_option('hic_last_deep_check', 0);
-            hic_log('Internal Scheduler: Reset heartbeat scheduler timestamps to restart polling');
+            hic_log('Internal Scheduler: Reset scheduler timestamps to restart polling');
         }
     }
 }
@@ -1246,10 +1246,10 @@ function hic_api_poll_bookings_continuous() {
                 update_option('hic_last_continuous_check', $reset_timestamp);
                 hic_log('Continuous Polling: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $reset_timestamp) . " ($reset_timestamp)");
                 
-                // Also reset heartbeat scheduler timestamps to restart polling immediately
+                // Also reset scheduler timestamps to restart polling immediately
                 update_option('hic_last_continuous_poll', 0);
                 update_option('hic_last_deep_check', 0);
-                hic_log('Continuous Polling: Reset heartbeat scheduler timestamps to restart polling');
+                hic_log('Continuous Polling: Reset scheduler timestamps to restart polling');
             }
         }
         
@@ -1348,10 +1348,10 @@ function hic_api_poll_bookings_deep_check() {
             if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
                 hic_log('Deep Check: Timestamp error detected - this should not happen with 5-day lookback');
                 
-                // Reset heartbeat scheduler timestamps to restart polling immediately
+                // Reset scheduler timestamps to restart polling immediately
                 update_option('hic_last_continuous_poll', 0);
                 update_option('hic_last_deep_check', 0);
-                hic_log('Deep Check: Reset heartbeat scheduler timestamps to restart polling');
+                hic_log('Deep Check: Reset scheduler timestamps to restart polling');
             }
         }
         
