@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) exit;
 /* ============ Cron Diagnostics Functions ============ */
 
 /**
- * Check internal scheduler status (uses WordPress Heartbeat API)
+ * Check internal scheduler status (uses WordPress WP-Cron)
  */
 function hic_get_internal_scheduler_status() {
     global $wpdb;
@@ -39,7 +39,7 @@ function hic_get_internal_scheduler_status() {
         hic_get_api_url() && 
         (hic_has_basic_auth_credentials() || hic_get_api_key());
     
-    // Get stats from heartbeat scheduler if available
+    // Get stats from WP-Cron scheduler if available
     if (class_exists('HIC_Booking_Poller')) {
         $poller = new HIC_Booking_Poller();
         $poller_stats = $poller->get_stats();
@@ -79,28 +79,9 @@ function hic_get_internal_scheduler_status() {
                     $status['internal_scheduler']['next_deep_human'] = 'Ora (WP-Cron)';
                 }
             } else {
-                // Using Heartbeat fallback
-                if ($status['internal_scheduler']['last_continuous_poll'] > 0) {
-                    $next_continuous = $status['internal_scheduler']['last_continuous_poll'] + 60; // 1 minute
-                    if ($next_continuous > time()) {
-                        $status['internal_scheduler']['next_continuous_human'] = 'Tra ' . human_time_diff(time(), $next_continuous) . ' (Heartbeat)';
-                    } else {
-                        $status['internal_scheduler']['next_continuous_human'] = 'Ora (in attesa Heartbeat)';
-                    }
-                } else {
-                    $status['internal_scheduler']['next_continuous_human'] = 'Heartbeat attivo - eseguirà al prossimo ciclo';
-                }
-                
-                if ($status['internal_scheduler']['last_deep_check'] > 0) {
-                    $next_deep = $status['internal_scheduler']['last_deep_check'] + 600; // 10 minutes
-                    if ($next_deep > time()) {
-                        $status['internal_scheduler']['next_deep_human'] = 'Tra ' . human_time_diff(time(), $next_deep) . ' (Heartbeat)';
-                    } else {
-                        $status['internal_scheduler']['next_deep_human'] = 'Ora (in attesa Heartbeat)';
-                    }
-                } else {
-                    $status['internal_scheduler']['next_deep_human'] = 'Heartbeat attivo - eseguirà al prossimo ciclo';
-                }
+                // WP-Cron non attivo
+                $status['internal_scheduler']['next_continuous_human'] = 'WP-Cron non attivo';
+                $status['internal_scheduler']['next_deep_human'] = 'WP-Cron non attivo';
             }
         }
     }
@@ -563,6 +544,7 @@ add_action('wp_ajax_hic_backfill_reservations', 'hic_ajax_backfill_reservations'
 add_action('wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_bookings');
 add_action('wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
 add_action('wp_ajax_hic_force_polling', 'hic_ajax_force_polling');
+add_action('wp_ajax_hic_download_error_logs', 'hic_ajax_download_error_logs');
 
 
 
@@ -962,6 +944,10 @@ function hic_diagnostics_page() {
                     <p>
                         <button class="button button-primary" id="force-polling">Forza Polling Ora</button>
                         <button class="button button-secondary" id="test-polling">Test Polling (con lock)</button>
+                        <button class="button button-secondary" id="download-error-logs" style="margin-left: 10px;">
+                            <span class="dashicons dashicons-download" style="margin-top: 3px;"></span>
+                            Scarica Log Errori
+                        </button>
                         <span id="polling-status" style="margin-left: 10px; font-weight: bold;"></span>
                     </p>
                     
@@ -1225,7 +1211,7 @@ function hic_diagnostics_page() {
                             <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
                                 <span class="status ok">
                                     <?php 
-                                    echo 'Attivo (Heartbeat API)';
+                                    echo 'Attivo (WP-Cron)';
                                     if ($scheduler_status['internal_scheduler']['last_poll_human'] !== 'Mai eseguito') {
                                         echo ' - Ultimo: ' . esc_html($scheduler_status['internal_scheduler']['last_poll_human']);
                                     }
@@ -1301,7 +1287,7 @@ function hic_diagnostics_page() {
                             <li><strong>Test connessione:</strong> Usa il pulsante "Test Connessione API" per verificare che tutto funzioni</li>
                         </ol>
                         <p><strong>Nota:</strong> Senza queste configurazioni, il contatore rimarrà sempre a 0 perché il sistema non può scaricare le prenotazioni da Hotel in Cloud.</p>
-                        <p><strong>Scheduler Interno Dual-Mode:</strong> Il sistema utilizza uno scheduler interno ottimizzato con WordPress Heartbeat API che esegue due tipi di controlli: polling continuo ogni minuto per le prenotazioni recenti e manuali, e deep check ogni 10 minuti che controlla indietro di 5 giorni per recuperare eventuali prenotazioni perse. Non dipende da WordPress Cron o traffico del sito.</p>
+                        <p><strong>Scheduler Interno WP-Cron:</strong> Il sistema utilizza WordPress WP-Cron per eseguire due tipi di controlli: polling continuo ogni minuto per le prenotazioni recenti e manuali, e deep check ogni 10 minuti che controlla indietro di 5 giorni per recuperare eventuali prenotazioni perse. Richiede WP-Cron attivo per funzionare.</p>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -1333,7 +1319,7 @@ function hic_diagnostics_page() {
                                     <span class="status warning">⚠ Disabilitato</span>
                                 <?php endif; ?>
                             </td>
-                            <td>Sistema di polling interno con Heartbeat API</td>
+                            <td>Sistema di polling interno con WP-Cron</td>
                         </tr>
                         <tr>
                             <td>API URL</td>
@@ -1686,7 +1672,7 @@ function hic_diagnostics_page() {
                                 <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
                                     <span class="status ok">✓ Attivo</span><br>
                                     <small>
-                                        <strong>Sistema:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['scheduler_type'] ?? 'Heartbeat API'); ?><br>
+                                        <strong>Sistema:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['scheduler_type'] ?? 'WP-Cron'); ?><br>
                                         <strong>Polling Continuo (1 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_continuous_human'] ?? 'Mai eseguito'); ?><br>
                                         <strong>Deep Check (10 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_deep_human'] ?? 'Mai eseguito'); ?><br>
                                         <strong>Prossimo continuo:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['next_continuous_human'] ?? 'Sconosciuto'); ?><br>
@@ -1697,7 +1683,7 @@ function hic_diagnostics_page() {
                                     <small>Verificare configurazione API</small>
                                 <?php endif; ?>
                             </td>
-                            <td>Sistema ibrido: WP-Cron principale + Heartbeat fallback. Polling continuo ogni minuto + deep check ogni 10 minuti (5 giorni lookback)</td>
+                            <td>Sistema WP-Cron: Polling continuo ogni minuto + deep check ogni 10 minuti (5 giorni lookback)</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1720,7 +1706,7 @@ function hic_diagnostics_page() {
                                     <span class="status error">✗ Non Caricato</span>
                                 <?php endif; ?>
                             </td>
-                            <td>Sistema di polling interno con Heartbeat API</td>
+                            <td>Sistema di polling interno con WP-Cron</td>
                         </tr>
                         
                         <tr>
@@ -2457,7 +2443,79 @@ function hic_diagnostics_page() {
                 $btn.prop('disabled', false).text('Test Polling (con lock)');
             });
         });
+        
+        // Log download handler
+        $('#download-error-logs').click(function() {
+            var $btn = $(this);
+            
+            if (!confirm('Vuoi scaricare il file di log degli errori?')) {
+                return;
+            }
+            
+            // Create hidden form for download
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = ajaxurl;
+            form.style.display = 'none';
+            
+            // Add action parameter
+            var actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'hic_download_error_logs';
+            form.appendChild(actionInput);
+            
+            // Add nonce parameter
+            var nonceInput = document.createElement('input');
+            nonceInput.type = 'hidden';
+            nonceInput.name = 'nonce';
+            nonceInput.value = '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>';
+            form.appendChild(nonceInput);
+            
+            // Submit form for download
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        });
     });
     </script>
+
+<?php
+
+/**
+ * AJAX handler for downloading error logs
+ */
+function hic_ajax_download_error_logs() {
+    // Verify nonce for security
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die('Nonce verification failed');
+    }
+    
+    // Check if user has permission
+    if (!current_user_can('manage_options')) {
+        wp_die('Insufficient permissions');
+    }
+    
+    $log_file = hic_get_log_file();
+    
+    if (!file_exists($log_file) || !is_readable($log_file)) {
+        wp_die('Log file not found or not readable');
+    }
+    
+    // Set headers for file download
+    $filename = 'hic-error-log-' . date('Y-m-d-H-i-s') . '.txt';
+    
+    header('Content-Type: text/plain');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . filesize($log_file));
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    
+    // Output the file content
+    readfile($log_file);
+    
+    wp_die(); // Stop execution after download
+}
+
     <?php
 }
