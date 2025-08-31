@@ -71,7 +71,7 @@ function hic_handle_api_response($response, $context = 'API call') {
 // in booking-poller.php. This file now contains only core API functions.
 
 /**
- * Chiama HIC: GET /reservations/{propId}
+ * Chiama HIC: GET /reservations/{propId} o /reservations_updates/{propId}
  */
 function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $limit = null){
     $base = rtrim(hic_get_api_url(), '/'); // es: https://api.hotelincloud.com/api/partner
@@ -80,9 +80,18 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     if (!$base || !$email || !$pass || !$prop_id) {
         return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
     }
-    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
-    $args = array('date_type'=>$date_type,'from_date'=>$from_date,'to_date'=>$to_date);
-    if ($limit) $args['limit'] = (int)$limit;
+    
+    // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
+    if ($date_type === 'created') {
+        $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
+        $args = array('since' => strtotime($from_date));
+        if ($limit) $args['limit'] = (int)$limit;
+        // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
+    } else {
+        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+        $args = array('date_type'=>$date_type,'from_date'=>$from_date,'to_date'=>$to_date);
+        if ($limit) $args['limit'] = (int)$limit;
+    }
     $url = add_query_arg($args, $endpoint);
     
     // Log API call details for debugging
@@ -1006,13 +1015,12 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
     
     hic_log("Backfill: Starting backfill from $from_date to $to_date (date_type: $date_type, limit: " . ($limit ?: 'none') . ")");
     
-    // Validate date type (based on API documentation: only checkin, checkout, presence are supported)
-    // Note: For date_type='created' functionality, use /reservations_updates endpoint with updated_after parameter
-    // (limited to 7 days back due to API constraints)
-    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
+    // Validate date type (based on API documentation: checkin, checkout, presence for /reservations, created for /reservations_updates)
+    // Note: For date_type='created', uses /reservations_updates endpoint with 'since' parameter
+    if (!in_array($date_type, array('checkin', 'checkout', 'presence', 'created'))) {
         return array(
             'success' => false,
-            'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence". Per recuperare prenotazioni per data di creazione, utilizza l\'endpoint updates (limitato a 7 giorni).',
+            'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout", "presence" o "created".',
             'stats' => array()
         );
     }
