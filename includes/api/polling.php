@@ -334,7 +334,18 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     
         // Check for new and updated reservations using /reservations_updates endpoint
         // This catches all recently created or modified reservations
-        $last_update_check = get_option('hic_last_update_check', $current_time - 7200); // Default to 2 hours ago
+        $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin
+        $earliest_allowed = $current_time - $max_lookback_seconds;
+        $default_check = max($earliest_allowed, $current_time - 7200); // Default to 2 hours ago or earliest allowed
+        
+        $last_update_check = get_option('hic_last_update_check', $default_check);
+        
+        // Validate that the stored timestamp is not too old
+        if ($last_update_check < $earliest_allowed) {
+            hic_log("Quasi-realtime Poll: Stored timestamp too old (" . date('Y-m-d H:i:s', $last_update_check) . "), resetting to earliest allowed: " . date('Y-m-d H:i:s', $earliest_allowed));
+            $last_update_check = $earliest_allowed;
+            update_option('hic_last_update_check', $last_update_check);
+        }
         
         hic_log("Internal Scheduler: Checking for updates since " . date('Y-m-d H:i:s', $last_update_check));
         $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_update_check, 100);
@@ -352,8 +363,16 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
             // Update the last check timestamp
             update_option('hic_last_update_check', $current_time);
         } else {
-            $polling_errors[] = "updates polling: " . $updated_reservations->get_error_message();
+            $error_message = $updated_reservations->get_error_message();
+            $polling_errors[] = "updates polling: " . $error_message;
             $total_errors++;
+            
+            // Check if this is a timestamp too old error and reset if necessary
+            if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
+                $reset_timestamp = $current_time - (2 * 60 * 60); // Reset to 2 hours ago
+                update_option('hic_last_update_check', $reset_timestamp);
+                hic_log('Quasi-realtime Poll: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $reset_timestamp) . " ($reset_timestamp)");
+            }
         }
     
     // Also poll by checkin date to catch any updates to existing bookings
@@ -1284,7 +1303,13 @@ function hic_api_poll_bookings_deep_check() {
         
         // Check for updates in the last 5 days using /reservations_updates endpoint
         // This catches any modifications or new reservations that might have been missed
-        $lookback_timestamp = $current_time - $lookback_seconds;
+        $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin
+        $safe_lookback_seconds = min($lookback_seconds, $max_lookback_seconds); // Ensure we don't exceed API limits
+        $lookback_timestamp = $current_time - $safe_lookback_seconds;
+        
+        if ($safe_lookback_seconds < $lookback_seconds) {
+            hic_log("Deep Check: Reduced lookback from " . ($lookback_seconds / DAY_IN_SECONDS) . " days to " . ($safe_lookback_seconds / DAY_IN_SECONDS) . " days due to API limits");
+        }
         
         hic_log("Deep Check: Checking for updates since " . date('Y-m-d H:i:s', $lookback_timestamp));
         $updated_reservations = hic_fetch_reservations_updates($prop_id, $lookback_timestamp, 500);
@@ -1300,8 +1325,14 @@ function hic_api_poll_bookings_deep_check() {
                 $total_errors += $process_result['errors'];
             }
         } else {
-            hic_log("Deep Check: Error checking updates: " . $updated_reservations->get_error_message());
+            $error_message = $updated_reservations->get_error_message();
+            hic_log("Deep Check: Error checking updates: " . $error_message);
             $total_errors++;
+            
+            // For deep check, timestamp errors are less likely due to 5-day limit, but handle them anyway
+            if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
+                hic_log('Deep Check: Timestamp error detected - this should not happen with 5-day lookback');
+            }
         }
         
         // Also check check-in dates for the next 7 days (catch future reservations that might have been missed)
