@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) exit;
 /* ============ Cron Diagnostics Functions ============ */
 
 /**
- * Check internal scheduler status (replaces WP-Cron diagnostics)
+ * Check internal scheduler status (no WordPress Cron dependency)
  */
 function hic_get_internal_scheduler_status() {
     $status = array(
@@ -20,17 +20,6 @@ function hic_get_internal_scheduler_status() {
             'lag_seconds' => 0,
             'next_run_estimate' => null,
             'next_run_human' => 'Sconosciuto'
-        ),
-        'queue_table' => array(
-            'exists' => false,
-            'total_events' => 0,
-            'processed_events' => 0,
-            'pending_events' => 0,
-            'error_events' => 0
-        ),
-        'lock_status' => array(
-            'active' => false,
-            'age_seconds' => 0
         )
     );
     
@@ -41,23 +30,8 @@ function hic_get_internal_scheduler_status() {
         hic_get_api_url() && 
         (hic_has_basic_auth_credentials() || hic_get_api_key());
     
-    // Check if queue table exists first
-    global $wpdb;
-    $queue_table = $wpdb->prefix . 'hic_booking_events';
-    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
-    
-    // If table doesn't exist, try to create it
-    if (!$table_exists && function_exists('hic_create_database_table')) {
-        hic_log('Diagnostics: Queue table missing, attempting to create database tables');
-        hic_create_database_table();
-        // Re-check if table exists after creation attempt
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
-    }
-    
-    $status['queue_table']['exists'] = $table_exists;
-    
-    // Get stats from reliable poller if available and table exists
-    if (class_exists('HIC_Booking_Poller') && $table_exists) {
+    // Get stats from internal scheduler if available
+    if (class_exists('HIC_Booking_Poller')) {
         $poller = new HIC_Booking_Poller();
         $poller_stats = $poller->get_stats();
         
@@ -65,36 +39,22 @@ function hic_get_internal_scheduler_status() {
             $status['internal_scheduler'] = array_merge($status['internal_scheduler'], array(
                 'last_poll' => $poller_stats['last_poll'] ?? 0,
                 'last_poll_human' => $poller_stats['last_poll_human'] ?? 'Mai eseguito',
-                'lag_seconds' => $poller_stats['lag_seconds'] ?? 0
+                'lag_seconds' => $poller_stats['lag_seconds'] ?? 0,
+                'polling_interval' => $poller_stats['polling_interval'] ?? 300
             ));
             
-            $status['queue_table'] = array(
-                'exists' => true,
-                'total_events' => $poller_stats['total_events'] ?? 0,
-                'processed_events' => $poller_stats['processed_events'] ?? 0,
-                'pending_events' => $poller_stats['pending_events'] ?? 0,
-                'error_events' => $poller_stats['error_events'] ?? 0
-            );
-            
-            $status['lock_status'] = array(
-                'active' => $poller_stats['lock_active'] ?? false,
-                'age_seconds' => $poller_stats['lock_age'] ?? 0
-            );
+            // Calculate next run estimate
+            if ($status['internal_scheduler']['last_poll'] > 0) {
+                $next_run_estimate = $status['internal_scheduler']['last_poll'] + $status['internal_scheduler']['polling_interval'];
+                $status['internal_scheduler']['next_run_estimate'] = $next_run_estimate;
+                
+                if ($next_run_estimate > time()) {
+                    $status['internal_scheduler']['next_run_human'] = human_time_diff($next_run_estimate, time()) . ' da ora';
+                } else {
+                    $status['internal_scheduler']['next_run_human'] = 'Ora (in ritardo)';
+                }
+            }
         }
-    }
-    
-    // Calculate next run estimate based on polling interval
-    if ($status['internal_scheduler']['last_poll'] > 0) {
-        $polling_interval = 300; // 5 minutes default
-        $schedules = wp_get_schedules();
-        $configured_interval = hic_get_polling_interval();
-        if (isset($schedules[$configured_interval])) {
-            $polling_interval = $schedules[$configured_interval]['interval'];
-        }
-        
-        $next_run_estimate = $status['internal_scheduler']['last_poll'] + $polling_interval;
-        $status['internal_scheduler']['next_run_estimate'] = $next_run_estimate;
-        $status['internal_scheduler']['next_run_human'] = human_time_diff($next_run_estimate, time()) . ' from now';
     }
     
     // Real-time sync stats (keep existing functionality)
@@ -294,21 +254,14 @@ function hic_force_restart_internal_scheduler() {
     
     $results = array();
     
-    // Clear any existing WP-Cron events (cleanup)
-    $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event');
+    // Clear any existing WP-Cron events (cleanup legacy events)
+    $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event', 'hic_reliable_poll_event');
     foreach ($legacy_events as $event) {
         $timestamp = wp_next_scheduled($event);
         if ($timestamp) {
             wp_unschedule_event($timestamp, $event);
             $results['legacy_' . $event . '_cleared'] = 'Cleared legacy event';
         }
-    }
-    
-    // Clear internal scheduler event
-    $reliable_timestamp = wp_next_scheduled('hic_reliable_poll_event');
-    if ($reliable_timestamp) {
-        wp_unschedule_event($reliable_timestamp, 'hic_reliable_poll_event');
-        $results['reliable_poll_event_cleared'] = 'Cleared existing event';
     }
     
     // Check if internal scheduler should be active
@@ -318,20 +271,20 @@ function hic_force_restart_internal_scheduler() {
                       (hic_has_basic_auth_credentials() || hic_get_api_key());
     
     if ($should_activate) {
-        // Schedule new reliable polling event
-        $result = wp_schedule_event(time() + 60, 'hic_reliable_interval', 'hic_reliable_poll_event');
-        if ($result) {
-            $results['internal_scheduler'] = 'Successfully restarted';
-            hic_log('Force restart: Internal scheduler restarted successfully');
-        } else {
-            $results['internal_scheduler'] = 'Failed to restart';
-            hic_log('Force restart: Failed to restart internal scheduler');
+        // Reset polling timestamps to trigger immediate execution
+        delete_option('hic_last_api_poll');
+        delete_option('hic_last_successful_poll');
+        $results['polling_timestamps_reset'] = 'Timestamps reset for immediate execution';
+        
+        // Trigger an immediate poll if the poller is available
+        if (function_exists('hic_api_poll_bookings')) {
+            hic_log('Force restart: Triggering immediate polling');
+            hic_api_poll_bookings();
+            $results['immediate_poll_triggered'] = 'Polling executed immediately';
         }
         
-        // Reset last poll timestamp to trigger immediate bootstrap
-        delete_option('hic_last_reliable_poll');
-        $results['poll_history_reset'] = 'Last poll timestamp reset for bootstrap';
-        
+        $results['internal_scheduler'] = 'Restarted and ready';
+        hic_log('Force restart: Internal scheduler restart completed successfully');
     } else {
         $results['internal_scheduler'] = 'Conditions not met for activation';
         hic_log('Force restart: Conditions not met for internal scheduler');
@@ -1230,10 +1183,10 @@ function hic_diagnostics_page() {
                                 </ul>
                             </li>
                             <li><strong>Abilita Polling Affidabile:</strong> Assicurati che l'opzione "Polling Affidabile" sia attivata</li>
-                            <li><strong>Verifica WordPress Cron:</strong> Se WordPress Cron è disabilitato, configura un cron di sistema per chiamare <code>wp-cron.php</code></li>
                             <li><strong>Test connessione:</strong> Usa il pulsante "Test Connessione API" per verificare che tutto funzioni</li>
                         </ol>
                         <p><strong>Nota:</strong> Senza queste configurazioni, il contatore rimarrà sempre a 0 perché il sistema non può scaricare le prenotazioni da Hotel in Cloud.</p>
+                        <p><strong>Scheduler Interno:</strong> Il sistema utilizza uno scheduler interno che si attiva automaticamente ad ogni caricamento di pagina quando le condizioni sono soddisfatte. Non è necessario configurare WordPress Cron.</p>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -1446,10 +1399,6 @@ function hic_diagnostics_page() {
                     $poller = new HIC_Booking_Poller();
                     $reliable_stats = $poller->get_stats();
                 }
-                
-                // Check WordPress cron status
-                $wp_cron_disabled = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
-                $cron_event_scheduled = wp_next_scheduled('hic_reliable_poll_event');
                 ?>
                 
                 <table class="widefat">
@@ -1462,33 +1411,20 @@ function hic_diagnostics_page() {
                     </thead>
                     <tbody>
                         <tr>
-                            <td>WordPress Cron</td>
+                            <td>Scheduler Interno</td>
                             <td>
-                                <?php if ($wp_cron_disabled): ?>
-                                    <span class="status error">⚠ Disabilitato</span>
+                                <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
+                                    <span class="status ok">✓ Attivo</span><br>
+                                    <small>
+                                        Ultimo polling: <?php echo esc_html($scheduler_status['internal_scheduler']['last_poll_human']); ?><br>
+                                        Prossimo polling: <?php echo esc_html($scheduler_status['internal_scheduler']['next_run_human']); ?>
+                                    </small>
                                 <?php else: ?>
-                                    <span class="status ok">✓ Attivo</span>
+                                    <span class="status error">✗ Non attivo</span><br>
+                                    <small>Verificare configurazione API</small>
                                 <?php endif; ?>
                             </td>
-                            <td>
-                                <?php if ($wp_cron_disabled): ?>
-                                    Sistema cron disabilitato da DISABLE_WP_CRON. Il polling potrebbe non funzionare.
-                                <?php else: ?>
-                                    Sistema cron WordPress funzionante
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Evento Polling Schedulato</td>
-                            <td>
-                                <?php if ($cron_event_scheduled): ?>
-                                    <span class="status ok">✓ Schedulato</span><br>
-                                    <small>Prossima esecuzione: <?php echo esc_html(date('Y-m-d H:i:s', $cron_event_scheduled)); ?></small>
-                                <?php else: ?>
-                                    <span class="status error">✗ Non schedulato</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>Evento cron per il polling automatico</td>
+                            <td>Scheduler interno che si attiva automaticamente senza WordPress Cron</td>
                         </tr>
                     </tbody>
                 </table>
