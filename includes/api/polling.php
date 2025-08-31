@@ -1,6 +1,7 @@
 <?php
 /**
- * API Polling Handler
+ * API Polling Handler - Core API Functions Only
+ * Note: WP-Cron scheduling removed in favor of internal scheduler (booking-poller.php)
  */
 
 if (!defined('ABSPATH')) exit;
@@ -8,49 +9,6 @@ if (!defined('ABSPATH')) exit;
 // Define constants for better maintainability
 define('HIC_POLL_INTERVAL_SECONDS', 300);  // 5 minutes
 define('HIC_RETRY_INTERVAL_SECONDS', 900); // 15 minutes
-
-// Aggiungi intervallo personalizzato per il polling PRIMA di usarlo
-// Use higher priority to ensure it's registered early
-add_filter('cron_schedules', function($schedules) {
-  if (!isset($schedules['hic_poll_interval'])) {
-    $schedules['hic_poll_interval'] = array(
-      'interval' => HIC_POLL_INTERVAL_SECONDS,
-      'display' => 'Ogni 5 minuti (HIC Polling)'
-    );
-  }
-  
-  if (!isset($schedules['hic_retry_interval'])) {
-    $schedules['hic_retry_interval'] = array(
-      'interval' => HIC_RETRY_INTERVAL_SECONDS,
-      'display' => 'Ogni 15 minuti (HIC Retry)'
-    );
-  }
-  
-  // Add quasi-realtime polling schedules
-  if (!isset($schedules['every_minute'])) {
-    $schedules['every_minute'] = array(
-      'interval' => 60,
-      'display' => 'Every Minute'
-    );
-  }
-  
-  if (!isset($schedules['every_two_minutes'])) {
-    $schedules['every_two_minutes'] = array(
-      'interval' => 120,
-      'display' => 'Every Two Minutes'
-    );
-  }
-  
-  // Add reliable polling schedule
-  if (!isset($schedules['hic_reliable_interval'])) {
-    $schedules['hic_reliable_interval'] = array(
-      'interval' => 300, // 5 minutes default
-      'display' => 'Every 5 Minutes (HIC Reliable)'
-    );
-  }
-  
-  return $schedules;
-}, 5);
 
 /**
  * Helper function for consistent API error handling
@@ -108,122 +66,9 @@ function hic_handle_api_response($response, $context = 'API call') {
   return $data;
 }
 
-/* ============ API Polling HIC ============ */
-// Se selezionato API Polling, configura il cron
-add_action('init', function() {
-  $should_schedule = false;
-  
-  if (hic_get_connection_type() === 'api' && hic_get_api_url()) {
-    // Check if we have Basic Auth credentials or legacy API key
-    $has_basic_auth = hic_has_basic_auth_credentials();
-    $has_legacy_key = hic_get_api_key(); // backward compatibility
-    
-    $should_schedule = $has_basic_auth || $has_legacy_key;
-    
-    // Log scheduling conditions for debugging
-    hic_log("Cron scheduling conditions - Connection type: " . hic_get_connection_type() . 
-            ", API URL: " . (hic_get_api_url() ? 'configured' : 'missing') .
-            ", Basic Auth: " . ($has_basic_auth ? 'yes' : 'no') .
-            ", Legacy Key: " . ($has_legacy_key ? 'yes' : 'no') .
-            ", Should schedule: " . ($should_schedule ? 'yes' : 'no'));
-  }
-  
-  if ($should_schedule) {
-    if (!wp_next_scheduled('hic_api_poll_event')) {
-      // Use configured polling interval for quasi-realtime polling
-      $polling_interval = hic_get_polling_interval();
-      $result = wp_schedule_event(time() + 60, $polling_interval, 'hic_api_poll_event');
-      if (!$result) {
-        hic_log("ERROR: Failed to schedule hic_api_poll_event with interval '$polling_interval'. Check if interval is registered.");
-      } else {
-        hic_log("hic_api_poll_event scheduled successfully with interval '$polling_interval'");
-        // Verify the scheduled interval
-        $schedules = wp_get_schedules();
-        if (isset($schedules[$polling_interval])) {
-          hic_log('Confirmed: ' . $polling_interval . ' = ' . $schedules[$polling_interval]['interval'] . ' seconds');
-        }
-      }
-    } else {
-      // Log that event is already scheduled and verify its interval
-      $next_run = wp_next_scheduled('hic_api_poll_event');
-      hic_log('hic_api_poll_event already scheduled for: ' . date('Y-m-d H:i:s', $next_run));
-    }
-  } else {
-    // Rimuovi il cron se non è più necessario
-    $timestamp = wp_next_scheduled('hic_api_poll_event');
-    if ($timestamp) {
-      wp_unschedule_event($timestamp, 'hic_api_poll_event');
-      hic_log('hic_api_poll_event unscheduled (conditions not met)');
-    }
-  }
-});
-
-// Funzione di polling API
-add_action('hic_api_poll_event', 'hic_api_poll_bookings');
-
-// New updates polling system
-add_action('init', function() {
-  $should_schedule_updates = false;
-  
-  if (hic_get_connection_type() === 'api' && hic_get_api_url() && hic_updates_enrich_contacts()) {
-    $has_basic_auth = hic_has_basic_auth_credentials();
-    $should_schedule_updates = $has_basic_auth;
-  }
-  
-  if ($should_schedule_updates) {
-    if (!wp_next_scheduled('hic_api_updates_event')) {
-      $result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event');
-      if (!$result) {
-        hic_log('ERROR: Failed to schedule hic_api_updates_event. Check if hic_poll_interval is registered.');
-      } else {
-        hic_log('hic_api_updates_event scheduled successfully with hic_poll_interval');
-        // Verify the scheduled interval
-        $schedules = wp_get_schedules();
-        if (isset($schedules['hic_poll_interval'])) {
-          hic_log('Confirmed: hic_poll_interval = ' . $schedules['hic_poll_interval']['interval'] . ' seconds');
-        }
-      }
-    } else {
-      // Log that event is already scheduled
-      $next_run = wp_next_scheduled('hic_api_updates_event');
-      hic_log('hic_api_updates_event already scheduled for: ' . date('Y-m-d H:i:s', $next_run));
-    }
-  } else {
-    $timestamp = wp_next_scheduled('hic_api_updates_event');
-    if ($timestamp) {
-      wp_unschedule_event($timestamp, 'hic_api_updates_event');
-      hic_log('hic_api_updates_event unscheduled (conditions not met)');
-    }
-  }
-});
-
-// Retry mechanism for failed real-time notifications
-add_action('init', function() {
-  $should_schedule_retry = hic_should_schedule_retry_event();
-  
-  if ($should_schedule_retry) {
-    if (!wp_next_scheduled('hic_retry_failed_notifications_event')) {
-      $result = wp_schedule_event(time(), 'hic_retry_interval', 'hic_retry_failed_notifications_event');
-      if (!$result) {
-        hic_log('ERROR: Failed to schedule hic_retry_failed_notifications_event');
-      } else {
-        hic_log('hic_retry_failed_notifications_event scheduled successfully');
-      }
-    }
-  } else {
-    $timestamp = wp_next_scheduled('hic_retry_failed_notifications_event');
-    if ($timestamp) {
-      wp_unschedule_event($timestamp, 'hic_retry_failed_notifications_event');
-      hic_log('hic_retry_failed_notifications_event unscheduled (conditions not met)');
-    }
-  }
-});
-
-// Updates polling function
-add_action('hic_api_updates_event', 'hic_api_poll_updates');
-
-// Retry failed notifications function
-add_action('hic_retry_failed_notifications_event', 'hic_retry_failed_brevo_notifications');
+/* ============ Core API Functions ============ */
+// Note: WP-Cron scheduling has been removed in favor of the internal scheduler 
+// in booking-poller.php. This file now contains only core API functions.
 
 /**
  * Chiama HIC: GET /reservations/{propId}
@@ -1296,56 +1141,3 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
     }
 }
 
-/**
- * Force reschedule cron events to ensure correct interval
- */
-function hic_force_reschedule_cron_events() {
-    $results = array();
-    
-    // Clear existing events first
-    $poll_timestamp = wp_next_scheduled('hic_api_poll_event');
-    if ($poll_timestamp) {
-        wp_unschedule_event($poll_timestamp, 'hic_api_poll_event');
-        $results['hic_api_poll_event_cleared'] = 'Event cleared';
-    }
-    
-    $updates_timestamp = wp_next_scheduled('hic_api_updates_event');
-    if ($updates_timestamp) {
-        wp_unschedule_event($updates_timestamp, 'hic_api_updates_event');
-        $results['hic_api_updates_event_cleared'] = 'Event cleared';
-    }
-    
-    // Check if we should reschedule based on current configuration
-    $should_schedule_poll = hic_get_connection_type() === 'api' && hic_get_api_url() && 
-                           (hic_has_basic_auth_credentials() || hic_get_api_key());
-    
-    $should_schedule_updates = hic_get_connection_type() === 'api' && hic_get_api_url() && 
-                              hic_updates_enrich_contacts() && hic_has_basic_auth_credentials();
-    
-    // Reschedule with correct interval
-    if ($should_schedule_poll) {
-        $poll_result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event');
-        $results['hic_api_poll_event_scheduled'] = $poll_result ? 'Successfully scheduled' : 'Failed to schedule';
-        if ($poll_result) {
-            hic_log('Force reschedule: hic_api_poll_event rescheduled successfully');
-        } else {
-            hic_log('Force reschedule: Failed to reschedule hic_api_poll_event');
-        }
-    } else {
-        $results['hic_api_poll_event_scheduled'] = 'Conditions not met, not scheduled';
-    }
-    
-    if ($should_schedule_updates) {
-        $updates_result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event');
-        $results['hic_api_updates_event_scheduled'] = $updates_result ? 'Successfully scheduled' : 'Failed to schedule';
-        if ($updates_result) {
-            hic_log('Force reschedule: hic_api_updates_event rescheduled successfully');
-        } else {
-            hic_log('Force reschedule: Failed to reschedule hic_api_updates_event');
-        }
-    } else {
-        $results['hic_api_updates_event_scheduled'] = 'Conditions not met, not scheduled';
-    }
-    
-    return $results;
-}
