@@ -73,6 +73,21 @@ Each condition must be ✅ (green checkmark) for automatic polling to work:
 ### Issue: Lock is stuck (active for >5 minutes)
 **Solution**: Use "Forza Polling Ora" to clear the lock and restart polling
 
+### Issue: "Il timestamp è troppo vecchio (oltre 7 giorni)" - Polling Stops
+**Symptoms**: 
+- Logs show "HTTP 400 - Il timestamp è troppo vecchio (oltre 7 giorni)"
+- Diagnostics show "Polling Continuo (1 min): Mai" and "Deep Check (10 min): Mai"
+- Status shows "Prossimo continuo: In attesa di avvio"
+
+**Automatic Solution**: 
+The system automatically detects timestamp errors and resets both polling timestamps and heartbeat scheduler timestamps. Polling should resume within 1-2 minutes.
+
+**Manual Solution**: 
+If automatic recovery doesn't work, use "Forza Polling Ora" to immediately restart the polling system.
+
+**Technical Details**: 
+This issue occurs when the stored timestamp becomes older than the API's 7-day limit. The fix automatically resets the heartbeat scheduler to restart polling immediately.
+
 ## 💡 Best Practices
 
 1. **Test First**: Always use "Test Polling" before going live
