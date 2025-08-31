@@ -611,6 +611,19 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
         return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti per updates');
     }
     
+    // Validate timestamp - API rejects timestamps older than 7 days
+    $current_time = time();
+    $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin
+    $earliest_allowed = $current_time - $max_lookback_seconds;
+    
+    if ($since < $earliest_allowed) {
+        $original_since = $since;
+        $since = $earliest_allowed;
+        hic_log("HIC API timestamp validation: Capped timestamp from " . 
+                date('Y-m-d H:i:s', $original_since) . " to " . 
+                date('Y-m-d H:i:s', $since) . " (6-day limit)");
+    }
+    
     $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
     $args = array('updated_after' => $since);
     if ($limit) $args['limit'] = $limit;
