@@ -41,8 +41,23 @@ function hic_get_internal_scheduler_status() {
         hic_get_api_url() && 
         (hic_has_basic_auth_credentials() || hic_get_api_key());
     
-    // Get stats from reliable poller if available
-    if (class_exists('HIC_Booking_Poller')) {
+    // Check if queue table exists first
+    global $wpdb;
+    $queue_table = $wpdb->prefix . 'hic_booking_events';
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
+    
+    // If table doesn't exist, try to create it
+    if (!$table_exists && function_exists('hic_create_database_table')) {
+        hic_log('Diagnostics: Queue table missing, attempting to create database tables');
+        hic_create_database_table();
+        // Re-check if table exists after creation attempt
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
+    }
+    
+    $status['queue_table']['exists'] = $table_exists;
+    
+    // Get stats from reliable poller if available and table exists
+    if (class_exists('HIC_Booking_Poller') && $table_exists) {
         $poller = new HIC_Booking_Poller();
         $poller_stats = $poller->get_stats();
         
@@ -82,15 +97,7 @@ function hic_get_internal_scheduler_status() {
         $status['internal_scheduler']['next_run_human'] = human_time_diff($next_run_estimate, time()) . ' from now';
     }
     
-    // Check if queue table exists manually if poller is not available
-    if (!$status['queue_table']['exists']) {
-        global $wpdb;
-        $queue_table = $wpdb->prefix . 'hic_booking_events';
-        $status['queue_table']['exists'] = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
-    }
-    
     // Real-time sync stats (keep existing functionality)
-    global $wpdb;
     $realtime_table = $wpdb->prefix . 'hic_realtime_sync';
     if ($wpdb->get_var("SHOW TABLES LIKE '$realtime_table'") === $realtime_table) {
         $status['realtime_sync']['total_tracked'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table");
@@ -831,6 +838,7 @@ function hic_format_bookings_as_csv($bookings) {
 add_action('wp_ajax_hic_refresh_diagnostics', 'hic_ajax_refresh_diagnostics');
 add_action('wp_ajax_hic_test_dispatch', 'hic_ajax_test_dispatch');
 add_action('wp_ajax_hic_force_reschedule', 'hic_ajax_force_reschedule');
+add_action('wp_ajax_hic_create_tables', 'hic_ajax_create_tables');
 add_action('wp_ajax_hic_backfill_reservations', 'hic_ajax_backfill_reservations');
 add_action('wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_bookings');
 add_action('wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
@@ -887,6 +895,64 @@ function hic_ajax_force_reschedule() {
     
     $results = hic_force_restart_internal_scheduler();
     wp_die(json_encode(array('success' => true, 'results' => $results)));
+}
+
+function hic_ajax_create_tables() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    try {
+        // Call the database table creation function
+        $result = hic_create_database_table();
+        
+        if ($result) {
+            // Check which tables now exist
+            global $wpdb;
+            $tables_status = array();
+            $expected_tables = array(
+                'gclids' => $wpdb->prefix . 'hic_gclids',
+                'realtime_sync' => $wpdb->prefix . 'hic_realtime_sync',
+                'booking_events' => $wpdb->prefix . 'hic_booking_events'
+            );
+            
+            $all_exist = true;
+            foreach ($expected_tables as $name => $table) {
+                $exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+                $tables_status[$name] = $exists;
+                if (!$exists) $all_exist = false;
+            }
+            
+            $details = array();
+            foreach ($tables_status as $name => $exists) {
+                $details[] = $name . ': ' . ($exists ? 'OK' : 'MANCANTE');
+            }
+            
+            wp_die(json_encode(array(
+                'success' => $all_exist,
+                'message' => $all_exist ? 'Tutte le tabelle sono state create/verificate con successo.' : 'Alcune tabelle potrebbero non essere state create.',
+                'details' => implode(', ', $details)
+            )));
+            
+        } else {
+            wp_die(json_encode(array(
+                'success' => false,
+                'message' => 'Errore durante la creazione delle tabelle. Controlla i log per maggiori dettagli.'
+            )));
+        }
+        
+    } catch (Exception $e) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'Errore: ' . $e->getMessage()
+        )));
+    }
 }
 
 function hic_ajax_backfill_reservations() {
@@ -1057,6 +1123,24 @@ function hic_diagnostics_page() {
     $schedules = wp_get_schedules();
     $error_stats = hic_get_error_stats();
     
+    // Check if updates polling is scheduled and which interval is used
+    $updates_interval_used = false;
+    $next_updates_scheduled = wp_next_scheduled('hic_api_updates_event');
+    if ($next_updates_scheduled) {
+        // Find which interval is being used for the scheduled event
+        $crons = get_option('cron', array());
+        foreach ($crons as $timestamp => $cron_jobs) {
+            if (isset($cron_jobs['hic_api_updates_event'])) {
+                foreach ($cron_jobs['hic_api_updates_event'] as $job) {
+                    if (isset($job['schedule'])) {
+                        $updates_interval_used = $job['schedule'];
+                        break 2;
+                    }
+                }
+            }
+        }
+    }
+    
     ?>
     <div class="wrap">
         <h1>HIC Plugin Diagnostics</h1>
@@ -1069,6 +1153,7 @@ function hic_diagnostics_page() {
                 <p>
                     <button class="button button-secondary" id="refresh-diagnostics">Aggiorna Dati</button>
                     <button class="button" id="force-reschedule">Riavvia Sistema Interno</button>
+                    <button class="button" id="create-tables">Crea/Verifica Tabelle DB</button>
                     <button class="button" id="test-dispatch">Test Dispatch Funzioni</button>
                 </p>
             </div>
@@ -2045,6 +2130,47 @@ function hic_diagnostics_page() {
                     alert('Errore nell\'aggiornamento dati');
                 }
                 $btn.prop('disabled', false).text('Aggiorna Dati');
+            });
+        });
+        
+        // Create tables handler (for fixing "Queue table not found" errors)
+        $('#create-tables').click(function() {
+            var $btn = $(this);
+            var $results = $('#hic-test-results');
+            
+            if (!confirm('Vuoi creare/verificare le tabelle del database? Questa operazione è sicura e non cancella dati esistenti.')) {
+                return;
+            }
+            
+            $btn.prop('disabled', true).text('Creando tabelle...');
+            
+            $.post(ajaxurl, {
+                action: 'hic_create_tables',
+                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
+            }, function(response) {
+                var result = JSON.parse(response);
+                var messageClass = result.success ? 'notice-success' : 'notice-error';
+                var html = '<div class="notice ' + messageClass + ' inline"><p><strong>Creazione Tabelle:</strong><br>';
+                
+                if (result.success) {
+                    html += result.message;
+                    if (result.details) {
+                        html += '<br><em>Dettagli: ' + result.details + '</em>';
+                    }
+                } else {
+                    html += 'Errore: ' + (result.message || 'Unknown error');
+                }
+                
+                html += '</p></div>';
+                $results.html(html);
+                $btn.prop('disabled', false).text('Crea/Verifica Tabelle DB');
+                
+                // Refresh page after 3 seconds on success
+                if (result.success) {
+                    setTimeout(function() {
+                        location.reload();
+                    }, 3000);
+                }
             });
         });
         
