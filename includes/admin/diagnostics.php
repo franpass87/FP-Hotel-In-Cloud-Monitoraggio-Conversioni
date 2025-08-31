@@ -210,19 +210,27 @@ function hic_get_recent_log_entries($limit = 50) {
 }
 
 /**
- * Manual cron execution for testing
+ * Manual execution for testing (now using internal scheduler)
  */
 function hic_execute_manual_cron($event_name) {
-    if (!in_array($event_name, array('hic_api_poll_event', 'hic_api_updates_event'))) {
+    if (!in_array($event_name, array('hic_api_poll_event', 'hic_api_updates_event', 'hic_reliable_poll_event'))) {
         return array('success' => false, 'message' => 'Invalid event name');
     }
     
     $start_time = microtime(true);
     
     try {
-        if ($event_name === 'hic_api_poll_event') {
-            hic_api_poll_bookings();
-            $message = 'Main polling executed successfully';
+        if ($event_name === 'hic_reliable_poll_event' || $event_name === 'hic_api_poll_event') {
+            // Use the internal scheduler
+            if (class_exists('HIC_Booking_Poller')) {
+                $poller = new HIC_Booking_Poller();
+                $poller->execute_poll();
+                $message = 'Internal scheduler polling executed successfully';
+            } else {
+                // Fallback to legacy function
+                hic_api_poll_bookings();
+                $message = 'Legacy polling executed successfully';
+            }
         } else {
             hic_api_poll_updates();
             $message = 'Updates polling executed successfully';
@@ -1166,6 +1174,22 @@ function hic_diagnostics_page() {
     
     // Get initial data
     $scheduler_status = hic_get_internal_scheduler_status();
+    
+    // Legacy compatibility: map scheduler status to old cron_status format for template
+    $cron_status = array(
+        'poll_event' => array(
+            'scheduled' => false, 
+            'next_run_human' => 'Sistema WP-Cron rimosso',
+            'conditions_met' => false
+        ),
+        'updates_event' => array(
+            'scheduled' => false,
+            'next_run_human' => 'Sistema WP-Cron rimosso', 
+            'conditions_met' => false
+        ),
+        'custom_interval_registered' => false,
+        'wp_cron_disabled' => true
+    );
     $credentials_status = hic_get_credentials_status();
     $execution_stats = hic_get_execution_stats();
     $recent_logs = hic_get_recent_log_entries(20);
