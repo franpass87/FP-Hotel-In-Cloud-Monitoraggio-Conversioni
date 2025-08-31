@@ -1420,9 +1420,16 @@ function hic_diagnostics_page() {
                             <tr>
                                 <td><?php echo esc_html(str_replace('_', ' ', ucfirst($condition))); ?></td>
                                 <td>
-                                    <span class="status <?php echo $status ? 'ok' : 'error'; ?>">
-                                        <?php echo $status ? '✅ Sì' : '❌ No'; ?>
-                                    </span>
+                                    <?php 
+                                    // Special handling for API key when Basic Auth is being used
+                                    if ($condition === 'api_key_configured' && !$status && $poller_diagnostics['conditions']['basic_auth_complete']): ?>
+                                        <span class="status ok">✅ Non necessario</span>
+                                        <br><small style="color: #46b450;">Basic Auth in uso</small>
+                                    <?php else: ?>
+                                        <span class="status <?php echo $status ? 'ok' : 'error'; ?>">
+                                            <?php echo $status ? '✅ Sì' : '❌ No'; ?>
+                                        </span>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <?php
@@ -1432,7 +1439,7 @@ function hic_diagnostics_page() {
                                         'api_url_configured' => 'URL API configurato',
                                         'has_credentials' => 'Credenziali API disponibili (Basic Auth o API Key)',
                                         'basic_auth_complete' => 'Credenziali Basic Auth complete (Property ID + Email + Password)',
-                                        'api_key_configured' => 'API Key configurata (metodo legacy)'
+                                        'api_key_configured' => 'API Key configurata (metodo legacy - alternativo a Basic Auth)'
                                     );
                                     echo esc_html($descriptions[$condition] ?? 'Controllo sistema');
                                     ?>
@@ -1486,16 +1493,42 @@ function hic_diagnostics_page() {
                             <li>Il lock impedisce esecuzioni multiple simultanee del polling</li>
                             <li>Se il lock è attivo da più di 5 minuti, potrebbe indicare un polling bloccato</li>
                         </ul>
+                        <p><strong>⚠ Importante per le Credenziali:</strong></p>
+                        <ul>
+                            <li><strong>Basic Auth (Raccomandato):</strong> Property ID + Email + Password - Quando configurato, l'API Key non è necessaria</li>
+                            <li><strong>API Key (Legacy):</strong> Metodo alternativo - Quando configurato, Basic Auth non è necessario</li>
+                            <li><strong>Richiesto:</strong> Solo UNO dei due metodi deve essere configurato, non entrambi</li>
+                        </ul>
                     </div>
                     
                     <?php
                     // Check if all conditions are met
                     $all_conditions_met = true;
+                    $credential_method_configured = false;
+                    
                     foreach ($poller_diagnostics['conditions'] as $condition => $status) {
+                        // Skip API key check if Basic Auth is complete (they are alternatives)
+                        if ($condition === 'api_key_configured' && $poller_diagnostics['conditions']['basic_auth_complete']) {
+                            continue; // API Key not needed when Basic Auth is working
+                        }
+                        // Skip Basic Auth check if API Key is configured (they are alternatives)
+                        if ($condition === 'basic_auth_complete' && $poller_diagnostics['conditions']['api_key_configured']) {
+                            continue; // Basic Auth not needed when API Key is working
+                        }
+                        // Check if we have at least one credential method
+                        if (($condition === 'basic_auth_complete' || $condition === 'api_key_configured') && $status) {
+                            $credential_method_configured = true;
+                        }
+                        
                         if (!$status) {
                             $all_conditions_met = false;
                             break;
                         }
+                    }
+                    
+                    // Ensure we have at least one credential method
+                    if (!$credential_method_configured) {
+                        $all_conditions_met = false;
                     }
                     ?>
                     
