@@ -1164,6 +1164,24 @@ function hic_diagnostics_page() {
                                 </span>
                             <?php else: ?>
                                 <span class="status error">Non attivo</span>
+                                <br><small style="color: #dc3232;">
+                                    <?php
+                                    $polling_issues = array();
+                                    if (!hic_reliable_polling_enabled()) {
+                                        $polling_issues[] = "Polling affidabile disabilitato nelle impostazioni";
+                                    }
+                                    if (hic_get_connection_type() !== 'api') {
+                                        $polling_issues[] = "Tipo connessione non è 'API Polling' (attuale: " . hic_get_connection_type() . ")";
+                                    }
+                                    if (!hic_get_api_url()) {
+                                        $polling_issues[] = "URL API non configurato";
+                                    }
+                                    if (!hic_has_basic_auth_credentials() && !hic_get_api_key()) {
+                                        $polling_issues[] = "Credenziali API mancanti (serve Property ID + Email + Password oppure API Key)";
+                                    }
+                                    echo implode('<br>', $polling_issues);
+                                    ?>
+                                </small>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -1196,6 +1214,29 @@ function hic_diagnostics_page() {
                         <li><strong>Monitoraggio log:</strong> Controlla la sezione "Log Recenti" per errori o problemi</li>
                     </ul>
                 </div>
+                
+                <?php if ($connection_type === 'api' && (!$scheduler_status['internal_scheduler']['enabled'] || !$scheduler_status['internal_scheduler']['conditions_met'])): ?>
+                <div class="polling-troubleshoot">
+                    <h3 style="color: #d63638;">⚠ Risoluzione Problemi Polling</h3>
+                    <div class="notice notice-error inline">
+                        <p><strong>Il sistema di polling non è attivo!</strong> Per far funzionare il monitoraggio automatico:</p>
+                        <ol>
+                            <li><strong>Verifica tipo connessione:</strong> Vai su <em>Impostazioni → HIC Monitoring</em> e assicurati che "Tipo Connessione" sia impostato su "<strong>API Polling</strong>"</li>
+                            <li><strong>Configura credenziali API:</strong> Inserisci i seguenti dati nelle impostazioni:
+                                <ul>
+                                    <li>API URL (fornito da Hotel in Cloud)</li>
+                                    <li>ID Struttura (Property ID)</li>
+                                    <li>Email e Password API <em>oppure</em> API Key</li>
+                                </ul>
+                            </li>
+                            <li><strong>Abilita Polling Affidabile:</strong> Assicurati che l'opzione "Polling Affidabile" sia attivata</li>
+                            <li><strong>Verifica WordPress Cron:</strong> Se WordPress Cron è disabilitato, configura un cron di sistema per chiamare <code>wp-cron.php</code></li>
+                            <li><strong>Test connessione:</strong> Usa il pulsante "Test Connessione API" per verificare che tutto funzioni</li>
+                        </ol>
+                        <p><strong>Nota:</strong> Senza queste configurazioni, il contatore rimarrà sempre a 0 perché il sistema non può scaricare le prenotazioni da Hotel in Cloud.</p>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
             
             <!-- System Configuration Section -->
@@ -1405,7 +1446,53 @@ function hic_diagnostics_page() {
                     $poller = new HIC_Booking_Poller();
                     $reliable_stats = $poller->get_stats();
                 }
+                
+                // Check WordPress cron status
+                $wp_cron_disabled = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
+                $cron_event_scheduled = wp_next_scheduled('hic_reliable_poll_event');
                 ?>
+                
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Stato</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>WordPress Cron</td>
+                            <td>
+                                <?php if ($wp_cron_disabled): ?>
+                                    <span class="status error">⚠ Disabilitato</span>
+                                <?php else: ?>
+                                    <span class="status ok">✓ Attivo</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($wp_cron_disabled): ?>
+                                    Sistema cron disabilitato da DISABLE_WP_CRON. Il polling potrebbe non funzionare.
+                                <?php else: ?>
+                                    Sistema cron WordPress funzionante
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Evento Polling Schedulato</td>
+                            <td>
+                                <?php if ($cron_event_scheduled): ?>
+                                    <span class="status ok">✓ Schedulato</span><br>
+                                    <small>Prossima esecuzione: <?php echo esc_html(date('Y-m-d H:i:s', $cron_event_scheduled)); ?></small>
+                                <?php else: ?>
+                                    <span class="status error">✗ Non schedulato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Evento cron per il polling automatico</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
                 <table class="widefat">
                     <thead>
                         <tr>
