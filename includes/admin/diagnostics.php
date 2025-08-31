@@ -257,11 +257,8 @@ function hic_force_restart_internal_scheduler() {
     // Clear any existing WP-Cron events (cleanup legacy events)
     $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event', 'hic_reliable_poll_event');
     foreach ($legacy_events as $event) {
-        $timestamp = wp_next_scheduled($event);
-        if ($timestamp) {
-            wp_unschedule_event($timestamp, $event);
-            $results['legacy_' . $event . '_cleared'] = 'Cleared legacy event';
-        }
+        wp_clear_scheduled_hook($event);
+        $results['legacy_' . $event . '_cleared'] = 'Cleared all legacy cron events';
     }
     
     // Check if internal scheduler should be active
@@ -828,23 +825,7 @@ function hic_diagnostics_page() {
     $schedules = wp_get_schedules();
     $error_stats = hic_get_error_stats();
     
-    // Check if updates polling is scheduled and which interval is used
-    $updates_interval_used = false;
-    $next_updates_scheduled = wp_next_scheduled('hic_api_updates_event');
-    if ($next_updates_scheduled) {
-        // Find which interval is being used for the scheduled event
-        $crons = get_option('cron', array());
-        foreach ($crons as $timestamp => $cron_jobs) {
-            if (isset($cron_jobs['hic_api_updates_event'])) {
-                foreach ($cron_jobs['hic_api_updates_event'] as $job) {
-                    if (isset($job['schedule'])) {
-                        $updates_interval_used = $job['schedule'];
-                        break 2;
-                    }
-                }
-            }
-        }
-    }
+    // Note: Updates polling and all cron dependencies removed - system uses internal scheduler only
     
     ?>
     <div class="wrap">
