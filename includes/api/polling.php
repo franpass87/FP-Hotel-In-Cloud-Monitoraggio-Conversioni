@@ -1078,8 +1078,8 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
     );
     
     try {
-        // Fetch reservations from API
-        $reservations = hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $limit);
+        // Fetch reservations from API using raw fetch to avoid double processing
+        $reservations = hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, $limit);
         
         if (is_wp_error($reservations)) {
             return array(
@@ -1147,5 +1147,82 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
             'stats' => $stats
         );
     }
+}
+
+/**
+ * Raw fetch function that doesn't process reservations (for backfill use)
+ */
+function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, $limit = null) {
+    $base = rtrim(hic_get_api_url(), '/');
+    $email = hic_get_api_email();
+    $pass = hic_get_api_password();
+    
+    if (!$base || !$email || !$pass || !$prop_id) {
+        return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
+    }
+    
+    // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
+    if ($date_type === 'created') {
+        $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
+        $args = array('since' => strtotime($from_date));
+        if ($limit) $args['limit'] = (int)$limit;
+        // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
+    } else {
+        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+        $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
+        if ($limit) $args['limit'] = (int)$limit;
+    }
+    $url = add_query_arg($args, $endpoint);
+    
+    hic_log("Backfill Raw API Call: $url");
+
+    $res = wp_remote_get($url, array(
+        'timeout' => 30,
+        'headers' => array(
+            'Authorization' => 'Basic ' . base64_encode("$email:$pass"),
+            'Accept' => 'application/json',
+            'User-Agent' => 'WP/FP-HIC-Plugin-Backfill'
+        ),
+    ));
+    
+    if (is_wp_error($res)) {
+        hic_log("Backfill Raw API call failed: " . $res->get_error_message());
+        return $res;
+    }
+    
+    $code = wp_remote_retrieve_response_code($res);
+    if ($code !== 200) {
+        $body = wp_remote_retrieve_body($res);
+        hic_log("Backfill Raw API HTTP $code - Response body: " . substr($body, 0, 500));
+        
+        // Provide specific error messages for common HTTP codes in backfill context
+        switch ($code) {
+            case 400:
+                return new WP_Error('hic_http', "HTTP 400 - Richiesta backfill non valida. Verifica i parametri: date_type deve essere checkin, checkout, presence o created.");
+            case 401:
+                return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide per backfill. Verifica email e password API.");
+            case 403:
+                return new WP_Error('hic_http', "HTTP 403 - Accesso negato per backfill. L'account potrebbe non avere permessi per questa struttura.");
+            case 404:
+                return new WP_Error('hic_http', "HTTP 404 - Struttura non trovata per backfill. Verifica l'ID Struttura (propId).");
+            case 429:
+                return new WP_Error('hic_http', "HTTP 429 - Troppe richieste per backfill. Riprova tra qualche minuto.");
+            default:
+                return new WP_Error('hic_http', "HTTP $code - Errore backfill API");
+        }
+    }
+    
+    $body = wp_remote_retrieve_body($res);
+    if (empty($body)) {
+        return new WP_Error('hic_empty_response', 'Empty response body from backfill API');
+    }
+    
+    $data = json_decode($body, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        hic_log("Backfill JSON decode error: " . json_last_error_msg());
+        return new WP_Error('hic_json_error', 'Invalid JSON response from backfill API');
+    }
+    
+    return $data;
 }
 
