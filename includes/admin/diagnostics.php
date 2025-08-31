@@ -557,12 +557,13 @@ function hic_force_reschedule_crons() {
     $results = array();
     
     if (hic_should_schedule_poll_event()) {
-        if (wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event')) {
+        $polling_interval = hic_get_validated_polling_interval();
+        if ($polling_interval && wp_schedule_event(time(), $polling_interval, 'hic_api_poll_event')) {
             $results['poll_event'] = 'Successfully rescheduled';
-            hic_log('Force reschedule: hic_api_poll_event rescheduled successfully');
+            hic_log("Force reschedule: hic_api_poll_event rescheduled successfully with interval '$polling_interval'");
         } else {
             $results['poll_event'] = 'Failed to reschedule';
-            hic_log('Force reschedule: Failed to reschedule hic_api_poll_event');
+            hic_log('Force reschedule: Failed to reschedule hic_api_poll_event - ' . ($polling_interval ? 'wp_schedule_event failed' : 'no valid interval'));
         }
     } else {
         $results['poll_event'] = 'Conditions not met for scheduling';
@@ -570,12 +571,13 @@ function hic_force_reschedule_crons() {
     }
     
     if (hic_should_schedule_updates_event()) {
-        if (wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event')) {
+        $polling_interval = hic_get_validated_polling_interval();
+        if ($polling_interval && wp_schedule_event(time(), $polling_interval, 'hic_api_updates_event')) {
             $results['updates_event'] = 'Successfully rescheduled';
-            hic_log('Force reschedule: hic_api_updates_event rescheduled successfully');
+            hic_log("Force reschedule: hic_api_updates_event rescheduled successfully with interval '$polling_interval'");
         } else {
             $results['updates_event'] = 'Failed to reschedule';
-            hic_log('Force reschedule: Failed to reschedule hic_api_updates_event');
+            hic_log('Force reschedule: Failed to reschedule hic_api_updates_event - ' . ($polling_interval ? 'wp_schedule_event failed' : 'no valid interval'));
         }
     } else {
         $results['updates_event'] = 'Conditions not met for scheduling';

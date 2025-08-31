@@ -92,6 +92,30 @@ function hic_get_polling_interval() {
 }
 
 /**
+ * Get a validated polling interval - ensures the interval exists before using it
+ */
+function hic_get_validated_polling_interval() {
+    $schedules = wp_get_schedules();
+    $preferred_interval = hic_get_polling_interval();
+    
+    // First check if the preferred interval exists
+    if (isset($schedules[$preferred_interval])) {
+        hic_log("Using preferred polling interval: $preferred_interval (" . $schedules[$preferred_interval]['interval'] . " seconds)");
+        return $preferred_interval;
+    }
+    
+    // Fallback to hic_poll_interval if it exists
+    if (isset($schedules['hic_poll_interval'])) {
+        hic_log("Preferred interval '$preferred_interval' not found, using fallback: hic_poll_interval (" . $schedules['hic_poll_interval']['interval'] . " seconds)");
+        return 'hic_poll_interval';
+    }
+    
+    // Final fallback - this should never happen, but just in case
+    hic_log("ERROR: No valid polling interval found! Available schedules: " . implode(', ', array_keys($schedules)));
+    return false;
+}
+
+/**
  * Quasi-realtime polling lock functions
  */
 function hic_acquire_polling_lock($timeout = 300) {

@@ -122,18 +122,22 @@ add_action('init', function() {
   
   if ($should_schedule) {
     if (!wp_next_scheduled('hic_api_poll_event')) {
-      // Use configured polling interval for quasi-realtime polling
-      $polling_interval = hic_get_polling_interval();
-      $result = wp_schedule_event(time() + 60, $polling_interval, 'hic_api_poll_event');
-      if (!$result) {
-        hic_log("ERROR: Failed to schedule hic_api_poll_event with interval '$polling_interval'. Check if interval is registered.");
-      } else {
-        hic_log("hic_api_poll_event scheduled successfully with interval '$polling_interval'");
-        // Verify the scheduled interval
-        $schedules = wp_get_schedules();
-        if (isset($schedules[$polling_interval])) {
-          hic_log('Confirmed: ' . $polling_interval . ' = ' . $schedules[$polling_interval]['interval'] . ' seconds');
+      // Use validated polling interval to ensure it exists
+      $polling_interval = hic_get_validated_polling_interval();
+      if ($polling_interval) {
+        $result = wp_schedule_event(time() + 60, $polling_interval, 'hic_api_poll_event');
+        if (!$result) {
+          hic_log("ERROR: Failed to schedule hic_api_poll_event with interval '$polling_interval'. wp_schedule_event returned false.");
+        } else {
+          hic_log("hic_api_poll_event scheduled successfully with interval '$polling_interval'");
+          // Verify the scheduled interval
+          $schedules = wp_get_schedules();
+          if (isset($schedules[$polling_interval])) {
+            hic_log('Confirmed: ' . $polling_interval . ' = ' . $schedules[$polling_interval]['interval'] . ' seconds');
+          }
         }
+      } else {
+        hic_log("ERROR: Cannot schedule hic_api_poll_event - no valid polling interval available");
       }
     } else {
       // Log that event is already scheduled and verify its interval
@@ -164,16 +168,22 @@ add_action('init', function() {
   
   if ($should_schedule_updates) {
     if (!wp_next_scheduled('hic_api_updates_event')) {
-      $result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event');
-      if (!$result) {
-        hic_log('ERROR: Failed to schedule hic_api_updates_event. Check if hic_poll_interval is registered.');
-      } else {
-        hic_log('hic_api_updates_event scheduled successfully with hic_poll_interval');
-        // Verify the scheduled interval
-        $schedules = wp_get_schedules();
-        if (isset($schedules['hic_poll_interval'])) {
-          hic_log('Confirmed: hic_poll_interval = ' . $schedules['hic_poll_interval']['interval'] . ' seconds');
+      // Use validated polling interval to ensure consistency
+      $polling_interval = hic_get_validated_polling_interval();
+      if ($polling_interval) {
+        $result = wp_schedule_event(time(), $polling_interval, 'hic_api_updates_event');
+        if (!$result) {
+          hic_log("ERROR: Failed to schedule hic_api_updates_event with interval '$polling_interval'. wp_schedule_event returned false.");
+        } else {
+          hic_log("hic_api_updates_event scheduled successfully with interval '$polling_interval'");
+          // Verify the scheduled interval
+          $schedules = wp_get_schedules();
+          if (isset($schedules[$polling_interval])) {
+            hic_log('Confirmed: ' . $polling_interval . ' = ' . $schedules[$polling_interval]['interval'] . ' seconds');
+          }
         }
+      } else {
+        hic_log("ERROR: Cannot schedule hic_api_updates_event - no valid polling interval available");
       }
     } else {
       // Log that event is already scheduled
@@ -1316,24 +1326,36 @@ function hic_force_reschedule_cron_events() {
     
     // Reschedule with correct interval
     if ($should_schedule_poll) {
-        $poll_result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_poll_event');
-        $results['hic_api_poll_event_scheduled'] = $poll_result ? 'Successfully scheduled' : 'Failed to schedule';
-        if ($poll_result) {
-            hic_log('Force reschedule: hic_api_poll_event rescheduled successfully');
+        $polling_interval = hic_get_validated_polling_interval();
+        if ($polling_interval) {
+            $poll_result = wp_schedule_event(time(), $polling_interval, 'hic_api_poll_event');
+            $results['hic_api_poll_event_scheduled'] = $poll_result ? 'Successfully scheduled' : 'Failed to schedule';
+            if ($poll_result) {
+                hic_log("Force reschedule: hic_api_poll_event rescheduled successfully with interval '$polling_interval'");
+            } else {
+                hic_log("Force reschedule: Failed to reschedule hic_api_poll_event with interval '$polling_interval'");
+            }
         } else {
-            hic_log('Force reschedule: Failed to reschedule hic_api_poll_event');
+            $results['hic_api_poll_event_scheduled'] = 'No valid interval available';
+            hic_log('Force reschedule: Cannot reschedule hic_api_poll_event - no valid polling interval available');
         }
     } else {
         $results['hic_api_poll_event_scheduled'] = 'Conditions not met, not scheduled';
     }
     
     if ($should_schedule_updates) {
-        $updates_result = wp_schedule_event(time(), 'hic_poll_interval', 'hic_api_updates_event');
-        $results['hic_api_updates_event_scheduled'] = $updates_result ? 'Successfully scheduled' : 'Failed to schedule';
-        if ($updates_result) {
-            hic_log('Force reschedule: hic_api_updates_event rescheduled successfully');
+        $polling_interval = hic_get_validated_polling_interval();
+        if ($polling_interval) {
+            $updates_result = wp_schedule_event(time(), $polling_interval, 'hic_api_updates_event');
+            $results['hic_api_updates_event_scheduled'] = $updates_result ? 'Successfully scheduled' : 'Failed to schedule';
+            if ($updates_result) {
+                hic_log("Force reschedule: hic_api_updates_event rescheduled successfully with interval '$polling_interval'");
+            } else {
+                hic_log("Force reschedule: Failed to reschedule hic_api_updates_event with interval '$polling_interval'");
+            }
         } else {
-            hic_log('Force reschedule: Failed to reschedule hic_api_updates_event');
+            $results['hic_api_updates_event_scheduled'] = 'No valid interval available';
+            hic_log('Force reschedule: Cannot reschedule hic_api_updates_event - no valid polling interval available');
         }
     } else {
         $results['hic_api_updates_event_scheduled'] = 'Conditions not met, not scheduled';
