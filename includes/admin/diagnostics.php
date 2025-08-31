@@ -512,6 +512,7 @@ add_action('wp_ajax_hic_create_tables', 'hic_ajax_create_tables');
 add_action('wp_ajax_hic_backfill_reservations', 'hic_ajax_backfill_reservations');
 add_action('wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_bookings');
 add_action('wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
+add_action('wp_ajax_hic_force_polling', 'hic_ajax_force_polling');
 
 
 
@@ -816,6 +817,64 @@ function hic_ajax_reset_download_tracking() {
     }
 }
 
+function hic_ajax_force_polling() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    try {
+        // Get force flag from request
+        $force = isset($_POST['force']) && $_POST['force'] === 'true';
+        
+        // Check if poller class exists
+        if (!class_exists('HIC_Booking_Poller')) {
+            wp_die(json_encode(array(
+                'success' => false, 
+                'message' => 'HIC_Booking_Poller class not found'
+            )));
+        }
+        
+        $poller = new HIC_Booking_Poller();
+        
+        // Get diagnostics before polling
+        $diagnostics_before = $poller->get_detailed_diagnostics();
+        
+        // Execute polling (force or normal)
+        if ($force) {
+            hic_log('Admin Force Polling: Starting force execution');
+            $result = $poller->force_execute_poll();
+        } else {
+            hic_log('Admin Manual Polling: Starting normal execution');
+            $result = $poller->execute_poll();
+        }
+        
+        // Get stats after polling
+        $stats_after = $poller->get_stats();
+        
+        // Prepare response
+        $response = array_merge($result, array(
+            'diagnostics_before' => $diagnostics_before,
+            'stats_after' => $stats_after,
+            'force_mode' => $force
+        ));
+        
+        wp_die(json_encode($response));
+        
+    } catch (Exception $e) {
+        hic_log('Admin Polling Error: ' . $e->getMessage());
+        wp_die(json_encode(array(
+            'success' => false, 
+            'message' => 'Errore durante l\'esecuzione del polling: ' . $e->getMessage()
+        )));
+    }
+}
+
 /* ============ Diagnostics Admin Page ============ */
 
 /**
@@ -845,12 +904,30 @@ function hic_diagnostics_page() {
             <!-- System Status Section -->
             <div class="card">
                 <h2>Stato Sistema</h2>
-                <p>
-                    <button class="button button-secondary" id="refresh-diagnostics">Aggiorna Dati</button>
-                    <button class="button" id="force-reschedule">Riavvia Sistema Interno</button>
-                    <button class="button" id="create-tables">Crea/Verifica Tabelle DB</button>
-                    <button class="button" id="test-dispatch">Test Dispatch Funzioni</button>
-                </p>
+                
+                <!-- Manual Polling Section -->
+                <div class="manual-polling-section" style="margin-top: 15px; padding: 10px; background: #f0f8ff; border-left: 4px solid #0073aa;">
+                    <h3 style="margin-top: 0;">🔄 Controllo Manuale Polling</h3>
+                    <p>Usa questi pulsanti per testare e forzare il sistema di polling manualmente:</p>
+                    <p>
+                        <button class="button button-primary" id="force-polling">Forza Polling Ora</button>
+                        <button class="button button-secondary" id="test-polling">Test Polling (con lock)</button>
+                        <span id="polling-status" style="margin-left: 10px; font-weight: bold;"></span>
+                    </p>
+                    
+                    <div id="polling-results" style="display: none; margin-top: 15px; padding: 10px; background: #f7f7f7; border-left: 4px solid #0073aa;">
+                        <h4>Risultati Polling:</h4>
+                        <div id="polling-results-content"></div>
+                    </div>
+                    
+                    <div class="notice notice-info inline" style="margin-top: 15px;">
+                        <p><strong>Differenza tra i pulsanti:</strong></p>
+                        <ul>
+                            <li><strong>Forza Polling Ora:</strong> Esegue il polling immediatamente, ignorando eventuali lock attivi</li>
+                            <li><strong>Test Polling:</strong> Esegue il polling normale, rispettando i lock esistenti</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
             
             <!-- Backfill Section -->
@@ -1148,7 +1225,6 @@ function hic_diagnostics_page() {
                         <?php if ($connection_type === 'webhook'): ?>
                             <li><strong>Verifica configurazione Hotel in Cloud:</strong> Assicurati che i webhook siano configurati per inviare TUTTE le prenotazioni</li>
                             <li><strong>Considera API Polling:</strong> Per maggiore affidabilità, valuta il passaggio alla modalità "API Polling"</li>
-                            <li><strong>Test webhook:</strong> Usa il pulsante "Test Dispatch Funzioni" per verificare che le integrazioni funzionino</li>
                         <?php else: ?>
                             <li><strong>Modalità consigliata:</strong> API Polling è la modalità migliore per catturare automaticamente le prenotazioni manuali</li>
                             <li><strong>Frequenza polling:</strong> Il sistema utilizza Heartbeat API per controllare nuove prenotazioni ogni 60 secondi (indipendente dal traffico)</li>
@@ -1302,6 +1378,128 @@ function hic_diagnostics_page() {
                 </table>
             </div>
             
+            <!-- Detailed Polling Diagnostics Section -->
+            <div class="card">
+                <h2>🔍 Diagnostica Polling Dettagliata</h2>
+                <?php
+                // Get detailed polling diagnostics
+                $poller_diagnostics = null;
+                if (class_exists('HIC_Booking_Poller')) {
+                    $poller = new HIC_Booking_Poller();
+                    $poller_diagnostics = $poller->get_detailed_diagnostics();
+                }
+                ?>
+                
+                <?php if ($poller_diagnostics): ?>
+                    <h3>Condizioni per il Polling</h3>
+                    <table class="widefat">
+                        <thead>
+                            <tr>
+                                <th>Condizione</th>
+                                <th>Stato</th>
+                                <th>Descrizione</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($poller_diagnostics['conditions'] as $condition => $status): ?>
+                            <tr>
+                                <td><?php echo esc_html(str_replace('_', ' ', ucfirst($condition))); ?></td>
+                                <td>
+                                    <span class="status <?php echo $status ? 'ok' : 'error'; ?>">
+                                        <?php echo $status ? '✅ Sì' : '❌ No'; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php
+                                    $descriptions = array(
+                                        'reliable_polling_enabled' => 'Sistema di polling affidabile attivato nelle impostazioni',
+                                        'connection_type_api' => 'Tipo connessione impostato su "API Polling"',
+                                        'api_url_configured' => 'URL API configurato',
+                                        'has_credentials' => 'Credenziali API disponibili (Basic Auth o API Key)',
+                                        'basic_auth_complete' => 'Credenziali Basic Auth complete (Property ID + Email + Password)',
+                                        'api_key_configured' => 'API Key configurata (metodo legacy)'
+                                    );
+                                    echo esc_html($descriptions[$condition] ?? 'Controllo sistema');
+                                    ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <h3>Configurazione Attuale</h3>
+                    <table class="widefat">
+                        <tbody>
+                            <?php foreach ($poller_diagnostics['configuration'] as $key => $value): ?>
+                            <tr>
+                                <td><?php echo esc_html(str_replace('_', ' ', ucfirst($key))); ?></td>
+                                <td>
+                                    <span class="status <?php echo ($value === 'configured') ? 'ok' : 'error'; ?>">
+                                        <?php echo esc_html($value); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <h3>Stato Lock di Polling</h3>
+                    <table class="widefat">
+                        <tbody>
+                            <tr>
+                                <td>Lock Attivo</td>
+                                <td>
+                                    <span class="status <?php echo $poller_diagnostics['lock_status']['active'] ? 'warning' : 'ok'; ?>">
+                                        <?php echo $poller_diagnostics['lock_status']['active'] ? '🔒 Sì' : '🔓 No'; ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php if ($poller_diagnostics['lock_status']['active']): ?>
+                            <tr>
+                                <td>Lock Timestamp</td>
+                                <td><?php echo esc_html($poller_diagnostics['lock_status']['timestamp']); ?></td>
+                            </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                    
+                    <div class="notice notice-info inline" style="margin-top: 15px;">
+                        <p><strong>Interpretazione:</strong></p>
+                        <ul>
+                            <li>Per funzionare, il polling richiede che <strong>tutte</strong> le condizioni sopra siano soddisfatte</li>
+                            <li>Se una condizione fallisce, il polling automatico non verrà eseguito</li>
+                            <li>Il lock impedisce esecuzioni multiple simultanee del polling</li>
+                            <li>Se il lock è attivo da più di 5 minuti, potrebbe indicare un polling bloccato</li>
+                        </ul>
+                    </div>
+                    
+                    <?php
+                    // Check if all conditions are met
+                    $all_conditions_met = true;
+                    foreach ($poller_diagnostics['conditions'] as $condition => $status) {
+                        if (!$status) {
+                            $all_conditions_met = false;
+                            break;
+                        }
+                    }
+                    ?>
+                    
+                    <?php if (!$all_conditions_met): ?>
+                    <div class="notice notice-error inline" style="margin-top: 15px;">
+                        <p><strong>⚠ Problema Identificato:</strong> Non tutte le condizioni per il polling sono soddisfatte. Il sistema di polling automatico non è attivo.</p>
+                        <p><strong>Azione consigliata:</strong> Correggi le condizioni mancanti nelle impostazioni del plugin, poi usa il pulsante "Forza Polling Ora" per testare.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="notice notice-success inline" style="margin-top: 15px;">
+                        <p><strong>✅ Tutte le condizioni sono soddisfatte!</strong> Il polling dovrebbe funzionare automaticamente.</p>
+                        <p><strong>Se il polling non funziona:</strong> Usa il pulsante "Forza Polling Ora" per testare immediatamente.</p>
+                    </div>
+                    <?php endif; ?>
+                    
+                <?php else: ?>
+                    <p>Impossibile ottenere diagnostiche dettagliate. La classe HIC_Booking_Poller non è disponibile.</p>
+                <?php endif; ?>
+            </div>
 
             <!-- Execution Stats Section -->
             <div class="card">
@@ -1789,136 +1987,6 @@ function hic_diagnostics_page() {
     
     <script type="text/javascript">
     jQuery(document).ready(function($) {
-        // Refresh diagnostics handler
-        $('#refresh-diagnostics').click(function() {
-            var $btn = $(this);
-            $btn.prop('disabled', true).text('Aggiornando...');
-            
-            $.post(ajaxurl, {
-                action: 'hic_refresh_diagnostics',
-                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
-            }, function(response) {
-                var result = JSON.parse(response);
-                if (result.success) {
-                    location.reload(); // Simple refresh for now
-                } else {
-                    alert('Errore nell\'aggiornamento dati');
-                }
-                $btn.prop('disabled', false).text('Aggiorna Dati');
-            });
-        });
-        
-        // Create tables handler (for fixing "Queue table not found" errors)
-        $('#create-tables').click(function() {
-            var $btn = $(this);
-            var $results = $('#hic-test-results');
-            
-            if (!confirm('Vuoi creare/verificare le tabelle del database? Questa operazione è sicura e non cancella dati esistenti.')) {
-                return;
-            }
-            
-            $btn.prop('disabled', true).text('Creando tabelle...');
-            
-            $.post(ajaxurl, {
-                action: 'hic_create_tables',
-                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
-            }, function(response) {
-                var result = JSON.parse(response);
-                var messageClass = result.success ? 'notice-success' : 'notice-error';
-                var html = '<div class="notice ' + messageClass + ' inline"><p><strong>Creazione Tabelle:</strong><br>';
-                
-                if (result.success) {
-                    html += result.message;
-                    if (result.details) {
-                        html += '<br><em>Dettagli: ' + result.details + '</em>';
-                    }
-                } else {
-                    html += 'Errore: ' + (result.message || 'Unknown error');
-                }
-                
-                html += '</p></div>';
-                $results.html(html);
-                $btn.prop('disabled', false).text('Crea/Verifica Tabelle DB');
-                
-                // Refresh page after 3 seconds on success
-                if (result.success) {
-                    setTimeout(function() {
-                        location.reload();
-                    }, 3000);
-                }
-            });
-        });
-        
-        // Force reschedule handler
-        $('#force-reschedule').click(function() {
-            var $btn = $(this);
-            var $results = $('#hic-test-results');
-            
-            if (!confirm('Vuoi forzare la rischedulazione dei cron jobs?')) {
-                return;
-            }
-            
-            $btn.prop('disabled', true).text('Rischedulando...');
-            
-            $.post(ajaxurl, {
-                action: 'hic_force_reschedule',
-                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
-            }, function(response) {
-                var result = JSON.parse(response);
-                var html = '<div class="notice notice-info inline"><p><strong>Risultati Rischedulazione:</strong><br>';
-                
-                if (result.success) {
-                    Object.keys(result.results).forEach(function(key) {
-                        html += key + ': ' + result.results[key] + '<br>';
-                    });
-                } else {
-                    html += 'Errore: ' + (result.message || 'Unknown error');
-                }
-                
-                html += '</p></div>';
-                $results.html(html);
-                $btn.prop('disabled', false).text('Riavvia Sistema Interno');
-                
-                // Refresh page after 2 seconds
-                setTimeout(function() {
-                    location.reload();
-                }, 2000);
-            });
-        });
-        
-        // Test dispatch handler
-        $('#test-dispatch').click(function() {
-            var $btn = $(this);
-            var $results = $('#hic-test-results');
-            
-            if (!confirm('Vuoi testare le funzioni di dispatch con dati di esempio?')) {
-                return;
-            }
-            
-            $btn.prop('disabled', true).text('Testando...');
-            
-            $.post(ajaxurl, {
-                action: 'hic_test_dispatch',
-                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
-            }, function(response) {
-                var result = JSON.parse(response);
-                var messageClass = result.success ? 'notice-success' : 'notice-error';
-                var html = '<div class="notice ' + messageClass + ' inline"><p><strong>Test Dispatch:</strong><br>';
-                
-                if (result.success) {
-                    Object.keys(result.results).forEach(function(key) {
-                        html += key.toUpperCase() + ': ' + result.results[key] + '<br>';
-                    });
-                    html += '<br><em>Controlla i log per i dettagli.</em>';
-                } else {
-                    html += 'Errore: ' + (result.message || 'Unknown error');
-                }
-                
-                html += '</p></div>';
-                $results.html(html);
-                $btn.prop('disabled', false).text('Test Dispatch Funzioni');
-            });
-        });
         
         // Backfill handler
         $('#start-backfill').click(function() {
@@ -2164,6 +2232,144 @@ function hic_diagnostics_page() {
             }).fail(function() {
                 $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
                 $btn.prop('disabled', false);
+            });
+        });
+        
+        // Force Polling handler
+        $('#force-polling').click(function() {
+            var $btn = $(this);
+            var $status = $('#polling-status');
+            var $results = $('#polling-results');
+            var $resultsContent = $('#polling-results-content');
+            
+            $btn.prop('disabled', true).text('Eseguendo polling forzato...');
+            $status.text('Avvio...').css('color', '#0073aa');
+            $results.hide();
+            
+            $.post(ajaxurl, {
+                action: 'hic_force_polling',
+                force: 'true',
+                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
+            }, function(response) {
+                var result = JSON.parse(response);
+                
+                if (result.success) {
+                    $status.text('Polling completato!').css('color', '#46b450');
+                    
+                    var html = '<div class="notice notice-success inline"><p><strong>Polling Forzato Completato:</strong><br>';
+                    html += 'Messaggio: ' + result.message + '<br>';
+                    if (result.execution_time) {
+                        html += 'Tempo esecuzione: ' + result.execution_time + ' secondi<br>';
+                    }
+                    if (result.lock_cleared) {
+                        html += 'Lock esistente rimosso per l\'esecuzione<br>';
+                    }
+                    html += '</p></div>';
+                    
+                    // Add diagnostics info if available
+                    if (result.diagnostics_before && result.diagnostics_before.conditions) {
+                        html += '<div style="margin-top: 10px;"><strong>Condizioni Polling:</strong><ul>';
+                        var conditions = result.diagnostics_before.conditions;
+                        Object.keys(conditions).forEach(function(key) {
+                            var status = conditions[key] ? '✅' : '❌';
+                            html += '<li>' + status + ' ' + key + ': ' + conditions[key] + '</li>';
+                        });
+                        html += '</ul></div>';
+                    }
+                    
+                    $resultsContent.html(html);
+                    $results.show();
+                    
+                    // Refresh page after 3 seconds
+                    setTimeout(function() {
+                        location.reload();
+                    }, 3000);
+                    
+                } else {
+                    $status.text('Errore durante il polling').css('color', '#dc3232');
+                    
+                    var html = '<div class="notice notice-error inline"><p><strong>Errore Polling:</strong><br>';
+                    html += result.message || 'Errore sconosciuto';
+                    html += '</p></div>';
+                    
+                    $resultsContent.html(html);
+                    $results.show();
+                }
+                
+                $btn.prop('disabled', false).text('Forza Polling Ora');
+                
+            }).fail(function() {
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+                $btn.prop('disabled', false).text('Forza Polling Ora');
+            });
+        });
+        
+        // Test Polling handler (normal execution)
+        $('#test-polling').click(function() {
+            var $btn = $(this);
+            var $status = $('#polling-status');
+            var $results = $('#polling-results');
+            var $resultsContent = $('#polling-results-content');
+            
+            $btn.prop('disabled', true).text('Testando polling...');
+            $status.text('Test in corso...').css('color', '#0073aa');
+            $results.hide();
+            
+            $.post(ajaxurl, {
+                action: 'hic_force_polling',
+                force: 'false',
+                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
+            }, function(response) {
+                var result = JSON.parse(response);
+                
+                if (result.success) {
+                    $status.text('Test completato!').css('color', '#46b450');
+                    
+                    var html = '<div class="notice notice-success inline"><p><strong>Test Polling Completato:</strong><br>';
+                    html += 'Messaggio: ' + result.message + '<br>';
+                    if (result.execution_time) {
+                        html += 'Tempo esecuzione: ' + result.execution_time + ' secondi<br>';
+                    }
+                    html += '</p></div>';
+                    
+                } else {
+                    $status.text('Test fallito').css('color', '#dc3232');
+                    
+                    var html = '<div class="notice notice-warning inline"><p><strong>Test Polling Fallito:</strong><br>';
+                    html += result.message || 'Errore sconosciuto';
+                    
+                    // Add detailed diagnostics for troubleshooting
+                    if (result.diagnostics_before) {
+                        html += '<br><br><strong>Diagnostica:</strong><ul>';
+                        var conditions = result.diagnostics_before.conditions;
+                        if (conditions) {
+                            Object.keys(conditions).forEach(function(key) {
+                                var status = conditions[key] ? '✅' : '❌';
+                                html += '<li>' + status + ' ' + key + ': ' + conditions[key] + '</li>';
+                            });
+                        }
+                        html += '</ul>';
+                        
+                        if (result.diagnostics_before.configuration) {
+                            html += '<strong>Configurazione:</strong><ul>';
+                            var config = result.diagnostics_before.configuration;
+                            Object.keys(config).forEach(function(key) {
+                                html += '<li>' + key + ': ' + config[key] + '</li>';
+                            });
+                            html += '</ul>';
+                        }
+                    }
+                    
+                    html += '</p></div>';
+                }
+                
+                $resultsContent.html(html);
+                $results.show();
+                $btn.prop('disabled', false).text('Test Polling (con lock)');
+                
+            }).fail(function() {
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+                $btn.prop('disabled', false).text('Test Polling (con lock)');
             });
         });
     });

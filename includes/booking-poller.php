@@ -94,6 +94,129 @@ class HIC_Booking_Poller {
     }
     
     /**
+     * Execute polling manually - for CLI and admin interface
+     */
+    public function execute_poll() {
+        $start_time = microtime(true);
+        hic_log('Manual polling execution started');
+        
+        if (!$this->should_poll()) {
+            $error = 'Polling conditions not met. Check credentials and connection type.';
+            hic_log('Manual polling failed: ' . $error);
+            return array('success' => false, 'message' => $error);
+        }
+        
+        try {
+            // Call the main polling function directly
+            if (function_exists('hic_api_poll_bookings')) {
+                hic_api_poll_bookings();
+                $execution_time = round(microtime(true) - $start_time, 2);
+                
+                $message = "Manual polling completed in {$execution_time}s";
+                hic_log($message);
+                
+                return array(
+                    'success' => true, 
+                    'message' => $message,
+                    'execution_time' => $execution_time
+                );
+            } else {
+                $error = 'hic_api_poll_bookings function not found';
+                hic_log('Manual polling failed: ' . $error);
+                return array('success' => false, 'message' => $error);
+            }
+        } catch (Exception $e) {
+            $error = 'Polling execution failed: ' . $e->getMessage();
+            hic_log($error);
+            return array('success' => false, 'message' => $error);
+        }
+    }
+    
+    /**
+     * Force execute polling (bypassing locks for manual execution)
+     */
+    public function force_execute_poll() {
+        $start_time = microtime(true);
+        hic_log('Force manual polling execution started');
+        
+        if (!$this->should_poll()) {
+            $error = 'Polling conditions not met. Check credentials and connection type.';
+            hic_log('Force manual polling failed: ' . $error);
+            return array('success' => false, 'message' => $error);
+        }
+        
+        try {
+            // Temporarily clear the lock to allow forced execution
+            $lock_cleared = false;
+            if (get_transient('hic_reliable_polling_lock')) {
+                delete_transient('hic_reliable_polling_lock');
+                $lock_cleared = true;
+                hic_log('Cleared existing polling lock for force execution');
+            }
+            
+            // Call the main polling function directly
+            if (function_exists('hic_api_poll_bookings')) {
+                hic_api_poll_bookings();
+                $execution_time = round(microtime(true) - $start_time, 2);
+                
+                $message = "Force manual polling completed in {$execution_time}s";
+                if ($lock_cleared) {
+                    $message .= " (lock was cleared)";
+                }
+                hic_log($message);
+                
+                return array(
+                    'success' => true, 
+                    'message' => $message,
+                    'execution_time' => $execution_time,
+                    'lock_cleared' => $lock_cleared
+                );
+            } else {
+                $error = 'hic_api_poll_bookings function not found';
+                hic_log('Force manual polling failed: ' . $error);
+                return array('success' => false, 'message' => $error);
+            }
+        } catch (Exception $e) {
+            $error = 'Force polling execution failed: ' . $e->getMessage();
+            hic_log($error);
+            return array('success' => false, 'message' => $error);
+        }
+    }
+    
+    /**
+     * Get detailed diagnostics including polling conditions
+     */
+    public function get_detailed_diagnostics() {
+        $base_stats = $this->get_stats();
+        
+        // Add detailed condition checks
+        $diagnostics = array_merge($base_stats, array(
+            'conditions' => array(
+                'reliable_polling_enabled' => hic_reliable_polling_enabled(),
+                'connection_type_api' => hic_get_connection_type() === 'api',
+                'api_url_configured' => !empty(hic_get_api_url()),
+                'has_credentials' => hic_has_basic_auth_credentials() || !empty(hic_get_api_key()),
+                'basic_auth_complete' => hic_has_basic_auth_credentials(),
+                'api_key_configured' => !empty(hic_get_api_key())
+            ),
+            'configuration' => array(
+                'connection_type' => hic_get_connection_type(),
+                'api_url' => hic_get_api_url() ? 'configured' : 'missing',
+                'property_id' => hic_get_property_id() ? 'configured' : 'missing',
+                'api_email' => hic_get_api_email() ? 'configured' : 'missing',
+                'api_password' => hic_get_api_password() ? 'configured' : 'missing',
+                'api_key' => hic_get_api_key() ? 'configured' : 'missing'
+            ),
+            'lock_status' => array(
+                'active' => get_transient('hic_reliable_polling_lock') ? true : false,
+                'timestamp' => get_transient('hic_reliable_polling_lock') ?: null
+            )
+        ));
+        
+        return $diagnostics;
+    }
+    
+    /**
      * Get polling statistics for diagnostics
      */
     public function get_stats() {
