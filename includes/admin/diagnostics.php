@@ -1592,6 +1592,149 @@ function hic_diagnostics_page() {
                 </table>
             </div>
             
+            <!-- Reliable Polling Diagnostics -->
+            <div class="card">
+                <h2>Sistema Polling Affidabile</h2>
+                <?php 
+                $reliable_stats = array();
+                if (class_exists('HIC_Booking_Poller')) {
+                    $poller = new HIC_Booking_Poller();
+                    $reliable_stats = $poller->get_stats();
+                }
+                ?>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Valore</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Sistema Attivo</td>
+                            <td>
+                                <?php if (class_exists('HIC_Booking_Poller')): ?>
+                                    <span class="status ok">✓ Attivo</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Non Caricato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Sistema di polling interno senza dipendenza da WP-Cron</td>
+                        </tr>
+                        
+                        <?php if (!empty($reliable_stats) && !isset($reliable_stats['error'])): ?>
+                        <tr>
+                            <td>Ultimo Polling</td>
+                            <td>
+                                <?php if ($reliable_stats['last_poll'] > 0): ?>
+                                    <span class="status ok"><?php echo esc_html(date('Y-m-d H:i:s', $reliable_stats['last_poll'])); ?></span><br>
+                                    <small><?php echo esc_html($reliable_stats['last_poll_human']); ?></small>
+                                <?php else: ?>
+                                    <span class="status warning">Mai</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Ultimo tentativo di polling eseguito</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Lag Polling</td>
+                            <td>
+                                <?php 
+                                $lag = $reliable_stats['lag_seconds'];
+                                if ($lag < 600): // Less than 10 minutes ?>
+                                    <span class="status ok"><?php echo esc_html($lag); ?> secondi</span>
+                                <?php elseif ($lag < 1800): // Less than 30 minutes ?>
+                                    <span class="status warning"><?php echo esc_html($lag); ?> secondi</span>
+                                <?php else: ?>
+                                    <span class="status error"><?php echo esc_html($lag); ?> secondi</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Tempo trascorso dall'ultimo polling (watchdog attivo oltre 15 min)</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Lock Attivo</td>
+                            <td>
+                                <?php if ($reliable_stats['lock_active']): ?>
+                                    <span class="status warning">🔒 Attivo</span>
+                                    <?php if (isset($reliable_stats['lock_age'])): ?>
+                                        <br><small>Da <?php echo esc_html($reliable_stats['lock_age']); ?> secondi</small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="status ok">🔓 Libero</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Lock TTL anti-overlap (max 4 minuti)</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi in Coda</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['total_events'] > 0 ? 'ok' : 'warning'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['total_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Totale eventi prenotazioni nella tabella queue</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi Processati</td>
+                            <td>
+                                <span class="status ok">
+                                    <?php echo esc_html(number_format($reliable_stats['processed_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi elaborati con successo</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi in Attesa</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['pending_events'] > 0 ? 'warning' : 'ok'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['pending_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi non ancora processati</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi con Errore</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['error_events'] > 0 ? 'error' : 'ok'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['error_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi con errori di processamento</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Attività 24h</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['events_24h'] > 0 ? 'ok' : 'warning'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['events_24h'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi ricevuti nelle ultime 24 ore</td>
+                        </tr>
+                        
+                        <?php else: ?>
+                        <tr>
+                            <td colspan="3">
+                                <span class="status error">
+                                    <?php if (isset($reliable_stats['error'])): ?>
+                                        Errore: <?php echo esc_html($reliable_stats['error']); ?>
+                                    <?php else: ?>
+                                        Statistiche non disponibili
+                                    <?php endif; ?>
+                                </span>
+                            </td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            
             <!-- Error Summary Section -->
             <div class="card">
                 <h2>Riepilogo Errori</h2>

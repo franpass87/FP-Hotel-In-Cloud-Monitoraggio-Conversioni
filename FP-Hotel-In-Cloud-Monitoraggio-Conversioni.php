@@ -22,6 +22,14 @@ require_once plugin_dir_path(__FILE__) . 'includes/integrations/brevo.php';
 require_once plugin_dir_path(__FILE__) . 'includes/api/webhook.php';
 require_once plugin_dir_path(__FILE__) . 'includes/api/polling.php';
 
+// Include new reliable booking poller
+require_once plugin_dir_path(__FILE__) . 'includes/booking-poller.php';
+
+// Include CLI commands (only if WP-CLI is available)
+if (defined('WP_CLI') && WP_CLI) {
+    require_once plugin_dir_path(__FILE__) . 'includes/cli.php';
+}
+
 // Include admin interface (only in admin area)
 if (is_admin()) {
     require_once plugin_dir_path(__FILE__) . 'includes/admin/admin-settings.php';

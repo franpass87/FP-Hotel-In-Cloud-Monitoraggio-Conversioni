@@ -87,7 +87,7 @@ function hic_get_polling_range_extension_days() { return intval(hic_get_option('
  */
 function hic_get_polling_interval() { 
     $interval = hic_get_option('polling_interval', 'every_two_minutes'); 
-    $valid_intervals = array('every_minute', 'every_two_minutes', 'hic_poll_interval');
+    $valid_intervals = array('every_minute', 'every_two_minutes', 'hic_poll_interval', 'hic_reliable_interval');
     return in_array($interval, $valid_intervals) ? $interval : 'every_two_minutes';
 }
 
