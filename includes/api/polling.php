@@ -33,6 +33,11 @@ function hic_handle_api_response($response, $context = 'API call') {
     // Provide more specific error messages for common HTTP codes
     switch ($code) {
       case 400:
+        // Check for specific timestamp error
+        if (strpos($body, 'timestamp can\'t be older than seven days') !== false || 
+            strpos($body, 'the timestamp can\'t be older than seven days') !== false) {
+          return new WP_Error('hic_timestamp_too_old', "HTTP 400 - Il timestamp è troppo vecchio (oltre 7 giorni). Il sistema resetterà automaticamente il timestamp per la prossima richiesta.");
+        }
         return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Verifica i parametri: date_type deve essere checkin, checkout o presence per /reservations. Usa /reservations_updates con updated_after per modifiche recenti.");
       case 401:
         return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide. Verifica email e password API.");
@@ -501,10 +506,24 @@ function hic_api_poll_updates(){
     
     // Add safety overlap to prevent gaps between polling intervals
     $overlap_seconds = 300; // 5 minute overlap for safety
-    $last_since = get_option('hic_last_updates_since', time() - DAY_IN_SECONDS);
+    
+    // Ensure we never use a timestamp older than 6 days (API limit is 7 days)
+    $current_time = time();
+    $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin
+    $earliest_allowed = $current_time - $max_lookback_seconds;
+    $default_since = max($earliest_allowed, $current_time - DAY_IN_SECONDS); // Default to 1 day ago or earliest allowed
+    
+    $last_since = get_option('hic_last_updates_since', $default_since);
+    
+    // Validate that the stored timestamp is not too old
+    if ($last_since < $earliest_allowed) {
+        hic_log("Internal Scheduler: Stored timestamp too old (" . date('Y-m-d H:i:s', $last_since) . "), resetting to earliest allowed: " . date('Y-m-d H:i:s', $earliest_allowed));
+        $last_since = $earliest_allowed;
+        update_option('hic_last_updates_since', $last_since);
+    }
+    
     $since = max(0, $last_since - $overlap_seconds);
     
-    $current_time = time();
     hic_log("Internal Scheduler: polling updates for property $prop");
     hic_log("Internal Scheduler: last timestamp: " . date('Y-m-d H:i:s', $last_since) . " ($last_since)");
     hic_log("Internal Scheduler: requesting since: " . date('Y-m-d H:i:s', $since) . " ($since) [overlap: {$overlap_seconds}s]");
@@ -550,7 +569,15 @@ function hic_api_poll_updates(){
         update_option('hic_last_updates_since', $new_timestamp);
         hic_log('Internal Scheduler: hic_api_poll_updates completed successfully');
     } else {
-        hic_log('Internal Scheduler: hic_api_poll_updates failed: ' . $out->get_error_message());
+        $error_message = $out->get_error_message();
+        hic_log('Internal Scheduler: hic_api_poll_updates failed: ' . $error_message);
+        
+        // Check if this is a timestamp too old error and reset if necessary
+        if ($out->get_error_code() === 'hic_timestamp_too_old') {
+            $reset_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
+            update_option('hic_last_updates_since', $reset_timestamp);
+            hic_log('Internal Scheduler: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $reset_timestamp) . " ($reset_timestamp)");
+        }
     }
 }
 
@@ -1151,7 +1178,18 @@ function hic_api_poll_bookings_continuous() {
         
         // Check for new and updated reservations using /reservations_updates endpoint
         // This is the most effective way to catch recently created/modified reservations
-        $last_continuous_check = get_option('hic_last_continuous_check', $current_time - 7200); // Default to 2 hours ago
+        $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin
+        $earliest_allowed = $current_time - $max_lookback_seconds;
+        $default_check = max($earliest_allowed, $current_time - 7200); // Default to 2 hours ago or earliest allowed
+        
+        $last_continuous_check = get_option('hic_last_continuous_check', $default_check);
+        
+        // Validate that the stored timestamp is not too old
+        if ($last_continuous_check < $earliest_allowed) {
+            hic_log("Continuous Polling: Stored timestamp too old (" . date('Y-m-d H:i:s', $last_continuous_check) . "), resetting to earliest allowed: " . date('Y-m-d H:i:s', $earliest_allowed));
+            $last_continuous_check = $earliest_allowed;
+            update_option('hic_last_continuous_check', $last_continuous_check);
+        }
         
         hic_log("Continuous Polling: Checking for updates since " . date('Y-m-d H:i:s', $last_continuous_check));
         $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_continuous_check, 50);
@@ -1169,8 +1207,16 @@ function hic_api_poll_bookings_continuous() {
             // Update the last check timestamp
             update_option('hic_last_continuous_check', $current_time);
         } else {
-            hic_log("Continuous Polling: Error checking for updates: " . $updated_reservations->get_error_message());
+            $error_message = $updated_reservations->get_error_message();
+            hic_log("Continuous Polling: Error checking for updates: " . $error_message);
             $total_errors++;
+            
+            // Check if this is a timestamp too old error and reset if necessary
+            if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
+                $reset_timestamp = $current_time - (2 * 60 * 60); // Reset to 2 hours ago for continuous polling
+                update_option('hic_last_continuous_check', $reset_timestamp);
+                hic_log('Continuous Polling: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $reset_timestamp) . " ($reset_timestamp)");
+            }
         }
         
         // Also check by check-in date for today and tomorrow (catch modifications)
