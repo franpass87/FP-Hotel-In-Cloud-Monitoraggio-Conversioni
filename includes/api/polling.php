@@ -84,7 +84,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
     if ($date_type === 'created') {
         $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
-        $args = array('since' => strtotime($from_date));
+        $args = array('since' => $from_date); // Use date string format instead of timestamp
         if ($limit) $args['limit'] = (int)$limit;
         // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
     } else {
@@ -1164,7 +1164,7 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
     // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
     if ($date_type === 'created') {
         $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
-        $args = array('since' => strtotime($from_date));
+        $args = array('since' => $from_date); // Use date string format instead of timestamp
         if ($limit) $args['limit'] = (int)$limit;
         // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
     } else {
