@@ -689,9 +689,46 @@ function hic_get_error_stats() {
 /* ============ AJAX Handlers ============ */
 
 /**
- * Get the latest bookings from the API
+ * Get the downloaded booking IDs to avoid duplicates
  */
-function hic_get_latest_bookings($limit = 5) {
+function hic_get_downloaded_booking_ids() {
+    return get_option('hic_downloaded_booking_ids', array());
+}
+
+/**
+ * Add booking IDs to the downloaded list
+ */
+function hic_mark_bookings_as_downloaded($booking_ids) {
+    $downloaded_ids = hic_get_downloaded_booking_ids();
+    
+    foreach ($booking_ids as $id) {
+        if (!in_array($id, $downloaded_ids)) {
+            $downloaded_ids[] = $id;
+        }
+    }
+    
+    // Keep only the last 100 downloaded IDs to prevent the list from growing indefinitely
+    if (count($downloaded_ids) > 100) {
+        $downloaded_ids = array_slice($downloaded_ids, -100);
+    }
+    
+    update_option('hic_downloaded_booking_ids', $downloaded_ids);
+    
+    hic_log("Marked " . count($booking_ids) . " bookings as downloaded. Total tracked: " . count($downloaded_ids));
+}
+
+/**
+ * Reset the downloaded bookings tracking (admin function)
+ */
+function hic_reset_downloaded_bookings() {
+    delete_option('hic_downloaded_booking_ids');
+    hic_log("Reset downloaded bookings tracking");
+}
+
+/**
+ * Get the latest bookings from the API (with duplicate prevention)
+ */
+function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     $prop_id = hic_get_property_id();
     
     if (!$prop_id) {
@@ -708,14 +745,21 @@ function hic_get_latest_bookings($limit = 5) {
         return new WP_Error('missing_credentials', 'Credenziali API non configurate');
     }
     
+    // Get downloaded booking IDs for filtering
+    $downloaded_ids = $skip_downloaded ? hic_get_downloaded_booking_ids() : array();
+    
     // Get bookings from the last 30 days to ensure we get recent ones
     $to_date = date('Y-m-d H:i:s');
     $from_date = date('Y-m-d H:i:s', strtotime('-30 days'));
     
-    hic_log("Fetching latest $limit bookings for property $prop_id from $from_date to $to_date");
+    hic_log("Fetching latest $limit bookings for property $prop_id from $from_date to $to_date" . 
+            ($skip_downloaded ? " (skipping " . count($downloaded_ids) . " already downloaded)" : ""));
+    
+    // Get more bookings to account for filtering out downloaded ones
+    $fetch_limit = $skip_downloaded ? $limit * 3 : $limit * 2;
     
     // Use the existing fetch function but without processing
-    $result = hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, $limit * 2); // Get more to account for filtering
+    $result = hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, $fetch_limit);
     
     if (is_wp_error($result)) {
         return $result;
@@ -725,12 +769,25 @@ function hic_get_latest_bookings($limit = 5) {
         return new WP_Error('invalid_response', 'Risposta API non valida');
     }
     
-    // Sort by creation date or check-in date (newest first)
+    // Sort by creation date (newest first)
     usort($result, function($a, $b) {
         $date_a = isset($a['created_at']) ? $a['created_at'] : $a['from_date'];
         $date_b = isset($b['created_at']) ? $b['created_at'] : $b['from_date'];
         return strtotime($date_b) - strtotime($date_a);
     });
+    
+    // Filter out already downloaded bookings if skip_downloaded is true
+    if ($skip_downloaded && !empty($downloaded_ids)) {
+        $result = array_filter($result, function($booking) use ($downloaded_ids) {
+            $booking_id = $booking['id'] ?? '';
+            return !in_array($booking_id, $downloaded_ids);
+        });
+        
+        // Re-index the array after filtering
+        $result = array_values($result);
+        
+        hic_log("After filtering downloaded bookings: " . count($result) . " bookings remain");
+    }
     
     // Return only the requested number
     return array_slice($result, 0, $limit);
@@ -857,6 +914,7 @@ add_action('wp_ajax_hic_test_dispatch', 'hic_ajax_test_dispatch');
 add_action('wp_ajax_hic_force_reschedule', 'hic_ajax_force_reschedule');
 add_action('wp_ajax_hic_backfill_reservations', 'hic_ajax_backfill_reservations');
 add_action('wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_bookings');
+add_action('wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
 
 function hic_ajax_manual_cron_test() {
     // Verify nonce
@@ -976,8 +1034,8 @@ function hic_ajax_download_latest_bookings() {
     $format = sanitize_text_field($_POST['format'] ?? 'json');
     
     try {
-        // Get latest bookings
-        $result = hic_get_latest_bookings(5);
+        // Get latest bookings (with duplicate prevention)
+        $result = hic_get_latest_bookings(5, true);
         
         if (is_wp_error($result)) {
             wp_die(json_encode(array(
@@ -987,10 +1045,33 @@ function hic_ajax_download_latest_bookings() {
         }
         
         if (empty($result)) {
-            wp_die(json_encode(array(
-                'success' => false, 
-                'message' => 'Nessuna prenotazione trovata'
-            )));
+            // Check if we have any bookings at all (without filtering)
+            $all_bookings = hic_get_latest_bookings(5, false);
+            if (is_wp_error($all_bookings) || empty($all_bookings)) {
+                wp_die(json_encode(array(
+                    'success' => false, 
+                    'message' => 'Nessuna prenotazione trovata nell\'API'
+                )));
+            } else {
+                wp_die(json_encode(array(
+                    'success' => false, 
+                    'message' => 'Tutte le ultime 5 prenotazioni sono già state scaricate. Usa il bottone "Reset Download Tracking" per scaricarle nuovamente.',
+                    'already_downloaded' => true
+                )));
+            }
+        }
+        
+        // Extract booking IDs for tracking
+        $booking_ids = array();
+        foreach ($result as $booking) {
+            if (isset($booking['id']) && !empty($booking['id'])) {
+                $booking_ids[] = $booking['id'];
+            }
+        }
+        
+        // Mark these bookings as downloaded
+        if (!empty($booking_ids)) {
+            hic_mark_bookings_as_downloaded($booking_ids);
         }
         
         // Format the data based on requested format
@@ -1003,7 +1084,8 @@ function hic_ajax_download_latest_bookings() {
                 'format' => 'csv',
                 'filename' => $filename,
                 'data' => $csv_data,
-                'count' => count($result)
+                'count' => count($result),
+                'booking_ids' => $booking_ids
             )));
         } else {
             // JSON format
@@ -1014,7 +1096,8 @@ function hic_ajax_download_latest_bookings() {
                 'format' => 'json',
                 'filename' => $filename,
                 'data' => $result,
-                'count' => count($result)
+                'count' => count($result),
+                'booking_ids' => $booking_ids
             )));
         }
         
@@ -1022,6 +1105,34 @@ function hic_ajax_download_latest_bookings() {
         wp_die(json_encode(array(
             'success' => false, 
             'message' => 'Errore: ' . $e->getMessage()
+        )));
+    }
+}
+
+function hic_ajax_reset_download_tracking() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    try {
+        // Reset the download tracking
+        hic_reset_downloaded_bookings();
+        
+        wp_die(json_encode(array(
+            'success' => true,
+            'message' => 'Tracking dei download resettato con successo. Ora puoi scaricare nuovamente tutte le prenotazioni.'
+        )));
+        
+    } catch (Exception $e) {
+        wp_die(json_encode(array(
+            'success' => false, 
+            'message' => 'Errore durante il reset: ' . $e->getMessage()
         )));
     }
 }
@@ -1203,7 +1314,24 @@ function hic_diagnostics_page() {
             <!-- Download Latest Bookings Section -->
             <div class="card">
                 <h2>Scarica Ultime Prenotazioni</h2>
-                <p>Scarica le ultime 5 prenotazioni dal sistema Hotel in Cloud per controllo rapido.</p>
+                <p>Scarica le ultime 5 prenotazioni create dal sistema Hotel in Cloud per controllo rapido. Le prenotazioni già scaricate vengono automaticamente saltate.</p>
+                
+                <?php 
+                $downloaded_ids = hic_get_downloaded_booking_ids();
+                $downloaded_count = count($downloaded_ids);
+                ?>
+                
+                <!-- Download Tracking Status -->
+                <div class="notice notice-info inline" style="margin-bottom: 15px;">
+                    <p><strong>Status Tracking Download:</strong></p>
+                    <ul>
+                        <li>Prenotazioni già scaricate: <strong><?php echo esc_html($downloaded_count); ?></strong></li>
+                        <li>Sistema anti-duplicazione: <span class="status ok">✓ Attivo</span></li>
+                        <?php if ($downloaded_count > 0): ?>
+                            <li>Ultime ID scaricate: <code><?php echo esc_html(implode(', ', array_slice($downloaded_ids, -3))); ?></code></li>
+                        <?php endif; ?>
+                    </ul>
+                </div>
                 
                 <table class="form-table">
                     <tr>
@@ -1223,18 +1351,26 @@ function hic_diagnostics_page() {
                 <p>
                     <button class="button button-primary" id="download-latest-bookings">
                         <span class="dashicons dashicons-download" style="margin-top: 3px;"></span>
-                        Scarica Ultime 5 Prenotazioni
+                        Scarica Ultime 5 Prenotazioni (Non Scaricate)
                     </button>
+                    <?php if ($downloaded_count > 0): ?>
+                        <button class="button button-secondary" id="reset-download-tracking" style="margin-left: 10px;">
+                            <span class="dashicons dashicons-update-alt" style="margin-top: 3px;"></span>
+                            Reset Tracking Download
+                        </button>
+                    <?php endif; ?>
                     <span id="download-status" style="margin-left: 10px; font-weight: bold;"></span>
                 </p>
                 
                 <div class="notice notice-info inline" style="margin-top: 15px;">
                     <p><strong>Note:</strong></p>
                     <ul>
-                        <li>Vengono scaricate le ultime 5 prenotazioni basate sulla data di check-in</li>
+                        <li><strong>Anti-duplicazione:</strong> Vengono scaricate solo le prenotazioni mai scaricate prima</li>
+                        <li><strong>Ordinamento:</strong> Le ultime 5 prenotazioni basate sulla data di creazione (più recenti)</li>
+                        <li><strong>Tracking automatico:</strong> Il sistema ricorda quali prenotazioni sono state scaricate</li>
+                        <li><strong>Reset tracking:</strong> Usa il bottone "Reset" per consentire il nuovo download delle stesse prenotazioni</li>
                         <li>Il download include: ID, dati cliente, camera, date, importo e stato</li>
                         <li>Richiede connessione API configurata (non funziona in modalità webhook)</li>
-                        <li>Il file viene generato al momento e scaricato automaticamente</li>
                     </ul>
                 </div>
             </div>
@@ -2476,6 +2612,50 @@ function hic_diagnostics_page() {
                     
                 } else {
                     $status.text('Errore durante il download').css('color', '#dc3232');
+                    if (result.already_downloaded) {
+                        // Special handling for already downloaded message
+                        alert(result.message);
+                    } else {
+                        alert('Errore: ' + result.message);
+                    }
+                }
+                
+                $btn.prop('disabled', false);
+                
+            }).fail(function() {
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+                $btn.prop('disabled', false);
+            });
+        });
+        
+        // Reset download tracking handler
+        $('#reset-download-tracking').click(function() {
+            var $btn = $(this);
+            var $status = $('#download-status');
+            
+            if (!confirm('Vuoi resettare il tracking dei download? Dopo il reset potrai scaricare nuovamente tutte le prenotazioni.')) {
+                return;
+            }
+            
+            $btn.prop('disabled', true);
+            $status.text('Resettando tracking...').css('color', '#0073aa');
+            
+            $.post(ajaxurl, {
+                action: 'hic_reset_download_tracking',
+                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
+            }, function(response) {
+                var result = JSON.parse(response);
+                
+                if (result.success) {
+                    $status.text('Tracking resettato!').css('color', '#46b450');
+                    
+                    // Refresh the page after 2 seconds to update the UI
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                    
+                } else {
+                    $status.text('Errore durante il reset').css('color', '#dc3232');
                     alert('Errore: ' + result.message);
                 }
                 
