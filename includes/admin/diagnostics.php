@@ -661,9 +661,9 @@ function hic_ajax_backfill_reservations() {
     $date_type = sanitize_text_field($_POST['date_type'] ?? 'checkin');
     $limit = isset($_POST['limit']) ? intval($_POST['limit']) : null;
     
-    // Validate date type (based on API documentation: checkin, checkout, presence for /reservations, created for /reservations_updates)
-    if (!in_array($date_type, array('checkin', 'checkout', 'presence', 'created'))) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout", "presence" o "created".')));
+    // Validate date type (based on API documentation: only checkin, checkout, presence are valid for /reservations endpoint)
+    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence".')));
     }
     
     // Validate required fields
@@ -983,13 +983,12 @@ function hic_diagnostics_page() {
                                 <option value="checkin">Data Check-in</option>
                                 <option value="checkout">Data Check-out</option>
                                 <option value="presence">Periodo di presenza</option>
-                                <option value="created">Data Creazione</option>
                             </select>
                             <p class="description">
                                 <strong>Check-in:</strong> Prenotazioni per arrivi in questo periodo<br>
                                 <strong>Check-out:</strong> Prenotazioni per partenze in questo periodo<br>
-                                <strong>Presenza:</strong> Prenotazioni con soggiorno in questo periodo<br>
-                                <strong>Creazione:</strong> Prenotazioni create in questo periodo (usa endpoint /reservations_updates/)
+                                <strong>Presenza:</strong> Prenotazioni presenti in qualsiasi momento del periodo<br>
+                                <em>Nota:</em> Per nuove prenotazioni usa il polling automatico che controlla aggiornamenti recenti.
                             </p>
                         </td>
                     </tr>

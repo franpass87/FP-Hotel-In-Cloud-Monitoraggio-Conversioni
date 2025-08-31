@@ -33,7 +33,7 @@ function hic_handle_api_response($response, $context = 'API call') {
     // Provide more specific error messages for common HTTP codes
     switch ($code) {
       case 400:
-        return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Per date_type='created' usa endpoint /reservations_updates con updated_after timestamp. Per altri date_type (checkin, checkout, presence) usa /reservations.");
+        return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Verifica i parametri: date_type deve essere checkin, checkout o presence per /reservations. Usa /reservations_updates con updated_after per modifiche recenti.");
       case 401:
         return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide. Verifica email e password API.");
       case 403:
@@ -81,27 +81,18 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
         return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
     }
     
-    // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
-    if ($date_type === 'created') {
-        $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
-        // Convert date to timestamp for updated_after parameter (API expects Unix timestamp)
-        $updated_after_timestamp = is_numeric($from_date) ? (int)$from_date : strtotime($from_date);
-        $args = array('updated_after' => $updated_after_timestamp);
-        if ($limit) $args['limit'] = (int)$limit;
-        // Note: to_date is not supported by updates endpoint, it uses 'updated_after' parameter only
-    } else {
-        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
-        $args = array('date_type'=>$date_type,'from_date'=>$from_date,'to_date'=>$to_date);
-        if ($limit) $args['limit'] = (int)$limit;
+    // Validate date_type - only checkin, checkout, presence are valid for /reservations endpoint
+    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
+        return new WP_Error('hic_invalid_date_type', 'date_type deve essere checkin, checkout o presence. Per le modifiche recenti usa hic_fetch_reservations_updates()');
     }
+    
+    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+    $args = array('date_type'=>$date_type,'from_date'=>$from_date,'to_date'=>$to_date);
+    if ($limit) $args['limit'] = (int)$limit;
     $url = add_query_arg($args, $endpoint);
     
     // Log API call details for debugging
-    if ($date_type === 'created') {
-        hic_log("API Call (Updates endpoint): $url with updated_after timestamp: " . ($args['updated_after'] ?? 'not set'));
-    } else {
-        hic_log("API Call (Reservations endpoint): $url with params: " . json_encode($args));
-    }
+    hic_log("API Call (Reservations endpoint): $url with params: " . json_encode($args));
 
     $res = wp_remote_get($url, array(
         'timeout' => 30,
@@ -336,27 +327,29 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $total_errors = 0;
     $polling_errors = array();
     
-    // Poll by created date for recent bookings (most important for real-time)
-    $created_from = date('Y-m-d', $from_time);
-    $created_to = date('Y-m-d', $to_time);
-    
-    hic_log("Internal Scheduler: Polling by created date from $created_from to $created_to");
-    $created_reservations = hic_fetch_reservations_raw($prop_id, 'created', $created_from, $created_to, 100);
-    
-    if (!is_wp_error($created_reservations)) {
-        $created_count = is_array($created_reservations) ? count($created_reservations) : 0;
-        hic_log("Internal Scheduler: Found $created_count reservations by created date");
+        // Check for new and updated reservations using /reservations_updates endpoint
+        // This catches all recently created or modified reservations
+        $last_update_check = get_option('hic_last_update_check', $current_time - 7200); // Default to 2 hours ago
         
-        if ($created_count > 0) {
-            $process_result = hic_process_reservations_batch($created_reservations);
-            $total_new += $process_result['new'];
-            $total_skipped += $process_result['skipped'];
-            $total_errors += $process_result['errors'];
+        hic_log("Internal Scheduler: Checking for updates since " . date('Y-m-d H:i:s', $last_update_check));
+        $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_update_check, 100);
+        
+        if (!is_wp_error($updated_reservations)) {
+            $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
+            if ($updated_count > 0) {
+                hic_log("Internal Scheduler: Found $updated_count updated/new reservations");
+                $process_result = hic_process_reservations_batch($updated_reservations);
+                $total_new += $process_result['new'];
+                $total_skipped += $process_result['skipped'];
+                $total_errors += $process_result['errors'];
+            }
+            
+            // Update the last check timestamp
+            update_option('hic_last_update_check', $current_time);
+        } else {
+            $polling_errors[] = "updates polling: " . $updated_reservations->get_error_message();
+            $total_errors++;
         }
-    } else {
-        $polling_errors[] = "created date polling: " . $created_reservations->get_error_message();
-        $total_errors++;
-    }
     
     // Also poll by checkin date to catch any updates to existing bookings
     $checkin_from = date('Y-m-d', $from_time);
@@ -708,7 +701,7 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
     }
     
     $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
-    $args = array('since' => $since);
+    $args = array('updated_after' => $since);
     if ($limit) $args['limit'] = $limit;
     $url = add_query_arg($args, $endpoint);
     
@@ -989,12 +982,12 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
     
     hic_log("Backfill: Starting backfill from $from_date to $to_date (date_type: $date_type, limit: " . ($limit ?: 'none') . ")");
     
-    // Validate date type (based on API documentation: checkin, checkout, presence for /reservations, created for /reservations_updates)
-    // Note: For date_type='created', uses /reservations_updates endpoint with 'since' parameter
-    if (!in_array($date_type, array('checkin', 'checkout', 'presence', 'created'))) {
+    // Validate date_type (based on API documentation: checkin, checkout, presence for /reservations)
+    // Note: For recent updates, use hic_fetch_reservations_updates() instead
+    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
         return array(
             'success' => false,
-            'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout", "presence" o "created".',
+            'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence". Per aggiornamenti recenti usa la funzione updates.',
             'stats' => array()
         );
     }
@@ -1135,26 +1128,13 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
         return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
     }
     
-    // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
-    if ($date_type === 'created') {
-        $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
-        // Convert date to timestamp for updated_after parameter (API expects Unix timestamp)
-        $updated_after_timestamp = is_numeric($from_date) ? (int)$from_date : strtotime($from_date);
-        $args = array('updated_after' => $updated_after_timestamp);
-        if ($limit) $args['limit'] = (int)$limit;
-        // Note: to_date is not supported by updates endpoint, it uses 'updated_after' parameter only
-    } else {
-        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
-        $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
-        if ($limit) $args['limit'] = (int)$limit;
-    }
+    // Use standard /reservations/ endpoint - only valid date_type values supported
+    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+    $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
+    if ($limit) $args['limit'] = (int)$limit;
     $url = add_query_arg($args, $endpoint);
     
-    if ($date_type === 'created') {
-        hic_log("Backfill Raw API Call (Updates endpoint): $url with updated_after timestamp: " . ($args['updated_after'] ?? 'not set'));
-    } else {
-        hic_log("Backfill Raw API Call (Reservations endpoint): $url");
-    }
+    hic_log("Backfill Raw API Call (Reservations endpoint): $url");
 
     $res = wp_remote_get($url, array(
         'timeout' => 30,
@@ -1178,7 +1158,7 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
         // Provide specific error messages for common HTTP codes in backfill context
         switch ($code) {
             case 400:
-                return new WP_Error('hic_http', "HTTP 400 - Richiesta backfill non valida. Per date_type='created' usa endpoint /reservations_updates con updated_after timestamp. Per altri date_type usa /reservations con from_date/to_date.");
+                return new WP_Error('hic_http', "HTTP 400 - Richiesta backfill non valida. Verifica i parametri: date_type deve essere checkin, checkout o presence.");
             case 401:
                 return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide per backfill. Verifica email e password API.");
             case 403:
@@ -1245,24 +1225,27 @@ function hic_api_poll_bookings_continuous() {
         $total_skipped = 0;
         $total_errors = 0;
         
-        // Focus on created date first - this catches manual bookings and new online reservations
-        $created_from = date('Y-m-d', $from_time);
-        $created_to = date('Y-m-d', $to_time);
+        // Check for new and updated reservations using /reservations_updates endpoint
+        // This is the most effective way to catch recently created/modified reservations
+        $last_continuous_check = get_option('hic_last_continuous_check', $current_time - 7200); // Default to 2 hours ago
         
-        hic_log("Continuous Polling: Checking by created date from $created_from to $created_to");
-        $created_reservations = hic_fetch_reservations_raw($prop_id, 'created', $created_from, $created_to, 50);
+        hic_log("Continuous Polling: Checking for updates since " . date('Y-m-d H:i:s', $last_continuous_check));
+        $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_continuous_check, 50);
         
-        if (!is_wp_error($created_reservations)) {
-            $created_count = is_array($created_reservations) ? count($created_reservations) : 0;
-            if ($created_count > 0) {
-                hic_log("Continuous Polling: Found $created_count reservations by created date");
-                $process_result = hic_process_reservations_batch($created_reservations);
+        if (!is_wp_error($updated_reservations)) {
+            $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
+            if ($updated_count > 0) {
+                hic_log("Continuous Polling: Found $updated_count updated/new reservations");
+                $process_result = hic_process_reservations_batch($updated_reservations);
                 $total_new += $process_result['new'];
                 $total_skipped += $process_result['skipped'];
                 $total_errors += $process_result['errors'];
             }
+            
+            // Update the last check timestamp
+            update_option('hic_last_continuous_check', $current_time);
         } else {
-            hic_log("Continuous Polling: Error checking created reservations: " . $created_reservations->get_error_message());
+            hic_log("Continuous Polling: Error checking for updates: " . $updated_reservations->get_error_message());
             $total_errors++;
         }
         
@@ -1329,22 +1312,25 @@ function hic_api_poll_bookings_deep_check() {
         $total_skipped = 0;
         $total_errors = 0;
         
-        // Check by creation date - this is the most important for catching missed reservations
-        hic_log("Deep Check: Checking by created date from $from_date to $to_date");
-        $created_reservations = hic_fetch_reservations_raw($prop_id, 'created', $from_date, $to_date, 500);
+        // Check for updates in the last 5 days using /reservations_updates endpoint
+        // This catches any modifications or new reservations that might have been missed
+        $lookback_timestamp = $current_time - $lookback_seconds;
         
-        if (!is_wp_error($created_reservations)) {
-            $created_count = is_array($created_reservations) ? count($created_reservations) : 0;
-            hic_log("Deep Check: Found $created_count reservations by created date in 5-day window");
+        hic_log("Deep Check: Checking for updates since " . date('Y-m-d H:i:s', $lookback_timestamp));
+        $updated_reservations = hic_fetch_reservations_updates($prop_id, $lookback_timestamp, 500);
+        
+        if (!is_wp_error($updated_reservations)) {
+            $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
+            hic_log("Deep Check: Found $updated_count updated/new reservations in 5-day window");
             
-            if ($created_count > 0) {
-                $process_result = hic_process_reservations_batch($created_reservations);
+            if ($updated_count > 0) {
+                $process_result = hic_process_reservations_batch($updated_reservations);
                 $total_new += $process_result['new'];
                 $total_skipped += $process_result['skipped'];
                 $total_errors += $process_result['errors'];
             }
         } else {
-            hic_log("Deep Check: Error checking created reservations: " . $created_reservations->get_error_message());
+            hic_log("Deep Check: Error checking updates: " . $updated_reservations->get_error_message());
             $total_errors++;
         }
         
