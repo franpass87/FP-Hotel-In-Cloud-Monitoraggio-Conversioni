@@ -114,7 +114,7 @@ function hic_should_schedule_poll_event() {
     
     // Check if we have Basic Auth credentials or legacy API key
     $has_basic_auth = hic_has_basic_auth_credentials();
-    $has_legacy_key = hic_get_api_key();
+    $has_legacy_key = !empty(hic_get_api_key());
     
     return $has_basic_auth || $has_legacy_key;
 }

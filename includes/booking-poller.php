@@ -273,11 +273,11 @@ class HIC_Booking_Poller {
             ),
             'configuration' => array(
                 'connection_type' => hic_get_connection_type(),
-                'api_url' => hic_get_api_url() ? 'configured' : 'missing',
-                'property_id' => hic_get_property_id() ? 'configured' : 'missing',
-                'api_email' => hic_get_api_email() ? 'configured' : 'missing',
-                'api_password' => hic_get_api_password() ? 'configured' : 'missing',
-                'api_key' => hic_get_api_key() ? 'configured' : 'missing'
+                'api_url' => !empty(hic_get_api_url()) ? 'configured' : 'missing',
+                'property_id' => !empty(hic_get_property_id()) ? 'configured' : 'missing',
+                'api_email' => !empty(hic_get_api_email()) ? 'configured' : 'missing',
+                'api_password' => !empty(hic_get_api_password()) ? 'configured' : 'missing',
+                'api_key' => !empty(hic_get_api_key()) ? 'configured' : 'missing'
             ),
             'lock_status' => array(
                 'active' => get_transient('hic_reliable_polling_lock') ? true : false,
