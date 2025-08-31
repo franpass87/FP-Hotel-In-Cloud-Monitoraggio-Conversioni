@@ -137,6 +137,16 @@ Per **polling ogni minuto** (massime prestazioni):
 2. Controlla che le liste contatti esistano
 3. Verifica email prenotazione non sia già presente
 
+### Problema: "Backfill Errore 400 / Sistema Non Scarica Niente"
+**Soluzione**:
+1. Verifica che il tipo connessione sia "API Polling" (non webhook)
+2. Testa la connessione API dalle impostazioni HIC
+3. Controlla che Property ID, Email e Password API siano corretti
+4. Usa la funzione "Test Connessione API" nella sezione diagnostica
+5. Verifica nei log che non ci siano errori 401 (credenziali) o 403 (permessi)
+6. Se il backfill continua a dare errore 400, verifica il formato delle date (YYYY-MM-DD)
+7. Controlla che l'intervallo di date non superi i 6 mesi
+
 ## Monitoraggio Continuo
 
 ### Log da Monitorare

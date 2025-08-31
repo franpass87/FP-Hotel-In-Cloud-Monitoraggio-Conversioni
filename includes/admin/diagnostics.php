@@ -486,68 +486,6 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
 }
 
 /**
- * Raw fetch function that doesn't process reservations
- */
-function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, $limit = null) {
-    $base = rtrim(hic_get_api_url(), '/');
-    $email = hic_get_api_email();
-    $pass = hic_get_api_password();
-    
-    if (!$base || !$email || !$pass || !$prop_id) {
-        return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
-    }
-    
-    // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
-    if ($date_type === 'created') {
-        $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
-        $args = array('since' => strtotime($from_date));
-        if ($limit) $args['limit'] = (int)$limit;
-        // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
-    } else {
-        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
-        $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
-        if ($limit) $args['limit'] = (int)$limit;
-    }
-    $url = add_query_arg($args, $endpoint);
-    
-    hic_log("Raw API Call: $url");
-
-    $res = wp_remote_get($url, array(
-        'timeout' => 30,
-        'headers' => array(
-            'Authorization' => 'Basic ' . base64_encode("$email:$pass"),
-            'Accept' => 'application/json',
-            'User-Agent' => 'WP/FP-HIC-Plugin'
-        ),
-    ));
-    
-    if (is_wp_error($res)) {
-        hic_log("Raw API call failed: " . $res->get_error_message());
-        return $res;
-    }
-    
-    $code = wp_remote_retrieve_response_code($res);
-    if ($code !== 200) {
-        $body = wp_remote_retrieve_body($res);
-        hic_log("Raw API HTTP $code - Response body: " . substr($body, 0, 500));
-        return new WP_Error('hic_http', "HTTP $code - Errore API");
-    }
-    
-    $body = wp_remote_retrieve_body($res);
-    if (empty($body)) {
-        return new WP_Error('hic_empty_response', 'Empty response body');
-    }
-    
-    $data = json_decode($body, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        hic_log("JSON decode error: " . json_last_error_msg());
-        return new WP_Error('hic_json_error', 'Invalid JSON response');
-    }
-    
-    return $data;
-}
-
-/**
  * Format bookings as CSV
  */
 function hic_format_bookings_as_csv($bookings) {
