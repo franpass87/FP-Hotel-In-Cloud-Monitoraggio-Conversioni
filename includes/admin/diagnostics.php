@@ -962,7 +962,7 @@ function hic_ajax_refresh_diagnostics() {
     }
     
     $data = array(
-        'cron_status' => hic_get_cron_status(),
+        'scheduler_status' => hic_get_internal_scheduler_status(),
         'credentials_status' => hic_get_credentials_status(),
         'execution_stats' => hic_get_execution_stats(),
         'recent_logs' => hic_get_recent_log_entries(20),
@@ -1165,7 +1165,7 @@ function hic_diagnostics_page() {
     }
     
     // Get initial data
-    $cron_status = hic_get_cron_status();
+    $scheduler_status = hic_get_internal_scheduler_status();
     $credentials_status = hic_get_credentials_status();
     $execution_stats = hic_get_execution_stats();
     $recent_logs = hic_get_recent_log_entries(20);
@@ -1244,7 +1244,7 @@ function hic_diagnostics_page() {
                 
                 <p>
                     <button class="button button-secondary" id="refresh-diagnostics">Aggiorna Dati</button>
-                    <button class="button" id="force-reschedule">Forza Rischedulazione</button>
+                    <button class="button" id="force-reschedule">Riavvia Sistema Interno</button>
                     <button class="button" id="test-dispatch">Test Dispatch Funzioni</button>
                 </p>
             </div>
@@ -1413,15 +1413,15 @@ function hic_diagnostics_page() {
                         'message' => 'Modalità Webhook: Hotel in Cloud deve inviare webhook per TUTTE le prenotazioni, incluse quelle manuali.'
                     );
                 } elseif ($connection_type === 'api') {
-                    if (!$cron_status['poll_event']['scheduled']) {
+                    if (!$scheduler_status['internal_scheduler']['enabled'] || !$scheduler_status['internal_scheduler']['conditions_met']) {
                         $manual_booking_issues[] = array(
                             'type' => 'error',
-                            'message' => 'API Polling non schedulato: le prenotazioni manuali non verranno recuperate automaticamente.'
+                            'message' => 'Sistema di polling interno non attivo: le prenotazioni manuali non verranno recuperate automaticamente.'
                         );
                     } else {
                         $manual_booking_issues[] = array(
                             'type' => 'info',
-                            'message' => 'Modalità API Polling: le prenotazioni manuali vengono recuperate automaticamente ogni 1-2 minuti (quasi real-time).'
+                            'message' => 'Sistema di polling interno attivo: le prenotazioni manuali vengono recuperate automaticamente ogni 5 minuti.'
                         );
                     }
                 }
@@ -1470,12 +1470,19 @@ function hic_diagnostics_page() {
                     
                     <?php if ($connection_type === 'api'): ?>
                     <tr>
-                        <td>Prossimo Polling</td>
+                        <td>Sistema Polling</td>
                         <td>
-                            <?php if ($cron_status['poll_event']['scheduled']): ?>
-                                <span class="status ok"><?php echo esc_html($cron_status['poll_event']['next_run_human']); ?></span>
+                            <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
+                                <span class="status ok">
+                                    <?php 
+                                    echo 'Attivo';
+                                    if ($scheduler_status['internal_scheduler']['last_poll_human'] !== 'Mai eseguito') {
+                                        echo ' - Ultimo: ' . esc_html($scheduler_status['internal_scheduler']['last_poll_human']);
+                                    }
+                                    ?>
+                                </span>
                             <?php else: ?>
-                                <span class="status error">Non schedulato</span>
+                                <span class="status error">Non attivo</span>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -1558,123 +1565,41 @@ function hic_diagnostics_page() {
                 </ul>
             </div>
             
-            <!-- Cron Interval Diagnostics Section -->
+            <!-- System Configuration Section -->
             <div class="card">
-                <h2>Diagnostica Intervalli Cron</h2>
-                <?php 
-                // Get detailed cron information
-                $crons = _get_cron_array();
-                $schedules = wp_get_schedules();
-                ?>
-                
+                <h2>Configurazione Sistema</h2>
                 <table class="widefat">
-                    <tr>
-                        <td>Intervallo Configurato</td>
-                        <td>
-                            <?php 
-                            $polling_interval = hic_get_polling_interval();
-                            $intervals_map = array(
-                                'every_minute' => 'Ogni minuto (60s)',
-                                'every_two_minutes' => 'Ogni 2 minuti (120s)', 
-                                'hic_poll_interval' => 'Ogni 5 minuti (300s)'
-                            );
-                            echo '<strong>' . esc_html($intervals_map[$polling_interval] ?? $polling_interval) . '</strong>';
-                            ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Intervalli Quasi Real-time Registrati</td>
-                        <td>
-                            <?php 
-                            $quasi_realtime_intervals = array('every_minute', 'every_two_minutes');
-                            $registered_count = 0;
-                            foreach ($quasi_realtime_intervals as $interval) {
-                                if (isset($schedules[$interval])) {
-                                    $registered_count++;
-                                    echo '<span class="status ok">✓ ' . esc_html($schedules[$interval]['display']) . ' (' . $schedules[$interval]['interval'] . 's)</span><br>';
-                                } else {
-                                    echo '<span class="status error">✗ ' . esc_html($interval) . ' non registrato</span><br>';
-                                }
-                            }
-                            ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Intervallo Personalizzato Registrato</td>
-                        <td>
-                            <?php if (isset($schedules['hic_poll_interval'])): ?>
-                                <span class="status ok">✓ Registrato (<?php echo esc_html($schedules['hic_poll_interval']['interval']); ?> secondi)</span>
-                            <?php else: ?>
-                                <span class="status error">✗ NON Registrato</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    
-                    <?php 
-                    // Check what interval the scheduled events are actually using
-                    $poll_interval_used = null;
-                    $updates_interval_used = null;
-                    
-                    foreach ($crons as $timestamp => $cron) {
-                        if (isset($cron['hic_api_poll_event'])) {
-                            foreach ($cron['hic_api_poll_event'] as $key => $event) {
-                                $poll_interval_used = $event['schedule'];
-                            }
-                        }
-                        if (isset($cron['hic_api_updates_event'])) {
-                            foreach ($cron['hic_api_updates_event'] as $key => $event) {
-                                $updates_interval_used = $event['schedule'];
-                            }
-                        }
-                    }
-                    ?>
-                    
-                    <tr>
-                        <td>hic_api_poll_event - Intervallo Attuale</td>
-                        <td>
-                            <?php if ($poll_interval_used): ?>
-                                <?php 
-                                $actual_seconds = isset($schedules[$poll_interval_used]) ? $schedules[$poll_interval_used]['interval'] : 'N/A';
-                                $is_correct = $poll_interval_used === 'hic_poll_interval' && $actual_seconds == HIC_POLL_INTERVAL_SECONDS;
-                                ?>
-                                <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
-                                    <?php echo esc_html($poll_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
-                                </span>
-                                <?php if (!$is_correct): ?>
-                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (<?php echo HIC_POLL_INTERVAL_SECONDS; ?> sec)</small>
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Valore</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Tipo Connessione</td>
+                            <td><strong><?php echo esc_html(hic_get_connection_type()); ?></strong></td>
+                            <td>Modalità di comunicazione con Hotel in Cloud</td>
+                        </tr>
+                        <tr>
+                            <td>Sistema Polling Interno</td>
+                            <td>
+                                <?php if (hic_reliable_polling_enabled()): ?>
+                                    <span class="status ok">✓ Abilitato</span>
+                                <?php else: ?>
+                                    <span class="status warning">⚠ Disabilitato</span>
                                 <?php endif; ?>
-                            <?php else: ?>
-                                <span class="status error">Non schedulato</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    
-                    <tr>
-                        <td>hic_api_updates_event - Intervallo Attuale</td>
-                        <td>
-                            <?php if ($updates_interval_used): ?>
-                                <?php 
-                                $actual_seconds = isset($schedules[$updates_interval_used]) ? $schedules[$updates_interval_used]['interval'] : 'N/A';
-                                $is_correct = $updates_interval_used === 'hic_poll_interval' && $actual_seconds == HIC_POLL_INTERVAL_SECONDS;
-                                ?>
-                                <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
-                                    <?php echo esc_html($updates_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
-                                </span>
-                                <?php if (!$is_correct): ?>
-                                    <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (<?php echo HIC_POLL_INTERVAL_SECONDS; ?> sec)</small>
-                                <?php endif; ?>
-                            <?php else: ?>
-                                <span class="status error">Non schedulato</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
+                            </td>
+                            <td>Sistema di polling interno senza dipendenza da WP-Cron</td>
+                        </tr>
+                        <tr>
+                            <td>WP-Cron Legacy</td>
+                            <td><span class="status ok">✓ Rimosso</span></td>
+                            <td>Sistema legacy WP-Cron non più utilizzato</td>
+                        </tr>
+                    </tbody>
                 </table>
-                
-                <?php if (($poll_interval_used && $poll_interval_used !== 'hic_poll_interval') || ($updates_interval_used && $updates_interval_used !== 'hic_poll_interval')): ?>
-                <div class="notice notice-warning inline">
-                    <p><strong>Avviso:</strong> Gli eventi cron non stanno usando l'intervallo corretto. Usa il pulsante "Forza Rischedulazione" per correggere.</p>
-                </div>
-                <?php endif; ?>
                 
                 <h3>Sync Real-time Brevo</h3>
                 <table class="widefat">
@@ -1696,18 +1621,16 @@ function hic_diagnostics_page() {
                             </td>
                         </tr>
                         <tr>
-                            <td>Evento Retry Schedulato</td>
+                            <td>Sistema Retry</td>
                             <td>
-                                <?php if (isset($status['retry_event']['scheduled']) && $status['retry_event']['scheduled']): ?>
-                                    <span class="status ok">✓ Schedulato (<?php echo esc_html($status['retry_event']['next_run_human']); ?>)</span>
-                                <?php elseif (isset($status['retry_event']['conditions_met']) && $status['retry_event']['conditions_met']): ?>
-                                    <span class="status warning">⚠ Condizioni soddisfatte ma non schedulato</span>
+                                <?php if (function_exists('hic_should_schedule_retry_event') && hic_should_schedule_retry_event()): ?>
+                                    <span class="status ok">✓ Integrato nel polling interno</span>
                                 <?php else: ?>
                                     <span class="status error">✗ Non attivo (condizioni non soddisfatte)</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
-                        <?php if (isset($status['realtime_sync']['table_exists']) && $status['realtime_sync']['table_exists'] === false): ?>
+                        <?php if (isset($scheduler_status['realtime_sync']['table_exists']) && $scheduler_status['realtime_sync']['table_exists'] === false): ?>
                         <tr>
                             <td>Tabella Stati Sync</td>
                             <td><span class="status error">✗ Tabella non esistente</span></td>
@@ -1715,25 +1638,25 @@ function hic_diagnostics_page() {
                         <?php else: ?>
                         <tr>
                             <td>Prenotazioni Tracciate</td>
-                            <td><?php echo isset($status['realtime_sync']['total_tracked']) ? intval($status['realtime_sync']['total_tracked']) : '0'; ?></td>
+                            <td><?php echo isset($scheduler_status['realtime_sync']['total_tracked']) ? intval($scheduler_status['realtime_sync']['total_tracked']) : '0'; ?></td>
                         </tr>
                         <tr>
                             <td>Notificate con Successo</td>
                             <td>
-                                <span class="status ok"><?php echo isset($status['realtime_sync']['notified']) ? intval($status['realtime_sync']['notified']) : '0'; ?></span>
+                                <span class="status ok"><?php echo isset($scheduler_status['realtime_sync']['notified']) ? intval($scheduler_status['realtime_sync']['notified']) : '0'; ?></span>
                             </td>
                         </tr>
                         <tr>
                             <td>Fallite</td>
                             <td>
-                                <?php $failed = isset($status['realtime_sync']['failed']) ? intval($status['realtime_sync']['failed']) : 0; ?>
+                                <?php $failed = isset($scheduler_status['realtime_sync']['failed']) ? intval($scheduler_status['realtime_sync']['failed']) : 0; ?>
                                 <span class="status <?php echo $failed > 0 ? 'warning' : 'ok'; ?>"><?php echo $failed; ?></span>
                             </td>
                         </tr>
                         <tr>
                             <td>In Attesa</td>
                             <td>
-                                <?php $new = isset($status['realtime_sync']['new']) ? intval($status['realtime_sync']['new']) : 0; ?>
+                                <?php $new = isset($scheduler_status['realtime_sync']['new']) ? intval($scheduler_status['realtime_sync']['new']) : 0; ?>
                                 <span class="status <?php echo $new > 0 ? 'warning' : 'ok'; ?>"><?php echo $new; ?></span>
                             </td>
                         </tr>
@@ -2040,6 +1963,23 @@ function hic_diagnostics_page() {
                                 <?php endif; ?>
                             </td>
                             <td>Sistema di polling interno senza dipendenza da WP-Cron</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Tabella Queue</td>
+                            <td>
+                                <?php 
+                                global $wpdb;
+                                $queue_table = $wpdb->prefix . 'hic_booking_events';
+                                $queue_exists = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
+                                ?>
+                                <?php if ($queue_exists): ?>
+                                    <span class="status ok">✓ Trovata</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Queue table not found</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Tabella per la gestione degli eventi e deduplicazione</td>
                         </tr>
                         
                         <?php if (!empty($reliable_stats) && !isset($reliable_stats['error'])): ?>
@@ -2422,7 +2362,7 @@ function hic_diagnostics_page() {
                 
                 html += '</p></div>';
                 $results.html(html);
-                $btn.prop('disabled', false).text('Forza Rischedulazione');
+                $btn.prop('disabled', false).text('Riavvia Sistema Interno');
                 
                 // Refresh page after 2 seconds
                 setTimeout(function() {
