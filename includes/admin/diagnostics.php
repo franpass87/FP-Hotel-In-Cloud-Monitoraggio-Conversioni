@@ -904,12 +904,6 @@ function hic_diagnostics_page() {
             <!-- System Status Section -->
             <div class="card">
                 <h2>Stato Sistema</h2>
-                <p>
-                    <button class="button button-secondary" id="refresh-diagnostics">Aggiorna Dati</button>
-                    <button class="button" id="force-reschedule">Riavvia Sistema Interno</button>
-                    <button class="button" id="create-tables">Crea/Verifica Tabelle DB</button>
-                    <button class="button" id="test-dispatch">Test Dispatch Funzioni</button>
-                </p>
                 
                 <!-- Manual Polling Section -->
                 <div class="manual-polling-section" style="margin-top: 15px; padding: 10px; background: #f0f8ff; border-left: 4px solid #0073aa;">
@@ -1231,7 +1225,6 @@ function hic_diagnostics_page() {
                         <?php if ($connection_type === 'webhook'): ?>
                             <li><strong>Verifica configurazione Hotel in Cloud:</strong> Assicurati che i webhook siano configurati per inviare TUTTE le prenotazioni</li>
                             <li><strong>Considera API Polling:</strong> Per maggiore affidabilità, valuta il passaggio alla modalità "API Polling"</li>
-                            <li><strong>Test webhook:</strong> Usa il pulsante "Test Dispatch Funzioni" per verificare che le integrazioni funzionino</li>
                         <?php else: ?>
                             <li><strong>Modalità consigliata:</strong> API Polling è la modalità migliore per catturare automaticamente le prenotazioni manuali</li>
                             <li><strong>Frequenza polling:</strong> Il sistema utilizza Heartbeat API per controllare nuove prenotazioni ogni 60 secondi (indipendente dal traffico)</li>
@@ -1994,136 +1987,6 @@ function hic_diagnostics_page() {
     
     <script type="text/javascript">
     jQuery(document).ready(function($) {
-        // Refresh diagnostics handler
-        $('#refresh-diagnostics').click(function() {
-            var $btn = $(this);
-            $btn.prop('disabled', true).text('Aggiornando...');
-            
-            $.post(ajaxurl, {
-                action: 'hic_refresh_diagnostics',
-                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
-            }, function(response) {
-                var result = JSON.parse(response);
-                if (result.success) {
-                    location.reload(); // Simple refresh for now
-                } else {
-                    alert('Errore nell\'aggiornamento dati');
-                }
-                $btn.prop('disabled', false).text('Aggiorna Dati');
-            });
-        });
-        
-        // Create tables handler (for fixing "Queue table not found" errors)
-        $('#create-tables').click(function() {
-            var $btn = $(this);
-            var $results = $('#hic-test-results');
-            
-            if (!confirm('Vuoi creare/verificare le tabelle del database? Questa operazione è sicura e non cancella dati esistenti.')) {
-                return;
-            }
-            
-            $btn.prop('disabled', true).text('Creando tabelle...');
-            
-            $.post(ajaxurl, {
-                action: 'hic_create_tables',
-                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
-            }, function(response) {
-                var result = JSON.parse(response);
-                var messageClass = result.success ? 'notice-success' : 'notice-error';
-                var html = '<div class="notice ' + messageClass + ' inline"><p><strong>Creazione Tabelle:</strong><br>';
-                
-                if (result.success) {
-                    html += result.message;
-                    if (result.details) {
-                        html += '<br><em>Dettagli: ' + result.details + '</em>';
-                    }
-                } else {
-                    html += 'Errore: ' + (result.message || 'Unknown error');
-                }
-                
-                html += '</p></div>';
-                $results.html(html);
-                $btn.prop('disabled', false).text('Crea/Verifica Tabelle DB');
-                
-                // Refresh page after 3 seconds on success
-                if (result.success) {
-                    setTimeout(function() {
-                        location.reload();
-                    }, 3000);
-                }
-            });
-        });
-        
-        // Force reschedule handler
-        $('#force-reschedule').click(function() {
-            var $btn = $(this);
-            var $results = $('#hic-test-results');
-            
-            if (!confirm('Vuoi forzare la rischedulazione dei cron jobs?')) {
-                return;
-            }
-            
-            $btn.prop('disabled', true).text('Rischedulando...');
-            
-            $.post(ajaxurl, {
-                action: 'hic_force_reschedule',
-                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
-            }, function(response) {
-                var result = JSON.parse(response);
-                var html = '<div class="notice notice-info inline"><p><strong>Risultati Rischedulazione:</strong><br>';
-                
-                if (result.success) {
-                    Object.keys(result.results).forEach(function(key) {
-                        html += key + ': ' + result.results[key] + '<br>';
-                    });
-                } else {
-                    html += 'Errore: ' + (result.message || 'Unknown error');
-                }
-                
-                html += '</p></div>';
-                $results.html(html);
-                $btn.prop('disabled', false).text('Riavvia Sistema Interno');
-                
-                // Refresh page after 2 seconds
-                setTimeout(function() {
-                    location.reload();
-                }, 2000);
-            });
-        });
-        
-        // Test dispatch handler
-        $('#test-dispatch').click(function() {
-            var $btn = $(this);
-            var $results = $('#hic-test-results');
-            
-            if (!confirm('Vuoi testare le funzioni di dispatch con dati di esempio?')) {
-                return;
-            }
-            
-            $btn.prop('disabled', true).text('Testando...');
-            
-            $.post(ajaxurl, {
-                action: 'hic_test_dispatch',
-                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
-            }, function(response) {
-                var result = JSON.parse(response);
-                var messageClass = result.success ? 'notice-success' : 'notice-error';
-                var html = '<div class="notice ' + messageClass + ' inline"><p><strong>Test Dispatch:</strong><br>';
-                
-                if (result.success) {
-                    Object.keys(result.results).forEach(function(key) {
-                        html += key.toUpperCase() + ': ' + result.results[key] + '<br>';
-                    });
-                    html += '<br><em>Controlla i log per i dettagli.</em>';
-                } else {
-                    html += 'Errore: ' + (result.message || 'Unknown error');
-                }
-                
-                html += '</p></div>';
-                $results.html(html);
-                $btn.prop('disabled', false).text('Test Dispatch Funzioni');
-            });
-        });
         
         // Backfill handler
         $('#start-backfill').click(function() {
@@ -2417,9 +2280,9 @@ function hic_diagnostics_page() {
                     $resultsContent.html(html);
                     $results.show();
                     
-                    // Refresh diagnostics after 3 seconds
+                    // Refresh page after 3 seconds
                     setTimeout(function() {
-                        $('#refresh-diagnostics').trigger('click');
+                        location.reload();
                     }, 3000);
                     
                 } else {
