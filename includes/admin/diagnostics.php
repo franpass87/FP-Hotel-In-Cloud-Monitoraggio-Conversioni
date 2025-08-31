@@ -2481,6 +2481,7 @@ function hic_diagnostics_page() {
     </script>
 
 <?php
+} // End of hic_diagnostics_page() function
 
 /**
  * AJAX handler for downloading error logs
@@ -2515,7 +2516,4 @@ function hic_ajax_download_error_logs() {
     readfile($log_file);
     
     wp_die(); // Stop execution after download
-}
-
-    <?php
 }
