@@ -218,10 +218,10 @@ function hic_get_recent_log_entries($limit = 50) {
 
 
 /**
- * Test dispatch functions with sample data
+ * Test dispatch functions with sample data - Essential integrations only
  */
 function hic_test_dispatch_functions() {
-    // Test data for webhook-style integrations (legacy format)
+    // Test data for integrations
     $test_data = array(
         'reservation_id' => 'TEST_' . time(),
         'id' => 'TEST_' . time(),
@@ -239,115 +239,42 @@ function hic_test_dispatch_functions() {
     $results = array();
     
     try {
-        // Test with both organic (manual) and paid (gads) scenarios
+        // Test with organic traffic (no tracking IDs)
+        $gclid = null;
+        $fbclid = null;
         
-        // === TEST SCENARIO 1: Organic/Manual (no tracking IDs) ===
-        $organic_gclid = null;
-        $organic_fbclid = null;
-        $organic_sid = 'test_organic_' . time();
-        
-        // Test GA4 (Organic)
+        // Test GA4
         if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
-            hic_send_to_ga4($test_data, $organic_gclid, $organic_fbclid);
-            $results['ga4_organic'] = 'Test organic event sent to GA4';
+            hic_send_to_ga4($test_data, $gclid, $fbclid);
+            $results['ga4'] = 'Test event sent to GA4';
         } else {
-            $results['ga4_organic'] = 'GA4 not configured';
+            $results['ga4'] = 'GA4 not configured';
         }
         
-        // Test Facebook (Organic)
+        // Test Facebook
         if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
-            hic_send_to_fb($test_data, $organic_gclid, $organic_fbclid);
-            $results['facebook_organic'] = 'Test organic event sent to Facebook';
+            hic_send_to_fb($test_data, $gclid, $fbclid);
+            $results['facebook'] = 'Test event sent to Facebook';
         } else {
-            $results['facebook_organic'] = 'Facebook not configured';
+            $results['facebook'] = 'Facebook not configured';
         }
         
-        // Test Brevo (Organic)
+        // Test Brevo
         if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
-            hic_send_brevo_contact($test_data, $organic_gclid, $organic_fbclid);
-            hic_send_brevo_event($test_data, $organic_gclid, $organic_fbclid);
-            $results['brevo_organic'] = 'Test organic contact sent to Brevo';
+            hic_send_brevo_contact($test_data, $gclid, $fbclid);
+            hic_send_brevo_event($test_data, $gclid, $fbclid);
+            $results['brevo'] = 'Test contact and event sent to Brevo';
         } else {
-            $results['brevo_organic'] = 'Brevo not configured or disabled';
+            $results['brevo'] = 'Brevo not configured or disabled';
         }
-        
-        // === TEST SCENARIO 2: Paid Traffic (Google Ads) ===
-        $paid_gclid = 'test_gclid_' . time();
-        $paid_fbclid = null;
-        $paid_sid = 'test_gads_' . time();
-        
-        // Test GA4 (Paid)
-        if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
-            hic_send_to_ga4($test_data, $paid_gclid, $paid_fbclid);
-            $results['ga4_paid'] = 'Test paid (gads) event sent to GA4';
-        } else {
-            $results['ga4_paid'] = 'GA4 not configured';
-        }
-        
-        // Test Facebook (Paid)
-        if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
-            hic_send_to_fb($test_data, $paid_gclid, $paid_fbclid);
-            $results['facebook_paid'] = 'Test paid (gads) event sent to Facebook';
-        } else {
-            $results['facebook_paid'] = 'Facebook not configured';
-        }
-        
-        // Test Brevo (Paid)
-        if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
-            hic_send_brevo_contact($test_data, $paid_gclid, $paid_fbclid);
-            hic_send_brevo_event($test_data, $paid_gclid, $paid_fbclid);
-            $results['brevo_paid'] = 'Test paid (gads) contact sent to Brevo';
-        } else {
-            $results['brevo_paid'] = 'Brevo not configured or disabled';
-        }
-        
-        // === TEST SCENARIO 3: Facebook Ads Traffic (fbads) ===
-        $fb_gclid = null;
-        $fb_fbclid = 'test_fbclid_' . time();
-        $fb_sid = 'test_fbads_' . time();
-        
-        // Test GA4 (Facebook Ads)
-        if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
-            hic_send_to_ga4($test_data, $fb_gclid, $fb_fbclid);
-            $results['ga4_fbads'] = 'Test fbads event sent to GA4';
-        } else {
-            $results['ga4_fbads'] = 'GA4 not configured';
-        }
-        
-        // Test Facebook (Facebook Ads)
-        if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
-            hic_send_to_fb($test_data, $fb_gclid, $fb_fbclid);
-            $results['facebook_fbads'] = 'Test fbads event sent to Facebook';
-        } else {
-            $results['facebook_fbads'] = 'Facebook not configured';
-        }
-        
-        // Test Brevo (Facebook Ads)
-        if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
-            hic_send_brevo_contact($test_data, $fb_gclid, $fb_fbclid);
-            hic_send_brevo_event($test_data, $fb_gclid, $fb_fbclid);
-            $results['brevo_fbads'] = 'Test fbads contact sent to Brevo';
-        } else {
-            $results['brevo_fbads'] = 'Brevo not configured or disabled';
-        }
-        
-        // === EMAIL TESTS (Both scenarios use same email functions) ===
         
         // Test Admin Email
         $admin_email = hic_get_admin_email();
         if (!empty($admin_email)) {
-            hic_send_admin_email($test_data, $organic_gclid, $organic_fbclid, $organic_sid);
-            $results['admin_email'] = 'Test email sent to admin: ' . $admin_email . ' (bucket: organic)';
+            hic_send_admin_email($test_data, $gclid, $fbclid, 'test_' . time());
+            $results['admin_email'] = 'Test email sent to admin: ' . $admin_email;
         } else {
             $results['admin_email'] = 'Admin email not configured';
-        }
-        
-        // Test Francesco Email
-        if (hic_francesco_email_enabled()) {
-            hic_send_francesco_email($test_data, $paid_gclid, $paid_fbclid, $paid_sid);
-            $results['francesco_email'] = 'Test email sent to Francesco (bucket: gads)';
-        } else {
-            $results['francesco_email'] = 'Francesco email disabled in settings';
         }
         
         return array('success' => true, 'results' => $results);
@@ -357,169 +284,7 @@ function hic_test_dispatch_functions() {
     }
 }
 
-/**
- * Test bucket normalization function with all combinations
- */
-function hic_test_bucket_normalization() {
-    $test_cases = array(
-        // Test case format: [gclid, fbclid, expected_bucket, description]
-        array(null, null, 'organic', 'No tracking IDs (organic traffic)'),
-        array('', '', 'organic', 'Empty tracking IDs (organic traffic)'),
-        array('test_gclid_123', null, 'gads', 'Google Ads only (gclid priority)'),
-        array('test_gclid_123', '', 'gads', 'Google Ads with empty fbclid (gclid priority)'),
-        array(null, 'test_fbclid_456', 'fbads', 'Facebook Ads only (fbclid)'),
-        array('', 'test_fbclid_456', 'fbads', 'Facebook Ads with empty gclid (fbclid)'),
-        array('test_gclid_123', 'test_fbclid_456', 'gads', 'Both tracking IDs (gclid takes priority)'),
-        array('0', null, 'organic', 'String zero gclid (should be treated as empty)'),
-        array(null, '0', 'organic', 'String zero fbclid (should be treated as empty)'),
-        array('false', null, 'gads', 'String "false" gclid (non-empty string)'),
-        array(null, 'false', 'fbads', 'String "false" fbclid (non-empty string)')
-    );
-    
-    $results = array();
-    $passed = 0;
-    $failed = 0;
-    
-    foreach ($test_cases as $index => $test_case) {
-        list($gclid, $fbclid, $expected, $description) = $test_case;
-        
-        $actual = fp_normalize_bucket($gclid, $fbclid);
-        $test_passed = ($actual === $expected);
-        
-        if ($test_passed) {
-            $passed++;
-            $status = 'PASS';
-        } else {
-            $failed++;
-            $status = 'FAIL';
-        }
-        
-        $results[] = array(
-            'test' => $index + 1,
-            'description' => $description,
-            'gclid' => $gclid === null ? 'null' : "'" . $gclid . "'",
-            'fbclid' => $fbclid === null ? 'null' : "'" . $fbclid . "'",
-            'expected' => $expected,
-            'actual' => $actual,
-            'status' => $status
-        );
-    }
-    
-    // Test that legacy function still works
-    $legacy_result = hic_get_bucket('test_gclid', null);
-    if ($legacy_result === 'gads') {
-        $passed++;
-        $results[] = array(
-            'test' => 'legacy',
-            'description' => 'Legacy hic_get_bucket() function compatibility',
-            'gclid' => "'test_gclid'",
-            'fbclid' => 'null',
-            'expected' => 'gads',
-            'actual' => $legacy_result,
-            'status' => 'PASS'
-        );
-    } else {
-        $failed++;
-        $results[] = array(
-            'test' => 'legacy',
-            'description' => 'Legacy hic_get_bucket() function compatibility',
-            'gclid' => "'test_gclid'",
-            'fbclid' => 'null',
-            'expected' => 'gads',
-            'actual' => $legacy_result,
-            'status' => 'FAIL'
-        );
-    }
-    
-    return array(
-        'success' => $failed === 0,
-        'summary' => "Bucket normalization tests: {$passed} passed, {$failed} failed",
-        'passed' => $passed,
-        'failed' => $failed,
-        'results' => $results
-    );
-}
 
-/**
- * Test bucket normalization with actual dispatch functions
- */
-function hic_test_bucket_integration() {
-    $test_data = array(
-        'reservation_id' => 'BUCKET_TEST_' . time(),
-        'amount' => 100.00,
-        'currency' => 'EUR',
-        'email' => 'bucket-test@example.com',
-        'first_name' => 'Test',
-        'last_name' => 'Bucket',
-        'room' => 'Bucket Test Room'
-    );
-    
-    $test_scenarios = array(
-        array('scenario' => 'organic', 'gclid' => null, 'fbclid' => null),
-        array('scenario' => 'gads', 'gclid' => 'test_gclid_' . time(), 'fbclid' => null),
-        array('scenario' => 'fbads', 'gclid' => null, 'fbclid' => 'test_fbclid_' . time()),
-        array('scenario' => 'priority_test', 'gclid' => 'test_gclid_' . time(), 'fbclid' => 'test_fbclid_' . time())
-    );
-    
-    $results = array();
-    
-    foreach ($test_scenarios as $scenario) {
-        $expected_bucket = $scenario['scenario'] === 'priority_test' ? 'gads' : $scenario['scenario'];
-        $actual_bucket = fp_normalize_bucket($scenario['gclid'], $scenario['fbclid']);
-        
-        $test_result = array(
-            'scenario' => $scenario['scenario'],
-            'gclid' => $scenario['gclid'],
-            'fbclid' => $scenario['fbclid'],
-            'expected_bucket' => $expected_bucket,
-            'actual_bucket' => $actual_bucket,
-            'bucket_correct' => $actual_bucket === $expected_bucket,
-            'integrations' => array()
-        );
-        
-        // Test each integration with this scenario
-        $integrations = array(
-            'ga4' => function($data, $gclid, $fbclid) {
-                if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
-                    hic_send_to_ga4($data, $gclid, $fbclid);
-                    return 'sent';
-                }
-                return 'not_configured';
-            },
-            'facebook' => function($data, $gclid, $fbclid) {
-                if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
-                    hic_send_to_fb($data, $gclid, $fbclid);
-                    return 'sent';
-                }
-                return 'not_configured';
-            },
-            'brevo' => function($data, $gclid, $fbclid) {
-                if (!empty(hic_get_brevo_api_key())) {
-                    hic_send_brevo_event($data, $gclid, $fbclid);
-                    return 'sent';
-                }
-                return 'not_configured';
-            }
-        );
-        
-        foreach ($integrations as $name => $func) {
-            try {
-                $status = $func($test_data, $scenario['gclid'], $scenario['fbclid']);
-                $test_result['integrations'][$name] = $status;
-            } catch (Exception $e) {
-                $test_result['integrations'][$name] = 'error: ' . $e->getMessage();
-            }
-        }
-        
-        $results[] = $test_result;
-    }
-    
-    return array(
-        'success' => true,
-        'message' => 'Bucket integration tests completed',
-        'results' => $results
-    );
-}
 
 /**
  * Force restart of internal scheduler (replaces WP-Cron rescheduling)
@@ -980,9 +745,9 @@ function hic_ajax_backfill_reservations() {
     $date_type = sanitize_text_field($_POST['date_type'] ?? 'checkin');
     $limit = isset($_POST['limit']) ? intval($_POST['limit']) : null;
     
-    // Validate date type (based on API documentation: only checkin, checkout, presence are supported)
-    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence".')));
+    // Validate date type (based on API documentation: checkin, checkout, presence for /reservations, created for /reservations_updates)
+    if (!in_array($date_type, array('checkin', 'checkout', 'presence', 'created'))) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout", "presence" o "created".')));
     }
     
     // Validate required fields
@@ -1242,11 +1007,13 @@ function hic_diagnostics_page() {
                                 <option value="checkin">Data Check-in</option>
                                 <option value="checkout">Data Check-out</option>
                                 <option value="presence">Periodo di presenza</option>
+                                <option value="created">Data Creazione</option>
                             </select>
                             <p class="description">
                                 <strong>Check-in:</strong> Prenotazioni per arrivi in questo periodo<br>
                                 <strong>Check-out:</strong> Prenotazioni per partenze in questo periodo<br>
-                                <strong>Presenza:</strong> Prenotazioni con soggiorno in questo periodo
+                                <strong>Presenza:</strong> Prenotazioni con soggiorno in questo periodo<br>
+                                <strong>Creazione:</strong> Prenotazioni create in questo periodo (usa endpoint /reservations_updates/)
                             </p>
                         </td>
                     </tr>
@@ -1522,24 +1289,58 @@ function hic_diagnostics_page() {
                             <td>Sistema di polling interno senza dipendenza da WP-Cron</td>
                         </tr>
                         <tr>
-                            <td>WP-Cron Legacy</td>
-                            <td><span class="status ok">✓ Rimosso</span></td>
-                            <td>Sistema legacy WP-Cron non più utilizzato</td>
+                            <td>API URL</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['api_url'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['api_url'] ? 'Configurato' : 'Mancante'); ?>
+                            </span></td>
+                            <td>URL base per le chiamate API</td>
+                        </tr>
+                        <tr>
+                            <td>Property ID</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['property_id'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['property_id'] ? 'Configurato' : 'Mancante'); ?>
+                            </span></td>
+                            <td>ID della struttura alberghiera</td>
+                        </tr>
+                        <tr>
+                            <td>Credenziali API</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['api_email'] && $credentials_status['api_password'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['api_email'] && $credentials_status['api_password'] ? 'Configurate' : 'Mancanti'); ?>
+                            </span></td>
+                            <td>Email e password per autenticazione API</td>
                         </tr>
                     </tbody>
                 </table>
                 
-                <h3>Sync Real-time Brevo</h3>
+                <h3>Integrazioni Configurate</h3>
                 <table class="widefat">
-                    <thead>
-                        <tr>
-                            <th>Parametro</th>
-                            <th>Valore</th>
-                        </tr>
-                    </thead>
                     <tbody>
                         <tr>
-                            <td>Real-time Sync Abilitato</td>
+                            <td>GA4</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['ga4_configured'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['ga4_configured'] ? '✓ Configurato' : '✗ Non configurato'); ?>
+                            </span></td>
+                        </tr>
+                        <tr>
+                            <td>Brevo</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['brevo_configured'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['brevo_configured'] ? '✓ Configurato' : '✗ Non configurato'); ?>
+                            </span></td>
+                        </tr>
+                        <tr>
+                            <td>Facebook</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['facebook_configured'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['facebook_configured'] ? '✓ Configurato' : '✗ Non configurato'); ?>
+                            </span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>Real-time Sync</h3>
+                <table class="widefat">
+                    <tbody>
+                        <tr>
+                            <td>Real-time Sync Brevo</td>
                             <td>
                                 <?php if (hic_realtime_brevo_sync_enabled()): ?>
                                     <span class="status ok">✓ Abilitato</span>
@@ -1549,62 +1350,7 @@ function hic_diagnostics_page() {
                             </td>
                         </tr>
                         <tr>
-                            <td>Sistema Retry</td>
-                            <td>
-                                <?php if (function_exists('hic_should_schedule_retry_event') && hic_should_schedule_retry_event()): ?>
-                                    <span class="status ok">✓ Integrato nel polling interno</span>
-                                <?php else: ?>
-                                    <span class="status error">✗ Non attivo (condizioni non soddisfatte)</span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php if (isset($scheduler_status['realtime_sync']['table_exists']) && $scheduler_status['realtime_sync']['table_exists'] === false): ?>
-                        <tr>
-                            <td>Tabella Stati Sync</td>
-                            <td><span class="status error">✗ Tabella non esistente</span></td>
-                        </tr>
-                        <?php else: ?>
-                        <tr>
-                            <td>Prenotazioni Tracciate</td>
-                            <td><?php echo isset($scheduler_status['realtime_sync']['total_tracked']) ? intval($scheduler_status['realtime_sync']['total_tracked']) : '0'; ?></td>
-                        </tr>
-                        <tr>
-                            <td>Notificate con Successo</td>
-                            <td>
-                                <span class="status ok"><?php echo isset($scheduler_status['realtime_sync']['notified']) ? intval($scheduler_status['realtime_sync']['notified']) : '0'; ?></span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Fallite</td>
-                            <td>
-                                <?php $failed = isset($scheduler_status['realtime_sync']['failed']) ? intval($scheduler_status['realtime_sync']['failed']) : 0; ?>
-                                <span class="status <?php echo $failed > 0 ? 'warning' : 'ok'; ?>"><?php echo $failed; ?></span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>In Attesa</td>
-                            <td>
-                                <?php $new = isset($scheduler_status['realtime_sync']['new']) ? intval($scheduler_status['realtime_sync']['new']) : 0; ?>
-                                <span class="status <?php echo $new > 0 ? 'warning' : 'ok'; ?>"><?php echo $new; ?></span>
-                            </td>
-                        </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-                
-                <!-- Updates Polling Diagnostics -->
-                <h3>Diagnostica Updates Polling</h3>
-                <table class="widefat">
-                    <thead>
-                        <tr>
-                            <th>Parametro</th>
-                            <th>Valore</th>
-                            <th>Note</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Updates Enrichment Abilitato</td>
+                            <td>Updates Enrichment</td>
                             <td>
                                 <?php if (hic_updates_enrich_contacts()): ?>
                                     <span class="status ok">✓ Abilitato</span>
@@ -1612,153 +1358,29 @@ function hic_diagnostics_page() {
                                     <span class="status error">✗ Disabilitato</span>
                                 <?php endif; ?>
                             </td>
-                            <td>Controlla se il sistema di arricchimento contatti è attivo</td>
+                        </tr>
+                        <?php if (isset($scheduler_status['realtime_sync']['table_exists']) && $scheduler_status['realtime_sync']['table_exists'] !== false): ?>
+                        <tr>
+                            <td>Prenotazioni Tracciate</td>
+                            <td><?php echo isset($scheduler_status['realtime_sync']['total_tracked']) ? intval($scheduler_status['realtime_sync']['total_tracked']) : '0'; ?></td>
                         </tr>
                         <tr>
-                            <td>Ultimo Timestamp Updates</td>
+                            <td>Sync Riuscite / Fallite</td>
                             <td>
                                 <?php 
-                                $last_updates_since = get_option('hic_last_updates_since', 0);
-                                if ($last_updates_since > 0) {
-                                    $time_ago = human_time_diff($last_updates_since, time()) . ' fa';
-                                    echo '<span class="status ok">' . esc_html(date('Y-m-d H:i:s', $last_updates_since)) . '</span><br>';
-                                    echo '<small>Unix: ' . esc_html($last_updates_since) . ' (' . esc_html($time_ago) . ')</small>';
-                                } else {
-                                    echo '<span class="status warning">Non impostato</span>';
-                                }
+                                $notified = isset($scheduler_status['realtime_sync']['notified']) ? intval($scheduler_status['realtime_sync']['notified']) : 0;
+                                $failed = isset($scheduler_status['realtime_sync']['failed']) ? intval($scheduler_status['realtime_sync']['failed']) : 0;
                                 ?>
-                            </td>
-                            <td>Timestamp dell'ultimo update processato (con overlap di 5 min)</td>
-                        </tr>
-                        <tr>
-                            <td>Prossimo Polling Range</td>
-                            <td>
-                                <?php 
-                                if ($last_updates_since > 0) {
-                                    $overlap_seconds = 300; // Same as in polling function
-                                    $next_since = max(0, $last_updates_since - $overlap_seconds);
-                                    echo 'Richiederà updates dal: <br>';
-                                    echo '<strong>' . esc_html(date('Y-m-d H:i:s', $next_since)) . '</strong><br>';
-                                    echo '<small>Unix: ' . esc_html($next_since) . ' (overlap: ' . esc_html($overlap_seconds) . 's)</small>';
-                                } else {
-                                    echo '<span class="status warning">Non calcolabile</span>';
-                                }
-                                ?>
-                            </td>
-                            <td>Range che verrà richiesto nel prossimo polling</td>
-                        </tr>
-                        <tr>
-                            <td>Intervallo Updates Utilizzato</td>
-                            <td>
-                                <?php if ($updates_interval_used): ?>
-                                    <?php 
-                                    $actual_seconds = isset($schedules[$updates_interval_used]) ? $schedules[$updates_interval_used]['interval'] : 'N/A';
-                                    $is_correct = $updates_interval_used === 'hic_poll_interval' && $actual_seconds == HIC_POLL_INTERVAL_SECONDS;
-                                    ?>
-                                    <span class="status <?php echo $is_correct ? 'ok' : 'warning'; ?>">
-                                        <?php echo esc_html($updates_interval_used . ' (' . $actual_seconds . ' sec)'); ?>
-                                    </span>
-                                    <?php if (!$is_correct): ?>
-                                        <br><small style="color: #dc3232;">⚠ Dovrebbe usare hic_poll_interval (<?php echo HIC_POLL_INTERVAL_SECONDS; ?> sec)</small>
-                                    <?php endif; ?>
-                                <?php else: ?>
-                                    <span class="status error">Non schedulato</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>Intervallo effettivamente utilizzato per updates polling</td>
-                        </tr>
-                    </tbody>
-                </table>
-                
-                <h3>Intervalli HIC</h3>
-                <table class="widefat">
-                    <thead>
-                        <tr>
-                            <th>Nome Intervallo</th>
-                            <th>Secondi</th>
-                            <th>Descrizione</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        $hic_intervals = array();
-                        foreach ($schedules as $key => $schedule) {
-                            if (strpos($key, 'hic_') === 0) {
-                                $hic_intervals[$key] = $schedule;
-                            }
-                        }
-                        if (empty($hic_intervals)): ?>
-                        <tr>
-                            <td colspan="3" style="text-align: center; color: #ffb900; font-weight: bold;">
-                                Nessun intervallo HIC registrato
+                                <span class="status ok"><?php echo $notified; ?></span> / 
+                                <span class="status <?php echo $failed > 0 ? 'error' : 'ok'; ?>"><?php echo $failed; ?></span>
                             </td>
                         </tr>
-                        <?php else: ?>
-                            <?php foreach ($hic_intervals as $key => $schedule): ?>
-                            <tr>
-                                <td><code><?php echo esc_html($key); ?></code></td>
-                                <td><?php echo esc_html(number_format($schedule['interval'])); ?></td>
-                                <td><?php echo esc_html($schedule['display']); ?></td>
-                            </tr>
-                            <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
                 </table>
             </div>
             
-            <!-- Credentials Status Section -->
-            <div class="card">
-                <h2>Stato Credenziali e API</h2>
-                <table class="widefat" id="hic-credentials-status">
-                    <tr>
-                        <td>Tipo Connessione</td>
-                        <td><?php echo esc_html($credentials_status['connection_type']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>API URL</td>
-                        <td><span class="status <?php echo esc_attr($credentials_status['api_url'] ? 'ok' : 'error'); ?>">
-                            <?php echo esc_html($credentials_status['api_url'] ? 'Configurato' : 'Mancante'); ?>
-                        </span></td>
-                    </tr>
-                    <tr>
-                        <td>Property ID</td>
-                        <td><span class="status <?php echo esc_attr($credentials_status['property_id'] ? 'ok' : 'error'); ?>">
-                            <?php echo esc_html($credentials_status['property_id'] ? 'Configurato' : 'Mancante'); ?>
-                        </span></td>
-                    </tr>
-                    <tr>
-                        <td>API Email</td>
-                        <td><span class="status <?php echo esc_attr($credentials_status['api_email'] ? 'ok' : 'error'); ?>">
-                            <?php echo esc_html($credentials_status['api_email'] ? 'Configurato' : 'Mancante'); ?>
-                        </span></td>
-                    </tr>
-                    <tr>
-                        <td>API Password</td>
-                        <td><span class="status <?php echo esc_attr($credentials_status['api_password'] ? 'ok' : 'error'); ?>">
-                            <?php echo esc_html($credentials_status['api_password'] ? 'Configurato' : 'Mancante'); ?>
-                        </span></td>
-                    </tr>
-                    <tr>
-                        <td>GA4 Configurato</td>
-                        <td><span class="status <?php echo esc_attr($credentials_status['ga4_configured'] ? 'ok' : 'error'); ?>">
-                            <?php echo esc_html($credentials_status['ga4_configured'] ? 'Sì' : 'No'); ?>
-                        </span></td>
-                    </tr>
-                    <tr>
-                        <td>Brevo Configurato</td>
-                        <td><span class="status <?php echo esc_attr($credentials_status['brevo_configured'] ? 'ok' : 'error'); ?>">
-                            <?php echo esc_html($credentials_status['brevo_configured'] ? 'Sì' : 'No'); ?>
-                        </span></td>
-                    </tr>
-                    <tr>
-                        <td>Facebook Configurato</td>
-                        <td><span class="status <?php echo esc_attr($credentials_status['facebook_configured'] ? 'ok' : 'error'); ?>">
-                            <?php echo esc_html($credentials_status['facebook_configured'] ? 'Sì' : 'No'); ?>
-                        </span></td>
-                    </tr>
-                </table>
-            </div>
-            
+
             <!-- Execution Stats Section -->
             <div class="card">
                 <h2>Statistiche Esecuzione</h2>
@@ -2036,14 +1658,18 @@ function hic_diagnostics_page() {
     </div>
     
     <style>
+        /* Fix width issues - ensure full width usage */
         .wrap {
             max-width: none !important;
-            margin-right: 20px;
+            margin: 0 20px 0 0;
+            width: calc(100% - 20px) !important;
         }
         
         .hic-diagnostics-container {
             max-width: none;
             width: 100%;
+            margin: 0;
+            padding: 0;
         }
         
         .hic-diagnostics-container .card {
@@ -2074,12 +1700,14 @@ function hic_diagnostics_page() {
             width: 100%;
             max-width: none;
             margin-bottom: 15px;
+            table-layout: fixed;
         }
         
         .hic-diagnostics-container .widefat td,
         .hic-diagnostics-container .widefat th {
             padding: 12px 15px;
             vertical-align: top;
+            word-wrap: break-word;
         }
         
         .hic-diagnostics-container .form-table {
@@ -2099,6 +1727,7 @@ function hic_diagnostics_page() {
         .status.ok { color: #46b450; font-weight: bold; }
         .status.error { color: #dc3232; font-weight: bold; }
         .status.warning { color: #ffb900; font-weight: bold; }
+        .status.neutral { color: #666; font-weight: normal; }
         
         .manual-booking-alerts {
             margin-top: 15px;
@@ -2137,11 +1766,14 @@ function hic_diagnostics_page() {
             font-size: 12px;
             width: 100%;
             box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
         
         #hic-recent-logs div { 
             margin-bottom: 3px; 
-            padding: 12px;
+            padding: 2px 0;
+            border-bottom: 1px solid #eee;
         }
         
         .button {
@@ -2149,10 +1781,24 @@ function hic_diagnostics_page() {
             margin-bottom: 5px;
         }
         
+        /* Better responsive design */
+        @media (max-width: 1200px) {
+            .wrap {
+                width: calc(100% - 10px) !important;
+                margin-right: 10px;
+            }
+        }
+        
         /* Responsive improvements */
         @media (max-width: 782px) {
+            .wrap {
+                width: 100% !important;
+                margin-right: 0;
+            }
+            
             .hic-diagnostics-container .card {
                 padding: 15px;
+                margin-bottom: 15px;
             }
             
             .hic-diagnostics-container .widefat {
@@ -2163,11 +1809,16 @@ function hic_diagnostics_page() {
             .hic-diagnostics-container .widefat th {
                 padding: 8px 10px;
             }
+            
+            .hic-diagnostics-container .form-table th {
+                width: 150px;
+            }
         }
         
-        /* Ensure tables don't overflow */
+        /* Ensure tables don't overflow and use full width */
         .hic-diagnostics-container table {
-            table-layout: auto;
+            table-layout: fixed;
+            width: 100%;
             word-wrap: break-word;
         }
         
@@ -2176,6 +1827,12 @@ function hic_diagnostics_page() {
             background: #f1f1f1;
             padding: 2px 4px;
             border-radius: 3px;
+        }
+        
+        /* Better styling for notices */
+        .notice.inline {
+            margin: 15px 0;
+            padding: 12px;
         }
     </style>
     
@@ -2341,7 +1998,7 @@ function hic_diagnostics_page() {
             if (limit) {
                 message += '\nLimite: ' + limit + ' prenotazioni';
             }
-            message += '\nTipo data: ' + (dateType === 'checkin' ? 'Check-in' : dateType === 'checkout' ? 'Check-out' : 'Presenza');
+            message += '\nTipo data: ' + (dateType === 'checkin' ? 'Check-in' : dateType === 'checkout' ? 'Check-out' : dateType === 'presence' ? 'Presenza' : 'Creazione');
             
             if (!confirm(message)) {
                 return;
