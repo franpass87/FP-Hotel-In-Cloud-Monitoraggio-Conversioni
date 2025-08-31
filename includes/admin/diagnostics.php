@@ -611,59 +611,6 @@ function hic_force_restart_internal_scheduler() {
 }
 
 /**
- * Check system cron setup
- */
-function hic_check_system_cron() {
-    // Try to detect if wp-cron.php is being called by system cron
-    // This is a basic check - more sophisticated detection could be added
-    
-    $status = array(
-        'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
-        'suggested_crontab' => hic_get_suggested_crontab_entry(),
-        'suggested_crontab_with_test' => hic_get_suggested_crontab_with_test(),
-        'last_cron_check' => get_option('hic_last_cron_check', 0),
-        'cron_test_url' => hic_get_cron_test_url()
-    );
-    
-    // Update last check time
-    update_option('hic_last_cron_check', time());
-    
-    return $status;
-}
-
-/**
- * Get suggested crontab entry
- */
-function hic_get_suggested_crontab_entry() {
-    $wp_cron_url = site_url('wp-cron.php');
-    $polling_interval = hic_get_polling_interval();
-    
-    if ($polling_interval === 'every_minute') {
-        return "* * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1";
-    } elseif ($polling_interval === 'every_two_minutes') {
-        return "*/2 * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1";
-    } else {
-        return "*/5 * * * * wget -q -O - \"$wp_cron_url\" >/dev/null 2>&1";
-    }
-}
-
-/**
- * Get suggested crontab entry with test script
- */
-function hic_get_suggested_crontab_with_test() {
-    $test_url = hic_get_cron_test_url();
-    $base_cron = hic_get_suggested_crontab_entry();
-    return "$base_cron && wget -q -O - \"$test_url\" >/dev/null 2>&1";
-}
-
-/**
- * Get cron test URL
- */
-function hic_get_cron_test_url() {
-    return plugin_dir_url(dirname(dirname(__FILE__))) . 'cron-test.php';
-}
-
-/**
  * Get WordPress cron schedules info
  */
 function hic_get_wp_cron_schedules() {
@@ -974,8 +921,6 @@ function hic_ajax_refresh_diagnostics() {
         'credentials_status' => hic_get_credentials_status(),
         'execution_stats' => hic_get_execution_stats(),
         'recent_logs' => hic_get_recent_log_entries(20),
-        'system_cron' => hic_check_system_cron(),
-        'wp_cron_schedules' => hic_get_wp_cron_schedules(),
         'error_stats' => hic_get_error_stats()
     );
     
@@ -1174,27 +1119,10 @@ function hic_diagnostics_page() {
     
     // Get initial data
     $scheduler_status = hic_get_internal_scheduler_status();
-    
-    // Legacy compatibility: map scheduler status to old cron_status format for template
-    $cron_status = array(
-        'poll_event' => array(
-            'scheduled' => false, 
-            'next_run_human' => 'Sistema WP-Cron rimosso',
-            'conditions_met' => false
-        ),
-        'updates_event' => array(
-            'scheduled' => false,
-            'next_run_human' => 'Sistema WP-Cron rimosso', 
-            'conditions_met' => false
-        ),
-        'custom_interval_registered' => false,
-        'wp_cron_disabled' => true
-    );
     $credentials_status = hic_get_credentials_status();
     $execution_stats = hic_get_execution_stats();
     $recent_logs = hic_get_recent_log_entries(20);
-    $system_cron = hic_check_system_cron();
-    $wp_cron_schedules = hic_get_wp_cron_schedules();
+    $schedules = wp_get_schedules();
     $error_stats = hic_get_error_stats();
     
     ?>
@@ -1203,69 +1131,9 @@ function hic_diagnostics_page() {
         
         <div class="hic-diagnostics-container">
             
-            <!-- Cron Status Section -->
+            <!-- System Status Section -->
             <div class="card">
-                <h2>Stato Cron Jobs</h2>
-                <table class="widefat fixed" id="hic-cron-status">
-                    <thead>
-                        <tr>
-                            <th>Evento</th>
-                            <th>Schedulato</th>
-                            <th>Prossima Esecuzione</th>
-                            <th>Condizioni</th>
-                            <th>Azioni</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>hic_api_poll_event</td>
-                            <td><span class="status <?php echo esc_attr($cron_status['poll_event']['scheduled'] ? 'scheduled' : 'not-scheduled'); ?>">
-                                <?php echo esc_html($cron_status['poll_event']['scheduled'] ? 'Schedulato' : 'Non Schedulato'); ?>
-                            </span></td>
-                            <td><?php echo esc_html($cron_status['poll_event']['next_run_human']); ?></td>
-                            <td><span class="status <?php echo esc_attr($cron_status['poll_event']['conditions_met'] ? 'ok' : 'error'); ?>">
-                                <?php echo esc_html($cron_status['poll_event']['conditions_met'] ? 'OK' : 'Non Soddisfatte'); ?>
-                            </span></td>
-                            <td>
-                                <button class="button manual-cron-test" data-event="hic_api_poll_event">Test Manuale</button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>hic_api_updates_event</td>
-                            <td><span class="status <?php echo esc_attr($cron_status['updates_event']['scheduled'] ? 'scheduled' : 'not-scheduled'); ?>">
-                                <?php echo esc_html($cron_status['updates_event']['scheduled'] ? 'Schedulato' : 'Non Schedulato'); ?>
-                            </span></td>
-                            <td><?php echo esc_html($cron_status['updates_event']['next_run_human']); ?></td>
-                            <td><span class="status <?php echo esc_attr($cron_status['updates_event']['conditions_met'] ? 'ok' : 'error'); ?>">
-                                <?php echo esc_html($cron_status['updates_event']['conditions_met'] ? 'OK' : 'Non Soddisfatte'); ?>
-                            </span></td>
-                            <td>
-                                <button class="button manual-cron-test" data-event="hic_api_updates_event">Test Manuale</button>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="5" style="border-top: 2px solid #ddd; padding-top: 10px; font-weight: bold;">
-                                Sistema Cron
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Intervallo Personalizzato</td>
-                            <td><span class="status <?php echo esc_attr($cron_status['custom_interval_registered'] ? 'ok' : 'error'); ?>">
-                                <?php echo esc_html($cron_status['custom_interval_registered'] ? 'Registrato' : 'Non Registrato'); ?>
-                            </span></td>
-                            <td>hic_poll_interval (5 min)</td>
-                            <td><?php echo esc_html($cron_status['wp_cron_disabled'] ? 'WP-Cron Disabilitato' : 'WP-Cron Attivo'); ?></td>
-                            <td>
-                                <?php if (!$cron_status['custom_interval_registered']): ?>
-                                    <span style="color: red; font-weight: bold;">⚠️ Richiede correzione</span>
-                                <?php else: ?>
-                                    ✅ OK
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                
+                <h2>Stato Sistema</h2>
                 <p>
                     <button class="button button-secondary" id="refresh-diagnostics">Aggiorna Dati</button>
                     <button class="button" id="force-reschedule">Riavvia Sistema Interno</button>
@@ -1541,54 +1409,6 @@ function hic_diagnostics_page() {
                 </div>
             </div>
             
-            <!-- System Cron Section -->
-            <div class="card">
-                <h2>Configurazione Cron di Sistema</h2>
-                <table class="widefat">
-                    <tr>
-                        <td>WP Cron Disabilitato</td>
-                        <td><span class="status <?php echo esc_attr($system_cron['wp_cron_disabled'] ? 'error' : 'ok'); ?>">
-                            <?php echo esc_html($system_cron['wp_cron_disabled'] ? 'Sì (DISABLE_WP_CRON=true)' : 'No'); ?>
-                        </span></td>
-                    </tr>
-                    <tr>
-                        <td>Crontab Base</td>
-                        <td><code><?php echo esc_html($system_cron['suggested_crontab']); ?></code></td>
-                    </tr>
-                    <tr>
-                        <td>Crontab con Test</td>
-                        <td><code><?php echo esc_html($system_cron['suggested_crontab_with_test']); ?></code></td>
-                    </tr>
-                    <tr>
-                        <td>URL Test Cron</td>
-                        <td><a href="<?php echo esc_url($system_cron['cron_test_url']); ?>" target="_blank"><?php echo esc_html($system_cron['cron_test_url']); ?></a></td>
-                    </tr>
-                </table>
-                
-                <?php if ($system_cron['wp_cron_disabled']): ?>
-                <div class="notice notice-warning inline">
-                    <p><strong>Attenzione:</strong> WP Cron è disabilitato. È necessario configurare un cron di sistema.</p>
-                </div>
-                <?php endif; ?>
-                
-                <h3>Istruzioni Setup Cron di Sistema</h3>
-                <ol>
-                    <li>Accedere al server via SSH</li>
-                    <li>Eseguire: <code>crontab -e</code></li>
-                    <li>Aggiungere la riga: <code><?php echo esc_html($system_cron['suggested_crontab']); ?></code></li>
-                    <li>Per monitoraggio aggiuntivo, usare: <code><?php echo esc_html($system_cron['suggested_crontab_with_test']); ?></code></li>
-                    <li>Salvare e uscire dall'editor</li>
-                </ol>
-                
-                <h3>Verifica Funzionamento</h3>
-                <p>Per verificare che il cron di sistema funzioni:</p>
-                <ul>
-                    <li>Attendere 5-10 minuti dopo la configurazione</li>
-                    <li>Controllare i log di questo plugin per confermare l'esecuzione</li>
-                    <li>Testare l'URL di test: <a href="<?php echo esc_url($system_cron['cron_test_url']); ?>" target="_blank">Clicca qui per testare</a></li>
-                </ul>
-            </div>
-            
             <!-- System Configuration Section -->
             <div class="card">
                 <h2>Configurazione Sistema</h2>
@@ -1742,18 +1562,6 @@ function hic_diagnostics_page() {
                                 ?>
                             </td>
                             <td>Range che verrà richiesto nel prossimo polling</td>
-                        </tr>
-                        <tr>
-                            <td>Eventi Updates Schedulati</td>
-                            <td>
-                                <?php if (isset($status['updates_event']['scheduled']) && $status['updates_event']['scheduled']): ?>
-                                    <span class="status ok">✓ Schedulato</span><br>
-                                    <small>Prossima: <?php echo esc_html($status['updates_event']['next_run_human']); ?></small>
-                                <?php else: ?>
-                                    <span class="status error">✗ Non schedulato</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>Verifica schedulazione del cron hic_api_updates_event</td>
                         </tr>
                         <tr>
                             <td>Intervallo Updates Utilizzato</td>
@@ -2134,13 +1942,6 @@ function hic_diagnostics_page() {
                         <td><small><?php echo esc_html($error_stats['last_error']); ?></small></td>
                     </tr>
                     <?php endif; ?>
-                    <tr>
-                        <td>Intervallo Polling Configurato</td>
-                        <td><span class="status <?php echo esc_attr($wp_cron_schedules['hic_interval_exists'] ? 'ok' : 'error'); ?>">
-                            <?php echo $wp_cron_schedules['hic_interval_exists'] ? 
-                                esc_html($wp_cron_schedules['hic_interval_seconds'] . ' secondi') : esc_html('Non configurato'); ?>
-                        </span></td>
-                    </tr>
                 </table>
             </div>
             
@@ -2228,8 +2029,6 @@ function hic_diagnostics_page() {
         .status.ok { color: #46b450; font-weight: bold; }
         .status.error { color: #dc3232; font-weight: bold; }
         .status.warning { color: #ffb900; font-weight: bold; }
-        .status.scheduled { color: #0073aa; font-weight: bold; }
-        .status.not-scheduled { color: #ffb900; font-weight: bold; }
         
         .manual-booking-alerts {
             margin-top: 15px;
@@ -2312,33 +2111,6 @@ function hic_diagnostics_page() {
     
     <script type="text/javascript">
     jQuery(document).ready(function($) {
-        // Manual cron test handler
-        $('.manual-cron-test').click(function() {
-            var $btn = $(this);
-            var event = $btn.data('event');
-            var $results = $('#hic-test-results');
-            
-            $btn.prop('disabled', true).text('Eseguendo...');
-            
-            $.post(ajaxurl, {
-                action: 'hic_manual_cron_test',
-                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>',
-                event: event
-            }, function(response) {
-                var result = JSON.parse(response);
-                var messageClass = result.success ? 'notice-success' : 'notice-error';
-                var html = '<div class="notice ' + messageClass + ' inline">' +
-                          '<p><strong>' + event + ':</strong> ' + result.message;
-                if (result.execution_time) {
-                    html += ' (Tempo: ' + result.execution_time + ')';
-                }
-                html += '</p></div>';
-                
-                $results.html(html);
-                $btn.prop('disabled', false).text('Test Manuale');
-            });
-        });
-        
         // Refresh diagnostics handler
         $('#refresh-diagnostics').click(function() {
             var $btn = $(this);
