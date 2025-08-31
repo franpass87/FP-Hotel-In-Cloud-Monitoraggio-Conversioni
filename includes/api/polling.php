@@ -33,7 +33,7 @@ function hic_handle_api_response($response, $context = 'API call') {
     // Provide more specific error messages for common HTTP codes
     switch ($code) {
       case 400:
-        return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Verifica i parametri inviati (date_type deve essere checkin, checkout o presence).");
+        return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Verifica i parametri: date_type deve essere checkin, checkout o presence per /reservations. Usa /reservations_updates con updated_after per modifiche recenti.");
       case 401:
         return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide. Verifica email e password API.");
       case 403:
@@ -81,21 +81,18 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
         return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
     }
     
-    // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
-    if ($date_type === 'created') {
-        $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
-        $args = array('since' => $from_date); // Use date string format instead of timestamp
-        if ($limit) $args['limit'] = (int)$limit;
-        // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
-    } else {
-        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
-        $args = array('date_type'=>$date_type,'from_date'=>$from_date,'to_date'=>$to_date);
-        if ($limit) $args['limit'] = (int)$limit;
+    // Validate date_type - only checkin, checkout, presence are valid for /reservations endpoint
+    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
+        return new WP_Error('hic_invalid_date_type', 'date_type deve essere checkin, checkout o presence. Per le modifiche recenti usa hic_fetch_reservations_updates()');
     }
+    
+    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+    $args = array('date_type'=>$date_type,'from_date'=>$from_date,'to_date'=>$to_date);
+    if ($limit) $args['limit'] = (int)$limit;
     $url = add_query_arg($args, $endpoint);
     
     // Log API call details for debugging
-    hic_log("API Call: $url with params: " . json_encode($args));
+    hic_log("API Call (Reservations endpoint): $url with params: " . json_encode($args));
 
     $res = wp_remote_get($url, array(
         'timeout' => 30,
@@ -292,7 +289,7 @@ function hic_mark_reservation_processed($reservation) {
     }
 }
 
-// Wrapper cron function
+// Wrapper function - now simplified to use continuous polling by default
 function hic_api_poll_bookings(){
     $start_time = microtime(true);
     hic_log('Internal Scheduler: hic_api_poll_bookings execution started');
@@ -300,43 +297,11 @@ function hic_api_poll_bookings(){
     // Rotate log if needed
     hic_rotate_log_if_needed();
     
-    // Try to acquire lock to prevent overlapping executions
-    if (!hic_acquire_polling_lock(300)) {
-        hic_log('Internal Scheduler: Another polling process is running, skipping execution');
-        return;
-    }
+    // Use the new simplified continuous polling
+    hic_api_poll_bookings_continuous();
     
-    try {
-        // Always update execution timestamp regardless of results
-        update_option('hic_last_api_poll', time());
-        
-        $prop = hic_get_property_id();
-        $email = hic_get_api_email();
-        $password = hic_get_api_password();
-        $connection_type = hic_get_connection_type();
-        
-        hic_log("Internal Scheduler: Current config - Connection: $connection_type, PropID: $prop, Email: " . ($email ? 'configured' : 'missing'));
-        
-        // Use quasi-realtime approach with Basic Auth
-        if ($prop && $email && $password) {
-            hic_quasi_realtime_poll($prop, $start_time);
-        } else {
-            // Fall back to legacy API key method for backward compatibility
-            $api_url = hic_get_api_url();
-            $api_key = hic_get_api_key();
-            
-            if (!$api_url || !$api_key) {
-                hic_log('Internal Scheduler: No valid credentials found (neither Basic Auth nor legacy API key)');
-                return;
-            }
-            
-            hic_log('Internal Scheduler: using legacy API key method');
-            hic_legacy_api_poll_bookings();
-        }
-    } finally {
-        // Always release the lock
-        hic_release_polling_lock();
-    }
+    $execution_time = round((microtime(true) - $start_time) * 1000, 2);
+    hic_log("Internal Scheduler: hic_api_poll_bookings completed in {$execution_time}ms");
 }
 
 /**
@@ -362,27 +327,29 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $total_errors = 0;
     $polling_errors = array();
     
-    // Poll by created date for recent bookings (most important for real-time)
-    $created_from = date('Y-m-d', $from_time);
-    $created_to = date('Y-m-d', $to_time);
-    
-    hic_log("Internal Scheduler: Polling by created date from $created_from to $created_to");
-    $created_reservations = hic_fetch_reservations_raw($prop_id, 'created', $created_from, $created_to, 100);
-    
-    if (!is_wp_error($created_reservations)) {
-        $created_count = is_array($created_reservations) ? count($created_reservations) : 0;
-        hic_log("Internal Scheduler: Found $created_count reservations by created date");
+        // Check for new and updated reservations using /reservations_updates endpoint
+        // This catches all recently created or modified reservations
+        $last_update_check = get_option('hic_last_update_check', $current_time - 7200); // Default to 2 hours ago
         
-        if ($created_count > 0) {
-            $process_result = hic_process_reservations_batch($created_reservations);
-            $total_new += $process_result['new'];
-            $total_skipped += $process_result['skipped'];
-            $total_errors += $process_result['errors'];
+        hic_log("Internal Scheduler: Checking for updates since " . date('Y-m-d H:i:s', $last_update_check));
+        $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_update_check, 100);
+        
+        if (!is_wp_error($updated_reservations)) {
+            $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
+            if ($updated_count > 0) {
+                hic_log("Internal Scheduler: Found $updated_count updated/new reservations");
+                $process_result = hic_process_reservations_batch($updated_reservations);
+                $total_new += $process_result['new'];
+                $total_skipped += $process_result['skipped'];
+                $total_errors += $process_result['errors'];
+            }
+            
+            // Update the last check timestamp
+            update_option('hic_last_update_check', $current_time);
+        } else {
+            $polling_errors[] = "updates polling: " . $updated_reservations->get_error_message();
+            $total_errors++;
         }
-    } else {
-        $polling_errors[] = "created date polling: " . $created_reservations->get_error_message();
-        $total_errors++;
-    }
     
     // Also poll by checkin date to catch any updates to existing bookings
     $checkin_from = date('Y-m-d', $from_time);
@@ -521,95 +488,6 @@ function hic_process_single_reservation($reservation) {
     }
 }
 
-// Legacy API polling function for backward compatibility
-function hic_legacy_api_poll_bookings() {
-  $api_url = hic_get_api_url();
-  $api_key = hic_get_api_key();
-  
-  if (!$api_url || !$api_key) {
-    hic_log('API polling: URL o API key mancanti');
-    return;
-  }
-
-  // Always update execution timestamp regardless of results
-  update_option('hic_last_api_poll', time());
-
-  // Ottieni l'ultimo timestamp processato
-  $last_poll = get_option('hic_last_api_poll', strtotime('-1 hour'));
-  $current_time = time();
-
-  // Costruisci l'URL API con filtri temporali
-  $poll_url = add_query_arg([
-    'api_key' => $api_key,
-    'from' => date('Y-m-d H:i:s', $last_poll),
-    'to' => date('Y-m-d H:i:s', $current_time)
-  ], rtrim($api_url, '/') . '/bookings');
-
-  $response = wp_remote_get($poll_url, [
-    'timeout' => 30,
-    'headers' => [
-      'Accept' => 'application/json',
-      'User-Agent' => 'WordPress/HIC-Plugin'
-    ]
-  ]);
-
-  if (is_wp_error($response)) {
-    hic_log('API polling errore: ' . $response->get_error_message());
-    return;
-  }
-
-  $code = wp_remote_retrieve_response_code($response);
-  if ($code !== 200) {
-    hic_log("API polling HTTP error: $code");
-    return;
-  }
-
-  $body = wp_remote_retrieve_body($response);
-  $data = json_decode($body, true);
-
-  if (json_last_error() !== JSON_ERROR_NONE) {
-    hic_log('API polling: errore JSON - ' . json_last_error_msg());
-    return;
-  }
-
-  if (!$data || !is_array($data)) {
-    hic_log('API polling: risposta non valida - ' . substr($body, 0, 200));
-    return;
-  }
-
-  hic_log("API polling: trovate " . count($data) . " prenotazioni");
-
-  // Processa ogni prenotazione con error handling
-  $processed = 0;
-  $errors = 0;
-  foreach ($data as $booking) {
-    try {
-      hic_process_booking_data($booking);
-      $processed++;
-    } catch (Exception $e) {
-      $errors++;
-      hic_log('Errore processando prenotazione: ' . $e->getMessage());
-    }
-  }
-
-  hic_log("API polling completato: $processed processate, $errors errori");
-
-  // Store count for diagnostics
-  update_option('hic_last_poll_count', count($data));
-
-  // Only update timestamp if we found reservations OR if enough time has passed
-  $time_since_last_poll = $current_time - $last_poll;
-  if (count($data) > 0) {
-    update_option('hic_last_api_poll', $current_time);
-    hic_log("Legacy polling: Updated timestamp (found " . count($data) . " reservations)");
-  } elseif ($time_since_last_poll > DAY_IN_SECONDS) {
-    update_option('hic_last_api_poll', $current_time);
-    hic_log('Legacy polling: Advanced timestamp after 24+ hours with no reservations');
-  } else {
-    hic_log('Legacy polling: No reservations found, keeping previous timestamp for retry');
-  }
-}
-
 /**
  * New updates polling wrapper function
  */
@@ -734,7 +612,7 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
     }
     
     $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
-    $args = array('since' => $since);
+    $args = array('updated_after' => $since);
     if ($limit) $args['limit'] = $limit;
     $url = add_query_arg($args, $endpoint);
     
@@ -1015,12 +893,12 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
     
     hic_log("Backfill: Starting backfill from $from_date to $to_date (date_type: $date_type, limit: " . ($limit ?: 'none') . ")");
     
-    // Validate date type (based on API documentation: checkin, checkout, presence for /reservations, created for /reservations_updates)
-    // Note: For date_type='created', uses /reservations_updates endpoint with 'since' parameter
-    if (!in_array($date_type, array('checkin', 'checkout', 'presence', 'created'))) {
+    // Validate date_type (based on API documentation: checkin, checkout, presence for /reservations)
+    // Note: For recent updates, use hic_fetch_reservations_updates() instead
+    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
         return array(
             'success' => false,
-            'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout", "presence" o "created".',
+            'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence". Per aggiornamenti recenti usa la funzione updates.',
             'stats' => array()
         );
     }
@@ -1161,20 +1039,13 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
         return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
     }
     
-    // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
-    if ($date_type === 'created') {
-        $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
-        $args = array('since' => $from_date); // Use date string format instead of timestamp
-        if ($limit) $args['limit'] = (int)$limit;
-        // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
-    } else {
-        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
-        $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
-        if ($limit) $args['limit'] = (int)$limit;
-    }
+    // Use standard /reservations/ endpoint - only valid date_type values supported
+    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+    $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
+    if ($limit) $args['limit'] = (int)$limit;
     $url = add_query_arg($args, $endpoint);
     
-    hic_log("Backfill Raw API Call: $url");
+    hic_log("Backfill Raw API Call (Reservations endpoint): $url");
 
     $res = wp_remote_get($url, array(
         'timeout' => 30,
@@ -1198,7 +1069,7 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
         // Provide specific error messages for common HTTP codes in backfill context
         switch ($code) {
             case 400:
-                return new WP_Error('hic_http', "HTTP 400 - Richiesta backfill non valida. Verifica i parametri: date_type deve essere checkin, checkout, presence o created.");
+                return new WP_Error('hic_http', "HTTP 400 - Richiesta backfill non valida. Verifica i parametri: date_type deve essere checkin, checkout o presence.");
             case 401:
                 return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide per backfill. Verifica email e password API.");
             case 403:
@@ -1224,5 +1095,191 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
     }
     
     return $data;
+}
+
+/**
+ * Continuous polling function - runs every minute
+ * Focuses on recent reservations and manual bookings
+ */
+function hic_api_poll_bookings_continuous() {
+    $start_time = microtime(true);
+    hic_log('Continuous Polling: Starting 1-minute interval check');
+    
+    // Try to acquire lock to prevent overlapping executions
+    if (!hic_acquire_polling_lock(120)) { // 2-minute timeout for continuous polling
+        hic_log('Continuous Polling: Another polling process is running, skipping execution');
+        return;
+    }
+    
+    try {
+        $prop_id = hic_get_property_id();
+        if (empty($prop_id)) {
+            hic_log('Continuous Polling: No property ID configured');
+            return;
+        }
+        
+        $current_time = time();
+        
+        // Check recent reservations (last 2 hours) to catch new bookings and updates
+        $window_back_minutes = 120; // 2 hours back
+        $window_forward_minutes = 5; // 5 minutes forward
+        
+        $from_time = $current_time - ($window_back_minutes * 60);
+        $to_time = $current_time + ($window_forward_minutes * 60);
+        
+        $from_date = date('Y-m-d H:i:s', $from_time);
+        $to_date = date('Y-m-d H:i:s', $to_time);
+        
+        hic_log("Continuous Polling: Checking window from $from_date to $to_date (property: $prop_id)");
+        
+        $total_new = 0;
+        $total_skipped = 0;
+        $total_errors = 0;
+        
+        // Check for new and updated reservations using /reservations_updates endpoint
+        // This is the most effective way to catch recently created/modified reservations
+        $last_continuous_check = get_option('hic_last_continuous_check', $current_time - 7200); // Default to 2 hours ago
+        
+        hic_log("Continuous Polling: Checking for updates since " . date('Y-m-d H:i:s', $last_continuous_check));
+        $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_continuous_check, 50);
+        
+        if (!is_wp_error($updated_reservations)) {
+            $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
+            if ($updated_count > 0) {
+                hic_log("Continuous Polling: Found $updated_count updated/new reservations");
+                $process_result = hic_process_reservations_batch($updated_reservations);
+                $total_new += $process_result['new'];
+                $total_skipped += $process_result['skipped'];
+                $total_errors += $process_result['errors'];
+            }
+            
+            // Update the last check timestamp
+            update_option('hic_last_continuous_check', $current_time);
+        } else {
+            hic_log("Continuous Polling: Error checking for updates: " . $updated_reservations->get_error_message());
+            $total_errors++;
+        }
+        
+        // Also check by check-in date for today and tomorrow (catch modifications)
+        $checkin_from = date('Y-m-d', $current_time);
+        $checkin_to = date('Y-m-d', $current_time + DAY_IN_SECONDS);
+        
+        $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 30);
+        
+        if (!is_wp_error($checkin_reservations)) {
+            $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
+            if ($checkin_count > 0) {
+                hic_log("Continuous Polling: Found $checkin_count reservations by checkin date");
+                $process_result = hic_process_reservations_batch($checkin_reservations);
+                $total_new += $process_result['new'];
+                $total_skipped += $process_result['skipped'];
+                $total_errors += $process_result['errors'];
+            }
+        }
+        
+        $execution_time = round((microtime(true) - $start_time) * 1000, 2);
+        
+        // Store metrics for diagnostics
+        update_option('hic_last_continuous_poll_count', $total_new);
+        update_option('hic_last_continuous_poll_duration', $execution_time);
+        
+        hic_log("Continuous Polling: Completed in {$execution_time}ms - New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
+        
+    } finally {
+        hic_release_polling_lock();
+    }
+}
+
+/**
+ * Deep check polling function - runs every 10 minutes
+ * Looks back 5 days to catch any missed reservations
+ */
+function hic_api_poll_bookings_deep_check() {
+    $start_time = microtime(true);
+    hic_log('Deep Check: Starting 10-minute interval deep check (5-day lookback)');
+    
+    // Try to acquire lock to prevent overlapping executions
+    if (!hic_acquire_polling_lock(600)) { // 10-minute timeout for deep check
+        hic_log('Deep Check: Another polling process is running, skipping execution');
+        return;
+    }
+    
+    try {
+        $prop_id = hic_get_property_id();
+        if (empty($prop_id)) {
+            hic_log('Deep Check: No property ID configured');
+            return;
+        }
+        
+        $current_time = time();
+        $lookback_seconds = 5 * DAY_IN_SECONDS; // 5 days
+        
+        $from_date = date('Y-m-d', $current_time - $lookback_seconds);
+        $to_date = date('Y-m-d', $current_time);
+        
+        hic_log("Deep Check: Searching 5-day window from $from_date to $to_date (property: $prop_id)");
+        
+        $total_new = 0;
+        $total_skipped = 0;
+        $total_errors = 0;
+        
+        // Check for updates in the last 5 days using /reservations_updates endpoint
+        // This catches any modifications or new reservations that might have been missed
+        $lookback_timestamp = $current_time - $lookback_seconds;
+        
+        hic_log("Deep Check: Checking for updates since " . date('Y-m-d H:i:s', $lookback_timestamp));
+        $updated_reservations = hic_fetch_reservations_updates($prop_id, $lookback_timestamp, 500);
+        
+        if (!is_wp_error($updated_reservations)) {
+            $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
+            hic_log("Deep Check: Found $updated_count updated/new reservations in 5-day window");
+            
+            if ($updated_count > 0) {
+                $process_result = hic_process_reservations_batch($updated_reservations);
+                $total_new += $process_result['new'];
+                $total_skipped += $process_result['skipped'];
+                $total_errors += $process_result['errors'];
+            }
+        } else {
+            hic_log("Deep Check: Error checking updates: " . $updated_reservations->get_error_message());
+            $total_errors++;
+        }
+        
+        // Also check check-in dates for the next 7 days (catch future reservations that might have been missed)
+        $checkin_from = date('Y-m-d', $current_time);
+        $checkin_to = date('Y-m-d', $current_time + (7 * DAY_IN_SECONDS));
+        
+        hic_log("Deep Check: Checking by checkin date from $checkin_from to $checkin_to");
+        $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 200);
+        
+        if (!is_wp_error($checkin_reservations)) {
+            $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
+            if ($checkin_count > 0) {
+                hic_log("Deep Check: Found $checkin_count reservations by checkin date");
+                $process_result = hic_process_reservations_batch($checkin_reservations);
+                $total_new += $process_result['new'];
+                $total_skipped += $process_result['skipped'];
+                $total_errors += $process_result['errors'];
+            }
+        } else {
+            hic_log("Deep Check: Error checking checkin reservations: " . $checkin_reservations->get_error_message());
+        }
+        
+        $execution_time = round((microtime(true) - $start_time) * 1000, 2);
+        
+        // Store metrics for diagnostics
+        update_option('hic_last_deep_check_count', $total_new);
+        update_option('hic_last_deep_check_duration', $execution_time);
+        
+        // Update last successful deep check if no errors
+        if ($total_errors === 0) {
+            update_option('hic_last_successful_deep_check', $current_time);
+        }
+        
+        hic_log("Deep Check: Completed in {$execution_time}ms - Window: $from_date to $to_date, New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
+        
+    } finally {
+        hic_release_polling_lock();
+    }
 }
 
