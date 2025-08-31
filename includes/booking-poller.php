@@ -1,6 +1,6 @@
 <?php
 /**
- * Internal Booking Scheduler - Hybrid WP-Cron + Heartbeat API System
+ * Internal Booking Scheduler - WP-Cron System
  */
 
 if (!defined('ABSPATH')) exit;
@@ -13,20 +13,16 @@ class HIC_Booking_Poller {
     const WATCHDOG_THRESHOLD = 300; // 5 minutes threshold
     
     public function __construct() {
-        // Primary system: WP-Cron for reliable 24/7 operation
+        // WP-Cron system for reliable 24/7 operation
         add_action('hic_continuous_poll_event', array($this, 'execute_continuous_polling'));
         add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
-        
-        // Fallback system: Heartbeat API for when WP-Cron is disabled
-        add_filter('heartbeat_received', array($this, 'heartbeat_scheduler_check'), 10, 2);
-        add_filter('heartbeat_settings', array($this, 'heartbeat_settings'));
         
         // Initialize scheduler on activation
         add_action('init', array($this, 'ensure_scheduler_is_active'), 20);
     }
     
     /**
-     * Ensure the scheduler is active - uses WP-Cron as primary, Heartbeat as fallback
+     * Ensure the scheduler is active - uses WP-Cron system
      */
     public function ensure_scheduler_is_active() {
         if (!$this->should_poll()) {
@@ -88,61 +84,6 @@ class HIC_Booking_Poller {
         $deep_next = wp_next_scheduled('hic_deep_check_event');
         
         return ($continuous_next !== false && $deep_next !== false);
-    }
-    
-    /**
-     * Configure Heartbeat settings for optimal polling (fallback only)
-     */
-    public function heartbeat_settings($settings) {
-        // Set heartbeat interval to 60 seconds for continuous polling
-        $settings['interval'] = 60;
-        return $settings;
-    }
-    
-    /**
-     * Heartbeat scheduler check - runs as FALLBACK when WP-Cron is not working
-     * Implements simplified dual-mode polling:
-     * - Continuous polling every minute
-     * - Deep check every 10 minutes looking back 5 days
-     */
-    public function heartbeat_scheduler_check($response, $data) {
-        // Only run heartbeat fallback if WP-Cron is not working
-        if ($this->is_wp_cron_working()) {
-            return $response;
-        }
-        
-        // Only run if polling should be active
-        if (!$this->should_poll()) {
-            return $response;
-        }
-        
-        hic_log('Heartbeat Scheduler: Running as fallback (WP-Cron not working)');
-        
-        $current_time = time();
-        $last_continuous_poll = get_option('hic_last_continuous_poll', 0);
-        $last_deep_check = get_option('hic_last_deep_check', 0);
-        
-        // Check if it's time for continuous polling (every minute)
-        $time_since_continuous = $current_time - $last_continuous_poll;
-        if ($time_since_continuous >= self::CONTINUOUS_POLLING_INTERVAL) {
-            $this->execute_continuous_polling();
-            update_option('hic_last_continuous_poll', $current_time);
-        }
-        
-        // Check if it's time for deep check (every 10 minutes)
-        $time_since_deep = $current_time - $last_deep_check;
-        if ($time_since_deep >= self::DEEP_CHECK_INTERVAL) {
-            $this->execute_deep_check();
-            update_option('hic_last_deep_check', $current_time);
-        }
-        
-        // Update general timestamp for compatibility
-        update_option('hic_last_api_poll', $current_time);
-        
-        // Run watchdog check for debugging
-        $this->watchdog_check($last_continuous_poll, $current_time);
-        
-        return $response;
     }
     
     /**
@@ -213,7 +154,7 @@ class HIC_Booking_Poller {
         return hic_reliable_polling_enabled() && 
                hic_get_connection_type() === 'api' && 
                hic_get_api_url() && 
-               (hic_has_basic_auth_credentials() || hic_get_api_key());
+               (hic_has_basic_auth_credentials() || !empty(hic_get_api_key()));
     }
     
     /**
@@ -332,11 +273,11 @@ class HIC_Booking_Poller {
             ),
             'configuration' => array(
                 'connection_type' => hic_get_connection_type(),
-                'api_url' => hic_get_api_url() ? 'configured' : 'missing',
-                'property_id' => hic_get_property_id() ? 'configured' : 'missing',
-                'api_email' => hic_get_api_email() ? 'configured' : 'missing',
-                'api_password' => hic_get_api_password() ? 'configured' : 'missing',
-                'api_key' => hic_get_api_key() ? 'configured' : 'missing'
+                'api_url' => !empty(hic_get_api_url()) ? 'configured' : 'missing',
+                'property_id' => !empty(hic_get_property_id()) ? 'configured' : 'missing',
+                'api_email' => !empty(hic_get_api_email()) ? 'configured' : 'missing',
+                'api_password' => !empty(hic_get_api_password()) ? 'configured' : 'missing',
+                'api_key' => !empty(hic_get_api_key()) ? 'configured' : 'missing'
             ),
             'lock_status' => array(
                 'active' => get_transient('hic_reliable_polling_lock') ? true : false,
@@ -355,9 +296,9 @@ class HIC_Booking_Poller {
         $last_deep = get_option('hic_last_deep_check', 0);
         $last_general = get_option('hic_last_api_poll', 0);
         
-        // Check scheduler type
+        // Check scheduler type - WP-Cron only now
         $is_wp_cron_working = $this->is_wp_cron_working();
-        $scheduler_type = $is_wp_cron_working ? 'WP-Cron' : 'Heartbeat (fallback)';
+        $scheduler_type = $is_wp_cron_working ? 'WP-Cron' : 'Non attivo';
         
         $stats = array(
             'scheduler_type' => $scheduler_type,
