@@ -112,9 +112,9 @@ class HIC_Booking_Poller {
         
         hic_log("Deep check: Searching for reservations from $from_date to $to_date (property: $prop_id)");
         
-        // Check by creation date to catch manual bookings and any missed ones
-        if (function_exists('hic_fetch_reservations')) {
-            $reservations = hic_fetch_reservations($prop_id, 'created', $from_date, $to_date, 200);
+        // Check by check-in date to catch manual bookings and any missed ones
+        if (function_exists('hic_fetch_reservations_raw')) {
+            $reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, 200);
             if (!is_wp_error($reservations) && is_array($reservations)) {
                 $count = count($reservations);
                 hic_log("Deep check: Found $count reservations in 5-day lookback period");

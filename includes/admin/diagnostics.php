@@ -484,7 +484,6 @@ function hic_format_bookings_as_csv($bookings) {
         'Valuta',
         'Stato',
         'Presenza',
-        'Data Creazione',
         'Note'
     );
     
@@ -505,7 +504,6 @@ function hic_format_bookings_as_csv($bookings) {
             $booking['currency'] ?? 'EUR',
             $booking['status'] ?? '',
             $booking['presence'] ?? '',
-            $booking['created_at'] ?? '',
             $booking['notes'] ?? $booking['description'] ?? ''
         );
         
@@ -1101,7 +1099,7 @@ function hic_diagnostics_page() {
                     <p><strong>Note:</strong></p>
                     <ul>
                         <li><strong>Anti-duplicazione:</strong> Vengono inviate solo le prenotazioni mai inviate prima</li>
-                        <li><strong>Ordinamento:</strong> Le ultime 5 prenotazioni basate sulla data di creazione (più recenti)</li>
+                        <li><strong>Ordinamento:</strong> Le ultime 5 prenotazioni basate sull'ordine di arrivo dall'API</li>
                         <li><strong>Tracking automatico:</strong> Il sistema ricorda quali prenotazioni sono state inviate</li>
                         <li><strong>Reset tracking:</strong> Usa il bottone "Reset" per consentire il nuovo invio delle stesse prenotazioni</li>
                         <li><strong>Elaborazione completa:</strong> Include invio a GA4, Brevo, Facebook (se configurati) ed email</li>
@@ -2036,7 +2034,7 @@ function hic_diagnostics_page() {
             if (limit) {
                 message += '\nLimite: ' + limit + ' prenotazioni';
             }
-            message += '\nTipo data: ' + (dateType === 'checkin' ? 'Check-in' : dateType === 'checkout' ? 'Check-out' : dateType === 'presence' ? 'Presenza' : 'Creazione');
+            message += '\nTipo data: ' + (dateType === 'checkin' ? 'Check-in' : dateType === 'checkout' ? 'Check-out' : 'Presenza');
             
             if (!confirm(message)) {
                 return;
