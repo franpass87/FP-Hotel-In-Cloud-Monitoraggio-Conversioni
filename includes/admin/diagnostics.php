@@ -11,6 +11,8 @@ if (!defined('ABSPATH')) exit;
  * Check internal scheduler status (uses WordPress Heartbeat API)
  */
 function hic_get_internal_scheduler_status() {
+    global $wpdb;
+    
     $status = array(
         'internal_scheduler' => array(
             'enabled' => hic_reliable_polling_enabled(),
@@ -20,6 +22,13 @@ function hic_get_internal_scheduler_status() {
             'lag_seconds' => 0,
             'next_run_estimate' => null,
             'next_run_human' => 'Sconosciuto'
+        ),
+        'realtime_sync' => array(
+            'table_exists' => true,
+            'total_tracked' => 0,
+            'notified' => 0,
+            'failed' => 0,
+            'new' => 0
         )
     );
     
@@ -57,7 +66,7 @@ function hic_get_internal_scheduler_status() {
         }
     }
     
-    // Real-time sync stats (keep existing functionality)
+    // Real-time sync stats (keep existing functionality)  
     $realtime_table = $wpdb->prefix . 'hic_realtime_sync';
     if ($wpdb->get_var("SHOW TABLES LIKE '$realtime_table'") === $realtime_table) {
         $status['realtime_sync']['total_tracked'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table");
