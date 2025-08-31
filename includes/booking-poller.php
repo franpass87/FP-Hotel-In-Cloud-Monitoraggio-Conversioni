@@ -242,7 +242,8 @@ class HIC_Booking_Poller {
                 'api_url_configured' => !empty(hic_get_api_url()),
                 'has_credentials' => hic_has_basic_auth_credentials() || !empty(hic_get_api_key()),
                 'basic_auth_complete' => hic_has_basic_auth_credentials(),
-                'api_key_configured' => !empty(hic_get_api_key())
+                'api_key_configured' => !empty(hic_get_api_key()),
+                'credentials_type' => hic_has_basic_auth_credentials() ? 'basic_auth' : (!empty(hic_get_api_key()) ? 'api_key' : 'none')
             ),
             'configuration' => array(
                 'connection_type' => hic_get_connection_type(),

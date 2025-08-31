@@ -33,7 +33,7 @@ function hic_handle_api_response($response, $context = 'API call') {
     // Provide more specific error messages for common HTTP codes
     switch ($code) {
       case 400:
-        return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Verifica i parametri inviati (date_type deve essere checkin, checkout o presence).");
+        return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Per date_type='created' usa endpoint /reservations_updates con updated_after timestamp. Per altri date_type (checkin, checkout, presence) usa /reservations.");
       case 401:
         return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide. Verifica email e password API.");
       case 403:
@@ -84,9 +84,11 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
     if ($date_type === 'created') {
         $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
-        $args = array('since' => $from_date); // Use date string format instead of timestamp
+        // Convert date to timestamp for updated_after parameter (API expects Unix timestamp)
+        $updated_after_timestamp = is_numeric($from_date) ? (int)$from_date : strtotime($from_date);
+        $args = array('updated_after' => $updated_after_timestamp);
         if ($limit) $args['limit'] = (int)$limit;
-        // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
+        // Note: to_date is not supported by updates endpoint, it uses 'updated_after' parameter only
     } else {
         $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
         $args = array('date_type'=>$date_type,'from_date'=>$from_date,'to_date'=>$to_date);
@@ -95,7 +97,11 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     $url = add_query_arg($args, $endpoint);
     
     // Log API call details for debugging
-    hic_log("API Call: $url with params: " . json_encode($args));
+    if ($date_type === 'created') {
+        hic_log("API Call (Updates endpoint): $url with updated_after timestamp: " . ($args['updated_after'] ?? 'not set'));
+    } else {
+        hic_log("API Call (Reservations endpoint): $url with params: " . json_encode($args));
+    }
 
     $res = wp_remote_get($url, array(
         'timeout' => 30,
@@ -1132,9 +1138,11 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
     // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
     if ($date_type === 'created') {
         $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
-        $args = array('since' => $from_date); // Use date string format instead of timestamp
+        // Convert date to timestamp for updated_after parameter (API expects Unix timestamp)
+        $updated_after_timestamp = is_numeric($from_date) ? (int)$from_date : strtotime($from_date);
+        $args = array('updated_after' => $updated_after_timestamp);
         if ($limit) $args['limit'] = (int)$limit;
-        // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
+        // Note: to_date is not supported by updates endpoint, it uses 'updated_after' parameter only
     } else {
         $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
         $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
@@ -1142,7 +1150,11 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
     }
     $url = add_query_arg($args, $endpoint);
     
-    hic_log("Backfill Raw API Call: $url");
+    if ($date_type === 'created') {
+        hic_log("Backfill Raw API Call (Updates endpoint): $url with updated_after timestamp: " . ($args['updated_after'] ?? 'not set'));
+    } else {
+        hic_log("Backfill Raw API Call (Reservations endpoint): $url");
+    }
 
     $res = wp_remote_get($url, array(
         'timeout' => 30,
@@ -1166,7 +1178,7 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
         // Provide specific error messages for common HTTP codes in backfill context
         switch ($code) {
             case 400:
-                return new WP_Error('hic_http', "HTTP 400 - Richiesta backfill non valida. Verifica i parametri: date_type deve essere checkin, checkout, presence o created.");
+                return new WP_Error('hic_http', "HTTP 400 - Richiesta backfill non valida. Per date_type='created' usa endpoint /reservations_updates con updated_after timestamp. Per altri date_type usa /reservations con from_date/to_date.");
             case 401:
                 return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide per backfill. Verifica email e password API.");
             case 403:
