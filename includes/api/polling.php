@@ -295,27 +295,27 @@ function hic_mark_reservation_processed($reservation) {
 // Wrapper cron function
 function hic_api_poll_bookings(){
     $start_time = microtime(true);
-    hic_log('Cron: hic_api_poll_bookings execution started');
+    hic_log('Internal Scheduler: hic_api_poll_bookings execution started');
     
     // Rotate log if needed
     hic_rotate_log_if_needed();
     
     // Try to acquire lock to prevent overlapping executions
     if (!hic_acquire_polling_lock(300)) {
-        hic_log('Cron: Another polling process is running, skipping execution');
+        hic_log('Internal Scheduler: Another polling process is running, skipping execution');
         return;
     }
     
     try {
         // Always update execution timestamp regardless of results
-        update_option('hic_last_cron_execution', time());
+        update_option('hic_last_api_poll', time());
         
         $prop = hic_get_property_id();
         $email = hic_get_api_email();
         $password = hic_get_api_password();
         $connection_type = hic_get_connection_type();
         
-        hic_log("Cron: Current config - Connection: $connection_type, PropID: $prop, Email: " . ($email ? 'configured' : 'missing'));
+        hic_log("Internal Scheduler: Current config - Connection: $connection_type, PropID: $prop, Email: " . ($email ? 'configured' : 'missing'));
         
         // Use quasi-realtime approach with Basic Auth
         if ($prop && $email && $password) {
@@ -326,11 +326,11 @@ function hic_api_poll_bookings(){
             $api_key = hic_get_api_key();
             
             if (!$api_url || !$api_key) {
-                hic_log('Cron: No valid credentials found (neither Basic Auth nor legacy API key)');
+                hic_log('Internal Scheduler: No valid credentials found (neither Basic Auth nor legacy API key)');
                 return;
             }
             
-            hic_log('Cron: using legacy API key method');
+            hic_log('Internal Scheduler: using legacy API key method');
             hic_legacy_api_poll_bookings();
         }
     } finally {
@@ -355,7 +355,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $from_date = date('Y-m-d H:i:s', $from_time);
     $to_date = date('Y-m-d H:i:s', $to_time);
     
-    hic_log("Cron: Moving window polling from $from_date to $to_date (property: $prop_id)");
+    hic_log("Internal Scheduler: Moving window polling from $from_date to $to_date (property: $prop_id)");
     
     $total_new = 0;
     $total_skipped = 0;
@@ -366,12 +366,12 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $created_from = date('Y-m-d', $from_time);
     $created_to = date('Y-m-d', $to_time);
     
-    hic_log("Cron: Polling by created date from $created_from to $created_to");
+    hic_log("Internal Scheduler: Polling by created date from $created_from to $created_to");
     $created_reservations = hic_fetch_reservations_raw($prop_id, 'created', $created_from, $created_to, 100);
     
     if (!is_wp_error($created_reservations)) {
         $created_count = is_array($created_reservations) ? count($created_reservations) : 0;
-        hic_log("Cron: Found $created_count reservations by created date");
+        hic_log("Internal Scheduler: Found $created_count reservations by created date");
         
         if ($created_count > 0) {
             $process_result = hic_process_reservations_batch($created_reservations);
@@ -388,12 +388,12 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $checkin_from = date('Y-m-d', $from_time);
     $checkin_to = date('Y-m-d', $to_time + (7 * DAY_IN_SECONDS)); // Extend checkin window
     
-    hic_log("Cron: Polling by checkin date from $checkin_from to $checkin_to");
+    hic_log("Internal Scheduler: Polling by checkin date from $checkin_from to $checkin_to");
     $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 100);
     
     if (!is_wp_error($checkin_reservations)) {
         $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
-        hic_log("Cron: Found $checkin_count reservations by checkin date");
+        hic_log("Internal Scheduler: Found $checkin_count reservations by checkin date");
         
         if ($checkin_count > 0) {
             $process_result = hic_process_reservations_batch($checkin_reservations);
@@ -418,12 +418,12 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $polling_successful = empty($polling_errors) && $total_errors === 0;
     if ($polling_successful) {
         update_option('hic_last_successful_poll', $current_time);
-        hic_log("Cron: Updated last successful poll timestamp");
+        hic_log("Internal Scheduler: Updated last successful poll timestamp");
     }
     
     // Comprehensive logging
     $log_msg = sprintf(
-        "Cron: Completed in %sms - Window: %s to %s, New: %d, Skipped: %d, Errors: %d",
+        "Internal Scheduler: Completed in %sms - Window: %s to %s, New: %d, Skipped: %d, Errors: %d",
         $execution_time,
         $from_date,
         $to_date, 
@@ -532,7 +532,7 @@ function hic_legacy_api_poll_bookings() {
   }
 
   // Always update execution timestamp regardless of results
-  update_option('hic_last_cron_execution', time());
+  update_option('hic_last_api_poll', time());
 
   // Ottieni l'ultimo timestamp processato
   $last_poll = get_option('hic_last_api_poll', strtotime('-1 hour'));
@@ -614,10 +614,10 @@ function hic_legacy_api_poll_bookings() {
  * New updates polling wrapper function
  */
 function hic_api_poll_updates(){
-    hic_log('Cron: hic_api_poll_updates execution started');
+    hic_log('Internal Scheduler: hic_api_poll_updates execution started');
     
     // Always update execution timestamp regardless of results
-    update_option('hic_last_cron_execution', time());
+    update_option('hic_last_api_poll', time());
     
     $prop = hic_get_property_id();
     
@@ -627,14 +627,14 @@ function hic_api_poll_updates(){
     $since = max(0, $last_since - $overlap_seconds);
     
     $current_time = time();
-    hic_log("Cron: polling updates for property $prop");
-    hic_log("Cron: last timestamp: " . date('Y-m-d H:i:s', $last_since) . " ($last_since)");
-    hic_log("Cron: requesting since: " . date('Y-m-d H:i:s', $since) . " ($since) [overlap: {$overlap_seconds}s]");
+    hic_log("Internal Scheduler: polling updates for property $prop");
+    hic_log("Internal Scheduler: last timestamp: " . date('Y-m-d H:i:s', $last_since) . " ($last_since)");
+    hic_log("Internal Scheduler: requesting since: " . date('Y-m-d H:i:s', $since) . " ($since) [overlap: {$overlap_seconds}s]");
     
     $out = hic_fetch_reservations_updates($prop, $since, 200); // limit opzionale se supportato
     if (!is_wp_error($out)) {
         $updates_count = is_array($out) ? count($out) : 0;
-        hic_log("Cron: Found $updates_count updates");
+        hic_log("Internal Scheduler: Found $updates_count updates");
         
         // Calculate new timestamp based on actual updates
         $new_timestamp = $current_time;
@@ -653,26 +653,26 @@ function hic_api_poll_updates(){
             // Use the max updated_at if found, otherwise use current time
             if ($max_updated_at > 0) {
                 $new_timestamp = $max_updated_at;
-                hic_log("Cron: Using max updated_at timestamp: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+                hic_log("Internal Scheduler: Using max updated_at timestamp: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
             } else {
-                hic_log("Cron: No updated_at field found, using current time: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+                hic_log("Internal Scheduler: No updated_at field found, using current time: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
             }
         } else {
             // No updates found - advance timestamp only if enough time has passed to prevent infinite polling
             $time_since_last_poll = $current_time - $last_since;
             if ($time_since_last_poll > 3600) { // 1 hour
-                hic_log("Cron: No updates found but 1+ hour passed, advancing timestamp to prevent infinite polling");
+                hic_log("Internal Scheduler: No updates found but 1+ hour passed, advancing timestamp to prevent infinite polling");
             } else {
                 // Keep previous timestamp for retry, but with small increment to avoid exact same request
                 $new_timestamp = $last_since + 60; // Advance by 1 minute to make progress
-                hic_log("Cron: No updates found, advancing by 1 minute for next retry: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+                hic_log("Internal Scheduler: No updates found, advancing by 1 minute for next retry: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
             }
         }
         
         update_option('hic_last_updates_since', $new_timestamp);
-        hic_log('Cron: hic_api_poll_updates completed successfully');
+        hic_log('Internal Scheduler: hic_api_poll_updates completed successfully');
     } else {
-        hic_log('Cron: hic_api_poll_updates failed: ' . $out->get_error_message());
+        hic_log('Internal Scheduler: hic_api_poll_updates failed: ' . $out->get_error_message());
     }
 }
 
@@ -685,7 +685,7 @@ function hic_retry_failed_brevo_notifications() {
         return;
     }
 
-    hic_log('Cron: hic_retry_failed_brevo_notifications execution started');
+    hic_log('Internal Scheduler: hic_retry_failed_brevo_notifications execution started');
     
     // Get failed reservations that need retry
     $failed_reservations = hic_get_failed_reservations_for_retry(3, 30); // max 3 attempts, 30 min delay

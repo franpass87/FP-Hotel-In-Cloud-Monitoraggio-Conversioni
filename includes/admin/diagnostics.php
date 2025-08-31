@@ -8,9 +8,11 @@ if (!defined('ABSPATH')) exit;
 /* ============ Cron Diagnostics Functions ============ */
 
 /**
- * Check internal scheduler status (replaces WP-Cron diagnostics)
+ * Check internal scheduler status (uses WordPress Heartbeat API)
  */
 function hic_get_internal_scheduler_status() {
+    global $wpdb;
+    
     $status = array(
         'internal_scheduler' => array(
             'enabled' => hic_reliable_polling_enabled(),
@@ -21,16 +23,12 @@ function hic_get_internal_scheduler_status() {
             'next_run_estimate' => null,
             'next_run_human' => 'Sconosciuto'
         ),
-        'queue_table' => array(
-            'exists' => false,
-            'total_events' => 0,
-            'processed_events' => 0,
-            'pending_events' => 0,
-            'error_events' => 0
-        ),
-        'lock_status' => array(
-            'active' => false,
-            'age_seconds' => 0
+        'realtime_sync' => array(
+            'table_exists' => true,
+            'total_tracked' => 0,
+            'notified' => 0,
+            'failed' => 0,
+            'new' => 0
         )
     );
     
@@ -41,23 +39,8 @@ function hic_get_internal_scheduler_status() {
         hic_get_api_url() && 
         (hic_has_basic_auth_credentials() || hic_get_api_key());
     
-    // Check if queue table exists first
-    global $wpdb;
-    $queue_table = $wpdb->prefix . 'hic_booking_events';
-    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
-    
-    // If table doesn't exist, try to create it
-    if (!$table_exists && function_exists('hic_create_database_table')) {
-        hic_log('Diagnostics: Queue table missing, attempting to create database tables');
-        hic_create_database_table();
-        // Re-check if table exists after creation attempt
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
-    }
-    
-    $status['queue_table']['exists'] = $table_exists;
-    
-    // Get stats from reliable poller if available and table exists
-    if (class_exists('HIC_Booking_Poller') && $table_exists) {
+    // Get stats from heartbeat scheduler if available
+    if (class_exists('HIC_Booking_Poller')) {
         $poller = new HIC_Booking_Poller();
         $poller_stats = $poller->get_stats();
         
@@ -65,39 +48,25 @@ function hic_get_internal_scheduler_status() {
             $status['internal_scheduler'] = array_merge($status['internal_scheduler'], array(
                 'last_poll' => $poller_stats['last_poll'] ?? 0,
                 'last_poll_human' => $poller_stats['last_poll_human'] ?? 'Mai eseguito',
-                'lag_seconds' => $poller_stats['lag_seconds'] ?? 0
+                'lag_seconds' => $poller_stats['lag_seconds'] ?? 0,
+                'polling_interval' => $poller_stats['polling_interval'] ?? 300
             ));
             
-            $status['queue_table'] = array(
-                'exists' => true,
-                'total_events' => $poller_stats['total_events'] ?? 0,
-                'processed_events' => $poller_stats['processed_events'] ?? 0,
-                'pending_events' => $poller_stats['pending_events'] ?? 0,
-                'error_events' => $poller_stats['error_events'] ?? 0
-            );
-            
-            $status['lock_status'] = array(
-                'active' => $poller_stats['lock_active'] ?? false,
-                'age_seconds' => $poller_stats['lock_age'] ?? 0
-            );
+            // Calculate next run estimate (Heartbeat runs every 60 seconds)
+            if ($status['internal_scheduler']['last_poll'] > 0) {
+                $next_run_estimate = $status['internal_scheduler']['last_poll'] + $status['internal_scheduler']['polling_interval'];
+                $status['internal_scheduler']['next_run_estimate'] = $next_run_estimate;
+                
+                if ($next_run_estimate > time()) {
+                    $status['internal_scheduler']['next_run_human'] = human_time_diff($next_run_estimate, time()) . ' da ora';
+                } else {
+                    $status['internal_scheduler']['next_run_human'] = 'Ora (in attesa Heartbeat)';
+                }
+            }
         }
     }
     
-    // Calculate next run estimate based on polling interval
-    if ($status['internal_scheduler']['last_poll'] > 0) {
-        $polling_interval = 300; // 5 minutes default
-        $schedules = wp_get_schedules();
-        $configured_interval = hic_get_polling_interval();
-        if (isset($schedules[$configured_interval])) {
-            $polling_interval = $schedules[$configured_interval]['interval'];
-        }
-        
-        $next_run_estimate = $status['internal_scheduler']['last_poll'] + $polling_interval;
-        $status['internal_scheduler']['next_run_estimate'] = $next_run_estimate;
-        $status['internal_scheduler']['next_run_human'] = human_time_diff($next_run_estimate, time()) . ' from now';
-    }
-    
-    // Real-time sync stats (keep existing functionality)
+    // Real-time sync stats (keep existing functionality)  
     $realtime_table = $wpdb->prefix . 'hic_realtime_sync';
     if ($wpdb->get_var("SHOW TABLES LIKE '$realtime_table'") === $realtime_table) {
         $status['realtime_sync']['total_tracked'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table");
@@ -294,21 +263,11 @@ function hic_force_restart_internal_scheduler() {
     
     $results = array();
     
-    // Clear any existing WP-Cron events (cleanup)
-    $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event');
+    // Clear any existing WP-Cron events (cleanup legacy events)
+    $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event', 'hic_reliable_poll_event');
     foreach ($legacy_events as $event) {
-        $timestamp = wp_next_scheduled($event);
-        if ($timestamp) {
-            wp_unschedule_event($timestamp, $event);
-            $results['legacy_' . $event . '_cleared'] = 'Cleared legacy event';
-        }
-    }
-    
-    // Clear internal scheduler event
-    $reliable_timestamp = wp_next_scheduled('hic_reliable_poll_event');
-    if ($reliable_timestamp) {
-        wp_unschedule_event($reliable_timestamp, 'hic_reliable_poll_event');
-        $results['reliable_poll_event_cleared'] = 'Cleared existing event';
+        wp_clear_scheduled_hook($event);
+        $results['legacy_' . $event . '_cleared'] = 'Cleared all legacy cron events';
     }
     
     // Check if internal scheduler should be active
@@ -318,20 +277,20 @@ function hic_force_restart_internal_scheduler() {
                       (hic_has_basic_auth_credentials() || hic_get_api_key());
     
     if ($should_activate) {
-        // Schedule new reliable polling event
-        $result = wp_schedule_event(time() + 60, 'hic_reliable_interval', 'hic_reliable_poll_event');
-        if ($result) {
-            $results['internal_scheduler'] = 'Successfully restarted';
-            hic_log('Force restart: Internal scheduler restarted successfully');
-        } else {
-            $results['internal_scheduler'] = 'Failed to restart';
-            hic_log('Force restart: Failed to restart internal scheduler');
+        // Reset polling timestamps to trigger immediate execution
+        delete_option('hic_last_api_poll');
+        delete_option('hic_last_successful_poll');
+        $results['polling_timestamps_reset'] = 'Timestamps reset for immediate execution';
+        
+        // Trigger an immediate poll if the poller is available
+        if (function_exists('hic_api_poll_bookings')) {
+            hic_log('Force restart: Triggering immediate polling');
+            hic_api_poll_bookings();
+            $results['immediate_poll_triggered'] = 'Polling executed immediately';
         }
         
-        // Reset last poll timestamp to trigger immediate bootstrap
-        delete_option('hic_last_reliable_poll');
-        $results['poll_history_reset'] = 'Last poll timestamp reset for bootstrap';
-        
+        $results['internal_scheduler'] = 'Restarted and ready';
+        hic_log('Force restart: Internal scheduler restart completed successfully');
     } else {
         $results['internal_scheduler'] = 'Conditions not met for activation';
         hic_log('Force restart: Conditions not met for internal scheduler');
@@ -875,23 +834,7 @@ function hic_diagnostics_page() {
     $schedules = wp_get_schedules();
     $error_stats = hic_get_error_stats();
     
-    // Check if updates polling is scheduled and which interval is used
-    $updates_interval_used = false;
-    $next_updates_scheduled = wp_next_scheduled('hic_api_updates_event');
-    if ($next_updates_scheduled) {
-        // Find which interval is being used for the scheduled event
-        $crons = get_option('cron', array());
-        foreach ($crons as $timestamp => $cron_jobs) {
-            if (isset($cron_jobs['hic_api_updates_event'])) {
-                foreach ($cron_jobs['hic_api_updates_event'] as $job) {
-                    if (isset($job['schedule'])) {
-                        $updates_interval_used = $job['schedule'];
-                        break 2;
-                    }
-                }
-            }
-        }
-    }
+    // Note: Updates polling and all cron dependencies removed - system uses internal scheduler only
     
     ?>
     <div class="wrap">
@@ -1156,7 +1099,7 @@ function hic_diagnostics_page() {
                             <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
                                 <span class="status ok">
                                     <?php 
-                                    echo 'Attivo';
+                                    echo 'Attivo (Heartbeat API)';
                                     if ($scheduler_status['internal_scheduler']['last_poll_human'] !== 'Mai eseguito') {
                                         echo ' - Ultimo: ' . esc_html($scheduler_status['internal_scheduler']['last_poll_human']);
                                     }
@@ -1164,6 +1107,24 @@ function hic_diagnostics_page() {
                                 </span>
                             <?php else: ?>
                                 <span class="status error">Non attivo</span>
+                                <br><small style="color: #dc3232;">
+                                    <?php
+                                    $polling_issues = array();
+                                    if (!hic_reliable_polling_enabled()) {
+                                        $polling_issues[] = "Polling affidabile disabilitato nelle impostazioni";
+                                    }
+                                    if (hic_get_connection_type() !== 'api') {
+                                        $polling_issues[] = "Tipo connessione non è 'API Polling' (attuale: " . hic_get_connection_type() . ")";
+                                    }
+                                    if (!hic_get_api_url()) {
+                                        $polling_issues[] = "URL API non configurato";
+                                    }
+                                    if (!hic_has_basic_auth_credentials() && !hic_get_api_key()) {
+                                        $polling_issues[] = "Credenziali API mancanti (serve Property ID + Email + Password oppure API Key)";
+                                    }
+                                    echo implode('<br>', $polling_issues);
+                                    ?>
+                                </small>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -1190,12 +1151,35 @@ function hic_diagnostics_page() {
                             <li><strong>Test webhook:</strong> Usa il pulsante "Test Dispatch Funzioni" per verificare che le integrazioni funzionino</li>
                         <?php else: ?>
                             <li><strong>Modalità consigliata:</strong> API Polling è la modalità migliore per catturare automaticamente le prenotazioni manuali</li>
-                            <li><strong>Frequenza polling:</strong> Il sistema controlla nuove prenotazioni ogni 1-2 minuti (quasi real-time)</li>
+                            <li><strong>Frequenza polling:</strong> Il sistema utilizza Heartbeat API per controllare nuove prenotazioni ogni 60 secondi (indipendente dal traffico)</li>
                             <li><strong>Verifica credenziali:</strong> Assicurati che le credenziali API siano corrette</li>
                         <?php endif; ?>
                         <li><strong>Monitoraggio log:</strong> Controlla la sezione "Log Recenti" per errori o problemi</li>
                     </ul>
                 </div>
+                
+                <?php if ($connection_type === 'api' && (!$scheduler_status['internal_scheduler']['enabled'] || !$scheduler_status['internal_scheduler']['conditions_met'])): ?>
+                <div class="polling-troubleshoot">
+                    <h3 style="color: #d63638;">⚠ Risoluzione Problemi Polling</h3>
+                    <div class="notice notice-error inline">
+                        <p><strong>Il sistema di polling non è attivo!</strong> Per far funzionare il monitoraggio automatico:</p>
+                        <ol>
+                            <li><strong>Verifica tipo connessione:</strong> Vai su <em>Impostazioni → HIC Monitoring</em> e assicurati che "Tipo Connessione" sia impostato su "<strong>API Polling</strong>"</li>
+                            <li><strong>Configura credenziali API:</strong> Inserisci i seguenti dati nelle impostazioni:
+                                <ul>
+                                    <li>API URL (fornito da Hotel in Cloud)</li>
+                                    <li>ID Struttura (Property ID)</li>
+                                    <li>Email e Password API <em>oppure</em> API Key</li>
+                                </ul>
+                            </li>
+                            <li><strong>Abilita Polling Affidabile:</strong> Assicurati che l'opzione "Polling Affidabile" sia attivata</li>
+                            <li><strong>Test connessione:</strong> Usa il pulsante "Test Connessione API" per verificare che tutto funzioni</li>
+                        </ol>
+                        <p><strong>Nota:</strong> Senza queste configurazioni, il contatore rimarrà sempre a 0 perché il sistema non può scaricare le prenotazioni da Hotel in Cloud.</p>
+                        <p><strong>Scheduler Interno Heartbeat:</strong> Il sistema utilizza lo scheduler interno di WordPress (Heartbeat API) che si attiva automaticamente ogni 60 secondi quando le condizioni sono soddisfatte. Non è necessario configurare WordPress Cron o dipendere da traffico del sito.</p>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
             
             <!-- System Configuration Section -->
@@ -1224,7 +1208,7 @@ function hic_diagnostics_page() {
                                     <span class="status warning">⚠ Disabilitato</span>
                                 <?php endif; ?>
                             </td>
-                            <td>Sistema di polling interno senza dipendenza da WP-Cron</td>
+                            <td>Sistema di polling interno con Heartbeat API</td>
                         </tr>
                         <tr>
                             <td>API URL</td>
@@ -1406,6 +1390,35 @@ function hic_diagnostics_page() {
                     $reliable_stats = $poller->get_stats();
                 }
                 ?>
+                
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Stato</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Scheduler Interno</td>
+                            <td>
+                                <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
+                                    <span class="status ok">✓ Attivo</span><br>
+                                    <small>
+                                        Ultimo polling: <?php echo esc_html($scheduler_status['internal_scheduler']['last_poll_human']); ?><br>
+                                        Prossimo polling: <?php echo esc_html($scheduler_status['internal_scheduler']['next_run_human']); ?>
+                                    </small>
+                                <?php else: ?>
+                                    <span class="status error">✗ Non attivo</span><br>
+                                    <small>Verificare configurazione API</small>
+                                <?php endif; ?>
+                            </td>
+                            <td>Scheduler interno che utilizza WordPress Heartbeat API</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
                 <table class="widefat">
                     <thead>
                         <tr>
@@ -1424,7 +1437,7 @@ function hic_diagnostics_page() {
                                     <span class="status error">✗ Non Caricato</span>
                                 <?php endif; ?>
                             </td>
-                            <td>Sistema di polling interno senza dipendenza da WP-Cron</td>
+                            <td>Sistema di polling interno con Heartbeat API</td>
                         </tr>
                         
                         <tr>
