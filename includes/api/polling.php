@@ -367,7 +367,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $created_to = date('Y-m-d', $to_time);
     
     hic_log("Cron: Polling by created date from $created_from to $created_to");
-    $created_reservations = hic_fetch_reservations($prop_id, 'created', $created_from, $created_to, 100);
+    $created_reservations = hic_fetch_reservations_raw($prop_id, 'created', $created_from, $created_to, 100);
     
     if (!is_wp_error($created_reservations)) {
         $created_count = is_array($created_reservations) ? count($created_reservations) : 0;
@@ -389,7 +389,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $checkin_to = date('Y-m-d', $to_time + (7 * DAY_IN_SECONDS)); // Extend checkin window
     
     hic_log("Cron: Polling by checkin date from $checkin_from to $checkin_to");
-    $checkin_reservations = hic_fetch_reservations($prop_id, 'checkin', $checkin_from, $checkin_to, 100);
+    $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 100);
     
     if (!is_wp_error($checkin_reservations)) {
         $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
