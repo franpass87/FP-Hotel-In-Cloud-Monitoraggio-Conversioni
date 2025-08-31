@@ -2,6 +2,27 @@
 
 Plugin WordPress per il tracciamento delle conversioni da Hotel in Cloud verso GA4, Facebook Meta e Brevo.
 
+## Come Funziona in Sintesi
+
+**Quando arriva una prenotazione su Hotel in Cloud**, il plugin:
+1. 🔍 **La intercetta automaticamente** (tramite polling API ogni 1-5 minuti)
+2. 📊 **La invia a GA4** (evento purchase per analytics)
+3. 📧 **La invia a Brevo** (contatto + evento per email marketing)
+4. 📱 **La invia a Meta** (evento Purchase per Facebook Ads)
+
+Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling** indipendente da WordPress cron.
+
+### Modalità di Funzionamento
+
+- **API Polling (Raccomandato)**: WordPress controlla HIC ogni 1-5 minuti per nuove prenotazioni
+- **Webhook**: HIC invia immediatamente le prenotazioni a WordPress (richiede configurazione su HIC)
+
+📖 **Documentazione Completa**: 
+- [Come Funziona il Plugin](PLUGIN_FUNZIONAMENTO.md) - Spiegazione dettagliata
+- [Architettura Tecnica](ARCHITETTURA_TECNICA.md) - Diagrammi e flussi
+- [Guida Configurazione](GUIDA_CONFIGURAZIONE.md) - Setup passo-passo
+- [FAQ - Domande Frequenti](FAQ.md) - Risposte alle domande comuni
+
 ## Configurazione API
 
 ### API Hotel in Cloud
