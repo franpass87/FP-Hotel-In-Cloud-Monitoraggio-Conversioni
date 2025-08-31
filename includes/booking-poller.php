@@ -16,11 +16,43 @@ class HIC_Booking_Poller {
     private $log_context = array();
     
     public function __construct() {
+        // Register required cron schedules
+        add_filter('cron_schedules', array($this, 'add_cron_schedules'), 10);
+        
         add_action('init', array($this, 'init_scheduler'));
         add_action('hic_reliable_poll_event', array($this, 'execute_poll'));
         
         // Disable old WP-Cron events when reliable polling is active
         add_action('init', array($this, 'disable_legacy_cron_events'), 20);
+    }
+    
+    /**
+     * Add required cron schedules for internal scheduler
+     */
+    public function add_cron_schedules($schedules) {
+        if (!isset($schedules['hic_reliable_interval'])) {
+            $schedules['hic_reliable_interval'] = array(
+                'interval' => 300, // 5 minutes
+                'display' => 'Every 5 Minutes (HIC Internal Scheduler)'
+            );
+        }
+        
+        // Keep some intervals for backward compatibility
+        if (!isset($schedules['every_minute'])) {
+            $schedules['every_minute'] = array(
+                'interval' => 60,
+                'display' => 'Every Minute'
+            );
+        }
+        
+        if (!isset($schedules['every_two_minutes'])) {
+            $schedules['every_two_minutes'] = array(
+                'interval' => 120,
+                'display' => 'Every Two Minutes'
+            );
+        }
+        
+        return $schedules;
     }
     
     /**
@@ -139,6 +171,18 @@ class HIC_Booking_Poller {
             $this->log_structured('poll_start', array());
             
             $stats = $this->perform_polling();
+            
+            // Also handle updates polling if enabled
+            if ($this->should_poll_updates()) {
+                $updates_stats = $this->perform_updates_polling();
+                $stats = array_merge($stats, $updates_stats);
+            }
+            
+            // Handle retry notifications
+            if ($this->should_retry_notifications()) {
+                $retry_stats = $this->perform_retry_notifications();
+                $stats = array_merge($stats, $retry_stats);
+            }
             
             // Update last poll timestamp
             update_option('hic_last_reliable_poll', time());
@@ -415,6 +459,80 @@ class HIC_Booking_Poller {
     }
     
     /**
+     * Check if updates polling should be active
+     */
+    private function should_poll_updates() {
+        return hic_get_connection_type() === 'api' && 
+               hic_get_api_url() && 
+               hic_updates_enrich_contacts() && 
+               hic_has_basic_auth_credentials();
+    }
+    
+    /**
+     * Perform updates polling
+     */
+    private function perform_updates_polling() {
+        $stats = array(
+            'updates_processed' => 0,
+            'updates_errors' => 0
+        );
+        
+        try {
+            if (function_exists('hic_api_poll_updates')) {
+                hic_api_poll_updates();
+                $stats['updates_processed'] = 1;
+                
+                $this->log_structured('updates_polling_completed', array(
+                    'success' => true
+                ));
+            }
+        } catch (Exception $e) {
+            $stats['updates_errors'] = 1;
+            $this->log_structured('updates_polling_error', array(
+                'error' => $e->getMessage()
+            ));
+        }
+        
+        return $stats;
+    }
+    
+    /**
+     * Check if retry notifications should be active
+     */
+    private function should_retry_notifications() {
+        return function_exists('hic_should_schedule_retry_event') && 
+               hic_should_schedule_retry_event();
+    }
+    
+    /**
+     * Perform retry notifications
+     */
+    private function perform_retry_notifications() {
+        $stats = array(
+            'retries_processed' => 0,
+            'retries_errors' => 0
+        );
+        
+        try {
+            if (function_exists('hic_retry_failed_brevo_notifications')) {
+                hic_retry_failed_brevo_notifications();
+                $stats['retries_processed'] = 1;
+                
+                $this->log_structured('retry_notifications_completed', array(
+                    'success' => true
+                ));
+            }
+        } catch (Exception $e) {
+            $stats['retries_errors'] = 1;
+            $this->log_structured('retry_notifications_error', array(
+                'error' => $e->getMessage()
+            ));
+        }
+        
+        return $stats;
+    }
+    
+    /**
      * Structured JSON logging
      */
     private function log_structured($event, $data = array()) {
@@ -493,7 +611,7 @@ class HIC_Booking_Poller {
             return;
         }
         
-        $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event');
+        $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event');
         $disabled_count = 0;
         
         foreach ($legacy_events as $event) {
