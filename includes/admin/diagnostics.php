@@ -732,9 +732,17 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
         return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
     }
     
-    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
-    $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
-    if ($limit) $args['limit'] = (int)$limit;
+    // Use /reservations_updates/ endpoint for 'created' date_type as per API documentation
+    if ($date_type === 'created') {
+        $endpoint = $base . '/reservations_updates/' . rawurlencode($prop_id);
+        $args = array('since' => strtotime($from_date));
+        if ($limit) $args['limit'] = (int)$limit;
+        // Note: to_date is not supported by updates endpoint, it uses 'since' parameter only
+    } else {
+        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+        $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
+        if ($limit) $args['limit'] = (int)$limit;
+    }
     $url = add_query_arg($args, $endpoint);
     
     hic_log("Raw API Call: $url");
