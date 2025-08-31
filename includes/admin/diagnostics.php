@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) exit;
 /* ============ Cron Diagnostics Functions ============ */
 
 /**
- * Check internal scheduler status (no WordPress Cron dependency)
+ * Check internal scheduler status (uses WordPress Heartbeat API)
  */
 function hic_get_internal_scheduler_status() {
     $status = array(
@@ -30,7 +30,7 @@ function hic_get_internal_scheduler_status() {
         hic_get_api_url() && 
         (hic_has_basic_auth_credentials() || hic_get_api_key());
     
-    // Get stats from internal scheduler if available
+    // Get stats from heartbeat scheduler if available
     if (class_exists('HIC_Booking_Poller')) {
         $poller = new HIC_Booking_Poller();
         $poller_stats = $poller->get_stats();
@@ -43,7 +43,7 @@ function hic_get_internal_scheduler_status() {
                 'polling_interval' => $poller_stats['polling_interval'] ?? 300
             ));
             
-            // Calculate next run estimate
+            // Calculate next run estimate (Heartbeat runs every 60 seconds)
             if ($status['internal_scheduler']['last_poll'] > 0) {
                 $next_run_estimate = $status['internal_scheduler']['last_poll'] + $status['internal_scheduler']['polling_interval'];
                 $status['internal_scheduler']['next_run_estimate'] = $next_run_estimate;
@@ -51,7 +51,7 @@ function hic_get_internal_scheduler_status() {
                 if ($next_run_estimate > time()) {
                     $status['internal_scheduler']['next_run_human'] = human_time_diff($next_run_estimate, time()) . ' da ora';
                 } else {
-                    $status['internal_scheduler']['next_run_human'] = 'Ora (in ritardo)';
+                    $status['internal_scheduler']['next_run_human'] = 'Ora (in attesa Heartbeat)';
                 }
             }
         }
@@ -1090,7 +1090,7 @@ function hic_diagnostics_page() {
                             <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
                                 <span class="status ok">
                                     <?php 
-                                    echo 'Attivo';
+                                    echo 'Attivo (Heartbeat API)';
                                     if ($scheduler_status['internal_scheduler']['last_poll_human'] !== 'Mai eseguito') {
                                         echo ' - Ultimo: ' . esc_html($scheduler_status['internal_scheduler']['last_poll_human']);
                                     }
@@ -1142,7 +1142,7 @@ function hic_diagnostics_page() {
                             <li><strong>Test webhook:</strong> Usa il pulsante "Test Dispatch Funzioni" per verificare che le integrazioni funzionino</li>
                         <?php else: ?>
                             <li><strong>Modalità consigliata:</strong> API Polling è la modalità migliore per catturare automaticamente le prenotazioni manuali</li>
-                            <li><strong>Frequenza polling:</strong> Il sistema controlla nuove prenotazioni ogni 1-2 minuti (quasi real-time)</li>
+                            <li><strong>Frequenza polling:</strong> Il sistema utilizza Heartbeat API per controllare nuove prenotazioni ogni 60 secondi (indipendente dal traffico)</li>
                             <li><strong>Verifica credenziali:</strong> Assicurati che le credenziali API siano corrette</li>
                         <?php endif; ?>
                         <li><strong>Monitoraggio log:</strong> Controlla la sezione "Log Recenti" per errori o problemi</li>
@@ -1167,7 +1167,7 @@ function hic_diagnostics_page() {
                             <li><strong>Test connessione:</strong> Usa il pulsante "Test Connessione API" per verificare che tutto funzioni</li>
                         </ol>
                         <p><strong>Nota:</strong> Senza queste configurazioni, il contatore rimarrà sempre a 0 perché il sistema non può scaricare le prenotazioni da Hotel in Cloud.</p>
-                        <p><strong>Scheduler Interno:</strong> Il sistema utilizza uno scheduler interno che si attiva automaticamente ad ogni caricamento di pagina quando le condizioni sono soddisfatte. Non è necessario configurare WordPress Cron.</p>
+                        <p><strong>Scheduler Interno Heartbeat:</strong> Il sistema utilizza lo scheduler interno di WordPress (Heartbeat API) che si attiva automaticamente ogni 60 secondi quando le condizioni sono soddisfatte. Non è necessario configurare WordPress Cron o dipendere da traffico del sito.</p>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -1199,7 +1199,7 @@ function hic_diagnostics_page() {
                                     <span class="status warning">⚠ Disabilitato</span>
                                 <?php endif; ?>
                             </td>
-                            <td>Sistema di polling interno senza dipendenza da WP-Cron</td>
+                            <td>Sistema di polling interno con Heartbeat API</td>
                         </tr>
                         <tr>
                             <td>API URL</td>
@@ -1405,7 +1405,7 @@ function hic_diagnostics_page() {
                                     <small>Verificare configurazione API</small>
                                 <?php endif; ?>
                             </td>
-                            <td>Scheduler interno che si attiva automaticamente senza WordPress Cron</td>
+                            <td>Scheduler interno che utilizza WordPress Heartbeat API</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1428,7 +1428,7 @@ function hic_diagnostics_page() {
                                     <span class="status error">✗ Non Caricato</span>
                                 <?php endif; ?>
                             </td>
-                            <td>Sistema di polling interno senza dipendenza da WP-Cron</td>
+                            <td>Sistema di polling interno con Heartbeat API</td>
                         </tr>
                         
                         <tr>

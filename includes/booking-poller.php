@@ -1,6 +1,6 @@
 <?php
 /**
- * Internal Booking Scheduler - No WordPress Cron Dependency
+ * Internal Booking Scheduler - Uses WordPress Heartbeat API
  */
 
 if (!defined('ABSPATH')) exit;
@@ -11,17 +11,27 @@ class HIC_Booking_Poller {
     const WATCHDOG_THRESHOLD = 900; // 15 minutes in seconds
     
     public function __construct() {
-        // Use internal scheduler that checks on every init
-        add_action('init', array($this, 'internal_scheduler_check'));
+        // Use WordPress Heartbeat API for efficient periodic checks
+        add_filter('heartbeat_received', array($this, 'heartbeat_scheduler_check'), 10, 2);
+        add_filter('heartbeat_settings', array($this, 'heartbeat_settings'));
     }
     
     /**
-     * Internal scheduler check - runs on every WordPress init
+     * Configure Heartbeat settings for optimal polling
      */
-    public function internal_scheduler_check() {
-        // Only run if we're not in admin and polling should be active
-        if (is_admin() || !$this->should_poll()) {
-            return;
+    public function heartbeat_settings($settings) {
+        // Set heartbeat interval to 60 seconds for efficient polling checks
+        $settings['interval'] = 60;
+        return $settings;
+    }
+    
+    /**
+     * Heartbeat scheduler check - runs via WordPress Heartbeat API
+     */
+    public function heartbeat_scheduler_check($response, $data) {
+        // Only run if polling should be active
+        if (!$this->should_poll()) {
+            return $response;
         }
         
         $last_poll = get_option('hic_last_api_poll', 0);
@@ -35,13 +45,15 @@ class HIC_Booking_Poller {
         if ($time_since_poll >= $polling_interval) {
             // Use the existing polling system
             if (function_exists('hic_api_poll_bookings')) {
-                hic_log("Internal Scheduler: Triggering polling (last poll: {$time_since_poll}s ago)");
+                hic_log("Heartbeat Scheduler: Triggering polling (last poll: {$time_since_poll}s ago)");
                 hic_api_poll_bookings();
             }
         }
         
         // Run watchdog check for debugging
         $this->watchdog_check($last_poll, $current_time);
+        
+        return $response;
     }
     
     /**
@@ -77,7 +89,7 @@ class HIC_Booking_Poller {
         $lag = $current_time - $last_poll;
         
         if ($lag > self::WATCHDOG_THRESHOLD) {
-            hic_log("Internal Scheduler Watchdog: Polling lag detected - {$lag}s since last poll (threshold: " . self::WATCHDOG_THRESHOLD . "s)");
+            hic_log("Heartbeat Scheduler Watchdog: Polling lag detected - {$lag}s since last poll (threshold: " . self::WATCHDOG_THRESHOLD . "s)");
         }
     }
     
