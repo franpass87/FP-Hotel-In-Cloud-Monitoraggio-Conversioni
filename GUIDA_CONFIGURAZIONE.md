@@ -60,41 +60,34 @@ Access Token: [token di accesso CAPI]
 
 3. **Verifica Sistema Polling**:
    - Controlla "Sistema Polling Interno" in Diagnostics
-   - Deve mostrare "✅ Attivo" con ultimo polling recente
+   - Deve mostrare "✅ Attivo" con dual-mode: polling continuo + deep check
+   - Verifica che sia il polling continuo che il deep check abbiano timestamp recenti
 
-### Passo 4: Ottimizzazione Performance (Opzionale)
+### Passo 4: Sistema Ottimizzato (Automatico)
 
-Per **polling ogni minuto** (massime prestazioni):
+Il nuovo sistema è **già ottimizzato** e non richiede configurazioni aggiuntive:
 
-1. **Disabilita WP-Cron** (in `wp-config.php`):
-   ```php
-   define('DISABLE_WP_CRON', true);
-   ```
+- ✅ **Polling Continuo**: Ogni minuto controlla prenotazioni recenti e manuali
+- ✅ **Deep Check**: Ogni 10 minuti controlla indietro 5 giorni per recuperare eventuali prenotazioni perse  
+- ✅ **Non dipende da WP-Cron**: Utilizza WordPress Heartbeat API (più affidabile)
+- ✅ **Cattura prenotazioni manuali**: Include automaticamente le prenotazioni inserite manualmente dallo staff
 
-2. **Configura Cron di Sistema**:
-   ```bash
-   # Esegui ogni minuto
-   * * * * * wget -q -O - "https://tuosito.com/wp-cron.php" >/dev/null 2>&1
-   ```
-
-3. **Aggiorna Intervallo Plugin**:
-   ```
-   Intervallo: Every Minute
-   ```
+**Non sono più necessarie** le configurazioni cron esterne!
 
 ## Come Verificare che Funzioni
 
 ### 1. Crea una Prenotazione di Test
 - Vai su Hotel in Cloud
-- Crea una prenotazione di test
-- Attendi 1-5 minuti (dipende dall'intervallo)
+- Crea una prenotazione di test (online o manuale)
+- Attendi 1-2 minuti (polling continuo ogni minuto)
 
 ### 2. Controlla i Log
 - **WordPress Admin** → **Impostazioni** → **HIC Diagnostics**
 - Sezione "Log Recenti"
 - Cerca entries tipo:
   ```
-  ✅ "poll_completed" 
+  ✅ "Continuous Polling: Completed" 
+  ✅ "Deep Check: Completed"
   ✅ "Prenotazione processata"
   ✅ "GA4 purchase event sent"
   ✅ "Brevo contact sent"
@@ -118,6 +111,7 @@ Per **polling ogni minuto** (massime prestazioni):
 1. Verifica credenziali API HIC
 2. Controlla che "Sistema Polling Affidabile" sia attivo
 3. Verifica Property ID corretto
+4. Il sistema dual-mode dovrebbe mostrarsi attivo in Diagnostics
 
 ### Problema: "Connessione API Fallita"
 **Soluzione**:
@@ -151,14 +145,15 @@ Per **polling ogni minuto** (massime prestazioni):
 
 ### Log da Monitorare
 Controlla periodicamente in **HIC Diagnostics**:
-- ✅ "Sistema Polling Interno: Attivo"
-- ✅ "Ultimo polling: < 10 minuti fa"
+- ✅ "Sistema Polling Interno: Attivo" 
+- ✅ "Polling Continuo: < 2 minuti fa"
+- ✅ "Deep Check: < 15 minuti fa"
 - ✅ Nessun errore nei log recenti
 
 ### Metriche Chiave
-- **Prenotazioni intercettate**: Tutte le prenotazioni HIC
+- **Prenotazioni intercettate**: Tutte le prenotazioni HIC (online + manuali)
 - **Eventi GA4**: Purchase events in tempo reale
 - **Contatti Brevo**: Nuovi contatti/aggiornamenti
 - **Attribution**: Bucket gads/fbads/organic corretto
 
-Il sistema, una volta configurato, funziona **automaticamente** e invia ogni prenotazione HIC a GA4 e Brevo entro 1-5 minuti dall'arrivo.
+Il sistema dual-mode funziona **automaticamente** e rileva ogni prenotazione HIC (incluse quelle manuali) entro 1-2 minuti, con deep check ogni 10 minuti per garantire che nulla venga perso.

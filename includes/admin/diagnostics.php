@@ -48,20 +48,38 @@ function hic_get_internal_scheduler_status() {
             $status['internal_scheduler'] = array_merge($status['internal_scheduler'], array(
                 'last_poll' => $poller_stats['last_poll'] ?? 0,
                 'last_poll_human' => $poller_stats['last_poll_human'] ?? 'Mai eseguito',
+                'last_continuous_poll' => $poller_stats['last_continuous_poll'] ?? 0,
+                'last_continuous_human' => $poller_stats['last_continuous_human'] ?? 'Mai eseguito',
+                'last_deep_check' => $poller_stats['last_deep_check'] ?? 0,
+                'last_deep_human' => $poller_stats['last_deep_human'] ?? 'Mai eseguito',
                 'lag_seconds' => $poller_stats['lag_seconds'] ?? 0,
-                'polling_interval' => $poller_stats['polling_interval'] ?? 300
+                'continuous_lag' => $poller_stats['continuous_lag'] ?? 0,
+                'deep_lag' => $poller_stats['deep_lag'] ?? 0,
+                'polling_interval' => $poller_stats['polling_interval'] ?? 60,
+                'deep_check_interval' => $poller_stats['deep_check_interval'] ?? 600
             ));
             
-            // Calculate next run estimate (Heartbeat runs every 60 seconds)
-            if ($status['internal_scheduler']['last_poll'] > 0) {
-                $next_run_estimate = $status['internal_scheduler']['last_poll'] + $status['internal_scheduler']['polling_interval'];
-                $status['internal_scheduler']['next_run_estimate'] = $next_run_estimate;
-                
-                if ($next_run_estimate > time()) {
-                    $status['internal_scheduler']['next_run_human'] = human_time_diff($next_run_estimate, time()) . ' da ora';
+            // Calculate next run estimates for both continuous and deep check
+            if ($status['internal_scheduler']['last_continuous_poll'] > 0) {
+                $next_continuous = $status['internal_scheduler']['last_continuous_poll'] + 60; // 1 minute
+                if ($next_continuous > time()) {
+                    $status['internal_scheduler']['next_continuous_human'] = human_time_diff($next_continuous, time()) . ' da ora';
                 } else {
-                    $status['internal_scheduler']['next_run_human'] = 'Ora (in attesa Heartbeat)';
+                    $status['internal_scheduler']['next_continuous_human'] = 'Ora (in attesa Heartbeat)';
                 }
+            } else {
+                $status['internal_scheduler']['next_continuous_human'] = 'In attesa di avvio';
+            }
+            
+            if ($status['internal_scheduler']['last_deep_check'] > 0) {
+                $next_deep = $status['internal_scheduler']['last_deep_check'] + 600; // 10 minutes
+                if ($next_deep > time()) {
+                    $status['internal_scheduler']['next_deep_human'] = human_time_diff($next_deep, time()) . ' da ora';
+                } else {
+                    $status['internal_scheduler']['next_deep_human'] = 'Ora (in attesa Heartbeat)';
+                }
+            } else {
+                $status['internal_scheduler']['next_deep_human'] = 'In attesa di avvio';
             }
         }
     }
@@ -1227,7 +1245,7 @@ function hic_diagnostics_page() {
                             <li><strong>Considera API Polling:</strong> Per maggiore affidabilità, valuta il passaggio alla modalità "API Polling"</li>
                         <?php else: ?>
                             <li><strong>Modalità consigliata:</strong> API Polling è la modalità migliore per catturare automaticamente le prenotazioni manuali</li>
-                            <li><strong>Frequenza polling:</strong> Il sistema utilizza Heartbeat API per controllare nuove prenotazioni ogni 60 secondi (indipendente dal traffico)</li>
+                            <li><strong>Frequenza polling:</strong> Il sistema utilizza un approccio dual-mode: polling continuo ogni minuto + deep check ogni 10 minuti con lookback di 5 giorni</li>
                             <li><strong>Verifica credenziali:</strong> Assicurati che le credenziali API siano corrette</li>
                         <?php endif; ?>
                         <li><strong>Monitoraggio log:</strong> Controlla la sezione "Log Recenti" per errori o problemi</li>
@@ -1252,7 +1270,7 @@ function hic_diagnostics_page() {
                             <li><strong>Test connessione:</strong> Usa il pulsante "Test Connessione API" per verificare che tutto funzioni</li>
                         </ol>
                         <p><strong>Nota:</strong> Senza queste configurazioni, il contatore rimarrà sempre a 0 perché il sistema non può scaricare le prenotazioni da Hotel in Cloud.</p>
-                        <p><strong>Scheduler Interno Heartbeat:</strong> Il sistema utilizza lo scheduler interno di WordPress (Heartbeat API) che si attiva automaticamente ogni 60 secondi quando le condizioni sono soddisfatte. Non è necessario configurare WordPress Cron o dipendere da traffico del sito.</p>
+                        <p><strong>Scheduler Interno Dual-Mode:</strong> Il sistema utilizza uno scheduler interno ottimizzato con WordPress Heartbeat API che esegue due tipi di controlli: polling continuo ogni minuto per le prenotazioni recenti e manuali, e deep check ogni 10 minuti che controlla indietro di 5 giorni per recuperare eventuali prenotazioni perse. Non dipende da WordPress Cron o traffico del sito.</p>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -1604,15 +1622,17 @@ function hic_diagnostics_page() {
                                 <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
                                     <span class="status ok">✓ Attivo</span><br>
                                     <small>
-                                        Ultimo polling: <?php echo esc_html($scheduler_status['internal_scheduler']['last_poll_human']); ?><br>
-                                        Prossimo polling: <?php echo esc_html($scheduler_status['internal_scheduler']['next_run_human']); ?>
+                                        <strong>Polling Continuo (1 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_continuous_human'] ?? 'Mai eseguito'); ?><br>
+                                        <strong>Deep Check (10 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_deep_human'] ?? 'Mai eseguito'); ?><br>
+                                        <strong>Prossimo continuo:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['next_continuous_human'] ?? 'Sconosciuto'); ?><br>
+                                        <strong>Prossimo deep:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['next_deep_human'] ?? 'Sconosciuto'); ?>
                                     </small>
                                 <?php else: ?>
                                     <span class="status error">✗ Non attivo</span><br>
                                     <small>Verificare configurazione API</small>
                                 <?php endif; ?>
                             </td>
-                            <td>Scheduler interno che utilizza WordPress Heartbeat API</td>
+                            <td>Sistema dual-mode: polling continuo ogni minuto + deep check ogni 10 minuti (5 giorni lookback)</td>
                         </tr>
                     </tbody>
                 </table>
