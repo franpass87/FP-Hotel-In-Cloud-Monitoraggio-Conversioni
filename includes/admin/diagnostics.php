@@ -166,7 +166,6 @@ function hic_get_credentials_status() {
  */
 function hic_get_execution_stats() {
     return array(
-        'last_cron_execution' => get_option('hic_last_cron_execution', 0),
         'last_poll_time' => get_option('hic_last_api_poll', 0),
         'last_successful_poll' => get_option('hic_last_successful_poll', 0),
         'last_updates_time' => get_option('hic_last_updates_since', 0),
@@ -209,48 +208,7 @@ function hic_get_recent_log_entries($limit = 50) {
     return array_reverse($important_entries); // Most recent first
 }
 
-/**
- * Manual execution for testing (now using internal scheduler)
- */
-function hic_execute_manual_cron($event_name) {
-    if (!in_array($event_name, array('hic_api_poll_event', 'hic_api_updates_event', 'hic_reliable_poll_event'))) {
-        return array('success' => false, 'message' => 'Invalid event name');
-    }
-    
-    $start_time = microtime(true);
-    
-    try {
-        if ($event_name === 'hic_reliable_poll_event' || $event_name === 'hic_api_poll_event') {
-            // Use the internal scheduler
-            if (class_exists('HIC_Booking_Poller')) {
-                $poller = new HIC_Booking_Poller();
-                $poller->execute_poll();
-                $message = 'Internal scheduler polling executed successfully';
-            } else {
-                // Fallback to legacy function
-                hic_api_poll_bookings();
-                $message = 'Legacy polling executed successfully';
-            }
-        } else {
-            hic_api_poll_updates();
-            $message = 'Updates polling executed successfully';
-        }
-        
-        $execution_time = round((microtime(true) - $start_time) * 1000, 2);
-        
-        return array(
-            'success' => true, 
-            'message' => $message,
-            'execution_time' => $execution_time . 'ms'
-        );
-        
-    } catch (Exception $e) {
-        return array(
-            'success' => false, 
-            'message' => 'Error: ' . $e->getMessage()
-        );
-    }
-}
+
 
 /**
  * Test dispatch functions with sample data
@@ -610,17 +568,7 @@ function hic_force_restart_internal_scheduler() {
     return $results;
 }
 
-/**
- * Get WordPress cron schedules info
- */
-function hic_get_wp_cron_schedules() {
-    $schedules = wp_get_schedules();
-    return array(
-        'available_schedules' => $schedules,
-        'hic_interval_exists' => isset($schedules['hic_poll_interval']),
-        'hic_interval_seconds' => isset($schedules['hic_poll_interval']) ? $schedules['hic_poll_interval']['interval'] : null
-    );
-}
+
 
 /**
  * Get recent error count from logs
@@ -880,7 +828,6 @@ function hic_format_bookings_as_csv($bookings) {
 /* ============ AJAX Handlers ============ */
 
 // Add AJAX handlers
-add_action('wp_ajax_hic_manual_cron_test', 'hic_ajax_manual_cron_test');
 add_action('wp_ajax_hic_refresh_diagnostics', 'hic_ajax_refresh_diagnostics');
 add_action('wp_ajax_hic_test_dispatch', 'hic_ajax_test_dispatch');
 add_action('wp_ajax_hic_force_reschedule', 'hic_ajax_force_reschedule');
@@ -888,22 +835,7 @@ add_action('wp_ajax_hic_backfill_reservations', 'hic_ajax_backfill_reservations'
 add_action('wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_bookings');
 add_action('wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
 
-function hic_ajax_manual_cron_test() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
-    }
-    
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
-    }
-    
-    $event_name = sanitize_text_field($_POST['event'] ?? '');
-    $result = hic_execute_manual_cron($event_name);
-    
-    wp_die(json_encode($result));
-}
+
 
 function hic_ajax_refresh_diagnostics() {
     // Verify nonce
@@ -1679,20 +1611,6 @@ function hic_diagnostics_page() {
             <div class="card">
                 <h2>Statistiche Esecuzione</h2>
                 <table class="widefat" id="hic-execution-stats">
-                    <tr>
-                        <td>Ultima Esecuzione Cron</td>
-                        <td>
-                            <?php 
-                            if ($execution_stats['last_cron_execution']) {
-                                $execution_time = date('Y-m-d H:i:s', $execution_stats['last_cron_execution']);
-                                $time_ago = human_time_diff($execution_stats['last_cron_execution'], time()) . ' fa';
-                                echo '<span class="status ok">' . esc_html($execution_time) . '</span><br><small>(' . esc_html($time_ago) . ')</small>';
-                            } else {
-                                echo '<span class="status warning">Mai</span>';
-                            }
-                            ?>
-                        </td>
-                    </tr>
                     <tr>
                         <td>Ultimo Polling</td>
                         <td><?php echo $execution_stats['last_poll_time'] ? esc_html(date('Y-m-d H:i:s', $execution_stats['last_poll_time'])) : 'Mai'; ?></td>
