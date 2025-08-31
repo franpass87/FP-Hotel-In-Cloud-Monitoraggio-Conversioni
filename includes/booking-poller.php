@@ -170,6 +170,9 @@ class HIC_Booking_Poller {
         try {
             $this->log_structured('poll_start', array());
             
+            // Update last poll timestamp at the start to indicate polling is active
+            update_option('hic_last_reliable_poll', time());
+            
             $stats = $this->perform_polling();
             
             // Also handle updates polling if enabled
@@ -184,9 +187,6 @@ class HIC_Booking_Poller {
                 $stats = array_merge($stats, $retry_stats);
             }
             
-            // Update last poll timestamp
-            update_option('hic_last_reliable_poll', time());
-            
             $execution_time = round(microtime(true) - $start_time, 2);
             
             $this->log_structured('poll_completed', array_merge($stats, array(
@@ -198,6 +198,8 @@ class HIC_Booking_Poller {
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ));
+            // Still update timestamp even on error to show polling is running
+            update_option('hic_last_reliable_poll', time());
         } finally {
             $this->release_lock();
         }
@@ -223,10 +225,6 @@ class HIC_Booking_Poller {
         
         // Fetch reservations from API
         $reservations = $this->fetch_reservations($range);
-        
-        if ($reservations === false) {
-            throw new Exception('Failed to fetch reservations from API');
-        }
         
         $stats['reservations_fetched'] = count($reservations);
         $stats['api_calls'] = 1;
@@ -589,7 +587,7 @@ class HIC_Booking_Poller {
         // Last poll info
         $last_poll = get_option('hic_last_reliable_poll', 0);
         $stats['last_poll'] = $last_poll;
-        $stats['last_poll_human'] = $last_poll > 0 ? human_time_diff($last_poll) . ' ago' : 'Never';
+        $stats['last_poll_human'] = $last_poll > 0 ? human_time_diff($last_poll) . ' fa' : 'Mai';
         $stats['lag_seconds'] = $last_poll > 0 ? time() - $last_poll : 0;
         
         // Lock status
