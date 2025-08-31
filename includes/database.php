@@ -95,6 +95,57 @@ function hic_create_realtime_sync_table(){
   }
   
   hic_log('DB ready: '.$table.' (realtime sync states)');
+  
+  // Create booking events queue table
+  return hic_create_booking_events_table();
+}
+
+/* ============ DB: tabella queue eventi prenotazioni ============ */
+function hic_create_booking_events_table(){
+  global $wpdb;
+  
+  // Check if wpdb is available
+  if (!$wpdb) {
+    hic_log('hic_create_booking_events_table: wpdb is not available');
+    return false;
+  }
+  
+  $table = $wpdb->prefix . 'hic_booking_events';
+  $charset = $wpdb->get_charset_collate();
+  
+  $sql = "CREATE TABLE IF NOT EXISTS $table (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    booking_id VARCHAR(255) NOT NULL,
+    version_hash VARCHAR(64) NOT NULL,
+    raw_data TEXT NOT NULL,
+    poll_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    processed TINYINT(1) DEFAULT 0,
+    processed_at TIMESTAMP NULL,
+    process_attempts INT DEFAULT 0,
+    last_error TEXT NULL,
+    UNIQUE KEY unique_booking_version (booking_id, version_hash),
+    KEY booking_id_idx (booking_id),
+    KEY poll_timestamp_idx (poll_timestamp),
+    KEY processed_idx (processed)
+  ) $charset;";
+  
+  require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+  
+  $result = dbDelta($sql);
+  
+  if ($result === false) {
+    hic_log('hic_create_booking_events_table: Failed to create table ' . $table);
+    return false;
+  }
+  
+  // Verify table was created
+  $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+  if (!$table_exists) {
+    hic_log('hic_create_booking_events_table: Table creation verification failed for ' . $table);
+    return false;
+  }
+  
+  hic_log('DB ready: '.$table.' (booking events queue)');
   return true;
 }
 

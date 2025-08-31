@@ -81,6 +81,7 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_api_password', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_property_id', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_polling_interval', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_reliable_polling_enabled');
     
     // New HIC Extended Integration settings
     register_setting('hic_settings', 'hic_currency', array('sanitize_callback' => 'sanitize_text_field'));
@@ -132,6 +133,7 @@ function hic_settings_init() {
     add_settings_field('hic_api_password', 'API Password', 'hic_api_password_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_property_id', 'ID Struttura (propId)', 'hic_property_id_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_polling_interval', 'Intervallo Polling', 'hic_polling_interval_render', 'hic_settings', 'hic_hic_section');
+    add_settings_field('hic_reliable_polling_enabled', 'Polling Affidabile', 'hic_reliable_polling_enabled_render', 'hic_settings', 'hic_hic_section');
     
     // Extended HIC Integration settings
     add_settings_field('hic_currency', 'Valuta (Currency)', 'hic_currency_render', 'hic_settings', 'hic_hic_section');
@@ -371,8 +373,18 @@ function hic_polling_interval_render() {
     echo '<option value="every_minute"' . selected($interval, 'every_minute', false) . '>Ogni minuto (quasi real-time)</option>';
     echo '<option value="every_two_minutes"' . selected($interval, 'every_two_minutes', false) . '>Ogni 2 minuti (bilanciato)</option>';
     echo '<option value="hic_poll_interval"' . selected($interval, 'hic_poll_interval', false) . '>Ogni 5 minuti (compatibilità)</option>';
+    echo '<option value="hic_reliable_interval"' . selected($interval, 'hic_reliable_interval', false) . '>Ogni 5 minuti (affidabile)</option>';
     echo '</select>';
-    echo '<p class="description">Frequenza del polling API per prenotazioni quasi real-time. Richiede system cron per risultati ottimali.</p>';
+    echo '<p class="description">Frequenza del polling API per prenotazioni quasi real-time. "Affidabile" non dipende da WP-Cron.</p>';
+}
+
+function hic_reliable_polling_enabled_render() {
+    $enabled = hic_get_option('reliable_polling_enabled', '1') === '1';
+    echo '<label>';
+    echo '<input type="checkbox" name="hic_reliable_polling_enabled" value="1"' . checked($enabled, true, false) . ' />';
+    echo ' Attiva sistema polling affidabile';
+    echo '</label>';
+    echo '<p class="description">Sistema interno con watchdog e recupero automatico, indipendente da WP-Cron. <strong>Raccomandato per hosting condiviso.</strong></p>';
 }
 
 // Extended HIC Integration render functions

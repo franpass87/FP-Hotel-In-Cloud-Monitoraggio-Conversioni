@@ -29,6 +29,9 @@ function hic_brevo_double_optin_on_enrich() { return hic_get_option('brevo_doubl
 // Real-time sync settings
 function hic_realtime_brevo_sync_enabled() { return hic_get_option('realtime_brevo_sync', '1') === '1'; }
 
+// Reliable polling settings
+function hic_reliable_polling_enabled() { return hic_get_option('reliable_polling_enabled', '1') === '1'; }
+
 // Admin and General Settings
 function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
 function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR . '/hic-log.txt'); }
@@ -87,7 +90,7 @@ function hic_get_polling_range_extension_days() { return intval(hic_get_option('
  */
 function hic_get_polling_interval() { 
     $interval = hic_get_option('polling_interval', 'every_two_minutes'); 
-    $valid_intervals = array('every_minute', 'every_two_minutes', 'hic_poll_interval');
+    $valid_intervals = array('every_minute', 'every_two_minutes', 'hic_poll_interval', 'hic_reliable_interval');
     return in_array($interval, $valid_intervals) ? $interval : 'every_two_minutes';
 }
 

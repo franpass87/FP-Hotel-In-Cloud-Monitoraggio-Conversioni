@@ -688,12 +688,233 @@ function hic_get_error_stats() {
 
 /* ============ AJAX Handlers ============ */
 
+/**
+ * Get the downloaded booking IDs to avoid duplicates
+ */
+function hic_get_downloaded_booking_ids() {
+    return get_option('hic_downloaded_booking_ids', array());
+}
+
+/**
+ * Add booking IDs to the downloaded list
+ */
+function hic_mark_bookings_as_downloaded($booking_ids) {
+    $downloaded_ids = hic_get_downloaded_booking_ids();
+    
+    foreach ($booking_ids as $id) {
+        if (!in_array($id, $downloaded_ids)) {
+            $downloaded_ids[] = $id;
+        }
+    }
+    
+    // Keep only the last 100 downloaded IDs to prevent the list from growing indefinitely
+    if (count($downloaded_ids) > 100) {
+        $downloaded_ids = array_slice($downloaded_ids, -100);
+    }
+    
+    update_option('hic_downloaded_booking_ids', $downloaded_ids);
+    
+    hic_log("Marked " . count($booking_ids) . " bookings as downloaded. Total tracked: " . count($downloaded_ids));
+}
+
+/**
+ * Reset the downloaded bookings tracking (admin function)
+ */
+function hic_reset_downloaded_bookings() {
+    delete_option('hic_downloaded_booking_ids');
+    hic_log("Reset downloaded bookings tracking");
+}
+
+/**
+ * Get the latest bookings from the API (with duplicate prevention)
+ */
+function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
+    $prop_id = hic_get_property_id();
+    
+    if (!$prop_id) {
+        return new WP_Error('missing_prop_id', 'Property ID non configurato');
+    }
+    
+    // Check API connection type
+    if (hic_get_connection_type() !== 'api') {
+        return new WP_Error('wrong_connection', 'Sistema configurato per webhook, non API');
+    }
+    
+    // Validate credentials
+    if (!hic_has_basic_auth_credentials() && !hic_get_api_key()) {
+        return new WP_Error('missing_credentials', 'Credenziali API non configurate');
+    }
+    
+    // Get downloaded booking IDs for filtering
+    $downloaded_ids = $skip_downloaded ? hic_get_downloaded_booking_ids() : array();
+    
+    // Get bookings from the last 30 days to ensure we get recent ones
+    $to_date = date('Y-m-d H:i:s');
+    $from_date = date('Y-m-d H:i:s', strtotime('-30 days'));
+    
+    hic_log("Fetching latest $limit bookings for property $prop_id from $from_date to $to_date" . 
+            ($skip_downloaded ? " (skipping " . count($downloaded_ids) . " already downloaded)" : ""));
+    
+    // Get more bookings to account for filtering out downloaded ones
+    $fetch_limit = $skip_downloaded ? $limit * 3 : $limit * 2;
+    
+    // Use the existing fetch function but without processing
+    $result = hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, $fetch_limit);
+    
+    if (is_wp_error($result)) {
+        return $result;
+    }
+    
+    if (!is_array($result)) {
+        return new WP_Error('invalid_response', 'Risposta API non valida');
+    }
+    
+    // Sort by creation date (newest first)
+    usort($result, function($a, $b) {
+        $date_a = isset($a['created_at']) ? $a['created_at'] : $a['from_date'];
+        $date_b = isset($b['created_at']) ? $b['created_at'] : $b['from_date'];
+        return strtotime($date_b) - strtotime($date_a);
+    });
+    
+    // Filter out already downloaded bookings if skip_downloaded is true
+    if ($skip_downloaded && !empty($downloaded_ids)) {
+        $result = array_filter($result, function($booking) use ($downloaded_ids) {
+            $booking_id = $booking['id'] ?? '';
+            return !in_array($booking_id, $downloaded_ids);
+        });
+        
+        // Re-index the array after filtering
+        $result = array_values($result);
+        
+        hic_log("After filtering downloaded bookings: " . count($result) . " bookings remain");
+    }
+    
+    // Return only the requested number
+    return array_slice($result, 0, $limit);
+}
+
+/**
+ * Raw fetch function that doesn't process reservations
+ */
+function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, $limit = null) {
+    $base = rtrim(hic_get_api_url(), '/');
+    $email = hic_get_api_email();
+    $pass = hic_get_api_password();
+    
+    if (!$base || !$email || !$pass || !$prop_id) {
+        return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
+    }
+    
+    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+    $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
+    if ($limit) $args['limit'] = (int)$limit;
+    $url = add_query_arg($args, $endpoint);
+    
+    hic_log("Raw API Call: $url");
+
+    $res = wp_remote_get($url, array(
+        'timeout' => 30,
+        'headers' => array(
+            'Authorization' => 'Basic ' . base64_encode("$email:$pass"),
+            'Accept' => 'application/json',
+            'User-Agent' => 'WP/FP-HIC-Plugin'
+        ),
+    ));
+    
+    if (is_wp_error($res)) {
+        hic_log("Raw API call failed: " . $res->get_error_message());
+        return $res;
+    }
+    
+    $code = wp_remote_retrieve_response_code($res);
+    if ($code !== 200) {
+        $body = wp_remote_retrieve_body($res);
+        hic_log("Raw API HTTP $code - Response body: " . substr($body, 0, 500));
+        return new WP_Error('hic_http', "HTTP $code - Errore API");
+    }
+    
+    $body = wp_remote_retrieve_body($res);
+    if (empty($body)) {
+        return new WP_Error('hic_empty_response', 'Empty response body');
+    }
+    
+    $data = json_decode($body, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        hic_log("JSON decode error: " . json_last_error_msg());
+        return new WP_Error('hic_json_error', 'Invalid JSON response');
+    }
+    
+    return $data;
+}
+
+/**
+ * Format bookings as CSV
+ */
+function hic_format_bookings_as_csv($bookings) {
+    if (empty($bookings)) {
+        return '';
+    }
+    
+    // CSV headers
+    $headers = array(
+        'ID Prenotazione',
+        'Nome',
+        'Cognome', 
+        'Email',
+        'Telefono',
+        'Camera/Alloggio',
+        'Check-in',
+        'Check-out',
+        'Importo',
+        'Valuta',
+        'Stato',
+        'Presenza',
+        'Data Creazione',
+        'Note'
+    );
+    
+    $csv_lines = array();
+    $csv_lines[] = '"' . implode('","', $headers) . '"';
+    
+    foreach ($bookings as $booking) {
+        $row = array(
+            $booking['id'] ?? '',
+            $booking['client_first_name'] ?? $booking['first_name'] ?? '',
+            $booking['client_last_name'] ?? $booking['last_name'] ?? '',
+            $booking['client_email'] ?? $booking['email'] ?? '',
+            $booking['client_phone'] ?? $booking['phone'] ?? '',
+            $booking['accommodation_name'] ?? $booking['room'] ?? '',
+            $booking['from_date'] ?? $booking['checkin'] ?? '',
+            $booking['to_date'] ?? $booking['checkout'] ?? '',
+            $booking['amount'] ?? $booking['total'] ?? '',
+            $booking['currency'] ?? 'EUR',
+            $booking['status'] ?? '',
+            $booking['presence'] ?? '',
+            $booking['created_at'] ?? '',
+            $booking['notes'] ?? $booking['description'] ?? ''
+        );
+        
+        // Escape and quote each field
+        $escaped_row = array_map(function($field) {
+            return '"' . str_replace('"', '""', $field) . '"';
+        }, $row);
+        
+        $csv_lines[] = implode(',', $escaped_row);
+    }
+    
+    return implode("\n", $csv_lines);
+}
+
+/* ============ AJAX Handlers ============ */
+
 // Add AJAX handlers
 add_action('wp_ajax_hic_manual_cron_test', 'hic_ajax_manual_cron_test');
 add_action('wp_ajax_hic_refresh_diagnostics', 'hic_ajax_refresh_diagnostics');
 add_action('wp_ajax_hic_test_dispatch', 'hic_ajax_test_dispatch');
 add_action('wp_ajax_hic_force_reschedule', 'hic_ajax_force_reschedule');
 add_action('wp_ajax_hic_backfill_reservations', 'hic_ajax_backfill_reservations');
+add_action('wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_bookings');
+add_action('wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
 
 function hic_ajax_manual_cron_test() {
     // Verify nonce
@@ -797,6 +1018,123 @@ function hic_ajax_backfill_reservations() {
     $result = hic_backfill_reservations($from_date, $to_date, $date_type, $limit);
     
     wp_die(json_encode($result));
+}
+
+function hic_ajax_download_latest_bookings() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    $format = sanitize_text_field($_POST['format'] ?? 'json');
+    
+    try {
+        // Get latest bookings (with duplicate prevention)
+        $result = hic_get_latest_bookings(5, true);
+        
+        if (is_wp_error($result)) {
+            wp_die(json_encode(array(
+                'success' => false, 
+                'message' => 'Errore nel recupero prenotazioni: ' . $result->get_error_message()
+            )));
+        }
+        
+        if (empty($result)) {
+            // Check if we have any bookings at all (without filtering)
+            $all_bookings = hic_get_latest_bookings(5, false);
+            if (is_wp_error($all_bookings) || empty($all_bookings)) {
+                wp_die(json_encode(array(
+                    'success' => false, 
+                    'message' => 'Nessuna prenotazione trovata nell\'API'
+                )));
+            } else {
+                wp_die(json_encode(array(
+                    'success' => false, 
+                    'message' => 'Tutte le ultime 5 prenotazioni sono già state scaricate. Usa il bottone "Reset Download Tracking" per scaricarle nuovamente.',
+                    'already_downloaded' => true
+                )));
+            }
+        }
+        
+        // Extract booking IDs for tracking
+        $booking_ids = array();
+        foreach ($result as $booking) {
+            if (isset($booking['id']) && !empty($booking['id'])) {
+                $booking_ids[] = $booking['id'];
+            }
+        }
+        
+        // Mark these bookings as downloaded
+        if (!empty($booking_ids)) {
+            hic_mark_bookings_as_downloaded($booking_ids);
+        }
+        
+        // Format the data based on requested format
+        if ($format === 'csv') {
+            $csv_data = hic_format_bookings_as_csv($result);
+            $filename = 'ultime_5_prenotazioni_' . date('Y-m-d_H-i-s') . '.csv';
+            
+            wp_die(json_encode(array(
+                'success' => true,
+                'format' => 'csv',
+                'filename' => $filename,
+                'data' => $csv_data,
+                'count' => count($result),
+                'booking_ids' => $booking_ids
+            )));
+        } else {
+            // JSON format
+            $filename = 'ultime_5_prenotazioni_' . date('Y-m-d_H-i-s') . '.json';
+            
+            wp_die(json_encode(array(
+                'success' => true,
+                'format' => 'json',
+                'filename' => $filename,
+                'data' => $result,
+                'count' => count($result),
+                'booking_ids' => $booking_ids
+            )));
+        }
+        
+    } catch (Exception $e) {
+        wp_die(json_encode(array(
+            'success' => false, 
+            'message' => 'Errore: ' . $e->getMessage()
+        )));
+    }
+}
+
+function hic_ajax_reset_download_tracking() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    try {
+        // Reset the download tracking
+        hic_reset_downloaded_bookings();
+        
+        wp_die(json_encode(array(
+            'success' => true,
+            'message' => 'Tracking dei download resettato con successo. Ora puoi scaricare nuovamente tutte le prenotazioni.'
+        )));
+        
+    } catch (Exception $e) {
+        wp_die(json_encode(array(
+            'success' => false, 
+            'message' => 'Errore durante il reset: ' . $e->getMessage()
+        )));
+    }
 }
 
 /* ============ Diagnostics Admin Page ============ */
@@ -969,6 +1307,70 @@ function hic_diagnostics_page() {
                         <li>L'intervallo massimo consentito è di 6 mesi</li>
                         <li>Le prenotazioni duplicate vengono automaticamente saltate</li>
                         <li>Tutti gli eventi di backfill vengono registrati nei log</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Download Latest Bookings Section -->
+            <div class="card">
+                <h2>Scarica Ultime Prenotazioni</h2>
+                <p>Scarica le ultime 5 prenotazioni create dal sistema Hotel in Cloud per controllo rapido. Le prenotazioni già scaricate vengono automaticamente saltate.</p>
+                
+                <?php 
+                $downloaded_ids = hic_get_downloaded_booking_ids();
+                $downloaded_count = count($downloaded_ids);
+                ?>
+                
+                <!-- Download Tracking Status -->
+                <div class="notice notice-info inline" style="margin-bottom: 15px;">
+                    <p><strong>Status Tracking Download:</strong></p>
+                    <ul>
+                        <li>Prenotazioni già scaricate: <strong><?php echo esc_html($downloaded_count); ?></strong></li>
+                        <li>Sistema anti-duplicazione: <span class="status ok">✓ Attivo</span></li>
+                        <?php if ($downloaded_count > 0): ?>
+                            <li>Ultime ID scaricate: <code><?php echo esc_html(implode(', ', array_slice($downloaded_ids, -3))); ?></code></li>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="download-format">Formato File</label>
+                        </th>
+                        <td>
+                            <select id="download-format" name="download_format">
+                                <option value="json">JSON (per sviluppatori)</option>
+                                <option value="csv" selected>CSV (per Excel/fogli di calcolo)</option>
+                            </select>
+                            <p class="description">Scegli il formato per il download delle prenotazioni</p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <p>
+                    <button class="button button-primary" id="download-latest-bookings">
+                        <span class="dashicons dashicons-download" style="margin-top: 3px;"></span>
+                        Scarica Ultime 5 Prenotazioni (Non Scaricate)
+                    </button>
+                    <?php if ($downloaded_count > 0): ?>
+                        <button class="button button-secondary" id="reset-download-tracking" style="margin-left: 10px;">
+                            <span class="dashicons dashicons-update-alt" style="margin-top: 3px;"></span>
+                            Reset Tracking Download
+                        </button>
+                    <?php endif; ?>
+                    <span id="download-status" style="margin-left: 10px; font-weight: bold;"></span>
+                </p>
+                
+                <div class="notice notice-info inline" style="margin-top: 15px;">
+                    <p><strong>Note:</strong></p>
+                    <ul>
+                        <li><strong>Anti-duplicazione:</strong> Vengono scaricate solo le prenotazioni mai scaricate prima</li>
+                        <li><strong>Ordinamento:</strong> Le ultime 5 prenotazioni basate sulla data di creazione (più recenti)</li>
+                        <li><strong>Tracking automatico:</strong> Il sistema ricorda quali prenotazioni sono state scaricate</li>
+                        <li><strong>Reset tracking:</strong> Usa il bottone "Reset" per consentire il nuovo download delle stesse prenotazioni</li>
+                        <li>Il download include: ID, dati cliente, camera, date, importo e stato</li>
+                        <li>Richiede connessione API configurata (non funziona in modalità webhook)</li>
                     </ul>
                 </div>
             </div>
@@ -1592,6 +1994,149 @@ function hic_diagnostics_page() {
                 </table>
             </div>
             
+            <!-- Reliable Polling Diagnostics -->
+            <div class="card">
+                <h2>Sistema Polling Affidabile</h2>
+                <?php 
+                $reliable_stats = array();
+                if (class_exists('HIC_Booking_Poller')) {
+                    $poller = new HIC_Booking_Poller();
+                    $reliable_stats = $poller->get_stats();
+                }
+                ?>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Valore</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Sistema Attivo</td>
+                            <td>
+                                <?php if (class_exists('HIC_Booking_Poller')): ?>
+                                    <span class="status ok">✓ Attivo</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Non Caricato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Sistema di polling interno senza dipendenza da WP-Cron</td>
+                        </tr>
+                        
+                        <?php if (!empty($reliable_stats) && !isset($reliable_stats['error'])): ?>
+                        <tr>
+                            <td>Ultimo Polling</td>
+                            <td>
+                                <?php if ($reliable_stats['last_poll'] > 0): ?>
+                                    <span class="status ok"><?php echo esc_html(date('Y-m-d H:i:s', $reliable_stats['last_poll'])); ?></span><br>
+                                    <small><?php echo esc_html($reliable_stats['last_poll_human']); ?></small>
+                                <?php else: ?>
+                                    <span class="status warning">Mai</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Ultimo tentativo di polling eseguito</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Lag Polling</td>
+                            <td>
+                                <?php 
+                                $lag = $reliable_stats['lag_seconds'];
+                                if ($lag < 600): // Less than 10 minutes ?>
+                                    <span class="status ok"><?php echo esc_html($lag); ?> secondi</span>
+                                <?php elseif ($lag < 1800): // Less than 30 minutes ?>
+                                    <span class="status warning"><?php echo esc_html($lag); ?> secondi</span>
+                                <?php else: ?>
+                                    <span class="status error"><?php echo esc_html($lag); ?> secondi</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Tempo trascorso dall'ultimo polling (watchdog attivo oltre 15 min)</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Lock Attivo</td>
+                            <td>
+                                <?php if ($reliable_stats['lock_active']): ?>
+                                    <span class="status warning">🔒 Attivo</span>
+                                    <?php if (isset($reliable_stats['lock_age'])): ?>
+                                        <br><small>Da <?php echo esc_html($reliable_stats['lock_age']); ?> secondi</small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="status ok">🔓 Libero</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Lock TTL anti-overlap (max 4 minuti)</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi in Coda</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['total_events'] > 0 ? 'ok' : 'warning'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['total_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Totale eventi prenotazioni nella tabella queue</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi Processati</td>
+                            <td>
+                                <span class="status ok">
+                                    <?php echo esc_html(number_format($reliable_stats['processed_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi elaborati con successo</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi in Attesa</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['pending_events'] > 0 ? 'warning' : 'ok'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['pending_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi non ancora processati</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi con Errore</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['error_events'] > 0 ? 'error' : 'ok'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['error_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi con errori di processamento</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Attività 24h</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['events_24h'] > 0 ? 'ok' : 'warning'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['events_24h'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi ricevuti nelle ultime 24 ore</td>
+                        </tr>
+                        
+                        <?php else: ?>
+                        <tr>
+                            <td colspan="3">
+                                <span class="status error">
+                                    <?php if (isset($reliable_stats['error'])): ?>
+                                        Errore: <?php echo esc_html($reliable_stats['error']); ?>
+                                    <?php else: ?>
+                                        Statistiche non disponibili
+                                    <?php endif; ?>
+                                </span>
+                            </td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            
             <!-- Error Summary Section -->
             <div class="card">
                 <h2>Riepilogo Errori</h2>
@@ -1992,6 +2537,126 @@ function hic_diagnostics_page() {
                     
                     $resultsContent.html(html);
                     $results.show();
+                }
+                
+                $btn.prop('disabled', false);
+                
+            }).fail(function() {
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+                $btn.prop('disabled', false);
+            });
+        });
+        
+        // Download latest bookings handler
+        $('#download-latest-bookings').click(function() {
+            var $btn = $(this);
+            var $status = $('#download-status');
+            var format = $('#download-format').val();
+            
+            // Validate API configuration
+            <?php if (hic_get_connection_type() !== 'api'): ?>
+            alert('Questa funzione richiede la modalità API. Il sistema è configurato per webhook.');
+            return;
+            <?php endif; ?>
+            
+            <?php if (!hic_has_basic_auth_credentials() && !hic_get_api_key()): ?>
+            alert('Credenziali API non configurate. Verifica le impostazioni.');
+            return;
+            <?php endif; ?>
+            
+            <?php if (!hic_get_property_id()): ?>
+            alert('Property ID non configurato. Verifica le impostazioni.');
+            return;
+            <?php endif; ?>
+            
+            // Start download
+            $btn.prop('disabled', true);
+            $status.text('Scaricando prenotazioni...').css('color', '#0073aa');
+            
+            $.post(ajaxurl, {
+                action: 'hic_download_latest_bookings',
+                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>',
+                format: format
+            }, function(response) {
+                var result = JSON.parse(response);
+                
+                if (result.success) {
+                    $status.text('Download completato! (' + result.count + ' prenotazioni)').css('color', '#46b450');
+                    
+                    // Create and download file
+                    var blob, mimeType;
+                    if (result.format === 'csv') {
+                        blob = new Blob([result.data], { type: 'text/csv;charset=utf-8;' });
+                        mimeType = 'text/csv';
+                    } else {
+                        blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json;charset=utf-8;' });
+                        mimeType = 'application/json';
+                    }
+                    
+                    // Create download link and trigger download
+                    var link = document.createElement('a');
+                    if (link.download !== undefined) {
+                        var url = URL.createObjectURL(blob);
+                        link.setAttribute('href', url);
+                        link.setAttribute('download', result.filename);
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    } else {
+                        // Fallback for older browsers
+                        alert('Download automatico non supportato. Copia i dati dalla console del browser.');
+                        console.log('Booking data:', result.data);
+                    }
+                    
+                } else {
+                    $status.text('Errore durante il download').css('color', '#dc3232');
+                    if (result.already_downloaded) {
+                        // Special handling for already downloaded message
+                        alert(result.message);
+                    } else {
+                        alert('Errore: ' + result.message);
+                    }
+                }
+                
+                $btn.prop('disabled', false);
+                
+            }).fail(function() {
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+                $btn.prop('disabled', false);
+            });
+        });
+        
+        // Reset download tracking handler
+        $('#reset-download-tracking').click(function() {
+            var $btn = $(this);
+            var $status = $('#download-status');
+            
+            if (!confirm('Vuoi resettare il tracking dei download? Dopo il reset potrai scaricare nuovamente tutte le prenotazioni.')) {
+                return;
+            }
+            
+            $btn.prop('disabled', true);
+            $status.text('Resettando tracking...').css('color', '#0073aa');
+            
+            $.post(ajaxurl, {
+                action: 'hic_reset_download_tracking',
+                nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
+            }, function(response) {
+                var result = JSON.parse(response);
+                
+                if (result.success) {
+                    $status.text('Tracking resettato!').css('color', '#46b450');
+                    
+                    // Refresh the page after 2 seconds to update the UI
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                    
+                } else {
+                    $status.text('Errore durante il reset').css('color', '#dc3232');
+                    alert('Errore: ' + result.message);
                 }
                 
                 $btn.prop('disabled', false);

@@ -41,6 +41,14 @@ add_filter('cron_schedules', function($schedules) {
     );
   }
   
+  // Add reliable polling schedule
+  if (!isset($schedules['hic_reliable_interval'])) {
+    $schedules['hic_reliable_interval'] = array(
+      'interval' => 300, // 5 minutes default
+      'display' => 'Every 5 Minutes (HIC Reliable)'
+    );
+  }
+  
   return $schedules;
 }, 5);
 
