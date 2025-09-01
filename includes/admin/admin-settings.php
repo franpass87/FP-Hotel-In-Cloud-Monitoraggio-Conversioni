@@ -71,7 +71,6 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_fb_access_token');
     register_setting('hic_settings', 'hic_webhook_token');
     register_setting('hic_settings', 'hic_admin_email');
-    register_setting('hic_settings', 'hic_francesco_email_enabled');
     register_setting('hic_settings', 'hic_log_file');
     register_setting('hic_settings', 'hic_connection_type');
     register_setting('hic_settings', 'hic_api_url');
@@ -105,7 +104,6 @@ function hic_settings_init() {
 
     // Main settings
     add_settings_field('hic_admin_email', 'Email Amministratore', 'hic_admin_email_render', 'hic_settings', 'hic_main_section');
-    add_settings_field('hic_francesco_email_enabled', 'Notifica email a Francesco', 'hic_francesco_email_enabled_render', 'hic_settings', 'hic_main_section');
     add_settings_field('hic_log_file', 'File di Log', 'hic_log_file_render', 'hic_settings', 'hic_main_section');
     
     // GA4 settings
@@ -263,12 +261,10 @@ function hic_options_page() {
 // Render functions for settings fields
 function hic_admin_email_render() {
     echo '<input type="email" name="hic_admin_email" value="' . esc_attr(hic_get_admin_email()) . '" class="regular-text" />';
+    echo '<p class="description">Email per ricevere notifiche di nuove prenotazioni. Se vuoto, usa l\'email amministratore di WordPress.</p>';
 }
 
-function hic_francesco_email_enabled_render() {
-    $checked = hic_francesco_email_enabled() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_francesco_email_enabled" value="1" ' . esc_attr($checked) . ' /> Invia notifica email a francesco.passeri@gmail.com per ogni prenotazione';
-}
+
 
 function hic_log_file_render() {
     echo '<input type="text" name="hic_log_file" value="' . esc_attr(hic_get_log_file()) . '" class="regular-text" />';

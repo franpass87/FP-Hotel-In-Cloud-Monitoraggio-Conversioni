@@ -104,18 +104,16 @@ function hic_process_booking_data($data) {
       hic_log('hic_process_booking_data: Brevo disabled or credentials missing, skipping');
     }
     
-    // Admin email
-    if (hic_send_admin_email($data, $gclid, $fbclid, $sid)) {
-      $success_count++;
+    // Admin email - only attempt if valid email is configured
+    $admin_email = hic_get_admin_email();
+    if (!empty($admin_email) && hic_is_valid_email($admin_email)) {
+      if (hic_send_admin_email($data, $gclid, $fbclid, $sid)) {
+        $success_count++;
+      } else {
+        $error_count++;
+      }
     } else {
-      $error_count++;
-    }
-    
-    // Francesco email
-    if (hic_send_francesco_email($data, $gclid, $fbclid, $sid)) {
-      $success_count++;
-    } else {
-      $error_count++;
+      hic_log('hic_process_booking_data: Admin email not configured or invalid, skipping');
     }
     
     hic_log("Prenotazione processata (SID: " . ($sid ?? 'N/A') . ") - Successi: $success_count, Errori: $error_count");
