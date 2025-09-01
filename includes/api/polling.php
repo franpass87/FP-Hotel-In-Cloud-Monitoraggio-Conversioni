@@ -341,6 +341,11 @@ function hic_dispatch_reservation($transformed, $original) {
         // Brevo - always update contact info
         hic_dispatch_brevo_reservation($transformed);
         
+        // Brevo real-time events - send reservation_created event for new reservations
+        if (!$is_status_update && hic_realtime_brevo_sync_enabled()) {
+            hic_send_brevo_reservation_created_event($transformed);
+        }
+        
         hic_log("Reservation $uid dispatched successfully");
     } catch (Exception $e) {
         hic_log("Error dispatching reservation $uid: " . $e->getMessage());
