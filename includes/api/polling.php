@@ -113,13 +113,19 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
         return $data;
     }
 
+    // Handle new API response format with success/error structure
+    $reservations = hic_extract_reservations_from_response($data);
+    if (is_wp_error($reservations)) {
+        return $reservations;
+    }
+
     // Log di debug iniziale (ridotto)
-    hic_log(array('hic_reservations_count' => is_array($data) ? count($data) : 0));
+    hic_log(array('hic_reservations_count' => is_array($reservations) ? count($reservations) : 0));
 
     // Processa singole prenotazioni con la nuova pipeline
     $processed_count = 0;
-    if (is_array($data)) {
-        foreach ($data as $reservation) {
+    if (is_array($reservations)) {
+        foreach ($reservations as $reservation) {
             try {
                 if (hic_should_process_reservation($reservation)) {
                     $transformed = hic_transform_reservation($reservation);
@@ -133,11 +139,49 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
                 hic_log('Process reservation error: '.$e->getMessage()); 
             }
         }
-        if (count($data) > 0) {
-            hic_log("Processed $processed_count out of " . count($data) . " reservations (duplicates/invalid skipped)");
+        if (count($reservations) > 0) {
+            hic_log("Processed $processed_count out of " . count($reservations) . " reservations (duplicates/invalid skipped)");
         }
     }
-    return $data;
+    return $reservations;
+}
+
+/**
+ * Extract reservations from API response, handling both new and old formats
+ */
+function hic_extract_reservations_from_response($data) {
+    // Handle new API response format with success/error structure
+    if (is_array($data) && isset($data['success'])) {
+        // Check for error response
+        if ($data['success'] == 0 || $data['success'] === false) {
+            $error_message = isset($data['error']) ? $data['error'] : 'Unknown API error';
+            hic_log("API returned error: $error_message");
+            return new WP_Error('hic_api_error', "API Error: $error_message");
+        }
+        
+        // Success response - extract reservations
+        if (isset($data['reservations']) && is_array($data['reservations'])) {
+            hic_log("New API format detected with " . count($data['reservations']) . " reservations");
+            return $data['reservations'];
+        } else {
+            // Success but no reservations array
+            hic_log("API success but no reservations array found");
+            return array(); // Return empty array for successful response with no data
+        }
+    }
+    
+    // Handle old format - direct array of reservations
+    if (is_array($data)) {
+        // Check if this looks like an array of reservations (each element should be an array with reservation fields)
+        if (empty($data) || (isset($data[0]) && is_array($data[0]))) {
+            hic_log("Old API format detected with " . count($data) . " reservations");
+            return $data;
+        }
+    }
+    
+    // Invalid format
+    hic_log("Invalid API response format - expected array with reservations");
+    return new WP_Error('hic_invalid_format', 'Invalid API response format');
 }
 
 // Hook pubblico per esecuzione manuale
@@ -735,12 +779,18 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
         return $data;
     }
 
+    // Handle new API response format with success/error structure
+    $updates = hic_extract_reservations_from_response($data);
+    if (is_wp_error($updates)) {
+        return $updates;
+    }
+
     // Log di debug iniziale
-    hic_log(array('hic_updates_count' => is_array($data) ? count($data) : 0));
+    hic_log(array('hic_updates_count' => is_array($updates) ? count($updates) : 0));
 
     // Process each update
-    if (is_array($data)) {
-        foreach ($data as $u) {
+    if (is_array($updates)) {
+        foreach ($updates as $u) {
             try {
                 hic_process_update($u);
             } catch (Exception $e) { 
@@ -749,7 +799,7 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
         }
     }
     
-    return $data;
+    return $updates;
 }
 
 /**
@@ -1199,7 +1249,13 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
         return new WP_Error('hic_json_error', 'Invalid JSON response from backfill API');
     }
     
-    return $data;
+    // Handle new API response format with success/error structure
+    $reservations = hic_extract_reservations_from_response($data);
+    if (is_wp_error($reservations)) {
+        return $reservations;
+    }
+    
+    return $reservations;
 }
 
 /**
