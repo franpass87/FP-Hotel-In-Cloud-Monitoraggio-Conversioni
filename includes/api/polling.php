@@ -632,7 +632,7 @@ function hic_api_poll_updates(){
     hic_log("Internal Scheduler: last timestamp: " . date('Y-m-d H:i:s', $last_since) . " ($last_since)");
     hic_log("Internal Scheduler: requesting since: " . date('Y-m-d H:i:s', $since) . " ($since) [overlap: {$overlap_seconds}s]");
     
-    $out = hic_fetch_reservations_updates($prop, $since, 200); // limit opzionale se supportato
+    $out = hic_fetch_reservations_updates($prop, $since, 100); // limit opzionale se supportato
     if (!is_wp_error($out)) {
         $updates_count = is_array($out) ? count($out) : 0;
         hic_log("Internal Scheduler: Found $updates_count updates");
@@ -1419,7 +1419,7 @@ function hic_api_poll_bookings_deep_check() {
         }
         
         hic_log("Deep Check: Checking for updates since " . date('Y-m-d H:i:s', $lookback_timestamp));
-        $updated_reservations = hic_fetch_reservations_updates($prop_id, $lookback_timestamp, 500);
+        $updated_reservations = hic_fetch_reservations_updates($prop_id, $lookback_timestamp, 100);
         
         if (!is_wp_error($updated_reservations)) {
             $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
@@ -1452,7 +1452,7 @@ function hic_api_poll_bookings_deep_check() {
         $checkin_to = date('Y-m-d', $current_time + (7 * DAY_IN_SECONDS));
         
         hic_log("Deep Check: Checking by checkin date from $checkin_from to $checkin_to");
-        $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 200);
+        $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 100);
         
         if (!is_wp_error($checkin_reservations)) {
             $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
