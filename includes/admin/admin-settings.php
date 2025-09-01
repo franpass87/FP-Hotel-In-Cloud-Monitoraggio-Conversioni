@@ -263,6 +263,7 @@ function hic_options_page() {
 // Render functions for settings fields
 function hic_admin_email_render() {
     echo '<input type="email" name="hic_admin_email" value="' . esc_attr(hic_get_admin_email()) . '" class="regular-text" />';
+    echo '<p class="description">Email per ricevere notifiche di nuove prenotazioni. Se vuoto, usa l\'email amministratore di WordPress.</p>';
 }
 
 function hic_francesco_email_enabled_render() {

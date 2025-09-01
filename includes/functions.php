@@ -323,6 +323,14 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
     return false;
   }
   
+  // Log which admin email is being used for transparency
+  $custom_email = hic_get_option('admin_email', '');
+  if (!empty($custom_email)) {
+    hic_log('hic_send_admin_email: using custom admin email from settings: ' . $to);
+  } else {
+    hic_log('hic_send_admin_email: using WordPress default admin email: ' . $to);
+  }
+  
   $site_name = get_bloginfo('name');
   if (empty($site_name)) {
     $site_name = 'Hotel in Cloud';
