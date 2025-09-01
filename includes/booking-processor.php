@@ -116,17 +116,6 @@ function hic_process_booking_data($data) {
       hic_log('hic_process_booking_data: Admin email not configured or invalid, skipping');
     }
     
-    // Francesco email - only count as error if enabled but fails
-    if (hic_francesco_email_enabled()) {
-      if (hic_send_francesco_email($data, $gclid, $fbclid, $sid)) {
-        $success_count++;
-      } else {
-        $error_count++;
-      }
-    } else {
-      hic_log('hic_process_booking_data: Francesco email disabled, skipping');
-    }
-    
     hic_log("Prenotazione processata (SID: " . ($sid ?? 'N/A') . ") - Successi: $success_count, Errori: $error_count");
     
     return $error_count === 0;

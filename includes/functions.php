@@ -35,7 +35,6 @@ function hic_reliable_polling_enabled() { return hic_get_option('reliable_pollin
 // Admin and General Settings
 function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
 function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR . '/hic-log.txt'); }
-function hic_francesco_email_enabled() { return hic_get_option('francesco_email_enabled', '0') === '1'; }
 
 // Facebook Settings
 function hic_get_fb_pixel_id() { return hic_get_option('fb_pixel_id', ''); }
@@ -368,63 +367,7 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   }
 }
 
-/* ============ Francesco email notification ============ */
-function hic_send_francesco_email($data, $gclid, $fbclid, $sid){
-  if (!hic_francesco_email_enabled()) {
-    return false; // Setting disabled, don't send email
-  }
-  
-  // Validate input data
-  if (!is_array($data)) {
-    hic_log('hic_send_francesco_email: data is not an array');
-    return false;
-  }
-  
-  $bucket = fp_normalize_bucket($gclid, $fbclid);
-  $to = 'francesco.passeri@gmail.com';
-  
-  // Validate email format
-  if (!hic_is_valid_email($to)) {
-    hic_log('hic_send_francesco_email: invalid Francesco email address');
-    return false;
-  }
-  
-  $site_name = get_bloginfo('name');
-  if (empty($site_name)) {
-    $site_name = 'Hotel in Cloud';
-  }
-  
-  $subject = "Nuova prenotazione da " . $site_name;
 
-  $body  = "Hai ricevuto una nuova prenotazione da $site_name:\n\n";
-  $body .= "Reservation ID: " . ($data['reservation_id'] ?? ($data['id'] ?? 'n/a')) . "\n";
-  $body .= "Importo: " . (isset($data['amount']) ? hic_normalize_price($data['amount']) : '0') . " " . ($data['currency'] ?? 'EUR') . "\n";
-  $body .= "Nome: " . trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? '')) . "\n";
-  $body .= "Email: " . ($data['email'] ?? 'n/a') . "\n";
-  $body .= "Lingua: " . ($data['lingua'] ?? ($data['lang'] ?? 'n/a')) . "\n";
-  $body .= "Camera: " . ($data['room'] ?? 'n/a') . "\n";
-  $body .= "Check-in: " . ($data['checkin'] ?? 'n/a') . "\n";
-  $body .= "Check-out: " . ($data['checkout'] ?? 'n/a') . "\n";
-  $body .= "SID: " . ($sid ?? 'n/a') . "\n";
-  $body .= "GCLID: " . ($gclid ?? 'n/a') . "\n";
-  $body .= "FBCLID: " . ($fbclid ?? 'n/a') . "\n";
-  $body .= "Bucket: " . $bucket . "\n";
-
-  $content_type_filter = function(){ return 'text/plain; charset=UTF-8'; };
-  add_filter('wp_mail_content_type', $content_type_filter);
-  
-  $sent = wp_mail($to, $subject, $body);
-  
-  remove_filter('wp_mail_content_type', $content_type_filter);
-
-  if ($sent) {
-    hic_log('Email Francesco inviata (bucket='.$bucket.') a '.$to);
-    return true;
-  } else {
-    hic_log('Errore invio email Francesco a '.$to);
-    return false;
-  }
-}
 
 /* ============ Email Enrichment Functions ============ */
 function hic_mark_email_enriched($reservation_id, $real_email) {
