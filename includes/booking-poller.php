@@ -175,6 +175,7 @@ class HIC_Booking_Poller {
         $current_time = time();
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         $last_deep = get_option('hic_last_deep_check', 0);
+        $last_successful = get_option('hic_last_successful_poll', 0);
         
         hic_log("Watchdog: Running check - continuous lag: " . ($current_time - $last_continuous) . "s, deep lag: " . ($current_time - $last_deep) . "s");
         
@@ -190,6 +191,13 @@ class HIC_Booking_Poller {
         if ($deep_lag > 1200) { // 20 minutes lag
             hic_log("Watchdog: Deep check lag detected ({$deep_lag}s), attempting recovery");
             $this->recover_from_failure('deep');
+        }
+        
+        // Check for completely stuck polling - no successful polls for 1+ hours
+        $success_lag = $current_time - $last_successful;
+        if ($last_successful > 0 && $success_lag > 3600) { // 1 hour without success
+            hic_log("Watchdog: No successful polling for {$success_lag}s - likely timestamp error, triggering timestamp recovery");
+            $this->recover_from_failure('timestamp_error');
         }
         
         // Check if WP-Cron events are properly scheduled
@@ -239,9 +247,40 @@ class HIC_Booking_Poller {
                 sleep(1);
                 $this->ensure_scheduler_is_active();
                 break;
+                
+            case 'timestamp_error':
+                // Handle stuck polling due to timestamp errors
+                hic_log("Recovery: Resetting all timestamps due to timestamp errors");
+                $safe_timestamp = time() - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
+                update_option('hic_last_updates_since', $safe_timestamp);
+                update_option('hic_last_update_check', $safe_timestamp);
+                update_option('hic_last_continuous_check', $safe_timestamp);
+                update_option('hic_last_continuous_poll', 0);
+                update_option('hic_last_deep_check', 0);
+                
+                // Also restart the scheduler to ensure clean state
+                $this->clear_all_scheduled_events();
+                sleep(1);
+                $this->ensure_scheduler_is_active();
+                
+                hic_log("Recovery: All timestamps reset to " . date('Y-m-d H:i:s', $safe_timestamp) . " and scheduler restarted");
+                break;
         }
         
         hic_log("Recovery: Completed recovery attempt for $failure_type");
+    }
+    
+    /**
+     * Public method to trigger timestamp recovery
+     * Can be called from diagnostics interface or manual intervention
+     */
+    public function trigger_timestamp_recovery() {
+        hic_log("Manual timestamp recovery triggered");
+        $this->recover_from_failure('timestamp_error');
+        return array(
+            'success' => true,
+            'message' => 'Timestamp recovery completed - all timestamps reset and scheduler restarted'
+        );
     }
     
     /**
