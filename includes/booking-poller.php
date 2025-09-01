@@ -154,7 +154,7 @@ class HIC_Booking_Poller {
         return hic_reliable_polling_enabled() && 
                hic_get_connection_type() === 'api' && 
                hic_get_api_url() && 
-               (hic_has_basic_auth_credentials() || !empty(hic_get_api_key()));
+               hic_has_basic_auth_credentials();
     }
     
     /**
@@ -266,18 +266,16 @@ class HIC_Booking_Poller {
                 'reliable_polling_enabled' => hic_reliable_polling_enabled(),
                 'connection_type_api' => hic_get_connection_type() === 'api',
                 'api_url_configured' => !empty(hic_get_api_url()),
-                'has_credentials' => hic_has_basic_auth_credentials() || !empty(hic_get_api_key()),
+                'has_credentials' => hic_has_basic_auth_credentials(),
                 'basic_auth_complete' => hic_has_basic_auth_credentials(),
-                'api_key_configured' => !empty(hic_get_api_key()),
-                'credentials_type' => hic_has_basic_auth_credentials() ? 'basic_auth' : (!empty(hic_get_api_key()) ? 'api_key' : 'none')
+                'credentials_type' => hic_has_basic_auth_credentials() ? 'basic_auth' : 'none'
             ),
             'configuration' => array(
                 'connection_type' => hic_get_connection_type(),
                 'api_url' => !empty(hic_get_api_url()) ? 'configured' : 'missing',
                 'property_id' => !empty(hic_get_property_id()) ? 'configured' : 'missing',
                 'api_email' => !empty(hic_get_api_email()) ? 'configured' : 'missing',
-                'api_password' => !empty(hic_get_api_password()) ? 'configured' : 'missing',
-                'api_key' => !empty(hic_get_api_key()) ? 'configured' : 'missing'
+                'api_password' => !empty(hic_get_api_password()) ? 'configured' : 'missing'
             ),
             'lock_status' => array(
                 'active' => get_transient('hic_reliable_polling_lock') ? true : false,

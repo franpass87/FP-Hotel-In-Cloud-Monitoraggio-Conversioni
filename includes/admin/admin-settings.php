@@ -75,7 +75,6 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_log_file');
     register_setting('hic_settings', 'hic_connection_type');
     register_setting('hic_settings', 'hic_api_url');
-    register_setting('hic_settings', 'hic_api_key');
     // New Basic Auth settings
     register_setting('hic_settings', 'hic_api_email', array('sanitize_callback' => 'sanitize_email'));
     register_setting('hic_settings', 'hic_api_password', array('sanitize_callback' => 'sanitize_text_field'));
@@ -127,8 +126,7 @@ function hic_settings_init() {
     add_settings_field('hic_connection_type', 'Tipo Connessione', 'hic_connection_type_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_webhook_token', 'Webhook Token', 'hic_webhook_token_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_api_url', 'API URL', 'hic_api_url_render', 'hic_settings', 'hic_hic_section');
-    add_settings_field('hic_api_key', 'API Key', 'hic_api_key_render', 'hic_settings', 'hic_hic_section');
-    // New Basic Auth settings
+    // Basic Auth settings
     add_settings_field('hic_api_email', 'API Email', 'hic_api_email_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_api_password', 'API Password', 'hic_api_password_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_property_id', 'ID Struttura (propId)', 'hic_property_id_render', 'hic_settings', 'hic_hic_section');
@@ -319,12 +317,7 @@ function hic_api_url_render() {
     echo '<p class="description">URL delle API Hotel in Cloud (solo se si usa API Polling)</p>';
 }
 
-function hic_api_key_render() {
-    echo '<input type="password" name="hic_api_key" value="' . esc_attr(hic_get_api_key()) . '" class="regular-text" />';
-    echo '<p class="description">API Key per Hotel in Cloud (solo se si usa API Polling)</p>';
-}
-
-// New Basic Auth render functions
+// Basic Auth render functions
 function hic_api_email_render() {
     $value = hic_get_api_email();
     $is_constant = defined('HIC_API_EMAIL') && !empty(HIC_API_EMAIL);
