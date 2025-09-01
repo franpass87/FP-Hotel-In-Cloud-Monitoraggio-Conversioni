@@ -583,6 +583,7 @@ add_action('wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_track
 add_action('wp_ajax_hic_force_polling', 'hic_ajax_force_polling');
 add_action('wp_ajax_hic_download_error_logs', 'hic_ajax_download_error_logs');
 add_action('wp_ajax_hic_trigger_watchdog', 'hic_ajax_trigger_watchdog');
+add_action('wp_ajax_hic_reset_timestamps', 'hic_ajax_reset_timestamps');
 
 
 
@@ -987,6 +988,51 @@ function hic_ajax_trigger_watchdog() {
     }
 }
 
+/**
+ * AJAX handler for resetting timestamps (emergency recovery)
+ */
+function hic_ajax_reset_timestamps() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_admin_action', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    try {
+        hic_log('Admin Timestamp Reset: Manual timestamp reset initiated');
+        
+        // Execute timestamp recovery using the new method
+        if (class_exists('HIC_Booking_Poller')) {
+            $poller = new HIC_Booking_Poller();
+            $result = $poller->trigger_timestamp_recovery();
+            
+            $response = array(
+                'success' => true,
+                'message' => 'Timestamp reset completed successfully - all timestamps reset and scheduler restarted',
+                'result' => $result
+            );
+        } else {
+            $response = array(
+                'success' => false,
+                'message' => 'HIC_Booking_Poller class not available'
+            );
+        }
+        
+        wp_die(json_encode($response));
+        
+    } catch (Exception $e) {
+        hic_log('Admin Timestamp Reset Error: ' . $e->getMessage());
+        wp_die(json_encode(array(
+            'success' => false, 
+            'message' => 'Errore durante il reset dei timestamp: ' . $e->getMessage()
+        )));
+    }
+}
+
 /* ============ Diagnostics Admin Page ============ */
 
 /**
@@ -1025,6 +1071,7 @@ function hic_diagnostics_page() {
                         <button class="button button-primary" id="force-polling">Forza Polling Ora</button>
                         <button class="button button-secondary" id="test-polling">Test Polling (con lock)</button>
                         <button class="button button-secondary" id="trigger-watchdog">Trigger Watchdog</button>
+                        <button class="button button-secondary" id="reset-timestamps" style="background-color: #dc3232; border-color: #dc3232; color: white;">Reset Timestamps</button>
                         <button class="button button-secondary" id="download-error-logs" style="margin-left: 10px;">
                             <span class="dashicons dashicons-download" style="margin-top: 3px;"></span>
                             Scarica Log Errori
@@ -1043,6 +1090,7 @@ function hic_diagnostics_page() {
                             <li><strong>Forza Polling Ora:</strong> Esegue il polling immediatamente, ignorando eventuali lock attivi</li>
                             <li><strong>Test Polling:</strong> Esegue il polling normale, rispettando i lock esistenti</li>
                             <li><strong>Trigger Watchdog:</strong> Forza l'esecuzione del watchdog per rilevare e riparare problemi di scheduling</li>
+                            <li><strong>Reset Timestamps:</strong> <span style="color: #dc3232;">EMERGENZA</span> - Resetta tutti i timestamp quando il polling è bloccato da errori di timestamp</li>
                         </ul>
                     </div>
                 </div>
@@ -2545,6 +2593,61 @@ function hic_diagnostics_page() {
                 $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
             }).always(function() {
                 $btn.prop('disabled', false).text('Trigger Watchdog');
+            });
+        });
+        
+        // Reset Timestamps handler (emergency recovery)
+        $('#reset-timestamps').click(function() {
+            var $btn = $(this);
+            var $status = $('#polling-status');
+            var $results = $('#polling-results');
+            var $resultsContent = $('#polling-results-content');
+            
+            // Confirm before proceeding since this is an emergency action
+            if (!confirm('ATTENZIONE: Questa è un\'azione di emergenza che resetterà tutti i timestamp del sistema. Proseguire solo se il polling è bloccato da errori di timestamp. Continuare?')) {
+                return;
+            }
+            
+            $btn.prop('disabled', true).text('Resettando timestamp...');
+            $status.text('Reset timestamp in corso...').css('color', '#dc3232');
+            $results.hide();
+            
+            $.post(ajaxurl, {
+                action: 'hic_reset_timestamps',
+                nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
+            }).done(function(response) {
+                if (response.success) {
+                    $status.text('Reset completato!').css('color', '#46b450');
+                    
+                    var html = '<div class="notice notice-success inline"><p><strong>Reset Timestamp Completato:</strong><br>';
+                    html += response.message + '<br>';
+                    html += 'Il sistema di polling è stato riavviato e dovrebbe funzionare normalmente.';
+                    html += '</p></div>';
+                    
+                    $resultsContent.html(html);
+                    $results.show();
+                } else {
+                    $status.text('Reset fallito').css('color', '#dc3232');
+                    
+                    var html = '<div class="notice notice-error inline"><p><strong>Reset Fallito:</strong><br>';
+                    html += response.message || 'Errore sconosciuto';
+                    html += '</p></div>';
+                    
+                    $resultsContent.html(html);
+                    $results.show();
+                }
+                
+                // Log the response for debugging
+                console.log('Timestamp reset response:', response);
+                
+                setTimeout(function() {
+                    location.reload();
+                }, 3000);
+                
+            }).fail(function() {
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+            }).always(function() {
+                $btn.prop('disabled', false).text('Reset Timestamps');
             });
         });
         
