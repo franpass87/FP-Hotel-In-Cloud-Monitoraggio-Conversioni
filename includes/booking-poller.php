@@ -16,6 +16,7 @@ class HIC_Booking_Poller {
         // WP-Cron system for reliable 24/7 operation
         add_action('hic_continuous_poll_event', array($this, 'execute_continuous_polling'));
         add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
+        add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
         
         // Initialize scheduler on activation
         add_action('init', array($this, 'ensure_scheduler_is_active'), 20);
@@ -26,6 +27,10 @@ class HIC_Booking_Poller {
         // Add watchdog check using WordPress heartbeat
         add_action('heartbeat_received', array($this, 'heartbeat_watchdog'), 10, 2);
         add_filter('heartbeat_settings', array($this, 'heartbeat_settings'));
+        
+        // Add fallback mechanism for when WP-Cron completely fails
+        add_action('wp_loaded', array($this, 'fallback_polling_check'));
+        add_action('shutdown', array($this, 'shutdown_polling_check'));
     }
     
     /**
@@ -287,6 +292,85 @@ class HIC_Booking_Poller {
                 hic_log("Admin Watchdog: No continuous polling event scheduled, restarting scheduler");
                 $this->ensure_scheduler_is_active();
             }
+        }
+    }
+    
+    /**
+     * Fallback polling check - triggers on every page load as last resort
+     */
+    public function fallback_polling_check() {
+        // Only run as fallback if polling should be active but WP-Cron isn't working
+        if (!$this->should_poll()) {
+            return;
+        }
+        
+        // Check if WP-Cron is working - if so, don't interfere
+        if ($this->is_wp_cron_working()) {
+            return;
+        }
+        
+        $current_time = time();
+        $last_continuous = get_option('hic_last_continuous_poll', 0);
+        
+        // If WP-Cron is not working and polling is severely delayed (>10 minutes), run fallback
+        if ($current_time - $last_continuous > 600) {
+            hic_log("Fallback: WP-Cron not working and polling severely delayed, running fallback polling");
+            
+            // Use a transient to prevent multiple simultaneous executions
+            $fallback_lock = get_transient('hic_fallback_polling_lock');
+            if (!$fallback_lock) {
+                set_transient('hic_fallback_polling_lock', time(), 120); // 2-minute lock
+                
+                // Run polling in background (don't block page load)
+                wp_schedule_single_event(time() + 5, 'hic_fallback_poll_event');
+                add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
+                
+                hic_log("Fallback: Scheduled fallback polling event");
+            }
+        }
+    }
+    
+    /**
+     * Shutdown polling check - very lightweight check on page end
+     */
+    public function shutdown_polling_check() {
+        // Only run if polling should be active and we're not in admin
+        if (!$this->should_poll() || is_admin()) {
+            return;
+        }
+        
+        // Very quick check - just log if polling seems to be failing
+        $current_time = time();
+        $last_continuous = get_option('hic_last_continuous_poll', 0);
+        
+        if ($current_time - $last_continuous > 1800) { // 30 minutes lag
+            hic_log("Shutdown Check: Severe polling lag detected ({$current_time} - {$last_continuous} = " . ($current_time - $last_continuous) . "s)");
+        }
+    }
+    
+    /**
+     * Execute fallback polling when WP-Cron completely fails
+     */
+    public function execute_fallback_polling() {
+        hic_log("Fallback: Executing fallback polling due to WP-Cron failure");
+        
+        try {
+            // Try to restart the scheduler first
+            $this->ensure_scheduler_is_active();
+            
+            // Execute continuous polling
+            $this->execute_continuous_polling();
+            
+            // Also run deep check if it's been a while
+            $current_time = time();
+            $last_deep = get_option('hic_last_deep_check', 0);
+            if ($current_time - $last_deep > 1800) { // 30 minutes
+                $this->execute_deep_check();
+            }
+            
+            hic_log("Fallback: Fallback polling completed successfully");
+        } catch (Exception $e) {
+            hic_log("Fallback: Error during fallback polling: " . $e->getMessage());
         }
     }
     

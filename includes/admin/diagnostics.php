@@ -580,6 +580,7 @@ add_action('wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_boo
 add_action('wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
 add_action('wp_ajax_hic_force_polling', 'hic_ajax_force_polling');
 add_action('wp_ajax_hic_download_error_logs', 'hic_ajax_download_error_logs');
+add_action('wp_ajax_hic_trigger_watchdog', 'hic_ajax_trigger_watchdog');
 
 
 
@@ -942,6 +943,48 @@ function hic_ajax_force_polling() {
     }
 }
 
+/**
+ * AJAX handler for triggering watchdog check
+ */
+function hic_ajax_trigger_watchdog() {
+    // Verify nonce
+    if (!check_ajax_referer('hic_admin_action', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    try {
+        hic_log('Admin Watchdog: Manual watchdog trigger initiated');
+        
+        // Execute watchdog check
+        $watchdog_result = hic_trigger_watchdog_check();
+        
+        // Also force restart the scheduler for good measure
+        $restart_result = hic_force_restart_internal_scheduler();
+        
+        $response = array(
+            'success' => true,
+            'message' => 'Watchdog check completed successfully',
+            'watchdog_result' => $watchdog_result,
+            'scheduler_restart' => $restart_result
+        );
+        
+        hic_log('Admin Watchdog: Manual watchdog trigger completed successfully');
+        wp_die(json_encode($response));
+        
+    } catch (Exception $e) {
+        hic_log('Admin Watchdog Error: ' . $e->getMessage());
+        wp_die(json_encode(array(
+            'success' => false, 
+            'message' => 'Errore durante l\'esecuzione del watchdog: ' . $e->getMessage()
+        )));
+    }
+}
+
 /* ============ Diagnostics Admin Page ============ */
 
 /**
@@ -979,6 +1022,7 @@ function hic_diagnostics_page() {
                     <p>
                         <button class="button button-primary" id="force-polling">Forza Polling Ora</button>
                         <button class="button button-secondary" id="test-polling">Test Polling (con lock)</button>
+                        <button class="button button-secondary" id="trigger-watchdog">Trigger Watchdog</button>
                         <button class="button button-secondary" id="download-error-logs" style="margin-left: 10px;">
                             <span class="dashicons dashicons-download" style="margin-top: 3px;"></span>
                             Scarica Log Errori
@@ -996,6 +1040,7 @@ function hic_diagnostics_page() {
                         <ul>
                             <li><strong>Forza Polling Ora:</strong> Esegue il polling immediatamente, ignorando eventuali lock attivi</li>
                             <li><strong>Test Polling:</strong> Esegue il polling normale, rispettando i lock esistenti</li>
+                            <li><strong>Trigger Watchdog:</strong> Forza l'esecuzione del watchdog per rilevare e riparare problemi di scheduling</li>
                         </ul>
                     </div>
                 </div>
@@ -2449,6 +2494,55 @@ function hic_diagnostics_page() {
             }).fail(function() {
                 $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
                 $btn.prop('disabled', false).text('Test Polling (con lock)');
+            });
+        });
+        
+        // Trigger Watchdog handler
+        $('#trigger-watchdog').click(function() {
+            var $btn = $(this);
+            var $status = $('#polling-status');
+            var $results = $('#polling-results');
+            var $resultsContent = $('#polling-results-content');
+            
+            $btn.prop('disabled', true).text('Eseguendo watchdog...');
+            $status.text('Watchdog in corso...').css('color', '#0073aa');
+            $results.hide();
+            
+            $.post(ajaxurl, {
+                action: 'hic_trigger_watchdog',
+                nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
+            }).done(function(response) {
+                if (response.success) {
+                    $status.text('Watchdog completato!').css('color', '#46b450');
+                    
+                    var html = '<div class="notice notice-success inline"><p><strong>Watchdog Completato:</strong><br>';
+                    html += JSON.stringify(response.data, null, 2).replace(/\\n/g, '<br>').replace(/ {2}/g, '&nbsp;&nbsp;');
+                    html += '</p></div>';
+                    
+                    $resultsContent.html(html);
+                    $results.show();
+                } else {
+                    $status.text('Watchdog fallito').css('color', '#dc3232');
+                    
+                    var html = '<div class="notice notice-warning inline"><p><strong>Watchdog Fallito:</strong><br>';
+                    html += response.data || 'Errore sconosciuto';
+                    html += '</p></div>';
+                    
+                    $resultsContent.html(html);
+                    $results.show();
+                }
+                
+                // Log the response for debugging
+                console.log('Watchdog response:', response);
+                
+                setTimeout(function() {
+                    location.reload();
+                }, 3000);
+                
+            }).fail(function() {
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+            }).always(function() {
+                $btn.prop('disabled', false).text('Trigger Watchdog');
             });
         });
         
