@@ -144,7 +144,8 @@ function hic_dispatch_ga4_reservation($data) {
     'items' => [[
       'item_id' => sanitize_text_field($data['accommodation_id'] ?? ''),
       'item_name' => sanitize_text_field($data['accommodation_name'] ?? 'Accommodation'),
-      'quantity' => max(1, intval($data['guests'] ?? 1))
+      'quantity' => max(1, intval($data['guests'] ?? 1)),
+      'price' => $value
     ]],
     'checkin' => sanitize_text_field($data['from_date'] ?? ''),
     'checkout' => sanitize_text_field($data['to_date'] ?? ''),
