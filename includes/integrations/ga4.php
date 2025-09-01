@@ -193,7 +193,7 @@ function hic_dispatch_ga4_reservation($data) {
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  $log_msg = "GA4 HIC dispatch: bucket=organic transaction_id=$transaction_id value=$value $currency HTTP=$code";
+  $log_msg = "GA4 HIC dispatch: bucket=organic vertical=hotel transaction_id=$transaction_id value=$value $currency price_in_items={$params['items'][0]['price']} HTTP=$code";
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();

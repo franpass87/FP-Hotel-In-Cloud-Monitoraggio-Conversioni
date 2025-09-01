@@ -283,6 +283,17 @@ function hic_send_brevo_reservation_created_event($data) {
     'properties' => array()
   );
 
+  // Debug log the exact payload structure being sent
+  hic_log(array('Brevo trackEvent payload debug' => array(
+    'email' => $email,
+    'event' => 'reservation_created',  
+    'eventdata_structure' => 'eventdata.data',
+    'auth_header' => 'ma-key',
+    'amount' => $body['eventdata']['data']['amount'],
+    'bucket' => $body['eventdata']['data']['bucket'],
+    'vertical' => $body['eventdata']['data']['vertical']
+  )));
+
   $res = wp_remote_post('https://in-automate.brevo.com/api/v2/trackEvent', array(
     'headers' => array(
       'accept' => 'application/json',
@@ -300,7 +311,10 @@ function hic_send_brevo_reservation_created_event($data) {
     'event' => 'reservation_created',
     'email' => $email,
     'reservation_id' => $body['eventdata']['data']['reservation_id'],
+    'amount' => $body['eventdata']['data']['amount'],
     'bucket' => $bucket,
+    'vertical' => $body['eventdata']['data']['vertical'],
+    'API_header' => 'ma-key',
     'HTTP' => $code
   );
   
