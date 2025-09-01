@@ -34,9 +34,8 @@ Each condition must be ✅ (green checkmark) for automatic polling to work:
 - **Reliable Polling Enabled**: Must be turned on in settings
 - **Connection Type Api**: Must be set to "API Polling" (not webhook)
 - **Api Url Configured**: Must have valid Hotel in Cloud API URL
-- **Has Credentials**: Must have either Basic Auth OR API Key
+- **Has Credentials**: Must have Basic Auth credentials
 - **Basic Auth Complete**: Must have Property ID + Email + Password
-- **Api Key Configured**: Alternative to Basic Auth (legacy method)
 
 ### What to Check If Polling Fails
 
@@ -50,9 +49,8 @@ Each condition must be ✅ (green checkmark) for automatic polling to work:
    - **Fix**: Go to HIC Settings → Enter valid "API URL" from Hotel in Cloud
 
 4. **❌ Has Credentials = No**
-   - **Fix**: Configure either:
-     - Property ID + Email + Password (recommended)
-     - OR API Key (legacy method)
+   - **Fix**: Configure Basic Auth credentials:
+     - Property ID + Email + Password
 
 ### Lock Status
 - **🔓 No**: Normal, polling can run

@@ -37,7 +37,7 @@ function hic_get_internal_scheduler_status() {
         hic_reliable_polling_enabled() && 
         hic_get_connection_type() === 'api' && 
         hic_get_api_url() && 
-        (hic_has_basic_auth_credentials() || !empty(hic_get_api_key()));
+        hic_has_basic_auth_credentials();
     
     // Get stats from WP-Cron scheduler if available
     if (class_exists('HIC_Booking_Poller')) {
@@ -112,11 +112,8 @@ function hic_should_schedule_poll_event() {
         return false;
     }
     
-    // Check if we have Basic Auth credentials or legacy API key
-    $has_basic_auth = hic_has_basic_auth_credentials();
-    $has_legacy_key = !empty(hic_get_api_key());
-    
-    return $has_basic_auth || $has_legacy_key;
+    // Check if we have Basic Auth credentials
+    return hic_has_basic_auth_credentials();
 }
 
 /**
@@ -149,7 +146,6 @@ function hic_get_credentials_status() {
         'property_id' => !empty(hic_get_property_id()),
         'api_email' => !empty(hic_get_api_email()),
         'api_password' => !empty(hic_get_api_password()),
-        'api_key_legacy' => !empty(hic_get_api_key()),
         'updates_enrich_enabled' => hic_updates_enrich_contacts(),
         'ga4_configured' => !empty(hic_get_measurement_id()) && !empty(hic_get_api_secret()),
         'brevo_configured' => hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key()),
@@ -294,7 +290,7 @@ function hic_force_restart_internal_scheduler() {
     $should_activate = hic_reliable_polling_enabled() && 
                       hic_get_connection_type() === 'api' && 
                       hic_get_api_url() && 
-                      (hic_has_basic_auth_credentials() || !empty(hic_get_api_key()));
+                      hic_has_basic_auth_credentials();
     
     if ($should_activate) {
         // Reset polling timestamps to trigger immediate execution
@@ -425,8 +421,8 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     }
     
     // Validate credentials
-    if (!hic_has_basic_auth_credentials() && empty(hic_get_api_key())) {
-        return new WP_Error('missing_credentials', 'Credenziali API non configurate');
+    if (!hic_has_basic_auth_credentials()) {
+        return new WP_Error('missing_credentials', 'Credenziali Basic Auth non configurate');
     }
     
     // Get downloaded booking IDs for filtering
@@ -1231,8 +1227,8 @@ function hic_diagnostics_page() {
                                     if (!hic_get_api_url()) {
                                         $polling_issues[] = "URL API non configurato";
                                     }
-                                    if (!hic_has_basic_auth_credentials() && empty(hic_get_api_key())) {
-                                        $polling_issues[] = "Credenziali API mancanti (serve Property ID + Email + Password oppure API Key)";
+                                    if (!hic_has_basic_auth_credentials()) {
+                                        $polling_issues[] = "Credenziali Basic Auth mancanti (serve Property ID + Email + Password)";
                                     }
                                     echo implode('<br>', $polling_issues);
                                     ?>
@@ -1440,16 +1436,9 @@ function hic_diagnostics_page() {
                             <tr>
                                 <td><?php echo esc_html(str_replace('_', ' ', ucfirst($condition))); ?></td>
                                 <td>
-                                    <?php 
-                                    // Special handling for API key when Basic Auth is being used
-                                    if ($condition === 'api_key_configured' && !$status && $poller_diagnostics['conditions']['basic_auth_complete']): ?>
-                                        <span class="status ok">✅ Non necessario</span>
-                                        <br><small style="color: #46b450;">Basic Auth in uso</small>
-                                    <?php else: ?>
-                                        <span class="status <?php echo $status ? 'ok' : 'error'; ?>">
-                                            <?php echo $status ? '✅ Sì' : '❌ No'; ?>
-                                        </span>
-                                    <?php endif; ?>
+                                    <span class="status <?php echo $status ? 'ok' : 'error'; ?>">
+                                        <?php echo $status ? '✅ Sì' : '❌ No'; ?>
+                                    </span>
                                 </td>
                                 <td>
                                     <?php
@@ -1457,9 +1446,9 @@ function hic_diagnostics_page() {
                                         'reliable_polling_enabled' => 'Sistema di polling affidabile attivato nelle impostazioni',
                                         'connection_type_api' => 'Tipo connessione impostato su "API Polling"',
                                         'api_url_configured' => 'URL API configurato',
-                                        'has_credentials' => 'Credenziali API disponibili (Basic Auth o API Key)',
+                                        'has_credentials' => 'Credenziali Basic Auth disponibili',
                                         'basic_auth_complete' => 'Credenziali Basic Auth complete (Property ID + Email + Password)',
-                                        'api_key_configured' => 'API Key configurata (metodo legacy - alternativo a Basic Auth)'
+                                        'credentials_type' => 'Tipo di credenziali utilizzate'
                                     );
                                     echo esc_html($descriptions[$condition] ?? 'Controllo sistema');
                                     ?>
@@ -1515,40 +1504,20 @@ function hic_diagnostics_page() {
                         </ul>
                         <p><strong>⚠ Importante per le Credenziali:</strong></p>
                         <ul>
-                            <li><strong>Basic Auth (Raccomandato):</strong> Property ID + Email + Password - Quando configurato, l'API Key non è necessaria</li>
-                            <li><strong>API Key (Legacy):</strong> Metodo alternativo - Quando configurato, Basic Auth non è necessario</li>
-                            <li><strong>Richiesto:</strong> Solo UNO dei due metodi deve essere configurato, non entrambi</li>
+                            <li><strong>Basic Auth (Richiesto):</strong> Property ID + Email + Password</li>
+                            <li><strong>Richiesto:</strong> Tutti i campi Basic Auth devono essere configurati</li>
                         </ul>
                     </div>
                     
                     <?php
                     // Check if all conditions are met
                     $all_conditions_met = true;
-                    $credential_method_configured = false;
                     
                     foreach ($poller_diagnostics['conditions'] as $condition => $status) {
-                        // Skip API key check if Basic Auth is complete (they are alternatives)
-                        if ($condition === 'api_key_configured' && $poller_diagnostics['conditions']['basic_auth_complete']) {
-                            continue; // API Key not needed when Basic Auth is working
-                        }
-                        // Skip Basic Auth check if API Key is configured (they are alternatives)
-                        if ($condition === 'basic_auth_complete' && $poller_diagnostics['conditions']['api_key_configured']) {
-                            continue; // Basic Auth not needed when API Key is working
-                        }
-                        // Check if we have at least one credential method
-                        if (($condition === 'basic_auth_complete' || $condition === 'api_key_configured') && $status) {
-                            $credential_method_configured = true;
-                        }
-                        
                         if (!$status) {
                             $all_conditions_met = false;
                             break;
                         }
-                    }
-                    
-                    // Ensure we have at least one credential method
-                    if (!$credential_method_configured) {
-                        $all_conditions_met = false;
                     }
                     ?>
                     
@@ -2171,8 +2140,8 @@ function hic_diagnostics_page() {
             return;
             <?php endif; ?>
             
-            <?php if (!hic_has_basic_auth_credentials() && empty(hic_get_api_key())): ?>
-            alert('Credenziali API non configurate. Verifica le impostazioni.');
+            <?php if (!hic_has_basic_auth_credentials()): ?>
+            alert('Credenziali Basic Auth non configurate. Verifica le impostazioni.');
             return;
             <?php endif; ?>
             

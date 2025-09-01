@@ -149,24 +149,38 @@ add_action('hic_fetch_reservations', function($prop_id, $date_type, $from_date, 
  * Validates if a reservation should be processed
  */
 function hic_should_process_reservation($reservation) {
-    // Check required fields
-    $required = ['id', 'from_date', 'to_date', 'accommodation_id', 'accommodation_name'];
-    foreach ($required as $field) {
+    // Only require essential booking data - dates are critical for booking logic
+    $critical_fields = ['from_date', 'to_date'];
+    foreach ($critical_fields as $field) {
         if (empty($reservation[$field])) {
-            hic_log("Reservation skipped: missing required field '$field'");
+            hic_log("Reservation skipped: missing critical field '$field'");
             return false;
+        }
+    }
+    
+    // Check for any valid ID field (more flexible than requiring specific 'id' field)
+    $uid = hic_booking_uid($reservation);
+    if (empty($uid)) {
+        hic_log("Reservation skipped: no valid ID field found (tried: id, reservation_id, booking_id, transaction_id)");
+        return false;
+    }
+    
+    // Log warnings for missing optional data but don't block processing
+    $optional_fields = ['accommodation_id', 'accommodation_name'];
+    foreach ($optional_fields as $field) {
+        if (empty($reservation[$field])) {
+            hic_log("Reservation $uid: Warning - missing optional field '$field', using defaults");
         }
     }
     
     // Check valid flag
     $valid = isset($reservation['valid']) ? intval($reservation['valid']) : 1;
     if ($valid === 0 && !hic_process_invalid()) {
-        hic_log("Reservation skipped: valid=0 and process_invalid=false");
+        hic_log("Reservation $uid skipped: valid=0 and process_invalid=false");
         return false;
     }
     
     // Check deduplication
-    $uid = hic_booking_uid($reservation);
     if (hic_is_reservation_already_processed($uid)) {
         // Check if status update is allowed
         if (hic_allow_status_updates()) {
@@ -218,13 +232,35 @@ function hic_transform_reservation($reservation) {
         }
     }
     
+    // Get transaction_id using flexible ID resolution
+    $transaction_id = hic_booking_uid($reservation);
+    if (empty($transaction_id)) {
+        // Fallback to first available scalar field if no standard ID found
+        foreach ($reservation as $key => $value) {
+            if (is_scalar($value) && !empty($value)) {
+                $transaction_id = (string) $value;
+                hic_log("Using fallback transaction_id from field '$key': $transaction_id");
+                break;
+            }
+        }
+    }
+    
+    // Provide fallback accommodation data if missing
+    $accommodation_id = isset($reservation['accommodation_id']) ? $reservation['accommodation_id'] : '';
+    $accommodation_name = isset($reservation['accommodation_name']) ? $reservation['accommodation_name'] : '';
+    if (empty($accommodation_name) && !empty($accommodation_id)) {
+        $accommodation_name = "Accommodation $accommodation_id"; // Fallback name
+    } elseif (empty($accommodation_name)) {
+        $accommodation_name = "Unknown Accommodation"; // Ultimate fallback
+    }
+    
     return array(
-        'transaction_id' => $reservation['id'],
+        'transaction_id' => $transaction_id,
         'reservation_code' => isset($reservation['reservation_code']) ? $reservation['reservation_code'] : '',
         'value' => $value,
         'currency' => $currency,
-        'accommodation_id' => isset($reservation['accommodation_id']) ? $reservation['accommodation_id'] : '',
-        'accommodation_name' => isset($reservation['accommodation_name']) ? $reservation['accommodation_name'] : '',
+        'accommodation_id' => $accommodation_id,
+        'accommodation_name' => $accommodation_name,
         'room_name' => isset($reservation['room_name']) ? $reservation['room_name'] : '',
         'guests' => $guests,
         'from_date' => isset($reservation['from_date']) ? $reservation['from_date'] : '',
