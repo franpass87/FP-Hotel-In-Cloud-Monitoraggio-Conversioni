@@ -13,6 +13,9 @@ class HIC_Booking_Poller {
     const WATCHDOG_THRESHOLD = 300; // 5 minutes threshold
     
     public function __construct() {
+        // Register custom cron intervals first - always available for cron managers
+        add_filter('cron_schedules', array($this, 'add_custom_cron_intervals'));
+        
         // WP-Cron system for reliable 24/7 operation
         add_action('hic_continuous_poll_event', array($this, 'execute_continuous_polling'));
         add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
@@ -43,9 +46,6 @@ class HIC_Booking_Poller {
             $this->clear_all_scheduled_events();
             return;
         }
-        
-        // Register custom intervals first
-        add_filter('cron_schedules', array($this, 'add_custom_cron_intervals'));
         
         // Check and schedule continuous polling event
         $continuous_next = wp_next_scheduled('hic_continuous_poll_event');
@@ -146,11 +146,23 @@ class HIC_Booking_Poller {
         $continuous_next = wp_next_scheduled('hic_continuous_poll_event');
         $deep_next = wp_next_scheduled('hic_deep_check_event');
         
+        // Check polling conditions
+        $should_poll = $this->should_poll();
+        $reliable_polling = hic_reliable_polling_enabled();
+        $connection_type = hic_get_connection_type();
+        $api_url = hic_get_api_url();
+        $has_auth = hic_has_basic_auth_credentials();
+        
         $status_msg = sprintf(
-            'WP-Cron Status: Continuous next=%s, Deep next=%s, WP-Cron disabled=%s',
+            'WP-Cron Status: Continuous next=%s, Deep next=%s, WP-Cron disabled=%s, Should poll=%s (reliable=%s, type=%s, url=%s, auth=%s)',
             $continuous_next ? date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
             $deep_next ? date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
-            (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) ? 'YES' : 'NO'
+            (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) ? 'YES' : 'NO',
+            $should_poll ? 'YES' : 'NO',
+            $reliable_polling ? 'YES' : 'NO',
+            $connection_type ?: 'NONE',
+            $api_url ? 'SET' : 'MISSING',
+            $has_auth ? 'YES' : 'NO'
         );
         
         hic_log($status_msg);
@@ -586,9 +598,23 @@ class HIC_Booking_Poller {
         $is_wp_cron_working = $this->is_wp_cron_working();
         $scheduler_type = $is_wp_cron_working ? 'WP-Cron' : 'Non attivo';
         
+        // Get detailed polling conditions
+        $should_poll = $this->should_poll();
+        $reliable_polling = hic_reliable_polling_enabled();
+        $connection_type = hic_get_connection_type();
+        $api_url = hic_get_api_url();
+        $has_auth = hic_has_basic_auth_credentials();
+        
         $stats = array(
             'scheduler_type' => $scheduler_type,
             'wp_cron_working' => $is_wp_cron_working,
+            'should_poll' => $should_poll,
+            'polling_conditions' => array(
+                'reliable_polling_enabled' => $reliable_polling,
+                'connection_type' => $connection_type,
+                'api_url_set' => !empty($api_url),
+                'has_auth_credentials' => $has_auth
+            ),
             'last_poll' => $last_general,
             'last_poll_human' => $last_general > 0 ? human_time_diff($last_general) . ' fa' : 'Mai',
             'last_continuous_poll' => $last_continuous,
@@ -598,16 +624,15 @@ class HIC_Booking_Poller {
             'lag_seconds' => $last_general > 0 ? time() - $last_general : 0,
             'continuous_lag' => $last_continuous > 0 ? time() - $last_continuous : 0,
             'deep_lag' => $last_deep > 0 ? time() - $last_deep : 0,
-            'polling_active' => $this->should_poll(),
+            'polling_active' => $should_poll,
             'polling_interval' => self::CONTINUOUS_POLLING_INTERVAL,
             'deep_check_interval' => self::DEEP_CHECK_INTERVAL
         );
         
-        // Add WP-Cron specific info
-        if ($is_wp_cron_working) {
-            $stats['next_continuous_scheduled'] = wp_next_scheduled('hic_continuous_poll_event');
-            $stats['next_deep_scheduled'] = wp_next_scheduled('hic_deep_check_event');
-        }
+        // Add WP-Cron specific info (always show for debugging)
+        $stats['next_continuous_scheduled'] = wp_next_scheduled('hic_continuous_poll_event');
+        $stats['next_deep_scheduled'] = wp_next_scheduled('hic_deep_check_event');
+        $stats['wp_cron_disabled'] = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
         
         return $stats;
     }

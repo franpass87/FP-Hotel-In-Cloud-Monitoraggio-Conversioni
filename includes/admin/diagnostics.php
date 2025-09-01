@@ -58,13 +58,15 @@ function hic_get_internal_scheduler_status() {
                 'polling_interval' => $poller_stats['polling_interval'] ?? 60,
                 'deep_check_interval' => $poller_stats['deep_check_interval'] ?? 600,
                 'wp_cron_working' => $poller_stats['wp_cron_working'] ?? false,
-                'scheduler_type' => $poller_stats['scheduler_type'] ?? 'Unknown'
+                'scheduler_type' => $poller_stats['scheduler_type'] ?? 'Unknown',
+                'should_poll' => $poller_stats['should_poll'] ?? false,
+                'polling_conditions' => $poller_stats['polling_conditions'] ?? array()
             ));
             
             // Add detailed WP-Cron diagnostics
-            $continuous_next = wp_next_scheduled('hic_continuous_poll_event');
-            $deep_next = wp_next_scheduled('hic_deep_check_event');
-            $wp_cron_disabled = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
+            $continuous_next = $poller_stats['next_continuous_scheduled'] ?? wp_next_scheduled('hic_continuous_poll_event');
+            $deep_next = $poller_stats['next_deep_scheduled'] ?? wp_next_scheduled('hic_deep_check_event');
+            $wp_cron_disabled = $poller_stats['wp_cron_disabled'] ?? (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON);
             
             $status['internal_scheduler']['cron_diagnostics'] = array(
                 'continuous_scheduled' => $continuous_next,
