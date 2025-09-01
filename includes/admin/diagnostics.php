@@ -963,6 +963,15 @@ function hic_ajax_trigger_watchdog() {
     try {
         hic_log('Admin Watchdog: Manual watchdog trigger initiated');
         
+        // Check if required functions exist
+        if (!function_exists('hic_trigger_watchdog_check')) {
+            throw new Exception('Function hic_trigger_watchdog_check not found');
+        }
+        
+        if (!function_exists('hic_force_restart_internal_scheduler')) {
+            throw new Exception('Function hic_force_restart_internal_scheduler not found');
+        }
+        
         // Execute watchdog check
         $watchdog_result = hic_trigger_watchdog_check();
         
@@ -984,6 +993,12 @@ function hic_ajax_trigger_watchdog() {
         wp_die(json_encode(array(
             'success' => false, 
             'message' => 'Errore durante l\'esecuzione del watchdog: ' . $e->getMessage()
+        )));
+    } catch (Error $e) {
+        hic_log('Admin Watchdog Fatal Error: ' . $e->getMessage());
+        wp_die(json_encode(array(
+            'success' => false, 
+            'message' => 'Errore fatale durante l\'esecuzione del watchdog: ' . $e->getMessage()
         )));
     }
 }
@@ -1008,6 +1023,12 @@ function hic_ajax_reset_timestamps() {
         // Execute timestamp recovery using the new method
         if (class_exists('HIC_Booking_Poller')) {
             $poller = new HIC_Booking_Poller();
+            
+            // Check if the method exists
+            if (!method_exists($poller, 'trigger_timestamp_recovery')) {
+                throw new Exception('Method trigger_timestamp_recovery not found in HIC_Booking_Poller class');
+            }
+            
             $result = $poller->trigger_timestamp_recovery();
             
             $response = array(
@@ -1029,6 +1050,12 @@ function hic_ajax_reset_timestamps() {
         wp_die(json_encode(array(
             'success' => false, 
             'message' => 'Errore durante il reset dei timestamp: ' . $e->getMessage()
+        )));
+    } catch (Error $e) {
+        hic_log('Admin Timestamp Reset Fatal Error: ' . $e->getMessage());
+        wp_die(json_encode(array(
+            'success' => false, 
+            'message' => 'Errore fatale durante il reset dei timestamp: ' . $e->getMessage()
         )));
     }
 }
@@ -2566,7 +2593,13 @@ function hic_diagnostics_page() {
                     $status.text('Watchdog completato!').css('color', '#46b450');
                     
                     var html = '<div class="notice notice-success inline"><p><strong>Watchdog Completato:</strong><br>';
-                    html += JSON.stringify(response.data, null, 2).replace(/\\n/g, '<br>').replace(/ {2}/g, '&nbsp;&nbsp;');
+                    html += response.message + '<br><br>';
+                    if (response.watchdog_result) {
+                        html += '<strong>Risultato Watchdog:</strong><br>' + JSON.stringify(response.watchdog_result, null, 2).replace(/\n/g, '<br>').replace(/ {2}/g, '&nbsp;&nbsp;') + '<br><br>';
+                    }
+                    if (response.scheduler_restart) {
+                        html += '<strong>Scheduler Restart:</strong><br>' + JSON.stringify(response.scheduler_restart, null, 2).replace(/\n/g, '<br>').replace(/ {2}/g, '&nbsp;&nbsp;');
+                    }
                     html += '</p></div>';
                     
                     $resultsContent.html(html);
@@ -2575,7 +2608,7 @@ function hic_diagnostics_page() {
                     $status.text('Watchdog fallito').css('color', '#dc3232');
                     
                     var html = '<div class="notice notice-warning inline"><p><strong>Watchdog Fallito:</strong><br>';
-                    html += response.data || 'Errore sconosciuto';
+                    html += response.message || 'Errore sconosciuto';
                     html += '</p></div>';
                     
                     $resultsContent.html(html);
