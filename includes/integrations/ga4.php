@@ -144,13 +144,15 @@ function hic_dispatch_ga4_reservation($data) {
     'items' => [[
       'item_id' => sanitize_text_field($data['accommodation_id'] ?? ''),
       'item_name' => sanitize_text_field($data['accommodation_name'] ?? 'Accommodation'),
-      'quantity' => max(1, intval($data['guests'] ?? 1))
+      'quantity' => max(1, intval($data['guests'] ?? 1)),
+      'price' => $value
     ]],
     'checkin' => sanitize_text_field($data['from_date'] ?? ''),
     'checkout' => sanitize_text_field($data['to_date'] ?? ''),
     'reservation_code' => sanitize_text_field($data['reservation_code'] ?? ''),
     'presence' => sanitize_text_field($data['presence'] ?? ''),
     'unpaid_balance' => hic_normalize_price($data['unpaid_balance'] ?? 0),
+    'bucket' => 'organic',          // HIC reservations are direct bookings
     'vertical' => 'hotel'
   ];
 
@@ -191,7 +193,7 @@ function hic_dispatch_ga4_reservation($data) {
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  $log_msg = "GA4 HIC dispatch: transaction_id=$transaction_id value=$value $currency HTTP=$code";
+  $log_msg = "GA4 HIC dispatch: bucket=organic vertical=hotel transaction_id=$transaction_id value=$value $currency price_in_items={$params['items'][0]['price']} HTTP=$code";
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();

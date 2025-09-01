@@ -327,6 +327,17 @@ function hic_dispatch_reservation($transformed, $original) {
     $uid = hic_booking_uid($original);
     $is_status_update = hic_is_reservation_already_processed($uid);
     
+    // Debug log to verify fixes are in place
+    $realtime_enabled = hic_realtime_brevo_sync_enabled();
+    hic_log(array('Reservation dispatch debug' => array(
+        'uid' => $uid,
+        'is_status_update' => $is_status_update,
+        'realtime_brevo_enabled' => $realtime_enabled,
+        'value' => $transformed['value'] ?? 'missing',
+        'currency' => $transformed['currency'] ?? 'missing',
+        'email' => !empty($transformed['email']) ? 'present' : 'missing'
+    )));
+    
     try {
         // GA4 - only send once unless it's a status update we want to track
         if (!$is_status_update) {
@@ -340,6 +351,11 @@ function hic_dispatch_reservation($transformed, $original) {
         
         // Brevo - always update contact info
         hic_dispatch_brevo_reservation($transformed);
+        
+        // Brevo real-time events - send reservation_created event for new reservations
+        if (!$is_status_update && hic_realtime_brevo_sync_enabled()) {
+            hic_send_brevo_reservation_created_event($transformed);
+        }
         
         hic_log("Reservation $uid dispatched successfully");
     } catch (Exception $e) {

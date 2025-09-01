@@ -261,30 +261,44 @@ function hic_send_brevo_reservation_created_event($data) {
   $body = array(
     'event' => 'reservation_created',
     'email' => $email,
-    'properties' => array(
-      'reservation_id' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
-      'reservation_code' => isset($data['reservation_code']) ? $data['reservation_code'] : '',
-      'amount' => isset($data['original_price']) ? hic_normalize_price($data['original_price']) : 0,
-      'currency' => isset($data['currency']) ? $data['currency'] : 'EUR',
-      'from_date' => isset($data['from_date']) ? $data['from_date'] : '',
-      'to_date' => isset($data['to_date']) ? $data['to_date'] : '',
-      'guests' => isset($data['guests']) ? $data['guests'] : '',
-      'accommodation' => isset($data['accommodation_name']) ? $data['accommodation_name'] : '',
-      'phone' => isset($data['phone']) ? $data['phone'] : '',
-      'language' => isset($data['language']) ? $data['language'] : '',
-      'firstname' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
-      'lastname' => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
-      'bucket' => $bucket,
-      'vertical' => 'hotel',
-      'created_at' => current_time('mysql')
-    )
+    'eventdata' => array(
+      'data' => array(
+        'reservation_id' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
+        'reservation_code' => isset($data['reservation_code']) ? $data['reservation_code'] : '',
+        'amount' => isset($data['original_price']) ? hic_normalize_price($data['original_price']) : 0,
+        'currency' => isset($data['currency']) ? $data['currency'] : 'EUR',
+        'from_date' => isset($data['from_date']) ? $data['from_date'] : '',
+        'to_date' => isset($data['to_date']) ? $data['to_date'] : '',
+        'guests' => isset($data['guests']) ? $data['guests'] : '',
+        'accommodation' => isset($data['accommodation_name']) ? $data['accommodation_name'] : '',
+        'phone' => isset($data['phone']) ? $data['phone'] : '',
+        'language' => isset($data['language']) ? $data['language'] : '',
+        'firstname' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
+        'lastname' => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
+        'bucket' => $bucket,
+        'vertical' => 'hotel',
+        'created_at' => current_time('mysql')
+      )
+    ),
+    'properties' => array()
   );
+
+  // Debug log the exact payload structure being sent
+  hic_log(array('Brevo trackEvent payload debug' => array(
+    'email' => $email,
+    'event' => 'reservation_created',  
+    'eventdata_structure' => 'eventdata.data',
+    'auth_header' => 'ma-key',
+    'amount' => $body['eventdata']['data']['amount'],
+    'bucket' => $body['eventdata']['data']['bucket'],
+    'vertical' => $body['eventdata']['data']['vertical']
+  )));
 
   $res = wp_remote_post('https://in-automate.brevo.com/api/v2/trackEvent', array(
     'headers' => array(
       'accept' => 'application/json',
       'content-type' => 'application/json',
-      'api-key' => hic_get_brevo_api_key()
+      'ma-key' => hic_get_brevo_api_key()
     ),
     'body' => wp_json_encode($body),
     'timeout' => 15
@@ -296,8 +310,11 @@ function hic_send_brevo_reservation_created_event($data) {
   $log_data = array(
     'event' => 'reservation_created',
     'email' => $email,
-    'reservation_id' => $body['properties']['reservation_id'],
+    'reservation_id' => $body['eventdata']['data']['reservation_id'],
+    'amount' => $body['eventdata']['data']['amount'],
     'bucket' => $bucket,
+    'vertical' => $body['eventdata']['data']['vertical'],
+    'API_header' => 'ma-key',
     'HTTP' => $code
   );
   
