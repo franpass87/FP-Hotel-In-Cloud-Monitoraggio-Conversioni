@@ -152,6 +152,7 @@ function hic_dispatch_ga4_reservation($data) {
     'reservation_code' => sanitize_text_field($data['reservation_code'] ?? ''),
     'presence' => sanitize_text_field($data['presence'] ?? ''),
     'unpaid_balance' => hic_normalize_price($data['unpaid_balance'] ?? 0),
+    'bucket' => 'organic',          // HIC reservations are direct bookings
     'vertical' => 'hotel'
   ];
 
@@ -192,7 +193,7 @@ function hic_dispatch_ga4_reservation($data) {
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  $log_msg = "GA4 HIC dispatch: transaction_id=$transaction_id value=$value $currency HTTP=$code";
+  $log_msg = "GA4 HIC dispatch: bucket=organic transaction_id=$transaction_id value=$value $currency HTTP=$code";
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
