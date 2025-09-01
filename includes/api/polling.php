@@ -1436,14 +1436,25 @@ function hic_api_poll_bookings_deep_check() {
             hic_log("Deep Check: Error checking updates: " . $error_message);
             $total_errors++;
             
-            // For deep check, timestamp errors are less likely due to 5-day limit, but handle them anyway
+            // Handle timestamp errors properly to prevent polling from getting stuck
             if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
-                hic_log('Deep Check: Timestamp error detected - this should not happen with 5-day lookback');
+                hic_log('Deep Check: Timestamp error detected - resetting all relevant timestamps to recover');
+                
+                // Reset all relevant timestamps to safe values to ensure recovery
+                $safe_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
+                update_option('hic_last_updates_since', $safe_timestamp);
+                update_option('hic_last_update_check', $safe_timestamp);
+                update_option('hic_last_continuous_check', $safe_timestamp);
                 
                 // Reset scheduler timestamps to restart polling immediately
                 update_option('hic_last_continuous_poll', 0);
                 update_option('hic_last_deep_check', 0);
-                hic_log('Deep Check: Reset scheduler timestamps to restart polling');
+                
+                hic_log('Deep Check: Reset all timestamps to: ' . date('Y-m-d H:i:s', $safe_timestamp) . " for recovery");
+                hic_log('Deep Check: Reset scheduler timestamps to restart polling immediately');
+                
+                // Reduce error count since this is a recoverable error that's now handled
+                $total_errors--;
             }
         }
         
