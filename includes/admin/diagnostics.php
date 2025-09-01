@@ -1800,16 +1800,14 @@ function hic_diagnostics_page() {
                             <td>Scheduler Interno</td>
                             <td>
                                 <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
-                                    <span class="status ok">✓ Attivo</span><br>
+                                    Attivo<br>
                                     <small>
-                                        <strong>Sistema:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['scheduler_type'] ?? 'WP-Cron'); ?><br>
-                                        <strong>Polling Continuo (1 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_continuous_human'] ?? 'Mai eseguito'); ?><br>
-                                        <strong>Deep Check (10 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_deep_human'] ?? 'Mai eseguito'); ?><br>
-                                        <strong>Prossimo continuo:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['next_continuous_human'] ?? 'Sconosciuto'); ?><br>
-                                        <strong>Prossimo deep:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['next_deep_human'] ?? 'Sconosciuto'); ?>
+                                        Sistema: <?php echo esc_html($scheduler_status['internal_scheduler']['scheduler_type'] ?? 'WP-Cron'); ?><br>
+                                        Ultimo polling: <?php echo esc_html($scheduler_status['internal_scheduler']['last_continuous_human'] ?? 'Mai eseguito'); ?><br>
+                                        Ultimo controllo: <?php echo esc_html($scheduler_status['internal_scheduler']['last_deep_human'] ?? 'Mai eseguito'); ?>
                                     </small>
                                 <?php else: ?>
-                                    <span class="status error">✗ Non attivo</span><br>
+                                    Non attivo<br>
                                     <small>Verificare configurazione API</small>
                                 <?php endif; ?>
                             </td>
