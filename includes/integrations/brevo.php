@@ -322,7 +322,8 @@ function hic_send_brevo_reservation_created_event($data) {
     'amount' => $body['properties']['amount'],
     'bucket' => $body['properties']['bucket'],
     'vertical' => $body['properties']['vertical'],
-    'endpoint' => hic_get_brevo_event_endpoint()
+    'endpoint' => hic_get_brevo_event_endpoint(),
+    'full_payload' => $body
   )));
 
   $res = wp_remote_post(hic_get_brevo_event_endpoint(), array(
@@ -491,4 +492,145 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
         'log_data' => $log_data
       );
   }
+}
+
+/**
+ * Determine if a Brevo API error is retryable
+ */
+function hic_is_brevo_error_retryable($result) {
+  if (!isset($result['log_data']['HTTP'])) {
+    return false;
+  }
+  
+  $http_code = $result['log_data']['HTTP'];
+  
+  // Retryable errors (temporary issues)
+  $retryable_codes = array(429, 500, 502, 503);
+  
+  return in_array($http_code, $retryable_codes);
+}
+
+/**
+ * Test Brevo Contact API connectivity
+ */
+function hic_test_brevo_contact_api() {
+  $test_email = 'test-' . time() . '@example.com';
+  
+  $body = array(
+    'email' => $test_email,
+    'attributes' => array(
+      'FIRSTNAME' => 'Test',
+      'LASTNAME' => 'Connectivity'
+    ),
+    'listIds' => array(), // Empty list to avoid adding test contact to real lists
+    'updateEnabled' => false // Don't update if exists
+  );
+  
+  $res = wp_remote_post('https://api.brevo.com/v3/contacts', array(
+    'headers' => array(
+      'accept' => 'application/json',
+      'api-key' => hic_get_brevo_api_key(),
+      'content-type' => 'application/json'
+    ),
+    'body' => wp_json_encode($body),
+    'timeout' => 15
+  ));
+  
+  $result = hic_handle_brevo_response($res, 'contact_test', array(
+    'test_email' => $test_email,
+    'endpoint' => 'https://api.brevo.com/v3/contacts'
+  ));
+  
+  return array(
+    'success' => $result['success'],
+    'message' => $result['success'] ? 'Contact API test successful' : $result['error'],
+    'endpoint' => 'https://api.brevo.com/v3/contacts',
+    'http_code' => isset($result['log_data']['HTTP']) ? $result['log_data']['HTTP'] : 'N/A'
+  );
+}
+
+/**
+ * Test Brevo Event API connectivity
+ */
+function hic_test_brevo_event_api() {
+  $endpoint = hic_get_brevo_event_endpoint();
+  $test_email = 'test-' . time() . '@example.com';
+  
+  $body = array(
+    'event' => 'test_connectivity',
+    'email' => $test_email,
+    'properties' => array(
+      'test_timestamp' => current_time('mysql'),
+      'source' => 'hic_diagnostic_test',
+      'vertical' => 'hotel'
+    )
+  );
+  
+  hic_log(array('Brevo Event API Test' => array(
+    'endpoint' => $endpoint,
+    'test_email' => $test_email,
+    'payload' => $body
+  )));
+  
+  $res = wp_remote_post($endpoint, array(
+    'headers' => array(
+      'accept' => 'application/json',
+      'content-type' => 'application/json',
+      'api-key' => hic_get_brevo_api_key()
+    ),
+    'body' => wp_json_encode($body),
+    'timeout' => 15
+  ));
+  
+  $result = hic_handle_brevo_response($res, 'event_test', array(
+    'test_email' => $test_email,
+    'endpoint' => $endpoint,
+    'event' => 'test_connectivity'
+  ));
+  
+  $response_data = array(
+    'success' => $result['success'],
+    'message' => $result['success'] ? 'Event API test successful' : $result['error'],
+    'endpoint' => $endpoint,
+    'http_code' => isset($result['log_data']['HTTP']) ? $result['log_data']['HTTP'] : 'N/A'
+  );
+  
+  // If primary endpoint fails, try alternative endpoint
+  if (!$result['success'] && $endpoint !== 'https://in-automate.brevo.com/api/v2/trackEvent') {
+    $alt_endpoint = 'https://in-automate.brevo.com/api/v2/trackEvent';
+    
+    hic_log(array('Brevo Event API Alternative Test' => array(
+      'alt_endpoint' => $alt_endpoint,
+      'reason' => 'Primary endpoint failed'
+    )));
+    
+    $alt_res = wp_remote_post($alt_endpoint, array(
+      'headers' => array(
+        'accept' => 'application/json',
+        'content-type' => 'application/json',
+        'api-key' => hic_get_brevo_api_key()
+      ),
+      'body' => wp_json_encode($body),
+      'timeout' => 15
+    ));
+    
+    $alt_result = hic_handle_brevo_response($alt_res, 'event_test_alt', array(
+      'test_email' => $test_email,
+      'endpoint' => $alt_endpoint,
+      'event' => 'test_connectivity'
+    ));
+    
+    $response_data['alternative_test'] = array(
+      'success' => $alt_result['success'],
+      'message' => $alt_result['success'] ? 'Alternative endpoint successful' : $alt_result['error'],
+      'endpoint' => $alt_endpoint,
+      'http_code' => isset($alt_result['log_data']['HTTP']) ? $alt_result['log_data']['HTTP'] : 'N/A'
+    );
+    
+    if ($alt_result['success']) {
+      $response_data['recommendation'] = 'Consider using alternative endpoint: ' . $alt_endpoint;
+    }
+  }
+  
+  return $response_data;
 }
