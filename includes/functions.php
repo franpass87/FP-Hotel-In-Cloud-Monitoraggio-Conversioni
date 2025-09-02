@@ -28,6 +28,9 @@ function hic_brevo_double_optin_on_enrich() { return hic_get_option('brevo_doubl
 
 // Real-time sync settings
 function hic_realtime_brevo_sync_enabled() { return hic_get_option('realtime_brevo_sync', '1') === '1'; }
+function hic_get_brevo_event_endpoint() { 
+    return hic_get_option('brevo_event_endpoint', 'https://in-automate.brevo.com/api/v2/trackEvent'); 
+}
 
 // Reliable polling settings
 function hic_reliable_polling_enabled() { return hic_get_option('reliable_polling_enabled', '1') === '1'; }

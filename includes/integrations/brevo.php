@@ -80,7 +80,7 @@ function hic_send_brevo_event($data, $gclid, $fbclid){
     )
   );
 
-  $res = wp_remote_post('https://in-automate.brevo.com/api/v2/trackEvent', array(
+  $res = wp_remote_post(hic_get_brevo_event_endpoint(), array(
     'headers' => array(
       'accept'       => 'application/json',
       'content-type' => 'application/json',
@@ -256,6 +256,20 @@ function hic_send_brevo_reservation_created_event($data) {
     return false; 
   }
 
+  // Validate essential data fields
+  $validation_errors = array();
+  if (empty($data['transaction_id'])) {
+    $validation_errors[] = 'transaction_id missing';
+  }
+  if (empty($data['original_price']) && $data['original_price'] !== 0) {
+    $validation_errors[] = 'original_price missing';
+  }
+  
+  if (!empty($validation_errors)) {
+    hic_log('Brevo reservation_created event SKIPPED: validation errors - ' . implode(', ', $validation_errors));
+    return false;
+  }
+
   // Get gclid/fbclid for bucket normalization if available
   $gclid = '';
   $fbclid = '';
@@ -308,10 +322,10 @@ function hic_send_brevo_reservation_created_event($data) {
     'amount' => $body['properties']['amount'],
     'bucket' => $body['properties']['bucket'],
     'vertical' => $body['properties']['vertical'],
-    'endpoint' => 'https://in-automate.brevo.com/api/v2/trackEvent'
+    'endpoint' => hic_get_brevo_event_endpoint()
   )));
 
-  $res = wp_remote_post('https://in-automate.brevo.com/api/v2/trackEvent', array(
+  $res = wp_remote_post(hic_get_brevo_event_endpoint(), array(
     'headers' => array(
       'accept' => 'application/json',
       'content-type' => 'application/json',
@@ -327,7 +341,8 @@ function hic_send_brevo_reservation_created_event($data) {
     'reservation_id' => $body['properties']['reservation_id'],
     'amount' => $body['properties']['amount'],
     'bucket' => $bucket,
-    'vertical' => $body['properties']['vertical']
+    'vertical' => $body['properties']['vertical'],
+    'endpoint' => hic_get_brevo_event_endpoint()
   ));
   
   if (!$result['success']) {

@@ -2900,7 +2900,9 @@ function hic_test_brevo_event_api() {
         )
     );
     
-    $response = wp_remote_post('https://in-automate.brevo.com/api/v2/trackEvent', array(
+    // Test current endpoint (configurable)
+    $current_endpoint = function_exists('hic_get_brevo_event_endpoint') ? hic_get_brevo_event_endpoint() : 'https://in-automate.brevo.com/api/v2/trackEvent';
+    $response = wp_remote_post($current_endpoint, array(
         'headers' => array(
             'accept' => 'application/json',
             'content-type' => 'application/json',
@@ -2910,7 +2912,31 @@ function hic_test_brevo_event_api() {
         'timeout' => 10
     ));
     
-    return hic_handle_brevo_response($response, 'event_test', array('test_email' => $test_email));
+    $result = hic_handle_brevo_response($response, 'event_test', array('test_email' => $test_email));
+    
+    // If v2 fails, also test if there's a v3 events endpoint
+    if (!$result['success']) {
+        hic_log('v2 trackEvent failed, testing alternative v3 endpoint');
+        
+        // Test alternative v3 endpoint structure
+        $v3_response = wp_remote_post('https://api.brevo.com/v3/events', array(
+            'headers' => array(
+                'accept' => 'application/json',
+                'content-type' => 'application/json',
+                'api-key' => hic_get_brevo_api_key()
+            ),
+            'body' => wp_json_encode($body),
+            'timeout' => 10
+        ));
+        
+        $v3_result = hic_handle_brevo_response($v3_response, 'event_test_v3', array('test_email' => $test_email));
+        
+        // Add information about both tests to the result
+        $result['v3_test'] = $v3_result;
+        $result['note'] = 'v2 endpoint failed, v3 endpoint also tested';
+    }
+    
+    return $result;
 }
 
 /**
