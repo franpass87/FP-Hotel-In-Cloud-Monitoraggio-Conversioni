@@ -148,6 +148,27 @@ function hic_dispatch_pixel_reservation($data) {
   $value = hic_normalize_price($data['value']);
   $currency = sanitize_text_field($data['currency']);
 
+  // Get gclid/fbclid for bucket normalization if available
+  $gclid = '';
+  $fbclid = '';
+  if (!empty($data['transaction_id'])) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'hic_gclids';
+    
+    // Check if table exists before querying
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+    if ($table_exists) {
+      // Try to find tracking data using transaction_id as sid
+      $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
+      if ($row) { 
+        $gclid = $row->gclid ?: ''; 
+        $fbclid = $row->fbclid ?: ''; 
+      }
+    }
+  }
+
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
+
   $user_data = [
     'em' => [hash('sha256', strtolower(trim($data['email'])))]
   ];
@@ -169,6 +190,7 @@ function hic_dispatch_pixel_reservation($data) {
     'content_ids' => [sanitize_text_field($data['accommodation_id'] ?? '')],
     'content_name' => sanitize_text_field($data['accommodation_name'] ?? 'Accommodation'),
     'num_items' => max(1, intval($data['guests'] ?? 1)),
+    'bucket' => $bucket,             // Bucket attribution for custom conversions
     'vertical' => 'hotel'
   ];
 
@@ -210,7 +232,7 @@ function hic_dispatch_pixel_reservation($data) {
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  $log_msg = "FB HIC dispatch: transaction_id=$transaction_id value=$value $currency HTTP=$code";
+  $log_msg = "FB HIC dispatch: bucket=$bucket transaction_id=$transaction_id value=$value $currency HTTP=$code";
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();

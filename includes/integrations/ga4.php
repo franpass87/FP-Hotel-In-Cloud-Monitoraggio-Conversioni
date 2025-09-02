@@ -137,6 +137,27 @@ function hic_dispatch_ga4_reservation($data) {
   $value = hic_normalize_price($data['value']);
   $currency = sanitize_text_field($data['currency']);
 
+  // Get gclid/fbclid for bucket normalization if available
+  $gclid = '';
+  $fbclid = '';
+  if (!empty($data['transaction_id'])) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'hic_gclids';
+    
+    // Check if table exists before querying
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+    if ($table_exists) {
+      // Try to find tracking data using transaction_id as sid
+      $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
+      if ($row) { 
+        $gclid = $row->gclid ?: ''; 
+        $fbclid = $row->fbclid ?: ''; 
+      }
+    }
+  }
+
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
+
   $params = [
     'transaction_id' => $transaction_id,
     'currency' => $currency,
@@ -152,7 +173,7 @@ function hic_dispatch_ga4_reservation($data) {
     'reservation_code' => sanitize_text_field($data['reservation_code'] ?? ''),
     'presence' => sanitize_text_field($data['presence'] ?? ''),
     'unpaid_balance' => hic_normalize_price($data['unpaid_balance'] ?? 0),
-    'bucket' => 'organic',          // HIC reservations are direct bookings
+    'bucket' => $bucket,             // Use normalized bucket based on attribution
     'vertical' => 'hotel'
   ];
 
@@ -193,7 +214,7 @@ function hic_dispatch_ga4_reservation($data) {
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  $log_msg = "GA4 HIC dispatch: bucket=organic vertical=hotel transaction_id=$transaction_id value=$value $currency price_in_items={$params['items'][0]['price']} HTTP=$code";
+  $log_msg = "GA4 HIC dispatch: bucket=$bucket vertical=hotel transaction_id=$transaction_id value=$value $currency price_in_items={$params['items'][0]['price']} HTTP=$code";
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
