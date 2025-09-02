@@ -47,12 +47,15 @@ function hic_send_brevo_contact($data, $gclid, $fbclid){
     'body'    => wp_json_encode($body),
     'timeout' => 15
   ));
-  $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  $log_msg = "Brevo contact dispatch: email=$email lists=" . implode(',', $list_ids) . " HTTP=$code";
-  if (is_wp_error($res)) {
-    $log_msg .= " ERROR: " . $res->get_error_message();
+  
+  $result = hic_handle_brevo_response($res, 'contact_legacy', array(
+    'email' => $email, 
+    'lists' => implode(',', $list_ids)
+  ));
+  
+  if (!$result['success']) {
+    hic_log('Brevo contact dispatch FAILED: ' . $result['error']);
   }
-  hic_log($log_msg);
 }
 
 /* ============ Brevo: evento personalizzato (purchase + bucket) ============ */
@@ -86,8 +89,16 @@ function hic_send_brevo_event($data, $gclid, $fbclid){
     'body'    => wp_json_encode($body),
     'timeout' => 15
   ));
-  $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  hic_log(array('Brevo event: purchase (bucket='.$bucket.')' => $body, 'HTTP'=>$code));
+  
+  $result = hic_handle_brevo_response($res, 'event_legacy', array(
+    'event' => 'purchase',
+    'bucket' => $bucket,
+    'email' => $body['email']
+  ));
+  
+  if (!$result['success']) {
+    hic_log('Brevo event dispatch FAILED: ' . $result['error']);
+  }
 }
 
 /**
@@ -213,8 +224,16 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false) {
     'timeout' => 15
   ));
   
-  $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  hic_log(array('Brevo HIC contact sent' => array('email' => $email, 'res_id' => $data['transaction_id'], 'lists' => $list_ids, 'alias' => $is_alias), 'HTTP' => $code));
+  $result = hic_handle_brevo_response($res, 'contact', array(
+    'email' => $email, 
+    'res_id' => $data['transaction_id'], 
+    'lists' => $list_ids, 
+    'alias' => $is_alias
+  ));
+  
+  if (!$result['success']) {
+    hic_log('Brevo contact dispatch FAILED: ' . $result['error']);
+  }
 }
 
 /**
@@ -288,7 +307,8 @@ function hic_send_brevo_reservation_created_event($data) {
     'auth_header' => 'api-key',
     'amount' => $body['properties']['amount'],
     'bucket' => $body['properties']['bucket'],
-    'vertical' => $body['properties']['vertical']
+    'vertical' => $body['properties']['vertical'],
+    'endpoint' => 'https://in-automate.brevo.com/api/v2/trackEvent'
   )));
 
   $res = wp_remote_post('https://in-automate.brevo.com/api/v2/trackEvent', array(
@@ -301,27 +321,159 @@ function hic_send_brevo_reservation_created_event($data) {
     'timeout' => 15
   ));
   
-  $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
-  $success = !is_wp_error($res) && $code >= 200 && $code < 300;
-  
-  $log_data = array(
+  $result = hic_handle_brevo_response($res, 'event', array(
     'event' => 'reservation_created',
     'email' => $email,
     'reservation_id' => $body['properties']['reservation_id'],
     'amount' => $body['properties']['amount'],
     'bucket' => $bucket,
-    'vertical' => $body['properties']['vertical'],
-    'API_header' => 'api-key',
-    'HTTP' => $code
-  );
+    'vertical' => $body['properties']['vertical']
+  ));
   
-  if (!$success) {
-    $error_message = is_wp_error($res) ? $res->get_error_message() : "HTTP $code";
-    $log_data['error'] = $error_message;
-    hic_log(array('Brevo reservation_created event FAILED' => $log_data));
+  if (!$result['success']) {
+    hic_log('Brevo reservation_created event FAILED: ' . $result['error']);
+    
+    // Check if it's a retryable error or permanent failure
+    $is_retryable = hic_is_brevo_error_retryable($result);
+    if (!$is_retryable) {
+      hic_log('Brevo error is not retryable - marking as permanently failed');
+    }
+    
     return false;
   }
 
-  hic_log(array('Brevo reservation_created event sent' => $log_data));
+  hic_log(array('Brevo reservation_created event sent' => $result['log_data']));
   return true;
+}
+
+/**
+ * Enhanced Brevo API response handler with proper error handling
+ * According to Brevo API v3 specification
+ */
+function hic_handle_brevo_response($response, $request_type = 'unknown', $log_context = array()) {
+  // Check for WordPress HTTP errors
+  if (is_wp_error($response)) {
+    return array(
+      'success' => false,
+      'error' => 'Connection error: ' . $response->get_error_message(),
+      'log_data' => array_merge($log_context, array('error_type' => 'wp_error', 'HTTP' => 0))
+    );
+  }
+  
+  $http_code = wp_remote_retrieve_response_code($response);
+  $response_body = wp_remote_retrieve_body($response);
+  
+  // Parse response body for additional error information
+  $parsed_body = json_decode($response_body, true);
+  $brevo_error_code = null;
+  $brevo_error_message = null;
+  
+  if (is_array($parsed_body)) {
+    $brevo_error_code = isset($parsed_body['code']) ? $parsed_body['code'] : null;
+    $brevo_error_message = isset($parsed_body['message']) ? $parsed_body['message'] : null;
+  }
+  
+  $log_data = array_merge($log_context, array(
+    'HTTP' => $http_code,
+    'request_type' => $request_type,
+    'API_header' => 'api-key'
+  ));
+  
+  if ($brevo_error_code) {
+    $log_data['brevo_error_code'] = $brevo_error_code;
+  }
+  if ($brevo_error_message) {
+    $log_data['brevo_error_message'] = $brevo_error_message;
+  }
+  
+  // Handle HTTP response codes according to Brevo API specification
+  switch ($http_code) {
+    case 200: // OK
+    case 201: // Created
+    case 202: // Accepted
+    case 204: // No content
+      hic_log(array('Brevo ' . $request_type . ' success' => $log_data));
+      return array(
+        'success' => true,
+        'http_code' => $http_code,
+        'log_data' => $log_data
+      );
+      
+    case 400: // Bad request
+      $error_msg = 'Bad request - Invalid parameters';
+      if ($brevo_error_message) {
+        $error_msg .= ': ' . $brevo_error_message;
+      }
+      return array(
+        'success' => false,
+        'error' => $error_msg,
+        'log_data' => $log_data
+      );
+      
+    case 401: // Unauthorized
+      return array(
+        'success' => false,
+        'error' => 'Unauthorized - Invalid API key or expired credentials',
+        'log_data' => $log_data
+      );
+      
+    case 402: // Payment Required
+      return array(
+        'success' => false,
+        'error' => 'Payment required - Account not activated or insufficient credits',
+        'log_data' => $log_data
+      );
+      
+    case 403: // Forbidden
+      return array(
+        'success' => false,
+        'error' => 'Forbidden - No permission to access this resource',
+        'log_data' => $log_data
+      );
+      
+    case 404: // Not Found
+      return array(
+        'success' => false,
+        'error' => 'Not found - Endpoint or resource does not exist',
+        'log_data' => $log_data
+      );
+      
+    case 405: // Method Not Allowed
+      return array(
+        'success' => false,
+        'error' => 'Method not allowed - Check HTTP method (GET/POST/PUT/DELETE)',
+        'log_data' => $log_data
+      );
+      
+    case 406: // Not Acceptable
+      return array(
+        'success' => false,
+        'error' => 'Not acceptable - Content-Type must be application/json',
+        'log_data' => $log_data
+      );
+      
+    case 429: // Too Many Requests
+      return array(
+        'success' => false,
+        'error' => 'Rate limit exceeded - Too many requests, retry later',
+        'log_data' => $log_data,
+        'retry_after' => wp_remote_retrieve_header($response, 'retry-after')
+      );
+      
+    case 500:
+    case 502:
+    case 503:
+      return array(
+        'success' => false,
+        'error' => "Server error (HTTP $http_code) - Brevo service temporarily unavailable",
+        'log_data' => $log_data
+      );
+      
+    default:
+      return array(
+        'success' => false,
+        'error' => "Unknown HTTP error ($http_code)" . ($brevo_error_message ? ': ' . $brevo_error_message : ''),
+        'log_data' => $log_data
+      );
+  }
 }
