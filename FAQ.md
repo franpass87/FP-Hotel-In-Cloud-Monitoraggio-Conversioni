@@ -134,6 +134,21 @@ Il sistema **dual-mode è sempre attivo** e garantisce che nessuna prenotazione 
    }
    ```
 
+3. **Evento Real-time** (per nuove prenotazioni):
+   ```json
+   {
+     "event": "reservation_created",
+     "email": "cliente@email.com", 
+     "properties": {
+       "reservation_id": "12345",
+       "amount": 150.00,
+       "bucket": "organic",
+       "from_date": "2024-01-01",
+       "to_date": "2024-01-03"
+     }
+   }
+   ```
+
 ### Q: Come vengono gestite le email alias da OTA (Booking.com, etc.)?
 
 **R**: Il plugin ha un sistema di **Email Enrichment**:
