@@ -377,7 +377,10 @@ function hic_dispatch_reservation($transformed, $original) {
             
             // Brevo real-time events - send reservation_created event for new reservations
             if (!$is_status_update && hic_realtime_brevo_sync_enabled()) {
-                hic_send_brevo_reservation_created_event($transformed);
+                $event_result = hic_send_brevo_reservation_created_event($transformed);
+                if (!$event_result['success']) {
+                    hic_log("Failed to send Brevo reservation_created event in dispatch: " . $event_result['error']);
+                }
             }
         }
         
@@ -940,9 +943,9 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
     }
 
     // Send reservation_created event to Brevo
-    $event_sent = hic_send_brevo_reservation_created_event($transformed);
+    $event_result = hic_send_brevo_reservation_created_event($transformed);
     
-    if ($event_sent) {
+    if ($event_result['success']) {
         // Mark as successfully notified
         hic_mark_reservation_notified_to_brevo($reservation_id);
         hic_log("Successfully sent reservation_created event to Brevo for reservation $reservation_id");
@@ -952,9 +955,15 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
             hic_dispatch_brevo_reservation($transformed, false);
         }
     } else {
-        // Mark as failed for retry
-        hic_mark_reservation_notification_failed($reservation_id, 'Failed to send Brevo event');
-        hic_log("Failed to send reservation_created event to Brevo for reservation $reservation_id");
+        // Handle failure based on retryability
+        if ($event_result['retryable']) {
+            // Mark as failed for retry
+            hic_mark_reservation_notification_failed($reservation_id, 'Failed to send Brevo event: ' . $event_result['error']);
+            hic_log("Failed to send reservation_created event to Brevo for reservation $reservation_id (retryable error)");
+        } else {
+            // Already marked as permanent failure in hic_send_brevo_reservation_created_event
+            hic_log("Failed to send reservation_created event to Brevo for reservation $reservation_id (permanent failure)");
+        }
     }
 }
 
