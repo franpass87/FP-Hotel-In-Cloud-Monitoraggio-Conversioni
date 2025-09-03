@@ -112,6 +112,7 @@ function hic_get_internal_scheduler_status() {
         $status['realtime_sync']['total_tracked'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table");
         $status['realtime_sync']['notified'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'notified'");
         $status['realtime_sync']['failed'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'failed'");
+        $status['realtime_sync']['permanent_failure'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'permanent_failure'");
         $status['realtime_sync']['new'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'new'");
     } else {
         $status['realtime_sync']['table_exists'] = false;

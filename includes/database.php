@@ -408,6 +408,30 @@ function hic_mark_reservation_notification_failed($reservation_id, $error_messag
 }
 
 /**
+ * Mark reservation notification as permanently failed (non-retryable)
+ */
+function hic_mark_reservation_notification_permanent_failure($reservation_id, $error_message = null) {
+  if (empty($reservation_id)) return false;
+  
+  global $wpdb;
+  $table = $wpdb->prefix . 'hic_realtime_sync';
+  
+  $result = $wpdb->update(
+    $table,
+    array(
+      'sync_status' => 'permanent_failure',
+      'last_attempt' => current_time('mysql'),
+      'last_error' => $error_message
+    ),
+    array('reservation_id' => $reservation_id),
+    array('%s', '%s', '%s'),
+    array('%s')
+  );
+  
+  return $result !== false;
+}
+
+/**
  * Get failed reservations that need retry
  */
 function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_minutes = 30) {

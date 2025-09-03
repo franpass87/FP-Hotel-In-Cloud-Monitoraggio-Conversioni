@@ -353,13 +353,27 @@ function hic_send_brevo_reservation_created_event($data) {
     $is_retryable = hic_is_brevo_error_retryable($result);
     if (!$is_retryable) {
       hic_log('Brevo error is not retryable - marking as permanently failed');
+      // Mark reservation as permanently failed immediately for non-retryable errors
+      $reservation_id = isset($data['transaction_id']) ? $data['transaction_id'] : '';
+      if (!empty($reservation_id)) {
+        hic_mark_reservation_notification_permanent_failure($reservation_id, $result['error']);
+      }
     }
     
-    return false;
+    // Return additional info about retryability
+    return array(
+      'success' => false,
+      'retryable' => $is_retryable,
+      'error' => $result['error']
+    );
   }
 
   hic_log(array('Brevo reservation_created event sent' => $result['log_data']));
-  return true;
+  return array(
+    'success' => true,
+    'retryable' => null,
+    'error' => null
+  );
 }
 
 /**
@@ -539,13 +553,16 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid) {
     $is_new = hic_is_reservation_new_for_realtime($reservation_id);
     if ($is_new) {
       hic_mark_reservation_new_for_realtime($reservation_id);
-      $event_sent = hic_send_brevo_reservation_created_event($transformed_data);
-      if ($event_sent) {
+      $event_result = hic_send_brevo_reservation_created_event($transformed_data);
+      if ($event_result['success']) {
         hic_mark_reservation_notified_to_brevo($reservation_id);
       } else {
-        hic_mark_reservation_notification_failed($reservation_id, 'Failed to send reservation_created event');
+        if ($event_result['retryable']) {
+          hic_mark_reservation_notification_failed($reservation_id, 'Failed to send reservation_created event: ' . $event_result['error']);
+        }
+        // Non-retryable errors are already handled in hic_send_brevo_reservation_created_event
       }
-      return $event_sent;
+      return $event_result['success'];
     } else {
       hic_log("Unified Brevo: reservation $reservation_id already processed for real-time sync");
     }
