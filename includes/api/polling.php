@@ -391,11 +391,6 @@ function hic_dispatch_reservation($transformed, $original) {
 /**
  * Deduplication functions
  */
-function hic_is_reservation_already_processed($uid) {
-    if (empty($uid)) return false;
-    $synced = get_option('hic_synced_res_ids', array());
-    return in_array($uid, $synced);
-}
 
 function hic_mark_reservation_processed($reservation) {
     $uid = hic_booking_uid($reservation);
