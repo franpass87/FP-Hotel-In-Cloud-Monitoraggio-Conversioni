@@ -584,6 +584,7 @@ add_action('wp_ajax_hic_force_polling', 'hic_ajax_force_polling');
 add_action('wp_ajax_hic_download_error_logs', 'hic_ajax_download_error_logs');
 add_action('wp_ajax_hic_trigger_watchdog', 'hic_ajax_trigger_watchdog');
 add_action('wp_ajax_hic_reset_timestamps', 'hic_ajax_reset_timestamps');
+add_action('wp_ajax_hic_test_brevo_connectivity', 'hic_ajax_test_brevo_connectivity');
 
 
 
@@ -1568,6 +1569,21 @@ function hic_diagnostics_page() {
                         <?php endif; ?>
                     </tbody>
                 </table>
+                
+                <!-- Brevo API Test Section -->
+                <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
+                <div style="margin-top: 15px; padding: 10px; background: #f0f8ff; border-left: 4px solid #0073aa;">
+                    <h3 style="margin-top: 0;">🔗 Test Connettività Brevo</h3>
+                    <p>Testa la connettività con le API di Brevo per verificare che l'integrazione funzioni correttamente:</p>
+                    <p>
+                        <button class="button button-primary" id="test-brevo-connectivity">
+                            <span class="dashicons dashicons-cloud" style="margin-top: 3px;"></span>
+                            Test Connettività Brevo
+                        </button>
+                    </p>
+                    <div id="brevo-test-results" style="display: none; margin-top: 10px;"></div>
+                </div>
+                <?php endif; ?>
             </div>
             
             <!-- Detailed Polling Diagnostics Section -->
@@ -2717,6 +2733,59 @@ function hic_diagnostics_page() {
             form.submit();
             document.body.removeChild(form);
         });
+        
+        // Brevo connectivity test handler
+        $('#test-brevo-connectivity').click(function() {
+            var $btn = $(this);
+            var $results = $('#brevo-test-results');
+            
+            $btn.prop('disabled', true).text('Testando connettività...');
+            $results.hide();
+            
+            $.post(ajaxurl, {
+                action: 'hic_test_brevo_connectivity',
+                nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
+            }).done(function(response) {
+                var html = '';
+                
+                if (response.success) {
+                    html += '<div class="notice notice-success inline"><p><strong>Test Connettività Brevo Completato</strong></p>';
+                    
+                    // Contact API results
+                    html += '<h4>API Contatti (v3/contacts):</h4>';
+                    if (response.contact_api.success) {
+                        html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.contact_api.http_code + '</p>';
+                    } else {
+                        html += '<p><span class="status error">✗ Errore</span> - ' + response.contact_api.error + '</p>';
+                        if (response.contact_api.log_data && response.contact_api.log_data.brevo_error_message) {
+                            html += '<p><small>Dettaglio Brevo: ' + response.contact_api.log_data.brevo_error_message + '</small></p>';
+                        }
+                    }
+                    
+                    // Event API results
+                    html += '<h4>API Eventi (v2/trackEvent):</h4>';
+                    if (response.event_api.success) {
+                        html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.event_api.http_code + '</p>';
+                    } else {
+                        html += '<p><span class="status error">✗ Errore</span> - ' + response.event_api.error + '</p>';
+                        if (response.event_api.log_data && response.event_api.log_data.brevo_error_message) {
+                            html += '<p><small>Dettaglio Brevo: ' + response.event_api.log_data.brevo_error_message + '</small></p>';
+                        }
+                    }
+                    
+                    html += '</div>';
+                } else {
+                    html = '<div class="notice notice-error inline"><p><strong>Test Fallito:</strong><br>' + response.message + '</p></div>';
+                }
+                
+                $results.html(html).show();
+                
+            }).fail(function() {
+                $results.html('<div class="notice notice-error inline"><p><strong>Errore di comunicazione con il server</strong></p></div>').show();
+            }).always(function() {
+                $btn.prop('disabled', false).text('Test Connettività Brevo');
+            });
+        });
     });
     </script>
 
@@ -2756,4 +2825,156 @@ function hic_ajax_download_error_logs() {
     readfile($log_file);
     
     wp_die(); // Stop execution after download
+}
+
+/**
+ * AJAX handler for testing Brevo API connectivity
+ */
+function hic_ajax_test_brevo_connectivity() {
+    check_admin_referer('hic_admin_action', 'nonce');
+    
+    if (!hic_get_brevo_api_key()) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'API key Brevo mancante. Configura prima l\'API key nelle impostazioni.'
+        )));
+    }
+    
+    // Test contact API
+    $contact_test = hic_test_brevo_contact_api();
+    
+    // Test event API
+    $event_test = hic_test_brevo_event_api();
+    
+    wp_die(json_encode(array(
+        'success' => true,
+        'message' => 'Test connettività Brevo completato',
+        'contact_api' => $contact_test,
+        'event_api' => $event_test
+    )));
+}
+
+/**
+ * Test Brevo Contact API connectivity
+ */
+function hic_test_brevo_contact_api() {
+    $test_email = 'test-' . time() . '@example.com';
+    
+    $body = array(
+        'email' => $test_email,
+        'attributes' => array(
+            'FIRSTNAME' => 'Test',
+            'LASTNAME' => 'User',
+            'TEST_MODE' => 'true'
+        ),
+        'listIds' => array(), // No lists for test
+        'updateEnabled' => false // Don't actually update
+    );
+    
+    $response = wp_remote_post('https://api.brevo.com/v3/contacts', array(
+        'headers' => array(
+            'accept' => 'application/json',
+            'api-key' => hic_get_brevo_api_key(),
+            'content-type' => 'application/json'
+        ),
+        'body' => wp_json_encode($body),
+        'timeout' => 10
+    ));
+    
+    return hic_handle_brevo_response($response, 'contact_test', array('test_email' => $test_email));
+}
+
+/**
+ * Test Brevo Event API connectivity
+ */
+function hic_test_brevo_event_api() {
+    $test_email = 'test-' . time() . '@example.com';
+    
+    $body = array(
+        'event' => 'test_connection',
+        'email' => $test_email,
+        'properties' => array(
+            'test_mode' => true,
+            'timestamp' => time(),
+            'source' => 'connectivity_test'
+        )
+    );
+    
+    // Test current endpoint (configurable)
+    $current_endpoint = function_exists('hic_get_brevo_event_endpoint') ? hic_get_brevo_event_endpoint() : 'https://in-automate.brevo.com/api/v2/trackEvent';
+    $response = wp_remote_post($current_endpoint, array(
+        'headers' => array(
+            'accept' => 'application/json',
+            'content-type' => 'application/json',
+            'api-key' => hic_get_brevo_api_key()
+        ),
+        'body' => wp_json_encode($body),
+        'timeout' => 10
+    ));
+    
+    $result = hic_handle_brevo_response($response, 'event_test', array('test_email' => $test_email));
+    
+    // If v2 fails, also test if there's a v3 events endpoint
+    if (!$result['success']) {
+        hic_log('v2 trackEvent failed, testing alternative v3 endpoint');
+        
+        // Test alternative v3 endpoint structure
+        $v3_response = wp_remote_post('https://api.brevo.com/v3/events', array(
+            'headers' => array(
+                'accept' => 'application/json',
+                'content-type' => 'application/json',
+                'api-key' => hic_get_brevo_api_key()
+            ),
+            'body' => wp_json_encode($body),
+            'timeout' => 10
+        ));
+        
+        $v3_result = hic_handle_brevo_response($v3_response, 'event_test_v3', array('test_email' => $test_email));
+        
+        // Add information about both tests to the result
+        $result['v3_test'] = $v3_result;
+        $result['note'] = 'v2 endpoint failed, v3 endpoint also tested';
+    }
+    
+    return $result;
+}
+
+/**
+ * Determine if a Brevo API error is retryable
+ * According to Brevo API specification, some errors should not be retried
+ */
+function hic_is_brevo_error_retryable($result) {
+  if ($result['success']) {
+    return false; // No need to retry successful requests
+  }
+  
+  // Get HTTP code from log data
+  $http_code = isset($result['log_data']['HTTP']) ? $result['log_data']['HTTP'] : 0;
+  
+  // Determine retry-ability based on HTTP status codes
+  switch ($http_code) {
+    case 400: // Bad request - usually permanent (invalid data)
+    case 401: // Unauthorized - API key issue, permanent
+    case 403: // Forbidden - permission issue, permanent  
+    case 404: // Not found - endpoint issue, permanent
+    case 405: // Method not allowed - permanent
+    case 406: // Not acceptable - content-type issue, permanent
+      return false; // Don't retry these errors
+      
+    case 429: // Rate limit - definitely retryable
+    case 500: // Server error - retryable
+    case 502: // Bad gateway - retryable
+    case 503: // Service unavailable - retryable
+      return true; // Retry these errors
+      
+    case 402: // Payment required - might be temporary if credits are added
+      return true; // Retry in case account gets reactivated
+      
+    case 0: // Connection error
+      return true; // Retry connection errors
+      
+    default:
+      // For unknown errors, default to retryable to be safe
+      return true;
+  }
 }

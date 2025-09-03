@@ -95,6 +95,7 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_realtime_brevo_sync');
     register_setting('hic_settings', 'hic_brevo_list_alias', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_brevo_double_optin_on_enrich');
+    register_setting('hic_settings', 'hic_brevo_event_endpoint', array('sanitize_callback' => 'esc_url_raw'));
 
     add_settings_section('hic_main_section', 'Configurazione Principale', null, 'hic_settings');
     add_settings_section('hic_ga4_section', 'Google Analytics 4', null, 'hic_settings');
@@ -144,6 +145,7 @@ function hic_settings_init() {
     add_settings_field('hic_realtime_brevo_sync', 'Sync real-time a Brevo', 'hic_realtime_brevo_sync_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_list_alias', 'Lista alias Brevo', 'hic_brevo_list_alias_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_double_optin_on_enrich', 'Double opt-in quando arriva email reale', 'hic_brevo_double_optin_on_enrich_render', 'hic_settings', 'hic_brevo_section');
+    add_settings_field('hic_brevo_event_endpoint', 'Endpoint API Eventi Brevo', 'hic_brevo_event_endpoint_render', 'hic_settings', 'hic_brevo_section');
     
     add_settings_field('hic_debug_verbose', 'Log debug verboso', 'hic_debug_verbose_render', 'hic_settings', 'hic_main_section');
 }
@@ -442,4 +444,11 @@ function hic_brevo_list_alias_render() {
 function hic_brevo_double_optin_on_enrich_render() {
     $checked = hic_brevo_double_optin_on_enrich() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_brevo_double_optin_on_enrich" value="1" ' . $checked . ' /> Invia double opt-in quando arriva email reale';
+}
+
+function hic_brevo_event_endpoint_render() {
+    $endpoint = hic_get_brevo_event_endpoint();
+    echo '<input type="url" name="hic_brevo_event_endpoint" value="' . esc_attr($endpoint) . '" style="width: 100%;" />';
+    echo '<p class="description">Endpoint API per eventi Brevo. Default: https://in-automate.brevo.com/api/v2/trackEvent<br>';
+    echo 'Modificare solo se Brevo cambia il proprio endpoint per gli eventi o se si utilizza un endpoint personalizzato.</p>';
 }

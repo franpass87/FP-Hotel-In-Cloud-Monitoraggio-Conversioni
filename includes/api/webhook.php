@@ -45,13 +45,44 @@ function hic_webhook_handler(WP_REST_Request $request) {
   // Log received data (be careful with sensitive information)
   hic_log(['Webhook ricevuto' => array_merge($data, ['email' => !empty($data['email']) ? '***HIDDEN***' : 'missing'])]);
 
-  // Process booking data with error handling
-  $result = hic_process_booking_data($data);
+  // Generate unique identifier for deduplication
+  $reservation_id = hic_extract_reservation_id($data);
   
-  if ($result === false) {
-    hic_log('Webhook: elaborazione fallita per dati ricevuti');
-    return new WP_REST_Response(['error'=>'processing failed'], 500);
+  // Check for duplication to prevent double processing
+  if (!empty($reservation_id) && hic_is_reservation_already_processed($reservation_id)) {
+    hic_log("Webhook skipped: reservation $reservation_id already processed");
+    return ['status'=>'ok', 'processed' => false, 'reason' => 'already_processed'];
   }
 
-  return ['status'=>'ok', 'processed' => true];
+  // Acquire processing lock to prevent concurrent processing
+  if (!empty($reservation_id) && !hic_acquire_reservation_lock($reservation_id)) {
+    hic_log("Webhook skipped: reservation $reservation_id is being processed by another request");
+    return ['status'=>'ok', 'processed' => false, 'reason' => 'concurrent_processing'];
+  }
+
+  try {
+    // Process booking data with error handling
+    $result = hic_process_booking_data($data);
+    
+    // Mark reservation as processed if successful
+    if ($result !== false && !empty($reservation_id)) {
+      hic_mark_reservation_processed_by_id($reservation_id);
+    }
+    
+    // Update last webhook processing time for diagnostics
+    update_option('hic_last_webhook_processing', current_time('mysql'), false);
+    
+    if ($result === false) {
+      hic_log('Webhook: elaborazione fallita per dati ricevuti');
+      return new WP_REST_Response(['error'=>'processing failed'], 500);
+    }
+
+    return ['status'=>'ok', 'processed' => true];
+    
+  } finally {
+    // Always release the lock
+    if (!empty($reservation_id)) {
+      hic_release_reservation_lock($reservation_id);
+    }
+  }
 }

@@ -31,14 +31,10 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
     $amount = hic_normalize_price($data['amount']);
   }
 
-  // Generate transaction ID
-  $transaction_id = '';
-  if (!empty($data['reservation_id'])) {
-    $transaction_id = sanitize_text_field($data['reservation_id']);
-  } elseif (!empty($data['id'])) {
-    $transaction_id = sanitize_text_field($data['id']);
-  } else {
-    $transaction_id = uniqid('hic_');
+  // Generate transaction ID using consistent extraction
+  $transaction_id = hic_extract_reservation_id($data);
+  if (empty($transaction_id)) {
+    $transaction_id = uniqid('hic_ga4_');
   }
 
   $params = [
