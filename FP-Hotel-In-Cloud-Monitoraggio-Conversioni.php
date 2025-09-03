@@ -8,6 +8,9 @@
 
 if (!defined('ABSPATH')) exit;
 
+// Include constants first
+require_once plugin_dir_path(__FILE__) . 'includes/constants.php';
+
 // Include core functionality files
 require_once plugin_dir_path(__FILE__) . 'includes/functions.php';
 require_once plugin_dir_path(__FILE__) . 'includes/database.php';
@@ -24,6 +27,18 @@ require_once plugin_dir_path(__FILE__) . 'includes/api/polling.php';
 
 // Include new reliable booking poller
 require_once plugin_dir_path(__FILE__) . 'includes/booking-poller.php';
+
+// Include enhanced log management
+require_once plugin_dir_path(__FILE__) . 'includes/log-manager.php';
+
+// Include configuration validator
+require_once plugin_dir_path(__FILE__) . 'includes/config-validator.php';
+
+// Include performance monitoring
+require_once plugin_dir_path(__FILE__) . 'includes/performance-monitor.php';
+
+// Include health monitoring system
+require_once plugin_dir_path(__FILE__) . 'includes/health-monitor.php';
 
 // Include CLI commands (only if WP-CLI is available)
 if (defined('WP_CLI') && WP_CLI) {

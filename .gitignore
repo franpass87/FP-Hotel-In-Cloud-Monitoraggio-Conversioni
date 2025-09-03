@@ -2,6 +2,8 @@
 *-test.html
 test-*.html
 /tmp/
+tests/temp/
+tests/*.temp
 
 # IDE files
 .vscode/
@@ -16,7 +18,8 @@ Thumbs.db
 # Log files
 *.log
 debug.log
+hic-log*.txt
 
 # Temporary files
 *.tmp
-*.tempcron-test.php
+*.temp
