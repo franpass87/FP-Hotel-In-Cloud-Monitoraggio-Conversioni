@@ -54,18 +54,35 @@ function hic_webhook_handler(WP_REST_Request $request) {
     return ['status'=>'ok', 'processed' => false, 'reason' => 'already_processed'];
   }
 
-  // Process booking data with error handling
-  $result = hic_process_booking_data($data);
-  
-  // Mark reservation as processed if successful
-  if ($result !== false && !empty($reservation_id)) {
-    hic_mark_reservation_processed_by_id($reservation_id);
-  }
-  
-  if ($result === false) {
-    hic_log('Webhook: elaborazione fallita per dati ricevuti');
-    return new WP_REST_Response(['error'=>'processing failed'], 500);
+  // Acquire processing lock to prevent concurrent processing
+  if (!empty($reservation_id) && !hic_acquire_reservation_lock($reservation_id)) {
+    hic_log("Webhook skipped: reservation $reservation_id is being processed by another request");
+    return ['status'=>'ok', 'processed' => false, 'reason' => 'concurrent_processing'];
   }
 
-  return ['status'=>'ok', 'processed' => true];
+  try {
+    // Process booking data with error handling
+    $result = hic_process_booking_data($data);
+    
+    // Mark reservation as processed if successful
+    if ($result !== false && !empty($reservation_id)) {
+      hic_mark_reservation_processed_by_id($reservation_id);
+    }
+    
+    // Update last webhook processing time for diagnostics
+    update_option('hic_last_webhook_processing', current_time('mysql'), false);
+    
+    if ($result === false) {
+      hic_log('Webhook: elaborazione fallita per dati ricevuti');
+      return new WP_REST_Response(['error'=>'processing failed'], 500);
+    }
+
+    return ['status'=>'ok', 'processed' => true];
+    
+  } finally {
+    // Always release the lock
+    if (!empty($reservation_id)) {
+      hic_release_reservation_lock($reservation_id);
+    }
+  }
 }

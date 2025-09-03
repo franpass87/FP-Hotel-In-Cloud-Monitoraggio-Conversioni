@@ -128,11 +128,26 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
         foreach ($reservations as $reservation) {
             try {
                 if (hic_should_process_reservation($reservation)) {
-                    $transformed = hic_transform_reservation($reservation);
-                    if ($transformed !== false) {
-                        hic_dispatch_reservation($transformed, $reservation);
-                        hic_mark_reservation_processed($reservation);
-                        $processed_count++;
+                    $uid = hic_booking_uid($reservation);
+                    
+                    // Acquire processing lock to prevent concurrent processing
+                    if (!empty($uid) && !hic_acquire_reservation_lock($uid)) {
+                        hic_log("Polling skipped: reservation $uid is being processed concurrently");
+                        continue;
+                    }
+                    
+                    try {
+                        $transformed = hic_transform_reservation($reservation);
+                        if ($transformed !== false) {
+                            hic_dispatch_reservation($transformed, $reservation);
+                            hic_mark_reservation_processed($reservation);
+                            $processed_count++;
+                        }
+                    } finally {
+                        // Always release the lock
+                        if (!empty($uid)) {
+                            hic_release_reservation_lock($uid);
+                        }
                     }
                 }
             } catch (Exception $e) { 
@@ -568,8 +583,19 @@ function hic_process_reservations_batch($reservations) {
                     $presence = $reservation['presence'] ?? '';
                     if (in_array($presence, ['arrived', 'departed'])) {
                         hic_log("Reservation $uid: processing status update for presence=$presence");
-                        // Process as status update but don't count as new
-                        hic_process_single_reservation($reservation);
+                        
+                        // Acquire lock for status update processing
+                        if (!hic_acquire_reservation_lock($uid, 10)) {
+                            hic_log("Reservation $uid: skipped status update due to concurrent processing");
+                            continue;
+                        }
+                        
+                        try {
+                            // Process as status update but don't count as new
+                            hic_process_single_reservation($reservation);
+                        } finally {
+                            hic_release_reservation_lock($uid);
+                        }
                         continue;
                     }
                 }
@@ -578,10 +604,21 @@ function hic_process_reservations_batch($reservations) {
                 continue;
             }
             
-            // Process new reservation
-            hic_process_single_reservation($reservation);
-            hic_mark_reservation_processed($reservation);
-            $new_count++;
+            // Acquire lock for new reservation processing
+            if (!hic_acquire_reservation_lock($uid)) {
+                hic_log("Reservation $uid: skipped due to concurrent processing");
+                $skipped_count++;
+                continue;
+            }
+            
+            try {
+                // Process new reservation
+                hic_process_single_reservation($reservation);
+                hic_mark_reservation_processed($reservation);
+                $new_count++;
+            } finally {
+                hic_release_reservation_lock($uid);
+            }
             
         } catch (Exception $e) {
             $error_count++;

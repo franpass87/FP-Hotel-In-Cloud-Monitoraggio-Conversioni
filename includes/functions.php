@@ -461,6 +461,47 @@ function hic_mark_reservation_processed_by_id($reservation_id) {
     return false;
 }
 
+/* ================= TRANSACTION LOCKING FUNCTIONS ================= */
+
+/**
+ * Acquire a lock for processing a specific reservation to prevent concurrent processing
+ */
+function hic_acquire_reservation_lock($reservation_id, $timeout = 30) {
+  if (empty($reservation_id)) return false;
+  
+  $lock_key = 'hic_processing_lock_' . md5($reservation_id);
+  $lock_time = time();
+  
+  // Check if there's already a recent lock
+  $existing_lock = get_transient($lock_key);
+  if ($existing_lock !== false) {
+    $time_diff = $lock_time - $existing_lock;
+    if ($time_diff < $timeout) {
+      hic_log("Reservation $reservation_id: processing lock exists (age: {$time_diff}s), skipping");
+      return false;
+    } else {
+      hic_log("Reservation $reservation_id: expired lock found (age: {$time_diff}s), acquiring new lock");
+    }
+  }
+  
+  // Set the lock with timeout
+  set_transient($lock_key, $lock_time, $timeout);
+  hic_log("Reservation $reservation_id: processing lock acquired");
+  return true;
+}
+
+/**
+ * Release the processing lock for a reservation
+ */
+function hic_release_reservation_lock($reservation_id) {
+  if (empty($reservation_id)) return false;
+  
+  $lock_key = 'hic_processing_lock_' . md5($reservation_id);
+  delete_transient($lock_key);
+  hic_log("Reservation $reservation_id: processing lock released");
+  return true;
+}
+
 /**
  * Check if reservation ID was already processed (shared with polling)
  */
@@ -473,4 +514,30 @@ function hic_is_reservation_already_processed($reservation_id) {
     }
     
     return in_array($reservation_id, $synced);
+}
+
+/* ================= DIAGNOSTIC FUNCTIONS ================= */
+
+/**
+ * Get processing statistics for diagnostics
+ */
+function hic_get_processing_statistics() {
+    $synced = get_option('hic_synced_res_ids', array());
+    $current_locks = array();
+    
+    // Check for active locks (this is just for diagnostics)
+    // In production, locks are short-lived (30 seconds max)
+    $lock_prefix = 'hic_processing_lock_';
+    global $wpdb;
+    
+    $statistics = array(
+        'total_processed_reservations' => is_array($synced) ? count($synced) : 0,
+        'last_webhook_processing' => get_option('hic_last_webhook_processing', 'never'),
+        'last_polling_processing' => get_option('hic_last_api_poll', 'never'),
+        'connection_type' => hic_get_connection_type(),
+        'deduplication_enabled' => true,
+        'transaction_locking_enabled' => true
+    );
+    
+    return $statistics;
 }
