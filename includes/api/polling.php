@@ -329,10 +329,12 @@ function hic_dispatch_reservation($transformed, $original) {
     
     // Debug log to verify fixes are in place
     $realtime_enabled = hic_realtime_brevo_sync_enabled();
+    $connection_type = hic_get_connection_type();
     hic_log(array('Reservation dispatch debug' => array(
         'uid' => $uid,
         'is_status_update' => $is_status_update,
         'realtime_brevo_enabled' => $realtime_enabled,
+        'connection_type' => $connection_type,
         'value' => $transformed['value'] ?? 'missing',
         'currency' => $transformed['currency'] ?? 'missing',
         'email' => !empty($transformed['email']) ? 'present' : 'missing'
@@ -349,15 +351,22 @@ function hic_dispatch_reservation($transformed, $original) {
             hic_dispatch_pixel_reservation($transformed);
         }
         
-        // Brevo - always update contact info
-        hic_dispatch_brevo_reservation($transformed);
-        
-        // Brevo real-time events - send reservation_created event for new reservations
-        if (!$is_status_update && hic_realtime_brevo_sync_enabled()) {
-            hic_send_brevo_reservation_created_event($transformed);
+        // Brevo - handle differently based on connection type to prevent duplication
+        if ($connection_type === 'webhook') {
+            // In webhook mode, only update contact info but don't send events 
+            // (events are handled by webhook processor)
+            hic_dispatch_brevo_reservation($transformed);
+        } else {
+            // In polling mode, handle both contact and events
+            hic_dispatch_brevo_reservation($transformed);
+            
+            // Brevo real-time events - send reservation_created event for new reservations
+            if (!$is_status_update && hic_realtime_brevo_sync_enabled()) {
+                hic_send_brevo_reservation_created_event($transformed);
+            }
         }
         
-        hic_log("Reservation $uid dispatched successfully");
+        hic_log("Reservation $uid dispatched successfully (mode: $connection_type)");
     } catch (Exception $e) {
         hic_log("Error dispatching reservation $uid: " . $e->getMessage());
         throw $e;

@@ -498,16 +498,98 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
  * Determine if a Brevo API error is retryable
  */
 function hic_is_brevo_error_retryable($result) {
-  if (!isset($result['log_data']['HTTP'])) {
+  if (!is_array($result) || !isset($result['log_data']['HTTP'])) {
     return false;
   }
   
   $http_code = $result['log_data']['HTTP'];
   
-  // Retryable errors (temporary issues)
-  $retryable_codes = array(429, 500, 502, 503);
+  // Retryable errors: rate limiting, server errors
+  $retryable_codes = [429, 500, 502, 503];
   
   return in_array($http_code, $retryable_codes);
+}
+
+/**
+ * Unified Brevo event sender to prevent duplicate API calls
+ * Replaces separate hic_send_brevo_contact() + hic_send_brevo_event() calls
+ */
+function hic_send_unified_brevo_events($data, $gclid, $fbclid) {
+  if (!hic_get_brevo_api_key()) { 
+    hic_log('Unified Brevo dispatch SKIPPED: API key mancante'); 
+    return false; 
+  }
+
+  // Validate essential data
+  $email = isset($data['email']) ? $data['email'] : null;
+  if (!hic_is_valid_email($email)) { 
+    hic_log('Unified Brevo dispatch SKIPPED: email mancante o non valida'); 
+    return false; 
+  }
+
+  // Transform webhook data to modern format for consistency
+  $transformed_data = hic_transform_webhook_data_for_brevo($data);
+  
+  // Use the modern dispatcher for contact management
+  hic_dispatch_brevo_reservation($transformed_data, false);
+  
+  // Send event only if real-time sync is enabled and this is a new reservation
+  $reservation_id = hic_extract_reservation_id($data);
+  if (hic_realtime_brevo_sync_enabled() && !empty($reservation_id)) {
+    $is_new = hic_is_reservation_new_for_realtime($reservation_id);
+    if ($is_new) {
+      hic_mark_reservation_new_for_realtime($reservation_id);
+      $event_sent = hic_send_brevo_reservation_created_event($transformed_data);
+      if ($event_sent) {
+        hic_mark_reservation_notified_to_brevo($reservation_id);
+      } else {
+        hic_mark_reservation_notification_failed($reservation_id, 'Failed to send reservation_created event');
+      }
+      return $event_sent;
+    } else {
+      hic_log("Unified Brevo: reservation $reservation_id already processed for real-time sync");
+    }
+  }
+  
+  // Return true if contact was updated (event sending is optional)
+  return true;
+}
+
+/**
+ * Transform webhook data format to match modern polling format
+ */
+function hic_transform_webhook_data_for_brevo($webhook_data) {
+  if (!is_array($webhook_data)) {
+    return array();
+  }
+  
+  // Map webhook field names to modern field names
+  $transformed = array(
+    'transaction_id' => hic_extract_reservation_id($webhook_data),
+    'reservation_code' => isset($webhook_data['reservation_code']) ? $webhook_data['reservation_code'] : '',
+    'email' => isset($webhook_data['email']) ? $webhook_data['email'] : '',
+    'guest_first_name' => isset($webhook_data['first_name']) ? $webhook_data['first_name'] : '',
+    'guest_last_name' => isset($webhook_data['last_name']) ? $webhook_data['last_name'] : '',
+    'phone' => isset($webhook_data['whatsapp']) ? $webhook_data['whatsapp'] : (isset($webhook_data['phone']) ? $webhook_data['phone'] : ''),
+    'original_price' => isset($webhook_data['amount']) ? hic_normalize_price($webhook_data['amount']) : 0,
+    'currency' => isset($webhook_data['currency']) ? $webhook_data['currency'] : 'EUR',
+    'from_date' => isset($webhook_data['date']) ? $webhook_data['date'] : '',
+    'to_date' => isset($webhook_data['to_date']) ? $webhook_data['to_date'] : '',
+    'accommodation_name' => isset($webhook_data['room']) ? $webhook_data['room'] : '',
+    'guests' => isset($webhook_data['guests']) ? $webhook_data['guests'] : 1,
+    'language' => isset($webhook_data['lingua']) ? $webhook_data['lingua'] : (isset($webhook_data['lang']) ? $webhook_data['lang'] : '')
+  );
+  
+  // Remove empty values but keep numeric zeros
+  foreach ($transformed as $key => $value) {
+    if ($value === null || $value === '') {
+      if (!in_array($key, ['original_price', 'guests']) || !is_numeric($value)) {
+        unset($transformed[$key]);
+      }
+    }
+  }
+  
+  return $transformed;
 }
 
 /**

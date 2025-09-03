@@ -45,8 +45,22 @@ function hic_webhook_handler(WP_REST_Request $request) {
   // Log received data (be careful with sensitive information)
   hic_log(['Webhook ricevuto' => array_merge($data, ['email' => !empty($data['email']) ? '***HIDDEN***' : 'missing'])]);
 
+  // Generate unique identifier for deduplication
+  $reservation_id = hic_extract_reservation_id($data);
+  
+  // Check for duplication to prevent double processing
+  if (!empty($reservation_id) && hic_is_reservation_already_processed($reservation_id)) {
+    hic_log("Webhook skipped: reservation $reservation_id already processed");
+    return ['status'=>'ok', 'processed' => false, 'reason' => 'already_processed'];
+  }
+
   // Process booking data with error handling
   $result = hic_process_booking_data($data);
+  
+  // Mark reservation as processed if successful
+  if ($result !== false && !empty($reservation_id)) {
+    hic_mark_reservation_processed_by_id($reservation_id);
+  }
   
   if ($result === false) {
     hic_log('Webhook: elaborazione fallita per dati ricevuti');

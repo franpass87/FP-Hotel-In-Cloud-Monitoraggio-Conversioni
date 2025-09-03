@@ -411,3 +411,66 @@ function hic_get_reservation_email($reservation_id) {
     
     return isset($email_map[$reservation_id]) ? $email_map[$reservation_id] : null;
 }
+
+/* ================= DEDUPLICATION HELPER FUNCTIONS ================= */
+
+/**
+ * Extract reservation ID from webhook data for deduplication
+ */
+function hic_extract_reservation_id($data) {
+    if (!is_array($data)) {
+        return null;
+    }
+    
+    // Try different field names in order of preference
+    $id_fields = ['transaction_id', 'reservation_id', 'id', 'booking_id'];
+    
+    foreach ($id_fields as $field) {
+        if (!empty($data[$field]) && is_scalar($data[$field])) {
+            return (string) $data[$field];
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Mark reservation as processed by ID (for webhook deduplication)
+ */
+function hic_mark_reservation_processed_by_id($reservation_id) {
+    if (empty($reservation_id)) return false;
+    
+    $synced = get_option('hic_synced_res_ids', array());
+    if (!is_array($synced)) {
+        $synced = array();
+    }
+    
+    if (!in_array($reservation_id, $synced)) {
+        $synced[] = $reservation_id;
+        
+        // Keep only last 10k entries (FIFO)
+        if (count($synced) > 10000) {
+            $synced = array_slice($synced, -10000);
+        }
+        
+        update_option('hic_synced_res_ids', $synced, false); // autoload=false
+        hic_log("Marked reservation $reservation_id as processed for deduplication");
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Check if reservation ID was already processed (shared with polling)
+ */
+function hic_is_reservation_already_processed($reservation_id) {
+    if (empty($reservation_id)) return false;
+    
+    $synced = get_option('hic_synced_res_ids', array());
+    if (!is_array($synced)) {
+        return false;
+    }
+    
+    return in_array($reservation_id, $synced);
+}

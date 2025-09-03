@@ -92,10 +92,10 @@ function hic_process_booking_data($data) {
       hic_log('hic_process_booking_data: Facebook credentials missing, skipping');
     }
     
-    // Brevo Integration
+    // Brevo Integration - Unified approach to prevent duplicate events
     if (hic_is_brevo_enabled() && hic_get_brevo_api_key()) {
-      if (hic_send_brevo_contact($data, $gclid, $fbclid) && 
-          hic_send_brevo_event($data, $gclid, $fbclid)) {
+      $brevo_success = hic_send_unified_brevo_events($data, $gclid, $fbclid);
+      if ($brevo_success) {
         $success_count++;
       } else {
         $error_count++;
