@@ -43,6 +43,23 @@ class HICFunctionsTest {
         
         echo "✅ Email validation tests passed\n";
     }
+
+    public function testPriceNormalization() {
+        // European format with thousands separator
+        assert(abs(hic_normalize_price('1.234,56') - 1234.56) < 0.001, 'Should handle European format with thousands');
+
+        // US format with thousands separator
+        assert(abs(hic_normalize_price('1,234.56') - 1234.56) < 0.001, 'Should handle US format with thousands');
+
+        // Plain integer and decimal
+        assert(abs(hic_normalize_price('1234') - 1234.0) < 0.001, 'Should handle integer string');
+        assert(abs(hic_normalize_price('1234.00') - 1234.0) < 0.001, 'Should handle decimal string');
+
+        // Negative value should return 0
+        assert(hic_normalize_price('-10') === 0.0, 'Negative price should return 0');
+
+        echo "✅ Price normalization tests passed\n";
+    }
     
     public function testOTAEmailDetection() {
         // Test OTA alias emails
@@ -73,6 +90,7 @@ class HICFunctionsTest {
         try {
             $this->testBucketNormalization();
             $this->testEmailValidation();
+            $this->testPriceNormalization();
             $this->testOTAEmailDetection();
             $this->testConfigurationHelpers();
             
