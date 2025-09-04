@@ -53,9 +53,9 @@ class HIC_Booking_Poller {
         }
         
         // Check and schedule continuous polling event
-        $continuous_next = hic_safe_hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $continuous_next = hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         if (!$continuous_next) {
-            $scheduled = hic_safe_hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+            $scheduled = hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled continuous polling every minute');
             } else {
@@ -65,15 +65,15 @@ class HIC_Booking_Poller {
             // Check if event is overdue (more than 2 minutes in the past)
             if ($continuous_next < (time() - 120)) {
                 hic_log('WP-Cron Scheduler: Continuous polling event is overdue, rescheduling');
-                hic_safe_hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-                hic_safe_hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+                hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+                hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             }
         }
         
         // Check and schedule deep check event
-        $deep_next = hic_safe_hic_safe_wp_next_scheduled('hic_deep_check_event');
+        $deep_next = hic_safe_wp_next_scheduled('hic_deep_check_event');
         if (!$deep_next) {
-            $scheduled = hic_safe_hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
+            $scheduled = hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled deep check every 10 minutes');
             } else {
@@ -83,8 +83,8 @@ class HIC_Booking_Poller {
             // Check if event is overdue (more than 12 minutes in the past)
             if ($deep_next < (time() - 720)) {
                 hic_log('WP-Cron Scheduler: Deep check event is overdue, rescheduling');
-                hic_safe_hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
-                hic_safe_hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
+                hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+                hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
             }
         }
         
@@ -111,8 +111,8 @@ class HIC_Booking_Poller {
      * Clear all scheduled WP-Cron events
      */
     public function clear_all_scheduled_events() {
-        hic_safe_hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-        hic_safe_hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+        hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+        hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
         hic_log('WP-Cron Scheduler: Cleared all scheduled events');
     }
     
