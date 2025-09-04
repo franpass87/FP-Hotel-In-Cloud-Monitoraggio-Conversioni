@@ -256,6 +256,32 @@ function hic_options_page() {
     .hic-api-test-section .spinner {
         visibility: visible;
     }
+    
+    /* Fix for WooCommerce options panel margin issue */
+    .woocommerce_options_panel label,
+    .woocommerce_options_panel legend {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    /* Fix for schedule rows overflow in advanced mode */
+    .fp-schedule-row {
+        max-width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+        box-sizing: border-box;
+    }
+    
+    /* Fix for day pill checkbox label sizing */
+    .fp-day-pill-clean input[type="checkbox"]:checked + label {
+        max-width: 120px;
+        font-size: 14px;
+        padding: 4px 8px;
+        display: inline-block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
     </style>
     <?php
 }

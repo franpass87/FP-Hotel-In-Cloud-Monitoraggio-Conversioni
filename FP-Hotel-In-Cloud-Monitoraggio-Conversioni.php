@@ -69,7 +69,7 @@ add_action('init', function() {
     hic_get_config_validator();
 });
 
-// Enqueue frontend JavaScript
+// Enqueue frontend JavaScript and CSS
 add_action('wp_enqueue_scripts', function() {
     wp_enqueue_script(
         'hic-frontend', 
@@ -77,5 +77,22 @@ add_action('wp_enqueue_scripts', function() {
         array(),
         '1.4.0',
         true
+    );
+    
+    wp_enqueue_style(
+        'hic-styles',
+        plugin_dir_url(__FILE__) . 'assets/css/hic-styles.css',
+        array(),
+        '1.4.0'
+    );
+});
+
+// Enqueue admin CSS for WooCommerce integration
+add_action('admin_enqueue_scripts', function() {
+    wp_enqueue_style(
+        'hic-admin-styles',
+        plugin_dir_url(__FILE__) . 'assets/css/hic-styles.css',
+        array(),
+        '1.4.0'
     );
 });

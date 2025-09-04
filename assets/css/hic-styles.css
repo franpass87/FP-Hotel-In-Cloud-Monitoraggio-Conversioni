@@ -1,0 +1,114 @@
+/**
+ * Hotel in Cloud - Monitoraggio Conversioni CSS Styles
+ * Fixes for visualization issues in WooCommerce integration and time slot functionality
+ */
+
+/* Fix for WooCommerce options panel margin issue (-150px problem) */
+.woocommerce_options_panel label,
+.woocommerce_options_panel legend {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+}
+
+/* Fix for schedule rows overflow in advanced mode */
+.fp-schedule-row {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    box-sizing: border-box;
+    display: block;
+    margin-bottom: 10px;
+}
+
+/* Additional responsive fixes for schedule rows */
+@media (max-width: 1200px) {
+    .fp-schedule-row {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 782px) {
+    .fp-schedule-row {
+        font-size: 12px;
+        padding: 5px;
+    }
+}
+
+/* Fix for day pill checkbox label sizing (not 150px) */
+.fp-day-pill-clean input[type="checkbox"]:checked + label {
+    max-width: 120px;
+    width: auto;
+    font-size: 14px;
+    padding: 4px 8px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background-color: #0073aa;
+    color: white;
+    border-radius: 3px;
+    border: 1px solid #005177;
+}
+
+/* Additional styling for unchecked state */
+.fp-day-pill-clean input[type="checkbox"] + label {
+    max-width: 120px;
+    width: auto;
+    font-size: 14px;
+    padding: 4px 8px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background-color: #f1f1f1;
+    color: #333;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.fp-day-pill-clean input[type="checkbox"] + label:hover {
+    background-color: #e1e1e1;
+    border-color: #bbb;
+}
+
+/* Clean styling for day pill container */
+.fp-day-pill-clean {
+    display: inline-block;
+    margin: 2px;
+}
+
+.fp-day-pill-clean input[type="checkbox"] {
+    display: none;
+}
+
+/* Additional time slot related styling */
+.fp-time-slot-container {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 10px 0;
+}
+
+.fp-time-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    max-width: 100%;
+}
+
+/* Responsive adjustments for time slots */
+@media (max-width: 782px) {
+    .fp-time-slot-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .fp-day-pill-clean input[type="checkbox"] + label,
+    .fp-day-pill-clean input[type="checkbox"]:checked + label {
+        font-size: 12px;
+        padding: 3px 6px;
+        max-width: 100px;
+    }
+}
