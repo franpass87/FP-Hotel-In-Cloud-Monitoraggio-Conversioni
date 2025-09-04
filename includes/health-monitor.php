@@ -15,6 +15,11 @@ class HIC_Health_Monitor {
     private $alerts = [];
     
     public function __construct() {
+        // Ensure WordPress functions are available
+        if (!function_exists('add_action')) {
+            return;
+        }
+        
         // Register health check hooks
         add_action('wp_ajax_hic_health_check', [$this, 'ajax_health_check']);
         add_action('wp_ajax_nopriv_hic_health_check', [$this, 'public_health_check']);
@@ -506,7 +511,14 @@ class HIC_Health_Monitor {
     }
 }
 
-// Initialize health monitor
-if (HIC_FEATURE_HEALTH_MONITORING) {
-    new HIC_Health_Monitor();
+/**
+ * Initialize health monitor safely
+ */
+function hic_init_health_monitor() {
+    if (HIC_FEATURE_HEALTH_MONITORING && function_exists('add_action') && function_exists('get_option')) {
+        new HIC_Health_Monitor();
+    }
 }
+
+// Initialize health monitor when WordPress is ready
+add_action('init', 'hic_init_health_monitor');

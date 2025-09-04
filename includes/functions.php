@@ -226,9 +226,17 @@ function hic_log($msg){
   // Check if log directory exists and is writable
   $log_dir = dirname($log_file);
   if (!is_dir($log_dir)) {
-    if (!wp_mkdir_p($log_dir)) {
-      error_log('HIC Plugin: Cannot create log directory: ' . $log_dir);
-      return false;
+    // Use wp_mkdir_p if available, otherwise mkdir
+    if (function_exists('wp_mkdir_p')) {
+      if (!wp_mkdir_p($log_dir)) {
+        error_log('HIC Plugin: Cannot create log directory: ' . $log_dir);
+        return false;
+      }
+    } else {
+      if (!@mkdir($log_dir, 0755, true)) {
+        error_log('HIC Plugin: Cannot create log directory: ' . $log_dir);
+        return false;
+      }
     }
   }
   

@@ -359,5 +359,15 @@ class HIC_Config_Validator {
     }
 }
 
-// Create global validator instance
-$GLOBALS['hic_config_validator'] = new HIC_Config_Validator();
+/**
+ * Get or create global HIC_Config_Validator instance
+ */
+function hic_get_config_validator() {
+    if (!isset($GLOBALS['hic_config_validator'])) {
+        // Only instantiate if WordPress is loaded and functions are available
+        if (function_exists('get_option') && function_exists('get_bloginfo')) {
+            $GLOBALS['hic_config_validator'] = new HIC_Config_Validator();
+        }
+    }
+    return isset($GLOBALS['hic_config_validator']) ? $GLOBALS['hic_config_validator'] : null;
+}

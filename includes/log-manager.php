@@ -14,12 +14,19 @@ class HIC_Log_Manager {
     private $retention_days;
     
     public function __construct() {
+        // Ensure WordPress functions are available
+        if (!function_exists('hic_get_log_file')) {
+            return;
+        }
+        
         $this->log_file = hic_get_log_file();
         $this->max_size = HIC_LOG_MAX_SIZE;
         $this->retention_days = HIC_LOG_RETENTION_DAYS;
         
-        // Hook into WordPress shutdown to clean up logs
-        add_action('shutdown', [$this, 'cleanup_old_logs']);
+        // Hook into WordPress shutdown to clean up logs (only if add_action exists)
+        if (function_exists('add_action')) {
+            add_action('shutdown', [$this, 'cleanup_old_logs']);
+        }
     }
     
     /**
@@ -107,10 +114,20 @@ class HIC_Log_Manager {
      * Write to log file
      */
     private function write_to_log($formatted_message) {
+        // Skip if log file is not configured
+        if (empty($this->log_file)) {
+            return false;
+        }
+        
         // Ensure directory exists
         $log_dir = dirname($this->log_file);
         if (!file_exists($log_dir)) {
-            wp_mkdir_p($log_dir);
+            // Use wp_mkdir_p if available, otherwise mkdir
+            if (function_exists('wp_mkdir_p')) {
+                wp_mkdir_p($log_dir);
+            } else {
+                @mkdir($log_dir, 0755, true);
+            }
         }
         
         // Check if directory is writable
@@ -386,15 +403,28 @@ class HIC_Log_Manager {
     }
 }
 
-// Create global instance
-$GLOBALS['hic_log_manager'] = new HIC_Log_Manager();
+/**
+ * Get or create global HIC_Log_Manager instance
+ */
+function hic_get_log_manager() {
+    if (!isset($GLOBALS['hic_log_manager'])) {
+        // Only instantiate if WordPress is loaded and functions are available
+        if (function_exists('get_option') && function_exists('add_action')) {
+            $GLOBALS['hic_log_manager'] = new HIC_Log_Manager();
+        }
+    }
+    return isset($GLOBALS['hic_log_manager']) ? $GLOBALS['hic_log_manager'] : null;
+}
 
 /**
  * Enhanced hic_log function that uses the new log manager
  */
 if (!function_exists('hic_log_enhanced')) {
     function hic_log_enhanced($message, $level = HIC_LOG_LEVEL_INFO, $context = []) {
-        global $hic_log_manager;
-        return $hic_log_manager->log($message, $level, $context);
+        $log_manager = hic_get_log_manager();
+        if ($log_manager) {
+            return $log_manager->log($message, $level, $context);
+        }
+        return false;
     }
 }

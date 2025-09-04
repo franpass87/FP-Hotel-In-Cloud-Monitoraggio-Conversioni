@@ -13,6 +13,11 @@ class HIC_Booking_Poller {
     const WATCHDOG_THRESHOLD = 300; // 5 minutes threshold
     
     public function __construct() {
+        // Only initialize if WordPress functions are available
+        if (!function_exists('add_filter') || !function_exists('add_action')) {
+            return;
+        }
+        
         // Register custom cron intervals first - always available for cron managers
         add_filter('cron_schedules', array($this, 'add_custom_cron_intervals'));
         
@@ -677,5 +682,14 @@ class HIC_Booking_Poller {
     }
 }
 
-// Initialize the poller
-new HIC_Booking_Poller();
+/**
+ * Initialize booking poller safely
+ */
+function hic_init_booking_poller() {
+    if (function_exists('add_action') && function_exists('add_filter')) {
+        new HIC_Booking_Poller();
+    }
+}
+
+// Initialize booking poller when WordPress is ready
+add_action('init', 'hic_init_booking_poller');

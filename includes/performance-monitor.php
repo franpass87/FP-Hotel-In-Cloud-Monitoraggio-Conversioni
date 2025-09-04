@@ -13,6 +13,11 @@ class HIC_Performance_Monitor {
     private $metrics = [];
     
     public function __construct() {
+        // Ensure WordPress functions are available
+        if (!function_exists('add_action')) {
+            return;
+        }
+        
         // Hook into WordPress for tracking
         add_action('init', [$this, 'init_daily_metrics']);
         add_action('shutdown', [$this, 'save_metrics']);
@@ -480,7 +485,15 @@ class HIC_Performance_Monitor {
     }
 }
 
-// Create global performance monitor instance
-if (HIC_FEATURE_PERFORMANCE_METRICS) {
-    $GLOBALS['hic_performance_monitor'] = new HIC_Performance_Monitor();
+/**
+ * Get or create global HIC_Performance_Monitor instance
+ */
+function hic_get_performance_monitor() {
+    if (!isset($GLOBALS['hic_performance_monitor']) && HIC_FEATURE_PERFORMANCE_METRICS) {
+        // Only instantiate if WordPress is loaded and functions are available
+        if (function_exists('get_option') && function_exists('add_action')) {
+            $GLOBALS['hic_performance_monitor'] = new HIC_Performance_Monitor();
+        }
+    }
+    return isset($GLOBALS['hic_performance_monitor']) ? $GLOBALS['hic_performance_monitor'] : null;
 }
