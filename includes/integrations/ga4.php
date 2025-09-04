@@ -141,7 +141,7 @@ function hic_dispatch_ga4_reservation($data) {
     $table = $wpdb->prefix . 'hic_gclids';
     
     // Check if table exists before querying
-    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if ($table_exists) {
       // Try to find tracking data using transaction_id as sid
       $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));

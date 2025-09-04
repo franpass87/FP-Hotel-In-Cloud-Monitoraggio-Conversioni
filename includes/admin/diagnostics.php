@@ -108,12 +108,12 @@ function hic_get_internal_scheduler_status() {
     
     // Real-time sync stats (keep existing functionality)  
     $realtime_table = $wpdb->prefix . 'hic_realtime_sync';
-    if ($wpdb->get_var("SHOW TABLES LIKE '$realtime_table'") === $realtime_table) {
-        $status['realtime_sync']['total_tracked'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table");
-        $status['realtime_sync']['notified'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'notified'");
-        $status['realtime_sync']['failed'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'failed'");
-        $status['realtime_sync']['permanent_failure'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'permanent_failure'");
-        $status['realtime_sync']['new'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'new'");
+    if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $realtime_table)) === $realtime_table) {
+        $status['realtime_sync']['total_tracked'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table)));
+        $status['realtime_sync']['notified'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'notified'));
+        $status['realtime_sync']['failed'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'failed'));
+        $status['realtime_sync']['permanent_failure'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'permanent_failure'));
+        $status['realtime_sync']['new'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'new'));
     } else {
         $status['realtime_sync']['table_exists'] = false;
     }
@@ -668,7 +668,7 @@ function hic_ajax_create_tables() {
             
             $all_exist = true;
             foreach ($expected_tables as $name => $table) {
-                $exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+                $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
                 $tables_status[$name] = $exists;
                 if (!$exists) $all_exist = false;
             }
@@ -1862,7 +1862,7 @@ function hic_diagnostics_page() {
                                 <?php 
                                 global $wpdb;
                                 $queue_table = $wpdb->prefix . 'hic_booking_events';
-                                $queue_exists = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
+                                $queue_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $queue_table)) === $queue_table;
                                 ?>
                                 <?php if ($queue_exists): ?>
                                     <span class="status ok">✓ Trovata</span>

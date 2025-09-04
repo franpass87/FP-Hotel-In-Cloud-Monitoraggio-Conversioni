@@ -153,7 +153,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false) {
     $table = $wpdb->prefix . 'hic_gclids';
     
     // Check if table exists before querying
-    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if ($table_exists) {
       // Try to find tracking data using transaction_id as sid
       $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
@@ -278,7 +278,7 @@ function hic_send_brevo_reservation_created_event($data) {
     $table = $wpdb->prefix . 'hic_gclids';
     
     // Check if table exists before querying
-    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if ($table_exists) {
       // Try to find tracking data using transaction_id as sid
       $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));

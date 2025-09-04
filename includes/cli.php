@@ -123,7 +123,7 @@ if (defined('WP_CLI') && WP_CLI) {
             $table = $wpdb->prefix . 'hic_booking_events';
             
             // Check if table exists
-            if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) {
+            if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) !== $table) {
                 WP_CLI::error('Queue table not found');
                 return;
             }
