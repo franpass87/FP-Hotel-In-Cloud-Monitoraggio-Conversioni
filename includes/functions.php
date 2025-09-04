@@ -136,18 +136,39 @@ function hic_should_schedule_retry_event() {
 /* ============ New Helper Functions ============ */
 function hic_normalize_price($value) {
     if (empty($value) || (!is_numeric($value) && !is_string($value))) return 0.0;
-    
-    // Convert comma to dot and ensure numeric
-    $normalized = str_replace(',', '.', (string) $value);
+
+    $normalized = (string) $value;
+
+    // Remove spaces and non-breaking spaces
+    $normalized = str_replace(["\xC2\xA0", ' '], '', $normalized);
+
+    $has_comma = strpos($normalized, ',') !== false;
+    $has_dot   = strpos($normalized, '.') !== false;
+
+    if ($has_comma && $has_dot) {
+        // Determine decimal separator by last occurrence
+        if (strrpos($normalized, ',') > strrpos($normalized, '.')) {
+            // European format: dot for thousands, comma for decimals
+            $normalized = str_replace('.', '', $normalized);
+            $normalized = str_replace(',', '.', $normalized);
+        } else {
+            // US format: comma for thousands, dot for decimals
+            $normalized = str_replace(',', '', $normalized);
+        }
+    } elseif ($has_comma) {
+        // Only comma present -> treat as decimal separator
+        $normalized = str_replace(',', '.', $normalized);
+    }
+
     // Remove any non-numeric characters except dots and minus signs for negative values
     $normalized = preg_replace('/[^0-9.-]/', '', $normalized);
-    
+
     // Validate that we still have a numeric value
     if (!is_numeric($normalized)) {
         hic_log('hic_normalize_price: Invalid numeric value after normalization: ' . $value);
         return 0.0;
     }
-    
+
     $result = floatval($normalized);
     
     // Validate reasonable price range
@@ -170,8 +191,8 @@ function hic_is_valid_email($email) {
     $email = sanitize_email($email);
     if (empty($email)) return false;
     
-    // Use WordPress built-in email validation
-    return is_email($email);
+    // Use WordPress built-in email validation and return boolean
+    return is_email($email) !== false;
 }
 
 function hic_is_ota_alias_email($e){

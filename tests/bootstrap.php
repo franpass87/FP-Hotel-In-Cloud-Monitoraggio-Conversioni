@@ -5,6 +5,9 @@
 
 // Define WordPress test environment
 define('ABSPATH', dirname(__DIR__) . '/');
+if (!defined('WP_CONTENT_DIR')) {
+    define('WP_CONTENT_DIR', sys_get_temp_dir());
+}
 
 // Include WordPress test functions if available
 if (file_exists('/tmp/wordpress-tests-lib/includes/functions.php')) {
@@ -42,6 +45,12 @@ if (!function_exists('sanitize_text_field')) {
 if (!function_exists('sanitize_email')) {
     function sanitize_email($email) {
         return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : '';
+    }
+}
+
+if (!function_exists('is_email')) {
+    function is_email($email) {
+        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : false;
     }
 }
 
