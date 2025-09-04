@@ -430,8 +430,9 @@ class HIC_Health_Monitor {
      * Schedule health checks
      */
     private function schedule_health_checks() {
-        if (!wp_next_scheduled('hic_health_monitor_event')) {
-            wp_schedule_event(time(), 'hourly', 'hic_health_monitor_event');
+        // Use safe WordPress cron functions
+        if (!hic_safe_wp_next_scheduled('hic_health_monitor_event')) {
+            hic_safe_wp_schedule_event(time(), 'hourly', 'hic_health_monitor_event');
         }
     }
     

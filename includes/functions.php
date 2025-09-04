@@ -549,3 +549,35 @@ function hic_get_processing_statistics() {
     
     return $statistics;
 }
+
+/* ================= SAFE WORDPRESS CRON HELPERS ================= */
+
+/**
+ * Safely check if an event is scheduled
+ */
+function hic_safe_wp_next_scheduled($hook) {
+    if (!function_exists('wp_next_scheduled')) {
+        return false;
+    }
+    return wp_next_scheduled($hook);
+}
+
+/**
+ * Safely schedule an event
+ */
+function hic_safe_wp_schedule_event($timestamp, $recurrence, $hook, $args = array()) {
+    if (!function_exists('wp_schedule_event')) {
+        return false;
+    }
+    return wp_schedule_event($timestamp, $recurrence, $hook, $args);
+}
+
+/**
+ * Safely clear scheduled hooks
+ */
+function hic_safe_wp_clear_scheduled_hook($hook, $args = array()) {
+    if (!function_exists('wp_clear_scheduled_hook')) {
+        return false;
+    }
+    return wp_clear_scheduled_hook($hook, $args);
+}

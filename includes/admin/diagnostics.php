@@ -64,8 +64,8 @@ function hic_get_internal_scheduler_status() {
             ));
             
             // Add detailed WP-Cron diagnostics
-            $continuous_next = $poller_stats['next_continuous_scheduled'] ?? wp_next_scheduled('hic_continuous_poll_event');
-            $deep_next = $poller_stats['next_deep_scheduled'] ?? wp_next_scheduled('hic_deep_check_event');
+            $continuous_next = $poller_stats['next_continuous_scheduled'] ?? hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+            $deep_next = $poller_stats['next_deep_scheduled'] ?? hic_safe_wp_next_scheduled('hic_deep_check_event');
             $wp_cron_disabled = $poller_stats['wp_cron_disabled'] ?? (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON);
             
             $status['internal_scheduler']['cron_diagnostics'] = array(
@@ -303,7 +303,7 @@ function hic_force_restart_internal_scheduler() {
     // Clear any existing WP-Cron events (cleanup legacy events)
     $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event', 'hic_reliable_poll_event');
     foreach ($legacy_events as $event) {
-        wp_clear_scheduled_hook($event);
+        hic_safe_wp_clear_scheduled_hook($event);
         $results['legacy_' . $event . '_cleared'] = 'Cleared all legacy cron events';
     }
     

@@ -53,9 +53,9 @@ class HIC_Booking_Poller {
         }
         
         // Check and schedule continuous polling event
-        $continuous_next = wp_next_scheduled('hic_continuous_poll_event');
+        $continuous_next = hic_safe_hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         if (!$continuous_next) {
-            $scheduled = wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+            $scheduled = hic_safe_hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled continuous polling every minute');
             } else {
@@ -65,15 +65,15 @@ class HIC_Booking_Poller {
             // Check if event is overdue (more than 2 minutes in the past)
             if ($continuous_next < (time() - 120)) {
                 hic_log('WP-Cron Scheduler: Continuous polling event is overdue, rescheduling');
-                wp_clear_scheduled_hook('hic_continuous_poll_event');
-                wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+                hic_safe_hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+                hic_safe_hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             }
         }
         
         // Check and schedule deep check event
-        $deep_next = wp_next_scheduled('hic_deep_check_event');
+        $deep_next = hic_safe_hic_safe_wp_next_scheduled('hic_deep_check_event');
         if (!$deep_next) {
-            $scheduled = wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
+            $scheduled = hic_safe_hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled deep check every 10 minutes');
             } else {
@@ -83,8 +83,8 @@ class HIC_Booking_Poller {
             // Check if event is overdue (more than 12 minutes in the past)
             if ($deep_next < (time() - 720)) {
                 hic_log('WP-Cron Scheduler: Deep check event is overdue, rescheduling');
-                wp_clear_scheduled_hook('hic_deep_check_event');
-                wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
+                hic_safe_hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+                hic_safe_hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
             }
         }
         
@@ -111,8 +111,8 @@ class HIC_Booking_Poller {
      * Clear all scheduled WP-Cron events
      */
     public function clear_all_scheduled_events() {
-        wp_clear_scheduled_hook('hic_continuous_poll_event');
-        wp_clear_scheduled_hook('hic_deep_check_event');
+        hic_safe_hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+        hic_safe_hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
         hic_log('WP-Cron Scheduler: Cleared all scheduled events');
     }
     
@@ -127,8 +127,8 @@ class HIC_Booking_Poller {
         }
         
         // Check if events are scheduled
-        $continuous_next = wp_next_scheduled('hic_continuous_poll_event');
-        $deep_next = wp_next_scheduled('hic_deep_check_event');
+        $continuous_next = hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $deep_next = hic_safe_wp_next_scheduled('hic_deep_check_event');
         
         $is_working = ($continuous_next !== false && $deep_next !== false);
         
@@ -148,8 +148,8 @@ class HIC_Booking_Poller {
      * Log current scheduler status for debugging
      */
     private function log_scheduler_status() {
-        $continuous_next = wp_next_scheduled('hic_continuous_poll_event');
-        $deep_next = wp_next_scheduled('hic_deep_check_event');
+        $continuous_next = hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $deep_next = hic_safe_wp_next_scheduled('hic_deep_check_event');
         
         // Check polling conditions
         $should_poll = $this->should_poll();
@@ -213,8 +213,8 @@ class HIC_Booking_Poller {
         
         // Additional check: if polling should be active but no events are scheduled
         if ($this->should_poll()) {
-            $continuous_next = wp_next_scheduled('hic_continuous_poll_event');
-            $deep_next = wp_next_scheduled('hic_deep_check_event');
+            $continuous_next = hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+            $deep_next = hic_safe_wp_next_scheduled('hic_deep_check_event');
             
             if (!$continuous_next || !$deep_next) {
                 hic_log("Watchdog: Polling should be active but events not scheduled, forcing restart");
@@ -232,16 +232,16 @@ class HIC_Booking_Poller {
         switch ($failure_type) {
             case 'continuous':
                 // Force reschedule continuous polling
-                wp_clear_scheduled_hook('hic_continuous_poll_event');
-                wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+                hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+                hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
                 // Trigger immediate execution
                 $this->execute_continuous_polling();
                 break;
                 
             case 'deep':
                 // Force reschedule deep check
-                wp_clear_scheduled_hook('hic_deep_check_event');
-                wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
+                hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+                hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
                 // Trigger immediate execution
                 $this->execute_deep_check();
                 break;
@@ -343,7 +343,7 @@ class HIC_Booking_Poller {
             }
             
             // Also check if events are scheduled at all
-            $continuous_next = wp_next_scheduled('hic_continuous_poll_event');
+            $continuous_next = hic_safe_wp_next_scheduled('hic_continuous_poll_event');
             if (!$continuous_next) {
                 hic_log("Admin Watchdog: No continuous polling event scheduled, restarting scheduler");
                 $this->ensure_scheduler_is_active();
@@ -674,8 +674,8 @@ class HIC_Booking_Poller {
         );
         
         // Add WP-Cron specific info (always show for debugging)
-        $stats['next_continuous_scheduled'] = wp_next_scheduled('hic_continuous_poll_event');
-        $stats['next_deep_scheduled'] = wp_next_scheduled('hic_deep_check_event');
+        $stats['next_continuous_scheduled'] = hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $stats['next_deep_scheduled'] = hic_safe_wp_next_scheduled('hic_deep_check_event');
         $stats['wp_cron_disabled'] = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
         
         return $stats;
