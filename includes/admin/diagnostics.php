@@ -590,6 +590,9 @@ add_action('wp_ajax_hic_test_brevo_connectivity', 'hic_ajax_test_brevo_connectiv
 
 
 function hic_ajax_refresh_diagnostics() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -600,18 +603,29 @@ function hic_ajax_refresh_diagnostics() {
         wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
     }
     
-    $data = array(
-        'scheduler_status' => hic_get_internal_scheduler_status(),
-        'credentials_status' => hic_get_credentials_status(),
-        'execution_stats' => hic_get_execution_stats(),
-        'recent_logs' => hic_get_recent_log_entries(20),
-        'error_stats' => hic_get_error_stats()
-    );
-    
-    wp_die(json_encode(array('success' => true, 'data' => $data)));
+    try {
+        $data = array(
+            'scheduler_status' => hic_get_internal_scheduler_status(),
+            'credentials_status' => hic_get_credentials_status(),
+            'execution_stats' => hic_get_execution_stats(),
+            'recent_logs' => hic_get_recent_log_entries(20),
+            'error_stats' => hic_get_error_stats()
+        );
+        
+        wp_die(json_encode(array('success' => true, 'data' => $data)));
+    } catch (Exception $e) {
+        hic_log('AJAX Refresh Diagnostics Error: ' . $e->getMessage());
+        wp_die(json_encode(array('success' => false, 'message' => 'Errore durante il caricamento diagnostiche: ' . $e->getMessage())));
+    } catch (Error $e) {
+        hic_log('AJAX Refresh Diagnostics Fatal Error: ' . $e->getMessage());
+        wp_die(json_encode(array('success' => false, 'message' => 'Errore fatale durante il caricamento diagnostiche: ' . $e->getMessage())));
+    }
 }
 
 function hic_ajax_test_dispatch() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -627,6 +641,9 @@ function hic_ajax_test_dispatch() {
 }
 
 function hic_ajax_force_reschedule() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -642,6 +659,9 @@ function hic_ajax_force_reschedule() {
 }
 
 function hic_ajax_create_tables() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -700,6 +720,9 @@ function hic_ajax_create_tables() {
 }
 
 function hic_ajax_backfill_reservations() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -759,6 +782,9 @@ function hic_convert_api_booking_to_processor_format($api_booking) {
 }
 
 function hic_ajax_download_latest_bookings() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -863,6 +889,9 @@ function hic_ajax_download_latest_bookings() {
 }
 
 function hic_ajax_reset_download_tracking() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -891,6 +920,9 @@ function hic_ajax_reset_download_tracking() {
 }
 
 function hic_ajax_force_polling() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -952,6 +984,9 @@ function hic_ajax_force_polling() {
  * AJAX handler for triggering watchdog check
  */
 function hic_ajax_trigger_watchdog() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_admin_action', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -1009,6 +1044,9 @@ function hic_ajax_trigger_watchdog() {
  * AJAX handler for resetting timestamps (emergency recovery)
  */
 function hic_ajax_reset_timestamps() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     // Verify nonce
     if (!check_ajax_referer('hic_admin_action', 'nonce', false)) {
         wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
@@ -2832,6 +2870,9 @@ function hic_ajax_download_error_logs() {
  * AJAX handler for testing Brevo API connectivity
  */
 function hic_ajax_test_brevo_connectivity() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
     check_admin_referer('hic_admin_action', 'nonce');
     
     if (!hic_get_brevo_api_key()) {
