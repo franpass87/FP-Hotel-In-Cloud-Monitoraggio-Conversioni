@@ -230,3 +230,31 @@ Il sistema include test completi per tutte le combinazioni:
 - **Test Dispatch**: Simulazione booking per ogni scenario
 
 Accedi ai test dalla dashboard admin: **Impostazioni HIC > Diagnostics**
+
+## 🧪 Verifica Sistema
+
+Per verificare che tutti i sistemi funzionino correttamente:
+
+### Test Rapido via CLI
+```bash
+# Esegui tutti i test di verifica
+php tests/run-all-tests.php
+
+# Test di salute del sistema completo
+php tests/system-health-checker.php
+```
+
+### Test via Dashboard WordPress
+1. Vai in **WordPress Admin → Impostazioni → HIC Diagnostics**
+2. Clicca **"Test Dispatch Funzioni"** per test automatici
+3. Usa **"Forza Polling Ora"** per test manuale polling
+4. Controlla **"Sistema Polling Interno"** per stato real-time
+
+### Cosa Verificare
+- ✅ Tutte le funzioni core attive
+- ✅ Performance ottimali (< 100ms per 1000 operazioni)
+- ✅ Integrazioni configurate (GA4, Meta, Brevo)
+- ✅ Sistema polling attivo
+- ✅ Gestione errori robusta
+
+Per dettagli completi vedi: **[RAPPORTO_VERIFICA_SISTEMI.md](RAPPORTO_VERIFICA_SISTEMI.md)**
