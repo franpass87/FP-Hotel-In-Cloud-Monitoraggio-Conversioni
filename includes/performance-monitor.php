@@ -411,11 +411,13 @@ class HIC_Performance_Monitor {
         global $wpdb;
         
         // Clean up daily metrics
-        $options_to_check = $wpdb->get_results(
-            "SELECT option_name FROM {$wpdb->options} 
-             WHERE option_name LIKE 'hic_performance_metrics_%' 
-             OR option_name LIKE 'hic_api_stats_%'"
-        );
+        $options_to_check = $wpdb->get_results($wpdb->prepare(
+            "SELECT option_name FROM " . esc_sql($wpdb->options) . " 
+             WHERE option_name LIKE %s 
+             OR option_name LIKE %s",
+            'hic_performance_metrics_%',
+            'hic_api_stats_%'
+        ));
         
         foreach ($options_to_check as $option) {
             if (preg_match('/_(\\d{4}-\\d{2}-\\d{2})$/', $option->option_name, $matches)) {

@@ -304,7 +304,7 @@ class HIC_Health_Monitor {
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'hic_sid_gclid_mapping';
-        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name;
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_name)) === $table_name;
         
         if (!$table_exists) {
             return [
@@ -314,7 +314,7 @@ class HIC_Health_Monitor {
             ];
         }
         
-        $row_count = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name}");
+        $row_count = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($table_name)));
         
         return [
             'status' => 'pass',
