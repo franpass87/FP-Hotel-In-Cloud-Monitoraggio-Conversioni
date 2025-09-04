@@ -246,15 +246,26 @@ php tests/system-health-checker.php
 
 ### Test via Dashboard WordPress
 1. Vai in **WordPress Admin → Impostazioni → HIC Diagnostics**
-2. Clicca **"Test Dispatch Funzioni"** per test automatici
+2. Nella sezione **"Verifica Sistema Completa"** usa i nuovi pulsanti:
+   - **"Esegui Verifica Completa Sistema"**: Test approfonditi di tutti i componenti
+   - **"Test Salute Sistema"**: Health check rapido (target 86%)
+   - **"Test Dispatch Funzioni"**: Test invii GA4, Meta e Brevo
 3. Usa **"Forza Polling Ora"** per test manuale polling
 4. Controlla **"Sistema Polling Interno"** per stato real-time
 
+### Dashboard Widget
+- **Widget "HIC System Health"** nella dashboard WordPress mostra:
+  - Salute sistema in tempo reale (86% target)
+  - Stato ultimo polling
+  - Numero prenotazioni elaborate
+  - Auto-refresh ogni 5 minuti
+
 ### Cosa Verificare
-- ✅ Tutte le funzioni core attive
+- ✅ Tutte le funzioni core attive (100/100)
 - ✅ Performance ottimali (< 100ms per 1000 operazioni)
 - ✅ Integrazioni configurate (GA4, Meta, Brevo)
 - ✅ Sistema polling attivo
-- ✅ Gestione errori robusta
+- ✅ Gestione errori robusta (100/100)
+- ✅ Sicurezza implementata (100/100)
 
 Per dettagli completi vedi: **[RAPPORTO_VERIFICA_SISTEMI.md](RAPPORTO_VERIFICA_SISTEMI.md)**
