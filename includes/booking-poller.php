@@ -322,7 +322,7 @@ class HIC_Booking_Poller {
      */
     public function admin_watchdog_check() {
         // Only run on HIC admin pages to avoid unnecessary overhead
-        if (!isset($_GET['page']) || strpos($_GET['page'], 'hic') === false) {
+        if (!isset($_GET['page']) || strpos(sanitize_text_field($_GET['page']), 'hic') === false) {
             return;
         }
         
