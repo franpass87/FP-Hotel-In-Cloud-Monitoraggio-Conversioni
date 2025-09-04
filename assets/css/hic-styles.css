@@ -12,6 +12,32 @@
     margin-bottom: 8px !important;
 }
 
+/* Fix for experience product data h4 elements too close to margin */
+#experience_product_data > div:nth-child(14) > h4 {
+    margin-left: 12px !important;
+    margin-right: 12px !important;
+    padding-left: 8px !important;
+}
+
+/* Fix for options group positioning to prevent left alignment under tabs */
+.woocommerce_options_panel .options_group {
+    margin-left: 12px !important;
+    margin-right: 12px !important;
+    clear: both !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+/* Ensure proper spacing after WooCommerce tabs */
+#woocommerce-coupon-data ul.wc-tabs::after,
+#woocommerce-product-data ul.wc-tabs::after,
+.woocommerce ul.wc-tabs::after {
+    clear: both !important;
+    display: block !important;
+    content: '' !important;
+    height: 10px !important;
+}
+
 /* Fix for schedule rows overflow in advanced mode */
 .fp-schedule-row {
     max-width: 100%;
