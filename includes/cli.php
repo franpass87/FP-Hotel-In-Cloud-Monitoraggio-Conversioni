@@ -100,7 +100,7 @@ if (defined('WP_CLI') && WP_CLI) {
             delete_option('hic_last_reliable_poll');
             
             // Clear scheduled events
-            wp_clear_scheduled_hook('hic_reliable_poll_event');
+            hic_safe_wp_clear_scheduled_hook('hic_reliable_poll_event');
             
             WP_CLI::success('Polling state reset successfully');
         }
@@ -123,27 +123,44 @@ if (defined('WP_CLI') && WP_CLI) {
             $table = $wpdb->prefix . 'hic_booking_events';
             
             // Check if table exists
-            if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) {
+            if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) !== $table) {
                 WP_CLI::error('Queue table not found');
                 return;
             }
             
             $limit = isset($assoc_args['limit']) ? intval($assoc_args['limit']) : 20;
-            $status = isset($assoc_args['status']) ? $assoc_args['status'] : null;
+            $status = isset($assoc_args['status']) ? sanitize_text_field($assoc_args['status']) : null;
             
-            $where = '';
+            // Build secure query with prepared statements
+            $base_query = "SELECT id, booking_id, processed, poll_timestamp, processed_at, process_attempts, last_error 
+                          FROM " . esc_sql($table);
+            
+            $where_clause = '';
+            $query_params = array();
+            
             if ($status === 'pending') {
-                $where = 'WHERE processed = 0';
+                $where_clause = ' WHERE processed = %d';
+                $query_params[] = 0;
             } elseif ($status === 'processed') {
-                $where = 'WHERE processed = 1';
+                $where_clause = ' WHERE processed = %d';
+                $query_params[] = 1;
             } elseif ($status === 'error') {
-                $where = 'WHERE last_error IS NOT NULL';
+                $where_clause = ' WHERE last_error IS NOT NULL';
             }
             
-            $sql = "SELECT id, booking_id, processed, poll_timestamp, processed_at, process_attempts, last_error 
-                    FROM {$table} {$where} ORDER BY poll_timestamp DESC LIMIT {$limit}";
+            $order_limit = ' ORDER BY poll_timestamp DESC LIMIT %d';
+            $query_params[] = $limit;
             
-            $results = $wpdb->get_results($sql, ARRAY_A);
+            $sql = $base_query . $where_clause . $order_limit;
+            
+            if (!empty($query_params)) {
+                $prepared_sql = $wpdb->prepare($sql, $query_params);
+                $results = $wpdb->get_results($prepared_sql, ARRAY_A);
+            } else {
+                // For the case with no WHERE clause, we still need to prepare the LIMIT
+                $prepared_sql = $wpdb->prepare($sql, $limit);
+                $results = $wpdb->get_results($prepared_sql, ARRAY_A);
+            }
             
             if (empty($results)) {
                 WP_CLI::log('No events found in queue');

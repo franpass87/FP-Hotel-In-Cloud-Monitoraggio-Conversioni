@@ -64,8 +64,8 @@ function hic_get_internal_scheduler_status() {
             ));
             
             // Add detailed WP-Cron diagnostics
-            $continuous_next = $poller_stats['next_continuous_scheduled'] ?? wp_next_scheduled('hic_continuous_poll_event');
-            $deep_next = $poller_stats['next_deep_scheduled'] ?? wp_next_scheduled('hic_deep_check_event');
+            $continuous_next = $poller_stats['next_continuous_scheduled'] ?? hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+            $deep_next = $poller_stats['next_deep_scheduled'] ?? hic_safe_wp_next_scheduled('hic_deep_check_event');
             $wp_cron_disabled = $poller_stats['wp_cron_disabled'] ?? (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON);
             
             $status['internal_scheduler']['cron_diagnostics'] = array(
@@ -108,12 +108,12 @@ function hic_get_internal_scheduler_status() {
     
     // Real-time sync stats (keep existing functionality)  
     $realtime_table = $wpdb->prefix . 'hic_realtime_sync';
-    if ($wpdb->get_var("SHOW TABLES LIKE '$realtime_table'") === $realtime_table) {
-        $status['realtime_sync']['total_tracked'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table");
-        $status['realtime_sync']['notified'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'notified'");
-        $status['realtime_sync']['failed'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'failed'");
-        $status['realtime_sync']['permanent_failure'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'permanent_failure'");
-        $status['realtime_sync']['new'] = $wpdb->get_var("SELECT COUNT(*) FROM $realtime_table WHERE sync_status = 'new'");
+    if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $realtime_table)) === $realtime_table) {
+        $status['realtime_sync']['total_tracked'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table)));
+        $status['realtime_sync']['notified'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'notified'));
+        $status['realtime_sync']['failed'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'failed'));
+        $status['realtime_sync']['permanent_failure'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'permanent_failure'));
+        $status['realtime_sync']['new'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'new'));
     } else {
         $status['realtime_sync']['table_exists'] = false;
     }
@@ -303,7 +303,7 @@ function hic_force_restart_internal_scheduler() {
     // Clear any existing WP-Cron events (cleanup legacy events)
     $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event', 'hic_reliable_poll_event');
     foreach ($legacy_events as $event) {
-        wp_clear_scheduled_hook($event);
+        hic_safe_wp_clear_scheduled_hook($event);
         $results['legacy_' . $event . '_cleared'] = 'Cleared all legacy cron events';
     }
     
@@ -668,7 +668,7 @@ function hic_ajax_create_tables() {
             
             $all_exist = true;
             foreach ($expected_tables as $name => $table) {
-                $exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+                $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
                 $tables_status[$name] = $exists;
                 if (!$exists) $all_exist = false;
             }
@@ -1862,7 +1862,7 @@ function hic_diagnostics_page() {
                                 <?php 
                                 global $wpdb;
                                 $queue_table = $wpdb->prefix . 'hic_booking_events';
-                                $queue_exists = $wpdb->get_var("SHOW TABLES LIKE '$queue_table'") === $queue_table;
+                                $queue_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $queue_table)) === $queue_table;
                                 ?>
                                 <?php if ($queue_exists): ?>
                                     <span class="status ok">✓ Trovata</span>

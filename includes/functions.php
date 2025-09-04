@@ -226,9 +226,17 @@ function hic_log($msg){
   // Check if log directory exists and is writable
   $log_dir = dirname($log_file);
   if (!is_dir($log_dir)) {
-    if (!wp_mkdir_p($log_dir)) {
-      error_log('HIC Plugin: Cannot create log directory: ' . $log_dir);
-      return false;
+    // Use wp_mkdir_p if available, otherwise mkdir
+    if (function_exists('wp_mkdir_p')) {
+      if (!wp_mkdir_p($log_dir)) {
+        error_log('HIC Plugin: Cannot create log directory: ' . $log_dir);
+        return false;
+      }
+    } else {
+      if (!@mkdir($log_dir, 0755, true)) {
+        error_log('HIC Plugin: Cannot create log directory: ' . $log_dir);
+        return false;
+      }
     }
   }
   
@@ -540,4 +548,36 @@ function hic_get_processing_statistics() {
     );
     
     return $statistics;
+}
+
+/* ================= SAFE WORDPRESS CRON HELPERS ================= */
+
+/**
+ * Safely check if an event is scheduled
+ */
+function hic_safe_wp_next_scheduled($hook) {
+    if (!function_exists('wp_next_scheduled')) {
+        return false;
+    }
+    return wp_next_scheduled($hook);
+}
+
+/**
+ * Safely schedule an event
+ */
+function hic_safe_wp_schedule_event($timestamp, $recurrence, $hook, $args = array()) {
+    if (!function_exists('wp_schedule_event')) {
+        return false;
+    }
+    return wp_schedule_event($timestamp, $recurrence, $hook, $args);
+}
+
+/**
+ * Safely clear scheduled hooks
+ */
+function hic_safe_wp_clear_scheduled_hook($hook, $args = array()) {
+    if (!function_exists('wp_clear_scheduled_hook')) {
+        return false;
+    }
+    return wp_clear_scheduled_hook($hook, $args);
 }

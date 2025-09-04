@@ -39,7 +39,7 @@ function hic_create_database_table(){
   }
   
   // Verify table was created
-  $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     hic_log('hic_create_database_table: Table creation verification failed for ' . $table);
     return false;
@@ -88,7 +88,7 @@ function hic_create_realtime_sync_table(){
   }
   
   // Verify table was created
-  $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     hic_log('hic_create_realtime_sync_table: Table creation verification failed for ' . $table);
     return false;
@@ -139,7 +139,7 @@ function hic_create_booking_events_table(){
   }
   
   // Verify table was created
-  $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     hic_log('hic_create_booking_events_table: Table creation verification failed for ' . $table);
     return false;
@@ -162,12 +162,12 @@ function hic_capture_tracking_params(){
   $table = $wpdb->prefix . 'hic_gclids';
 
   // Check if table exists
-  $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     hic_log('hic_capture_tracking_params: Table does not exist, creating: ' . $table);
     hic_create_database_table();
     // Re-check if table exists after creation
-    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if (!$table_exists) {
       hic_log('hic_capture_tracking_params: Failed to create table: ' . $table);
       return false;
@@ -288,7 +288,7 @@ function hic_is_reservation_new_for_realtime($reservation_id) {
   $table = $wpdb->prefix . 'hic_realtime_sync';
   
   // Check if table exists
-  $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     hic_log('hic_is_reservation_new_for_realtime: Table does not exist: ' . $table);
     return true; // Assume new if table doesn't exist
@@ -327,7 +327,7 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
   $table = $wpdb->prefix . 'hic_realtime_sync';
   
   // Check if table exists
-  $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     hic_log('hic_mark_reservation_new_for_realtime: Table does not exist, creating: ' . $table);
     if (!hic_create_realtime_sync_table()) {
