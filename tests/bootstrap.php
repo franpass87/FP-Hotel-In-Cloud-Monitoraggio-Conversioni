@@ -14,18 +14,20 @@ if (file_exists('/tmp/wordpress-tests-lib/includes/functions.php')) {
     require_once '/tmp/wordpress-tests-lib/includes/functions.php';
 }
 
-// Mock WordPress functions for basic testing
+// Mock WordPress options handling for basic testing
 if (!function_exists('get_option')) {
+    $GLOBALS['hic_test_options'] = [];
+
     function get_option($option, $default = false) {
-        static $options = [];
-        return isset($options[$option]) ? $options[$option] : $default;
+        global $hic_test_options;
+        return array_key_exists($option, $hic_test_options) ? $hic_test_options[$option] : $default;
     }
 }
 
 if (!function_exists('update_option')) {
     function update_option($option, $value, $autoload = null) {
-        static $options = [];
-        $options[$option] = $value;
+        global $hic_test_options;
+        $hic_test_options[$option] = $value;
         return true;
     }
 }
