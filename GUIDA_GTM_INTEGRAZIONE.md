@@ -137,6 +137,11 @@ Gli eventi inviati al DataLayer GTM seguono lo standard Enhanced Ecommerce:
 - Currency
 - Items
 
+**Variabili personalizzate per attribution**:
+- `DLV - bucket` (Data Layer Variable: bucket)
+- `DLV - gclid` (Data Layer Variable: gclid) 
+- `DLV - fbclid` (Data Layer Variable: fbclid)
+
 **Trigger**: 
 - Tipo: Custom Event
 - Nome evento: `purchase`
@@ -150,6 +155,9 @@ Gli eventi inviati al DataLayer GTM seguono lo standard Enhanced Ecommerce:
   - `value`: `{{Value}}`
   - `currency`: `{{Currency}}`
   - `items`: `{{Items}}`
+  - `traffic_source`: `{{DLV - bucket}}` (per distinguere gads/fbads/organic)
+  - `gclid`: `{{DLV - gclid}}` (se disponibile)
+  - `fbclid`: `{{DLV - fbclid}}` (se disponibile)
 
 ### 3. Test e Debug
 
@@ -163,6 +171,45 @@ Gli eventi inviati al DataLayer GTM seguono lo standard Enhanced Ecommerce:
 1. Vai su GA4 > Reports > Realtime > Events
 2. Cerca evento `purchase`
 3. Verifica parametri ecommerce
+
+## Configurazione Attribution Tracking
+
+### Parametri di Provenienza Conservati
+
+Il plugin **conserva automaticamente** tutti i parametri di provenienza:
+- `gclid` - Google Ads Click ID 
+- `fbclid` - Facebook Click ID
+- `bucket` - Classificazione automatica: `gads` | `fbads` | `organic`
+
+### Setup GA4 Custom Dimensions 
+
+Per visualizzare l'attribution in GA4 quando usi GTM:
+
+1. **In GA4**: Vai su Configure > Custom Definitions > Custom Dimensions
+2. **Crea dimensioni**:
+   - **Traffic Source Bucket**: 
+     - Dimension name: `Traffic Source Bucket`
+     - Scope: `Event`
+     - Event parameter: `traffic_source`
+   - **Google Click ID**:
+     - Dimension name: `Google Click ID` 
+     - Scope: `Event`
+     - Event parameter: `gclid`
+   - **Facebook Click ID**:
+     - Dimension name: `Facebook Click ID`
+     - Scope: `Event` 
+     - Event parameter: `fbclid`
+
+3. **Verifica**: Dopo 24-48 ore, potrai usare queste dimensioni nei report GA4
+
+### Report Attribution Raccomandato
+
+Crea un report personalizzato con:
+- **Metrica primaria**: Conversioni, Revenue
+- **Dimensioni**: Traffic Source Bucket, Source/Medium
+- **Filtro eventi**: purchase
+
+Questo ti darà visibilità completa sull'attribution delle conversioni.
 
 ## Raccomandazioni per Diversi Scenari
 
@@ -227,10 +274,15 @@ Gli eventi inviati al DataLayer GTM seguono lo standard Enhanced Ecommerce:
 3. Verifica che ci siano prenotazioni in coda da processare
 
 ### Problema: Perdita di attribution (gclid/fbclid)
+**Causa**: I parametri sono inviati a GTM ma non configurati correttamente in GA4
+
 **Soluzione**:
-1. GTM conserva i parametri `gclid` e `fbclid` nell'evento
-2. Configura Enhanced Attribution in GTM
-3. Verifica che i parametri siano passati ai tag finali
+1. **Verifica DataLayer**: In GTM Preview, controlla che l'evento `purchase` contenga i campi `gclid`, `fbclid`, `bucket`
+2. **Configura variabili GTM**:
+   - Crea Data Layer Variables per `bucket`, `gclid`, `fbclid`
+   - Aggiungi come custom parameters nel tag GA4
+3. **Setup GA4 Custom Dimensions**: Segui la guida "Configurazione Attribution Tracking" sopra
+4. **Test**: Verifica nei report GA4 Real-time che i parametri arrivino correttamente
 
 ## Monitoraggio e Analytics
 
