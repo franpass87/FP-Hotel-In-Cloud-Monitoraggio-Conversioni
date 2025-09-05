@@ -13,6 +13,42 @@ add_action('admin_enqueue_scripts', 'hic_admin_enqueue_scripts');
 // Add AJAX handler for API connection test
 add_action('wp_ajax_hic_test_api_connection', 'hic_ajax_test_api_connection');
 
+// Add AJAX handler for email configuration test
+add_action('wp_ajax_hic_test_email_ajax', 'hic_ajax_test_email');
+
+function hic_ajax_test_email() {
+    // Verify nonce for security
+    if (!check_ajax_referer('hic_test_email', 'nonce', false)) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'Nonce di sicurezza non valido.'
+        )));
+    }
+    
+    // Check user permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'Permessi insufficienti.'
+        )));
+    }
+    
+    // Get email from request
+    $test_email = sanitize_email($_POST['email'] ?? '');
+    
+    if (empty($test_email) || !is_email($test_email)) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'Indirizzo email non valido.'
+        )));
+    }
+    
+    // Run email configuration test
+    $test_result = hic_test_email_configuration($test_email);
+    
+    wp_die(json_encode($test_result));
+}
+
 function hic_ajax_test_api_connection() {
     // Verify nonce for security
     if (!check_ajax_referer('hic_test_api_nonce', 'nonce', false)) {
@@ -71,7 +107,9 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_fb_pixel_id');
     register_setting('hic_settings', 'hic_fb_access_token');
     register_setting('hic_settings', 'hic_webhook_token');
-    register_setting('hic_settings', 'hic_admin_email');
+    register_setting('hic_settings', 'hic_admin_email', array(
+        'sanitize_callback' => 'hic_validate_admin_email'
+    ));
     register_setting('hic_settings', 'hic_log_file');
     register_setting('hic_settings', 'hic_connection_type');
     register_setting('hic_settings', 'hic_api_url');
@@ -292,8 +330,62 @@ function hic_options_page() {
 
 // Render functions for settings fields
 function hic_admin_email_render() {
-    echo '<input type="email" name="hic_admin_email" value="' . esc_attr(hic_get_admin_email()) . '" class="regular-text" />';
-    echo '<p class="description">Email per ricevere notifiche di nuove prenotazioni. Se vuoto, usa l\'email amministratore di WordPress.</p>';
+    $current_email = hic_get_admin_email();
+    $custom_email = hic_get_option('admin_email', '');
+    $wp_admin_email = get_option('admin_email');
+    
+    echo '<input type="email" name="hic_admin_email" value="' . esc_attr($current_email) . '" class="regular-text" id="hic_admin_email_field" />';
+    echo '<button type="button" class="button" onclick="hicTestEmail()" style="margin-left: 10px;">Test Email</button>';
+    echo '<div id="hic_email_test_result" style="margin-top: 10px;"></div>';
+    
+    echo '<p class="description">';
+    echo 'Email per ricevere notifiche di nuove prenotazioni. ';
+    if (empty($custom_email)) {
+        echo '<strong>Attualmente usa l\'email WordPress:</strong> ' . esc_html($wp_admin_email);
+    } else {
+        echo '<strong>Email personalizzata configurata:</strong> ' . esc_html($custom_email);
+    }
+    echo '</p>';
+    
+    // Add JavaScript for email testing
+    echo '<script>
+    function hicTestEmail() {
+        var email = document.getElementById("hic_admin_email_field").value;
+        var resultDiv = document.getElementById("hic_email_test_result");
+        
+        if (!email) {
+            resultDiv.innerHTML = "<div style=\"color: red;\">Inserisci un indirizzo email per il test.</div>";
+            return;
+        }
+        
+        resultDiv.innerHTML = "<div style=\"color: blue;\">Invio email di test in corso...</div>";
+        
+        var data = {
+            action: "hic_test_email_ajax",
+            email: email,
+            nonce: "' . wp_create_nonce('hic_test_email') . '"
+        };
+        
+        fetch(ajaxurl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultDiv.innerHTML = "<div style=\"color: green;\">✓ " + data.message + "</div>";
+            } else {
+                resultDiv.innerHTML = "<div style=\"color: red;\">✗ " + data.message + "</div>";
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = "<div style=\"color: red;\">Errore nella richiesta: " + error + "</div>";
+        });
+    }
+    </script>';
 }
 
 
@@ -507,4 +599,43 @@ function hic_brevo_event_endpoint_render() {
     echo '<input type="url" name="hic_brevo_event_endpoint" value="' . esc_attr($endpoint) . '" style="width: 100%;" />';
     echo '<p class="description">Endpoint API per eventi Brevo. Default: https://in-automate.brevo.com/api/v2/trackEvent<br>';
     echo 'Modificare solo se Brevo cambia il proprio endpoint per gli eventi o se si utilizza un endpoint personalizzato.</p>';
+}
+
+/* ============ Validation Functions ============ */
+function hic_validate_admin_email($input) {
+    // Allow empty value (will fall back to WordPress admin email)
+    if (empty($input)) {
+        return '';
+    }
+    
+    // Sanitize the email
+    $sanitized_email = sanitize_email($input);
+    
+    // Validate email format
+    if (!is_email($sanitized_email)) {
+        add_settings_error(
+            'hic_admin_email',
+            'invalid_email',
+            'L\'indirizzo email inserito non è valido. Sono stati ripristinati i valori precedenti.',
+            'error'
+        );
+        // Return the original value from database
+        return hic_get_option('admin_email', '');
+    }
+    
+    // Log the email change for transparency
+    $old_email = hic_get_option('admin_email', '');
+    if ($old_email !== $sanitized_email) {
+        hic_log('Admin email changed from "' . $old_email . '" to "' . $sanitized_email . '"');
+        
+        // Show success message
+        add_settings_error(
+            'hic_admin_email',
+            'email_updated',
+            'Email amministratore aggiornato con successo: ' . $sanitized_email,
+            'updated'
+        );
+    }
+    
+    return $sanitized_email;
 }
