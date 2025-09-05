@@ -359,10 +359,20 @@ function hic_transform_reservation($reservation) {
         $accommodation_name = "Unknown Accommodation"; // Ultimate fallback
     }
 
+    // Determine guest name from available fields
+    $first = $reservation['guest_first_name']
+        ?? $reservation['first_name']
+        ?? $reservation['client_first_name']
+        ?? '';
+    $last = $reservation['guest_last_name']
+        ?? $reservation['last_name']
+        ?? $reservation['client_last_name']
+        ?? '';
+
     // Determine primary email from available fields
-    $email = $reservation['email']
+    $email = $reservation['guest_email']
+        ?? $reservation['email']
         ?? $reservation['client_email']
-        ?? $reservation['guest_email']
         ?? '';
     if (!is_string($email)) {
         $email = '';
@@ -381,8 +391,8 @@ function hic_transform_reservation($reservation) {
         'to_date' => isset($reservation['to_date']) ? $reservation['to_date'] : '',
         'presence' => isset($reservation['presence']) ? $reservation['presence'] : '',
         'unpaid_balance' => $unpaid_balance,
-        'guest_first_name' => isset($reservation['guest_first_name']) ? $reservation['guest_first_name'] : '',
-        'guest_last_name' => isset($reservation['guest_last_name']) ? $reservation['guest_last_name'] : '',
+        'guest_first_name' => $first,
+        'guest_last_name' => $last,
         'email' => $email,
         'phone' => isset($reservation['phone']) ? $reservation['phone'] : '',
         'language' => $language,
@@ -713,9 +723,9 @@ function hic_should_process_reservation_with_email($reservation) {
     }
 
     // Determine email from reservation data
-    $email = $reservation['email']
+    $email = $reservation['guest_email']
+        ?? $reservation['email']
         ?? $reservation['client_email']
-        ?? $reservation['guest_email']
         ?? '';
 
     // Additional check: Skip reservations without email (minimal filter)
@@ -977,9 +987,9 @@ function hic_process_update(array $u){
     }
 
     // Validate and get email
-    $email = $u['email']
+    $email = $u['guest_email']
+        ?? $u['email']
         ?? $u['client_email']
-        ?? $u['guest_email']
         ?? '';
     if (empty($email) || !is_string($email)) {
         hic_log("hic_process_update: no valid email in update for reservation $id");
