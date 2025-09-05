@@ -353,9 +353,20 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   $bucket = fp_normalize_bucket($gclid, $fbclid);
   $to = hic_get_admin_email();
   
-  // Validate admin email
-  if (empty($to) || !hic_is_valid_email($to)) {
-    hic_log('hic_send_admin_email: invalid admin email: ' . $to);
+  // Enhanced email validation with detailed logging
+  if (empty($to)) {
+    hic_log('hic_send_admin_email: admin email is empty');
+    return false;
+  }
+  
+  if (!hic_is_valid_email($to)) {
+    hic_log('hic_send_admin_email: invalid admin email format: ' . $to);
+    return false;
+  }
+  
+  // Check WordPress email configuration
+  if (!function_exists('wp_mail')) {
+    hic_log('hic_send_admin_email: wp_mail function not available');
     return false;
   }
   
@@ -366,6 +377,19 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   } else {
     hic_log('hic_send_admin_email: using WordPress default admin email: ' . $to);
   }
+  
+  // Log WordPress mail configuration for debugging
+  $phpmailer_init_triggered = false;
+  $phpmailer_error = '';
+  
+  // Add temporary hook to capture PHPMailer errors
+  $phpmailer_hook = function($phpmailer) use (&$phpmailer_init_triggered, &$phpmailer_error) {
+    $phpmailer_init_triggered = true;
+    if ($phpmailer->ErrorInfo) {
+      $phpmailer_error = $phpmailer->ErrorInfo;
+    }
+  };
+  add_action('phpmailer_init', $phpmailer_hook);
   
   $site_name = get_bloginfo('name');
   if (empty($site_name)) {
@@ -391,20 +415,195 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   $content_type_filter = function(){ return 'text/plain; charset=UTF-8'; };
   add_filter('wp_mail_content_type', $content_type_filter);
   
+  // Enhanced email sending with detailed error reporting
+  hic_log('hic_send_admin_email: attempting to send email to ' . $to . ' with subject: ' . $subject);
+  
   $sent = wp_mail($to, $subject, $body);
   
+  // Remove filters and capture additional debugging info
   remove_filter('wp_mail_content_type', $content_type_filter);
+  remove_action('phpmailer_init', $phpmailer_hook);
 
+  // Enhanced logging with detailed error information
   if ($sent) {
-    hic_log('Email admin inviata (bucket='.$bucket.') a '.$to);
+    hic_log('Email admin inviata con successo (bucket='.$bucket.') a '.$to);
+    if ($phpmailer_init_triggered) {
+      hic_log('PHPMailer configuration was initialized correctly');
+    }
     return true;
   } else {
-    hic_log('Errore invio email admin a '.$to);
+    $error_details = 'wp_mail returned false';
+    
+    // Capture PHPMailer specific errors
+    if (!empty($phpmailer_error)) {
+      $error_details .= ' - PHPMailer Error: ' . $phpmailer_error;
+    }
+    
+    // Check for common WordPress mail issues
+    if (!$phpmailer_init_triggered) {
+      $error_details .= ' - PHPMailer was not initialized (possible mail function disabled)';
+    }
+    
+    // Log detailed error information
+    hic_log('ERRORE invio email admin a '.$to.' - '.$error_details);
+    
+    // Log server mail configuration for debugging
+    if (function_exists('ini_get')) {
+      $smtp_config = ini_get('SMTP');
+      $sendmail_path = ini_get('sendmail_path');
+      hic_log('Server mail config - SMTP: ' . ($smtp_config ?: 'not set') . ', Sendmail: ' . ($sendmail_path ?: 'not set'));
+    }
+    
     return false;
   }
 }
 
+/* ============ Email Configuration Testing ============ */
+function hic_test_email_configuration($recipient_email = null) {
+    $result = array(
+        'success' => false,
+        'message' => '',
+        'details' => array()
+    );
+    
+    // Use admin email if no recipient specified
+    if (empty($recipient_email)) {
+        $recipient_email = hic_get_admin_email();
+    }
+    
+    // Validate recipient email
+    if (empty($recipient_email) || !hic_is_valid_email($recipient_email)) {
+        $result['message'] = 'Invalid recipient email: ' . $recipient_email;
+        return $result;
+    }
+    
+    // Check WordPress mail function availability
+    if (!function_exists('wp_mail')) {
+        $result['message'] = 'wp_mail function not available';
+        return $result;
+    }
+    
+    // Capture PHPMailer configuration
+    $phpmailer_info = array();
+    $phpmailer_hook = function($phpmailer) use (&$phpmailer_info) {
+        $phpmailer_info['mailer'] = $phpmailer->Mailer;
+        $phpmailer_info['host'] = $phpmailer->Host;
+        $phpmailer_info['port'] = $phpmailer->Port;
+        $phpmailer_info['smtp_secure'] = $phpmailer->SMTPSecure;
+        $phpmailer_info['smtp_auth'] = $phpmailer->SMTPAuth;
+        $phpmailer_info['username'] = $phpmailer->Username;
+        $phpmailer_info['from'] = $phpmailer->From;
+        $phpmailer_info['from_name'] = $phpmailer->FromName;
+    };
+    
+    add_action('phpmailer_init', $phpmailer_hook);
+    
+    // Prepare test email
+    $subject = 'HIC Email Configuration Test - ' . date('Y-m-d H:i:s');
+    $body = "Questo è un test di configurazione email per il plugin Hotel in Cloud.\n\n";
+    $body .= "Timestamp: " . date('Y-m-d H:i:s') . "\n";
+    $body .= "Destinatario: " . $recipient_email . "\n";
+    $body .= "Sito: " . get_bloginfo('name') . "\n";
+    $body .= "URL: " . get_bloginfo('url') . "\n\n";
+    $body .= "Se ricevi questa email, la configurazione email funziona correttamente.";
+    
+    // Send test email
+    $sent = wp_mail($recipient_email, $subject, $body);
+    
+    remove_action('phpmailer_init', $phpmailer_hook);
+    
+    // Collect server mail configuration
+    $server_config = array();
+    if (function_exists('ini_get')) {
+        $server_config['smtp'] = ini_get('SMTP') ?: 'not set';
+        $server_config['smtp_port'] = ini_get('smtp_port') ?: 'not set';
+        $server_config['sendmail_path'] = ini_get('sendmail_path') ?: 'not set';
+        $server_config['mail_function'] = function_exists('mail') ? 'available' : 'not available';
+    }
+    
+    // Build result
+    $result['details']['phpmailer'] = $phpmailer_info;
+    $result['details']['server_config'] = $server_config;
+    $result['details']['wp_admin_email'] = get_option('admin_email');
+    $result['details']['hic_admin_email'] = hic_get_option('admin_email', '');
+    $result['details']['effective_admin_email'] = hic_get_admin_email();
+    
+    if ($sent) {
+        $result['success'] = true;
+        $result['message'] = 'Email di test inviata con successo a ' . $recipient_email;
+        hic_log('Email test configuration sent successfully to ' . $recipient_email);
+    } else {
+        $result['message'] = 'Errore nell\'invio dell\'email di test a ' . $recipient_email;
+        hic_log('Email test configuration failed for ' . $recipient_email . ' - Check server mail configuration');
+    }
+    
+    return $result;
+}
 
+/* ============ Email Diagnostics and Troubleshooting ============ */
+function hic_diagnose_email_issues() {
+    $issues = array();
+    $suggestions = array();
+    
+    // Check 1: Admin email configuration
+    $admin_email = hic_get_admin_email();
+    if (empty($admin_email)) {
+        $issues[] = 'Email amministratore non configurato';
+        $suggestions[] = 'Configura un indirizzo email nelle impostazioni HIC';
+    } elseif (!hic_is_valid_email($admin_email)) {
+        $issues[] = 'Email amministratore non valido: ' . $admin_email;
+        $suggestions[] = 'Correggi l\'indirizzo email nelle impostazioni';
+    }
+    
+    // Check 2: WordPress mail function
+    if (!function_exists('wp_mail')) {
+        $issues[] = 'Funzione wp_mail non disponibile';
+        $suggestions[] = 'Problema critico di WordPress - contatta lo sviluppatore';
+    }
+    
+    // Check 3: PHP mail function
+    if (!function_exists('mail')) {
+        $issues[] = 'Funzione mail() PHP non disponibile sul server';
+        $suggestions[] = 'Contatta il provider hosting per abilitare la funzione mail()';
+    }
+    
+    // Check 4: Server configuration
+    if (function_exists('ini_get')) {
+        $smtp_config = ini_get('SMTP');
+        $sendmail_path = ini_get('sendmail_path');
+        
+        if (empty($smtp_config) && empty($sendmail_path)) {
+            $issues[] = 'Configurazione email server non trovata';
+            $suggestions[] = 'Installa un plugin SMTP (WP Mail SMTP, Easy WP SMTP) o contatta l\'hosting';
+        }
+    }
+    
+    // Check 5: Recent email sending attempts (if function exists)
+    $email_errors = 0;
+    $log_file = hic_get_log_file();
+    if (file_exists($log_file) && is_readable($log_file)) {
+        $log_contents = file_get_contents($log_file);
+        $lines = explode("\n", $log_contents);
+        $recent_lines = array_slice($lines, -50); // Last 50 lines
+        
+        foreach ($recent_lines as $line) {
+            if (strpos($line, 'ERRORE invio email') !== false) {
+                $email_errors++;
+            }
+        }
+    }
+    
+    if ($email_errors > 0) {
+        $issues[] = "$email_errors errori email negli ultimi log";
+        $suggestions[] = 'Controlla i log dettagliati nella sezione Diagnostics';
+    }
+    
+    return array(
+        'issues' => $issues,
+        'suggestions' => $suggestions,
+        'has_issues' => !empty($issues)
+    );
+}
 
 /* ============ Email Enrichment Functions ============ */
 function hic_mark_email_enriched($reservation_id, $real_email) {

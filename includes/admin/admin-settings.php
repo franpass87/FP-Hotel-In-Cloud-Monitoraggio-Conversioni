@@ -13,6 +13,42 @@ add_action('admin_enqueue_scripts', 'hic_admin_enqueue_scripts');
 // Add AJAX handler for API connection test
 add_action('wp_ajax_hic_test_api_connection', 'hic_ajax_test_api_connection');
 
+// Add AJAX handler for email configuration test
+add_action('wp_ajax_hic_test_email_ajax', 'hic_ajax_test_email');
+
+function hic_ajax_test_email() {
+    // Verify nonce for security
+    if (!check_ajax_referer('hic_test_email', 'nonce', false)) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'Nonce di sicurezza non valido.'
+        )));
+    }
+    
+    // Check user permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'Permessi insufficienti.'
+        )));
+    }
+    
+    // Get email from request
+    $test_email = sanitize_email($_POST['email'] ?? '');
+    
+    if (empty($test_email) || !is_email($test_email)) {
+        wp_die(json_encode(array(
+            'success' => false,
+            'message' => 'Indirizzo email non valido.'
+        )));
+    }
+    
+    // Run email configuration test
+    $test_result = hic_test_email_configuration($test_email);
+    
+    wp_die(json_encode($test_result));
+}
+
 function hic_ajax_test_api_connection() {
     // Verify nonce for security
     if (!check_ajax_referer('hic_test_api_nonce', 'nonce', false)) {
@@ -71,7 +107,9 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_fb_pixel_id');
     register_setting('hic_settings', 'hic_fb_access_token');
     register_setting('hic_settings', 'hic_webhook_token');
-    register_setting('hic_settings', 'hic_admin_email');
+    register_setting('hic_settings', 'hic_admin_email', array(
+        'sanitize_callback' => 'hic_validate_admin_email'
+    ));
     register_setting('hic_settings', 'hic_log_file');
     register_setting('hic_settings', 'hic_connection_type');
     register_setting('hic_settings', 'hic_api_url');
@@ -292,8 +330,85 @@ function hic_options_page() {
 
 // Render functions for settings fields
 function hic_admin_email_render() {
-    echo '<input type="email" name="hic_admin_email" value="' . esc_attr(hic_get_admin_email()) . '" class="regular-text" />';
-    echo '<p class="description">Email per ricevere notifiche di nuove prenotazioni. Se vuoto, usa l\'email amministratore di WordPress.</p>';
+    $current_email = hic_get_admin_email();
+    $custom_email = hic_get_option('admin_email', '');
+    $wp_admin_email = get_option('admin_email');
+    
+    echo '<input type="email" name="hic_admin_email" value="' . esc_attr($current_email) . '" class="regular-text" id="hic_admin_email_field" />';
+    echo '<button type="button" class="button" onclick="hicTestEmail()" style="margin-left: 10px;">Test Email</button>';
+    echo '<div id="hic_email_test_result" style="margin-top: 10px;"></div>';
+    
+    echo '<p class="description">';
+    echo 'Email per ricevere notifiche di nuove prenotazioni. ';
+    if (empty($custom_email)) {
+        echo '<strong>Attualmente usa l\'email WordPress:</strong> ' . esc_html($wp_admin_email);
+    } else {
+        echo '<strong>Email personalizzata configurata:</strong> ' . esc_html($custom_email);
+    }
+    echo '</p>';
+    
+    // Add troubleshooting guide
+    echo '<div class="hic-email-troubleshooting" style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9;">';
+    echo '<h4 style="margin-top: 0;">🔧 Risoluzione Problemi Email</h4>';
+    echo '<details>';
+    echo '<summary style="cursor: pointer; font-weight: bold;">Se le email non arrivano, segui questi passi:</summary>';
+    echo '<ol style="margin: 10px 0;">';
+    echo '<li><strong>Testa la configurazione:</strong> Usa il pulsante "Test Email" sopra per verificare l\'invio</li>';
+    echo '<li><strong>Controlla lo spam:</strong> Verifica la cartella spam/junk della casella email</li>';
+    echo '<li><strong>Verifica l\'indirizzo email:</strong> Assicurati che l\'email sia corretta e funzionante</li>';
+    echo '<li><strong>Controlla i log:</strong> Vai in Diagnostics per vedere i log dettagliati degli invii</li>';
+    echo '<li><strong>Configurazione SMTP:</strong> Se il test fallisce, potrebbe servire un plugin SMTP (WP Mail SMTP, Easy WP SMTP)</li>';
+    echo '<li><strong>Contatta l\'hosting:</strong> Se tutto sopra è OK, il problema potrebbe essere nel server email</li>';
+    echo '</ol>';
+    echo '<p><strong>Configurazioni comuni che causano problemi:</strong></p>';
+    echo '<ul>';
+    echo '<li>Server senza funzione mail() PHP abilitata</li>';
+    echo '<li>Provider hosting che blocca l\'invio email</li>';
+    echo '<li>Mancanza di configurazione SMTP</li>';
+    echo '<li>Email che finiscono in blacklist per spam</li>';
+    echo '</ul>';
+    echo '</details>';
+    echo '</div>';
+    
+    // Add JavaScript for email testing
+    echo '<script>
+    function hicTestEmail() {
+        var email = document.getElementById("hic_admin_email_field").value;
+        var resultDiv = document.getElementById("hic_email_test_result");
+        
+        if (!email) {
+            resultDiv.innerHTML = "<div style=\"color: red;\">Inserisci un indirizzo email per il test.</div>";
+            return;
+        }
+        
+        resultDiv.innerHTML = "<div style=\"color: blue;\">Invio email di test in corso...</div>";
+        
+        var data = {
+            action: "hic_test_email_ajax",
+            email: email,
+            nonce: "' . wp_create_nonce('hic_test_email') . '"
+        };
+        
+        fetch(ajaxurl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultDiv.innerHTML = "<div style=\"color: green;\">✓ " + data.message + "</div>";
+            } else {
+                resultDiv.innerHTML = "<div style=\"color: red;\">✗ " + data.message + "</div>";
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = "<div style=\"color: red;\">Errore nella richiesta: " + error + "</div>";
+        });
+    }
+    </script>';
 }
 
 
@@ -507,4 +622,43 @@ function hic_brevo_event_endpoint_render() {
     echo '<input type="url" name="hic_brevo_event_endpoint" value="' . esc_attr($endpoint) . '" style="width: 100%;" />';
     echo '<p class="description">Endpoint API per eventi Brevo. Default: https://in-automate.brevo.com/api/v2/trackEvent<br>';
     echo 'Modificare solo se Brevo cambia il proprio endpoint per gli eventi o se si utilizza un endpoint personalizzato.</p>';
+}
+
+/* ============ Validation Functions ============ */
+function hic_validate_admin_email($input) {
+    // Allow empty value (will fall back to WordPress admin email)
+    if (empty($input)) {
+        return '';
+    }
+    
+    // Sanitize the email
+    $sanitized_email = sanitize_email($input);
+    
+    // Validate email format
+    if (!is_email($sanitized_email)) {
+        add_settings_error(
+            'hic_admin_email',
+            'invalid_email',
+            'L\'indirizzo email inserito non è valido. Sono stati ripristinati i valori precedenti.',
+            'error'
+        );
+        // Return the original value from database
+        return hic_get_option('admin_email', '');
+    }
+    
+    // Log the email change for transparency
+    $old_email = hic_get_option('admin_email', '');
+    if ($old_email !== $sanitized_email) {
+        hic_log('Admin email changed from "' . $old_email . '" to "' . $sanitized_email . '"');
+        
+        // Show success message
+        add_settings_error(
+            'hic_admin_email',
+            'email_updated',
+            'Email amministratore aggiornato con successo: ' . $sanitized_email,
+            'updated'
+        );
+    }
+    
+    return $sanitized_email;
 }

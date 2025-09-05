@@ -274,11 +274,35 @@ function hic_test_dispatch_functions() {
             $results['brevo'] = 'Brevo not configured or disabled';
         }
         
-        // Test Admin Email
+        // Test Admin Email with enhanced diagnostics
         $admin_email = hic_get_admin_email();
         if (!empty($admin_email)) {
-            hic_send_admin_email($test_data, $gclid, $fbclid, 'test_' . time());
-            $results['admin_email'] = 'Test email sent to admin: ' . $admin_email;
+            // Run comprehensive email test
+            $email_test_result = hic_test_email_configuration($admin_email);
+            
+            if ($email_test_result['success']) {
+                // Also send the normal admin email for comparison
+                $admin_sent = hic_send_admin_email($test_data, $gclid, $fbclid, 'test_' . time());
+                if ($admin_sent) {
+                    $results['admin_email'] = 'Email di test e notifica admin inviate con successo a: ' . $admin_email;
+                } else {
+                    $results['admin_email'] = 'Email di test OK, ma errore nell\'invio notifica admin a: ' . $admin_email;
+                }
+            } else {
+                $results['admin_email'] = 'Errore configurazione email: ' . $email_test_result['message'];
+            }
+            
+            // Add email configuration details for debugging
+            if (isset($email_test_result['details'])) {
+                $config_info = array();
+                if (isset($email_test_result['details']['server_config'])) {
+                    $config_info['server'] = $email_test_result['details']['server_config'];
+                }
+                if (isset($email_test_result['details']['phpmailer'])) {
+                    $config_info['phpmailer'] = $email_test_result['details']['phpmailer'];
+                }
+                $results['email_config'] = $config_info;
+            }
         } else {
             $results['admin_email'] = 'Admin email not configured';
         }

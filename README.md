@@ -78,6 +78,29 @@ La funzione "Test Dispatch Funzioni" permette di testare tutte le integrazioni c
 
 **Nota**: Le email di test vengono inviate agli indirizzi configurati nelle impostazioni del plugin, permettendo di verificare che il sistema di notifiche email funzioni correttamente.
 
+## Notifiche Email
+
+Il plugin invia automaticamente email di notifica all'amministratore per ogni nuova prenotazione ricevuta.
+
+### Configurazione Email Admin
+
+1. **Vai in:** WordPress Admin → Impostazioni → HIC Monitoring
+2. **Sezione:** Impostazioni Generali
+3. **Campo:** Email Amministratore
+4. **Test:** Usa il pulsante "Test Email" per verificare la configurazione
+
+### Risoluzione Problemi Email
+
+Se le email non arrivano:
+
+1. **Testa la configurazione** con il pulsante Test Email nelle impostazioni
+2. **Controlla spam/junk** nella casella di destinazione
+3. **Verifica i log** nella sezione Diagnostics per errori dettagliati
+4. **Configurazione SMTP** potrebbe essere necessaria (plugin come WP Mail SMTP)
+5. **Contatta l'hosting** se i test falliscono (problemi server mail)
+
+Il sistema include diagnostica avanzata per identificare automaticamente problemi comuni di configurazione email.
+
 ## Note su Privacy e Rate Limits
 
 - Il plugin rispetta i rate limits delle API Hotel in Cloud
