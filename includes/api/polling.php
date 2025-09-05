@@ -358,6 +358,15 @@ function hic_transform_reservation($reservation) {
     } elseif (empty($accommodation_name)) {
         $accommodation_name = "Unknown Accommodation"; // Ultimate fallback
     }
+
+    // Determine primary email from available fields
+    $email = $reservation['email']
+        ?? $reservation['client_email']
+        ?? $reservation['guest_email']
+        ?? '';
+    if (!is_string($email)) {
+        $email = '';
+    }
     
     return array(
         'transaction_id' => $transaction_id,
@@ -374,7 +383,7 @@ function hic_transform_reservation($reservation) {
         'unpaid_balance' => $unpaid_balance,
         'guest_first_name' => isset($reservation['guest_first_name']) ? $reservation['guest_first_name'] : '',
         'guest_last_name' => isset($reservation['guest_last_name']) ? $reservation['guest_last_name'] : '',
-        'email' => isset($reservation['email']) ? $reservation['email'] : '',
+        'email' => $email,
         'phone' => isset($reservation['phone']) ? $reservation['phone'] : '',
         'language' => $language,
         'original_price' => $price
@@ -702,13 +711,19 @@ function hic_should_process_reservation_with_email($reservation) {
     if (!hic_should_process_reservation($reservation)) {
         return false;
     }
-    
+
+    // Determine email from reservation data
+    $email = $reservation['email']
+        ?? $reservation['client_email']
+        ?? $reservation['guest_email']
+        ?? '';
+
     // Additional check: Skip reservations without email (minimal filter)
-    if (empty($reservation['email']) || !is_string($reservation['email'])) {
+    if (empty($email) || !is_string($email)) {
         hic_log("Reservation skipped: missing or invalid email");
         return false;
     }
-    
+
     return true;
 }
 
@@ -962,7 +977,10 @@ function hic_process_update(array $u){
     }
 
     // Validate and get email
-    $email = isset($u['email']) ? $u['email'] : null;
+    $email = $u['email']
+        ?? $u['client_email']
+        ?? $u['guest_email']
+        ?? '';
     if (empty($email) || !is_string($email)) {
         hic_log("hic_process_update: no valid email in update for reservation $id");
         return;
