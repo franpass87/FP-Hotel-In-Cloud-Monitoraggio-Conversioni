@@ -1010,8 +1010,8 @@ function hic_process_update(array $u){
     }
     
     // Get reservation ID with proper validation
-    $id = isset($u['id']) ? $u['id'] : null;
-    if (empty($id) || !is_scalar($id)) {
+    $id = hic_extract_reservation_id($u);
+    if (empty($id)) {
         hic_log('hic_process_update: missing or invalid reservation id');
         return;
     }
