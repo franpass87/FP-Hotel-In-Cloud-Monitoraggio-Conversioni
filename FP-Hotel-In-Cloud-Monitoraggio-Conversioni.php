@@ -18,6 +18,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/booking-processor.php';
 
 // Include integration files
 require_once plugin_dir_path(__FILE__) . 'includes/integrations/ga4.php';
+require_once plugin_dir_path(__FILE__) . 'includes/integrations/gtm.php';
 require_once plugin_dir_path(__FILE__) . 'includes/integrations/facebook.php';
 require_once plugin_dir_path(__FILE__) . 'includes/integrations/brevo.php';
 

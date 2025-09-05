@@ -77,6 +77,41 @@ Il sistema **dual-mode è sempre attivo** e garantisce che nessuna prenotazione 
 
 ## Integrazione GA4
 
+### Q: Posso usare Google Tag Manager invece di GA4 diretto?
+
+**R**: **Sì!** Il plugin ora supporta tre modalità di tracciamento:
+
+1. **Solo GA4 Measurement Protocol** (Server-side) - Attuale modalità
+2. **Solo Google Tag Manager** (Client-side) - Per gestione centralizzata tag
+3. **Modalità Ibrida** (GTM + GA4 backup) - Massima copertura
+
+📚 **Guida completa**: [GUIDA_GTM_INTEGRAZIONE.md](GUIDA_GTM_INTEGRAZIONE.md)
+
+**Vantaggi GTM**:
+- Gestione centralizzata di tutti i tag (GA4, Meta, LinkedIn, etc.)
+- Maggiore flessibilità per trigger personalizzati
+- Controllo granulare senza modifiche al codice
+
+**Vantaggi GA4 Diretto**:
+- Tracciamento server-side più affidabile
+- Non dipende da JavaScript/cookie del browser
+- Resistente ad AdBlocker
+
+### Q: Come evito la doppia misurazione con GTM?
+
+**R**: Il plugin previene automaticamente la doppia misurazione attraverso:
+
+1. **Modalità esclusive**: Solo una modalità attiva per volta
+2. **Transaction ID univoci**: Ogni conversione ha ID unico
+3. **Parametri differenziati**: Eventi marcati con source diversa
+
+Per modalità **Ibrida**, configura in GA4:
+- Dimensione personalizzata `event_source`
+- Server-side: `"measurement_protocol"`
+- Client-side: `"gtm_datalayer"`
+
+## Integrazione GA4
+
 ### Q: Quali eventi vengono inviati a GA4?
 
 **R**: Viene inviato un evento **`purchase`** con questi parametri:

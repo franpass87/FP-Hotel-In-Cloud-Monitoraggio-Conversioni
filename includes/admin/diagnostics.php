@@ -257,6 +257,14 @@ function hic_test_dispatch_functions() {
             $results['ga4'] = 'GA4 not configured';
         }
         
+        // Test GTM
+        if (hic_is_gtm_enabled() && !empty(hic_get_gtm_container_id())) {
+            hic_send_to_gtm_datalayer($test_data, $gclid, $fbclid);
+            $results['gtm'] = 'Test event queued for GTM DataLayer';
+        } else {
+            $results['gtm'] = 'GTM not configured or disabled';
+        }
+        
         // Test Facebook
         if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
             hic_send_to_fb($test_data, $gclid, $fbclid);

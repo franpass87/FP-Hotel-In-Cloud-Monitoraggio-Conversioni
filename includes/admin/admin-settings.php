@@ -96,9 +96,15 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_brevo_list_alias', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_brevo_double_optin_on_enrich');
     register_setting('hic_settings', 'hic_brevo_event_endpoint', array('sanitize_callback' => 'esc_url_raw'));
+    
+    // GTM Settings
+    register_setting('hic_settings', 'hic_gtm_container_id', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_tracking_mode', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_gtm_enabled');
 
     add_settings_section('hic_main_section', 'Configurazione Principale', null, 'hic_settings');
     add_settings_section('hic_ga4_section', 'Google Analytics 4', null, 'hic_settings');
+    add_settings_section('hic_gtm_section', 'Google Tag Manager', null, 'hic_settings');
     add_settings_section('hic_brevo_section', 'Brevo Settings', null, 'hic_settings');
     add_settings_section('hic_fb_section', 'Facebook Meta', null, 'hic_settings');
     add_settings_section('hic_hic_section', 'Hotel in Cloud', null, 'hic_settings');
@@ -110,6 +116,11 @@ function hic_settings_init() {
     // GA4 settings
     add_settings_field('hic_measurement_id', 'Measurement ID', 'hic_measurement_id_render', 'hic_settings', 'hic_ga4_section');
     add_settings_field('hic_api_secret', 'API Secret', 'hic_api_secret_render', 'hic_settings', 'hic_ga4_section');
+    
+    // GTM settings
+    add_settings_field('hic_gtm_enabled', 'Abilita GTM', 'hic_gtm_enabled_render', 'hic_settings', 'hic_gtm_section');
+    add_settings_field('hic_gtm_container_id', 'GTM Container ID', 'hic_gtm_container_id_render', 'hic_settings', 'hic_gtm_section');
+    add_settings_field('hic_tracking_mode', 'Modalità Tracciamento', 'hic_tracking_mode_render', 'hic_settings', 'hic_gtm_section');
     
     // Brevo settings
     add_settings_field('hic_brevo_enabled', 'Abilita Brevo', 'hic_brevo_enabled_render', 'hic_settings', 'hic_brevo_section');
@@ -278,6 +289,32 @@ function hic_measurement_id_render() {
 
 function hic_api_secret_render() {
     echo '<input type="text" name="hic_api_secret" value="' . esc_attr(hic_get_api_secret()) . '" class="regular-text" />';
+}
+
+// GTM render functions
+function hic_gtm_enabled_render() {
+    $checked = hic_is_gtm_enabled() ? 'checked' : '';
+    echo '<input type="checkbox" name="hic_gtm_enabled" value="1" ' . esc_attr($checked) . ' /> Abilita integrazione Google Tag Manager';
+    echo '<p class="description">Abilita il tracciamento tramite Google Tag Manager per una gestione più flessibile dei tag.</p>';
+}
+
+function hic_gtm_container_id_render() {
+    echo '<input type="text" name="hic_gtm_container_id" value="' . esc_attr(hic_get_gtm_container_id()) . '" class="regular-text" placeholder="GTM-XXXXXXX" />';
+    echo '<p class="description">ID del container GTM (formato: GTM-XXXXXXX). Disponibile in Google Tag Manager sotto "ID container".</p>';
+}
+
+function hic_tracking_mode_render() {
+    $mode = hic_get_tracking_mode();
+    echo '<select name="hic_tracking_mode" class="regular-text">';
+    echo '<option value="ga4_only"' . selected($mode, 'ga4_only', false) . '>Solo GA4 Measurement Protocol (Server-side)</option>';
+    echo '<option value="gtm_only"' . selected($mode, 'gtm_only', false) . '>Solo Google Tag Manager (Client-side)</option>';
+    echo '<option value="hybrid"' . selected($mode, 'hybrid', false) . '>Ibrido (GTM + GA4 backup per server-side)</option>';
+    echo '</select>';
+    echo '<p class="description">';
+    echo '<strong>GA4 Only:</strong> Tracciamento server-side via Measurement Protocol (attuale, più affidabile).<br>';
+    echo '<strong>GTM Only:</strong> Tracciamento client-side via DataLayer (più flessibile per gestire multiple piattaforme).<br>';
+    echo '<strong>Ibrido:</strong> GTM per client-side + GA4 come backup server-side (raccomandato per massima copertura).';
+    echo '</p>';
 }
 
 function hic_brevo_enabled_render() {

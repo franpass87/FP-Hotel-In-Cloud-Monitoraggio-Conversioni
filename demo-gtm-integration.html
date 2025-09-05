@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo GTM DataLayer Integration</title>
+    
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-DEMO123');</script>
+    <!-- End Google Tag Manager -->
+</head>
+<body>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-DEMO123"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
+    <h1>Demo: HIC Plugin GTM DataLayer Integration</h1>
+    
+    <p>Questo è un esempio di come il plugin HIC invia eventi al GTM DataLayer.</p>
+    
+    <button onclick="simulateBookingEvent()">Simula Evento Prenotazione</button>
+    
+    <h2>DataLayer Events:</h2>
+    <pre id="dataLayerLog"></pre>
+
+    <script>
+        // Initialize dataLayer
+        window.dataLayer = window.dataLayer || [];
+        
+        // Monitor dataLayer changes
+        const originalPush = window.dataLayer.push;
+        window.dataLayer.push = function() {
+            // Call original push
+            const result = originalPush.apply(this, arguments);
+            
+            // Log the event
+            updateDataLayerLog();
+            
+            return result;
+        };
+        
+        function updateDataLayerLog() {
+            const log = document.getElementById('dataLayerLog');
+            log.textContent = JSON.stringify(window.dataLayer, null, 2);
+        }
+        
+        function simulateBookingEvent() {
+            // This simulates what the HIC plugin pushes to dataLayer
+            const bookingEvent = {
+                'event': 'purchase',
+                'ecommerce': {
+                    'transaction_id': 'HIC_' + Date.now(),
+                    'affiliation': 'HotelInCloud',
+                    'value': 150.00,
+                    'currency': 'EUR',
+                    'items': [{
+                        'item_id': 'HIC_' + Date.now(),
+                        'item_name': 'Prenotazione Hotel',
+                        'item_category': 'Hotel',
+                        'quantity': 1,
+                        'price': 150.00
+                    }]
+                },
+                'bucket': 'organic',        // Attribution bucket
+                'vertical': 'hotel',        // Business vertical
+                'method': 'HotelInCloud',   // Booking method
+                'event_timestamp': Math.floor(Date.now() / 1000)
+            };
+            
+            // Push to dataLayer (this is what the plugin does)
+            dataLayer.push(bookingEvent);
+            
+            console.log('📊 Evento prenotazione inviato al GTM DataLayer:', bookingEvent);
+        }
+        
+        // Show initial dataLayer state
+        updateDataLayerLog();
+    </script>
+    
+    <h2>Configurazione GTM Richiesta:</h2>
+    <div style="background: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px;">
+        <h3>1. Trigger Personalizzato</h3>
+        <ul>
+            <li><strong>Tipo:</strong> Evento personalizzato</li>
+            <li><strong>Nome evento:</strong> purchase</li>
+            <li><strong>Alcune condizioni:</strong> Event equals "purchase"</li>
+        </ul>
+        
+        <h3>2. Tag GA4 Ecommerce</h3>
+        <ul>
+            <li><strong>Tipo tag:</strong> Google Analytics: GA4 Event</li>
+            <li><strong>Nome evento:</strong> purchase</li>
+            <li><strong>Parametri:</strong>
+                <ul>
+                    <li>transaction_id: {{Transaction ID}}</li>
+                    <li>value: {{Value}}</li>
+                    <li>currency: {{Currency}}</li>
+                    <li>items: {{Items}}</li>
+                </ul>
+            </li>
+        </ul>
+        
+        <h3>3. Variabili Built-in Necessarie</h3>
+        <ul>
+            <li>Transaction ID</li>
+            <li>Value</li>
+            <li>Currency</li>
+            <li>Items</li>
+        </ul>
+    </div>
+    
+    <h2>Vantaggi di questa Integrazione:</h2>
+    <ul>
+        <li><strong>🎯 Flessibilità:</strong> Gestisci tutti i tag da GTM</li>
+        <li><strong>🔄 Centralizzazione:</strong> Un unico punto per GA4, Meta, LinkedIn, etc.</li>
+        <li><strong>⚙️ Controllo:</strong> Trigger personalizzati senza modifiche al codice</li>
+        <li><strong>📊 Enhanced Ecommerce:</strong> Supporto completo per dati transazionali</li>
+        <li><strong>🏷️ Attribution:</strong> Bucket tracking per analisi del rendimento</li>
+        <li><strong>🚫 Anti-duplicazione:</strong> Prevenzione doppia misurazione automatica</li>
+    </ul>
+</body>
+</html>

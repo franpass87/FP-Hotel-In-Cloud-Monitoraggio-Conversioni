@@ -356,9 +356,19 @@ function hic_dispatch_reservation($transformed, $original) {
     )));
     
     try {
+        // Get tracking mode to determine which integrations to use
+        $tracking_mode = hic_get_tracking_mode();
+        
         // GA4 - only send once unless it's a status update we want to track
         if (!$is_status_update) {
-            hic_dispatch_ga4_reservation($transformed);
+            if ($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') {
+                hic_dispatch_ga4_reservation($transformed);
+            }
+            
+            // GTM - send to dataLayer for client-side processing
+            if ($tracking_mode === 'gtm_only' || $tracking_mode === 'hybrid') {
+                hic_dispatch_gtm_reservation($transformed);
+            }
         }
         
         // Meta Pixel - only send once unless it's a status update we want to track  
