@@ -235,22 +235,48 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
 
 /**
  * Send reservation_created event to Brevo for real-time notifications
+ *
+ * @param array  $data   Transformed reservation data
+ * @param string $gclid  Google click ID
+ * @param string $fbclid Facebook click ID
+ *
+ * @return array {
+ *     @type bool        $success   Whether the event was sent successfully
+ *     @type bool|null   $retryable Whether the failure is retryable
+ *     @type string|null $error     Error message when not successful
+ *     @type bool        $skipped   True when the event was skipped before sending
+ * }
  */
 function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = '') {
-  if (!hic_get_brevo_api_key()) { 
-    hic_log('Brevo reservation_created event SKIPPED: API key mancante'); 
-    return false; 
+  if (!hic_get_brevo_api_key()) {
+    hic_log('Brevo reservation_created event SKIPPED: API key mancante');
+    return array(
+      'success' => false,
+      'retryable' => false,
+      'error' => 'API key mancante',
+      'skipped' => true,
+    );
   }
 
   if (!hic_realtime_brevo_sync_enabled()) {
     hic_log('Brevo reservation_created event SKIPPED: real-time sync disabilitato');
-    return false;
+    return array(
+      'success' => false,
+      'retryable' => false,
+      'error' => 'real-time sync disabilitato',
+      'skipped' => true,
+    );
   }
 
   $email = isset($data['email']) ? $data['email'] : '';
-  if (!hic_is_valid_email($email)) { 
-    hic_log('Brevo reservation_created event SKIPPED: email mancante o non valida'); 
-    return false; 
+  if (!hic_is_valid_email($email)) {
+    hic_log('Brevo reservation_created event SKIPPED: email mancante o non valida');
+    return array(
+      'success' => false,
+      'retryable' => false,
+      'error' => 'email mancante o non valida',
+      'skipped' => true,
+    );
   }
 
   // Validate essential data fields
@@ -261,10 +287,15 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   if (empty($data['original_price']) && $data['original_price'] !== 0) {
     $validation_errors[] = 'original_price missing';
   }
-  
+
   if (!empty($validation_errors)) {
     hic_log('Brevo reservation_created event SKIPPED: validation errors - ' . implode(', ', $validation_errors));
-    return false;
+    return array(
+      'success' => false,
+      'retryable' => false,
+      'error' => 'validation errors',
+      'skipped' => true,
+    );
   }
 
   // Get gclid/fbclid for bucket normalization if available
@@ -359,7 +390,8 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     return array(
       'success' => false,
       'retryable' => $is_retryable,
-      'error' => $result['error']
+      'error' => $result['error'],
+      'skipped' => false,
     );
   }
 
@@ -367,7 +399,8 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   return array(
     'success' => true,
     'retryable' => null,
-    'error' => null
+    'error' => null,
+    'skipped' => false,
   );
 }
 
