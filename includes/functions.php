@@ -39,6 +39,11 @@ function hic_reliable_polling_enabled() { return hic_get_option('reliable_pollin
 function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
 function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR . '/hic-log.txt'); }
 
+// GTM Settings
+function hic_is_gtm_enabled() { return hic_get_option('gtm_enabled', '0') === '1'; }
+function hic_get_gtm_container_id() { return hic_get_option('gtm_container_id', ''); }
+function hic_get_tracking_mode() { return hic_get_option('tracking_mode', 'ga4_only'); }
+
 // Facebook Settings
 function hic_get_fb_pixel_id() { return hic_get_option('fb_pixel_id', ''); }
 function hic_get_fb_access_token() { return hic_get_option('fb_access_token', ''); }

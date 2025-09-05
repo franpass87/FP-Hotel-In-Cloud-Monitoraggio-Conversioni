@@ -70,15 +70,30 @@ function hic_process_booking_data($data) {
   $error_count = 0;
   
   try {
-    // GA4 Integration
-    if (hic_get_measurement_id() && hic_get_api_secret()) {
+    // Tracking integration based on selected mode
+    $tracking_mode = hic_get_tracking_mode();
+    
+    // GA4 Integration (server-side)
+    if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') && 
+        hic_get_measurement_id() && hic_get_api_secret()) {
       if (hic_send_to_ga4($data, $gclid, $fbclid)) {
         $success_count++;
       } else {
         $error_count++;
       }
-    } else {
-      hic_log('hic_process_booking_data: GA4 credentials missing, skipping');
+    } else if ($tracking_mode === 'ga4_only') {
+      hic_log('hic_process_booking_data: GA4 credentials missing for ga4_only mode, skipping');
+    }
+    
+    // GTM Integration (client-side via dataLayer)
+    if (($tracking_mode === 'gtm_only' || $tracking_mode === 'hybrid') && hic_is_gtm_enabled()) {
+      if (hic_send_to_gtm_datalayer($data, $gclid, $fbclid)) {
+        $success_count++;
+      } else {
+        $error_count++;
+      }
+    } else if ($tracking_mode === 'gtm_only') {
+      hic_log('hic_process_booking_data: GTM not enabled for gtm_only mode, skipping');
     }
     
     // Facebook Integration

@@ -1,0 +1,295 @@
+<?php
+/**
+ * Google Tag Manager Integration
+ */
+
+if (!defined('ABSPATH')) exit;
+
+/**
+ * Send conversion data to GTM Data Layer
+ * This pushes data to the client-side dataLayer for GTM to process
+ */
+function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
+    // Only proceed if GTM is enabled
+    if (!hic_is_gtm_enabled()) {
+        return false;
+    }
+
+    // Validate input data
+    if (!is_array($data)) {
+        hic_log('GTM DataLayer: data is not an array');
+        return false;
+    }
+
+    $bucket = fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+
+    // Validate and normalize amount
+    $amount = 0;
+    if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
+        $amount = hic_normalize_price($data['amount']);
+    }
+
+    // Generate transaction ID using consistent extraction
+    $transaction_id = hic_extract_reservation_id($data);
+    if (empty($transaction_id)) {
+        $transaction_id = uniqid('hic_gtm_');
+    }
+
+    // Prepare enhanced ecommerce data for GTM
+    $gtm_data = [
+        'event' => 'purchase',
+        'ecommerce' => [
+            'transaction_id' => $transaction_id,
+            'affiliation' => 'HotelInCloud',
+            'value' => $amount,
+            'currency' => sanitize_text_field($data['currency'] ?? 'EUR'),
+            'items' => [[
+                'item_id' => $transaction_id,
+                'item_name' => sanitize_text_field($data['room'] ?? 'Prenotazione'),
+                'item_category' => 'Hotel',
+                'quantity' => 1,
+                'price' => $amount
+            ]]
+        ],
+        // Custom dimensions for attribution
+        'bucket' => $bucket,
+        'vertical' => 'hotel',
+        'method' => 'HotelInCloud'
+    ];
+
+    // Add tracking IDs if available for enhanced attribution
+    if (!empty($gclid)) {
+        $gtm_data['gclid'] = sanitize_text_field($gclid);
+    }
+    if (!empty($fbclid)) {
+        $gtm_data['fbclid'] = sanitize_text_field($fbclid);
+    }
+
+    // Store the data to be pushed to dataLayer on next page load
+    hic_queue_gtm_event($gtm_data);
+
+    hic_log("GTM DataLayer: queued purchase event for transaction_id=$transaction_id, bucket=$bucket, value=$amount");
+    return true;
+}
+
+/**
+ * Queue GTM event for client-side processing
+ * Events are stored in wp_options and pushed on next page load
+ */
+function hic_queue_gtm_event($event_data) {
+    $queued_events = get_option('hic_gtm_queued_events', []);
+    
+    // Add timestamp to avoid conflicts
+    $event_data['event_timestamp'] = time();
+    
+    $queued_events[] = $event_data;
+    
+    // Keep only last 10 events to avoid database bloat
+    if (count($queued_events) > 10) {
+        $queued_events = array_slice($queued_events, -10);
+    }
+    
+    update_option('hic_gtm_queued_events', $queued_events);
+}
+
+/**
+ * Get and clear queued GTM events
+ */
+function hic_get_and_clear_gtm_events() {
+    $events = get_option('hic_gtm_queued_events', []);
+    delete_option('hic_gtm_queued_events');
+    return $events;
+}
+
+/**
+ * Output GTM container code in <head>
+ */
+function hic_output_gtm_head_code() {
+    if (!hic_is_gtm_enabled()) {
+        return;
+    }
+    
+    $container_id = hic_get_gtm_container_id();
+    if (empty($container_id)) {
+        return;
+    }
+    
+    // Validate GTM container ID format
+    if (!preg_match('/^GTM-[A-Z0-9]+$/', $container_id)) {
+        hic_log("GTM: Invalid container ID format: $container_id");
+        return;
+    }
+    
+    ?>
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','<?php echo esc_js($container_id); ?>');</script>
+    <!-- End Google Tag Manager -->
+    <?php
+}
+
+/**
+ * Output GTM noscript code in <body>
+ */
+function hic_output_gtm_body_code() {
+    if (!hic_is_gtm_enabled()) {
+        return;
+    }
+    
+    $container_id = hic_get_gtm_container_id();
+    if (empty($container_id) || !preg_match('/^GTM-[A-Z0-9]+$/', $container_id)) {
+        return;
+    }
+    
+    ?>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?php echo esc_attr($container_id); ?>"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+    <?php
+}
+
+/**
+ * Output queued GTM events to dataLayer
+ */
+function hic_output_gtm_events() {
+    if (!hic_is_gtm_enabled()) {
+        return;
+    }
+    
+    $events = hic_get_and_clear_gtm_events();
+    if (empty($events)) {
+        return;
+    }
+    
+    ?>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    <?php foreach ($events as $event): ?>
+    dataLayer.push(<?php echo wp_json_encode($event); ?>);
+    <?php endforeach; ?>
+    </script>
+    <?php
+}
+
+/**
+ * Hook GTM scripts into WordPress
+ */
+function hic_init_gtm_hooks() {
+    if (!hic_is_gtm_enabled()) {
+        return;
+    }
+    
+    // Add GTM head code
+    add_action('wp_head', 'hic_output_gtm_head_code', 1);
+    
+    // Add GTM body code (early in body)
+    add_action('wp_body_open', 'hic_output_gtm_body_code', 1);
+    
+    // Fallback for themes that don't support wp_body_open
+    add_action('wp_footer', function() {
+        if (!did_action('wp_body_open')) {
+            hic_output_gtm_body_code();
+        }
+    }, 1);
+    
+    // Output queued events
+    add_action('wp_footer', 'hic_output_gtm_events', 20);
+}
+
+// Initialize GTM hooks when WordPress is ready
+add_action('init', 'hic_init_gtm_hooks');
+
+/**
+ * GTM dispatcher for HIC reservation schema
+ * Similar to GA4 dispatcher but for GTM DataLayer
+ */
+function hic_dispatch_gtm_reservation($data) {
+    // Only proceed if GTM is enabled
+    if (!hic_is_gtm_enabled()) {
+        return false;
+    }
+
+    // Validate input data
+    if (!is_array($data)) {
+        hic_log('GTM dispatch: data is not an array');
+        return false;
+    }
+
+    // Validate required fields
+    $required_fields = ['transaction_id', 'value', 'currency'];
+    foreach ($required_fields as $field) {
+        if (!isset($data[$field])) {
+            hic_log("GTM dispatch: Missing required field '$field'");
+            return false;
+        }
+    }
+
+    $transaction_id = sanitize_text_field($data['transaction_id']);
+    $value = hic_normalize_price($data['value']);
+    $currency = sanitize_text_field($data['currency']);
+
+    // Get gclid/fbclid for bucket normalization if available
+    $gclid = '';
+    $fbclid = '';
+    if (!empty($data['transaction_id'])) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'hic_gclids';
+        
+        // Check if table exists before querying
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+        if ($table_exists) {
+            // Try to find tracking data using transaction_id as sid
+            $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
+            if ($row) { 
+                $gclid = $row->gclid ?: ''; 
+                $fbclid = $row->fbclid ?: ''; 
+            }
+        }
+    }
+
+    $bucket = fp_normalize_bucket($gclid, $fbclid);
+
+    // Prepare GTM ecommerce data
+    $gtm_data = [
+        'event' => 'purchase',
+        'ecommerce' => [
+            'transaction_id' => $transaction_id,
+            'affiliation' => 'HotelInCloud',
+            'value' => $value,
+            'currency' => $currency,
+            'items' => [[
+                'item_id' => sanitize_text_field($data['accommodation_id'] ?? ''),
+                'item_name' => sanitize_text_field($data['accommodation_name'] ?? 'Accommodation'),
+                'item_category' => sanitize_text_field($data['room_name'] ?? 'Hotel'),
+                'quantity' => max(1, intval($data['guests'] ?? 1)),
+                'price' => $value
+            ]]
+        ],
+        // Custom properties
+        'checkin' => sanitize_text_field($data['from_date'] ?? ''),
+        'checkout' => sanitize_text_field($data['to_date'] ?? ''),
+        'reservation_code' => sanitize_text_field($data['reservation_code'] ?? ''),
+        'presence' => sanitize_text_field($data['presence'] ?? ''),
+        'unpaid_balance' => hic_normalize_price($data['unpaid_balance'] ?? 0),
+        'bucket' => $bucket,
+        'vertical' => 'hotel'
+    ];
+
+    // Add tracking IDs if available
+    if (!empty($gclid)) {
+        $gtm_data['gclid'] = sanitize_text_field($gclid);
+    }
+    if (!empty($fbclid)) {
+        $gtm_data['fbclid'] = sanitize_text_field($fbclid);
+    }
+
+    // Queue the event
+    hic_queue_gtm_event($gtm_data);
+
+    hic_log("GTM dispatch: queued purchase event for bucket=$bucket vertical=hotel transaction_id=$transaction_id value=$value $currency");
+    return true;
+}
