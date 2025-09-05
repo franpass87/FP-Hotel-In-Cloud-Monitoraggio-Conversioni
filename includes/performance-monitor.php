@@ -447,13 +447,17 @@ class HIC_Performance_Monitor {
      * AJAX handler for getting metrics
      */
     public function ajax_get_metrics() {
-        if (!current_user_can('manage_options')) {
-            wp_die(json_encode(['error' => 'Insufficient permissions']));
+        if (!check_ajax_referer('hic_monitor_nonce', 'nonce', false)) {
+            wp_send_json(['error' => 'Invalid nonce'], 403);
         }
-        
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json(['error' => 'Insufficient permissions'], 403);
+        }
+
         $type = sanitize_text_field($_GET['type'] ?? 'summary');
         $days = absint($_GET['days'] ?? 7);
-        
+
         switch ($type) {
             case 'summary':
                 $data = $this->get_performance_summary($days);
@@ -467,8 +471,8 @@ class HIC_Performance_Monitor {
             default:
                 $data = ['error' => 'Invalid type'];
         }
-        
-        wp_die(json_encode($data));
+
+        wp_send_json($data);
     }
     
     /**

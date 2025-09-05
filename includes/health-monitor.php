@@ -440,14 +440,18 @@ class HIC_Health_Monitor {
      * AJAX health check handler
      */
     public function ajax_health_check() {
-        if (!current_user_can('manage_options')) {
-            wp_die(json_encode(['error' => 'Insufficient permissions']));
+        if (!check_ajax_referer('hic_monitor_nonce', 'nonce', false)) {
+            wp_send_json(['error' => 'Invalid nonce'], 403);
         }
-        
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json(['error' => 'Insufficient permissions'], 403);
+        }
+
         $level = sanitize_text_field($_GET['level'] ?? HIC_DIAGNOSTIC_BASIC);
         $health_data = $this->check_health($level);
-        
-        wp_die(json_encode($health_data));
+
+        wp_send_json($health_data);
     }
     
     /**
@@ -459,8 +463,8 @@ class HIC_Health_Monitor {
             'timestamp' => current_time('mysql'),
             'version' => HIC_PLUGIN_VERSION
         ];
-        
-        wp_die(json_encode($health_data));
+
+        wp_send_json($health_data);
     }
     
     /**
