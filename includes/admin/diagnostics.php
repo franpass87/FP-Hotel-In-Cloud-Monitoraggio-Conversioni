@@ -178,9 +178,17 @@ function hic_get_credentials_status() {
  * Get last execution times and stats
  */
 function hic_get_execution_stats() {
+    // Get the most recent polling timestamp from various sources
+    $last_api_poll = get_option('hic_last_api_poll', 0);
+    $last_continuous_poll = get_option('hic_last_continuous_poll', 0);
+    $last_successful_poll = get_option('hic_last_successful_poll', 0);
+    
+    // Use the most recent timestamp as the "last poll time"
+    $last_poll_time = max($last_api_poll, $last_continuous_poll, $last_successful_poll);
+    
     return array(
-        'last_poll_time' => get_option('hic_last_api_poll', 0),
-        'last_successful_poll' => get_option('hic_last_successful_poll', 0),
+        'last_poll_time' => $last_poll_time,
+        'last_successful_poll' => $last_successful_poll,
         'last_updates_time' => get_option('hic_last_updates_since', 0),
         'processed_reservations' => count(get_option('hic_synced_res_ids', array())),
         'enriched_emails' => count(get_option('hic_res_email_map', array())),
