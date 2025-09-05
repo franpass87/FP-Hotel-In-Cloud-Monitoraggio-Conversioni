@@ -45,18 +45,11 @@ class HICFunctionsTest {
     }
     
     public function testGTMHelperFunctions() {
-        // Mock WordPress option functions for testing
-        if (!function_exists('get_option')) {
-            function get_option($name, $default = '') {
-                $options = [
-                    'hic_gtm_enabled' => '1',
-                    'hic_gtm_container_id' => 'GTM-TEST123',
-                    'hic_tracking_mode' => 'hybrid'
-                ];
-                return $options[$name] ?? $default;
-            }
-        }
-        
+        // Configure options for testing
+        update_option('hic_gtm_enabled', '1');
+        update_option('hic_gtm_container_id', 'GTM-TEST123');
+        update_option('hic_tracking_mode', 'hybrid');
+
         // Test GTM helper functions
         assert(hic_is_gtm_enabled() === true, 'GTM should be enabled when option is "1"');
         assert(hic_get_gtm_container_id() === 'GTM-TEST123', 'Should return correct GTM container ID');
