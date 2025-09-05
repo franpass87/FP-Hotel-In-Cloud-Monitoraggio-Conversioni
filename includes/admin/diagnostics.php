@@ -607,19 +607,16 @@ add_action('wp_ajax_hic_get_system_status', 'hic_ajax_get_system_status');
 
 
 function hic_ajax_refresh_diagnostics() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     try {
         $data = array(
             'scheduler_status' => hic_get_internal_scheduler_status(),
@@ -628,71 +625,68 @@ function hic_ajax_refresh_diagnostics() {
             'recent_logs' => hic_get_recent_log_entries(20),
             'error_stats' => hic_get_error_stats()
         );
-        
-        wp_die(json_encode(array('success' => true, 'data' => $data)));
+
+        wp_send_json_success($data);
     } catch (Exception $e) {
         hic_log('AJAX Refresh Diagnostics Error: ' . $e->getMessage());
-        wp_die(json_encode(array('success' => false, 'message' => 'Errore durante il caricamento diagnostiche: ' . $e->getMessage())));
+        wp_send_json_error(array('message' => 'Errore durante il caricamento diagnostiche: ' . $e->getMessage()));
     } catch (Error $e) {
         hic_log('AJAX Refresh Diagnostics Fatal Error: ' . $e->getMessage());
-        wp_die(json_encode(array('success' => false, 'message' => 'Errore fatale durante il caricamento diagnostiche: ' . $e->getMessage())));
+        wp_send_json_error(array('message' => 'Errore fatale durante il caricamento diagnostiche: ' . $e->getMessage()));
     }
 }
 
 function hic_ajax_test_dispatch() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     $result = hic_test_dispatch_functions();
-    wp_die(json_encode($result));
+    if (!empty($result['success'])) {
+        unset($result['success']);
+        wp_send_json_success($result);
+    } else {
+        unset($result['success']);
+        wp_send_json_error($result);
+    }
 }
 
 function hic_ajax_force_reschedule() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     $results = hic_force_restart_internal_scheduler();
-    wp_die(json_encode(array('success' => true, 'results' => $results)));
+    wp_send_json_success(array('results' => $results));
 }
 
 function hic_ajax_create_tables() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     try {
         // Call the database table creation function
         $result = hic_create_database_table();
-        
+
         if ($result) {
             // Check which tables now exist
             global $wpdb;
@@ -702,74 +696,76 @@ function hic_ajax_create_tables() {
                 'realtime_sync' => $wpdb->prefix . 'hic_realtime_sync',
                 'booking_events' => $wpdb->prefix . 'hic_booking_events'
             );
-            
+
             $all_exist = true;
             foreach ($expected_tables as $name => $table) {
                 $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
                 $tables_status[$name] = $exists;
-                if (!$exists) $all_exist = false;
+                if (!$exists) {
+                    $all_exist = false;
+                }
             }
-            
+
             $details = array();
             foreach ($tables_status as $name => $exists) {
                 $details[] = $name . ': ' . ($exists ? 'OK' : 'MANCANTE');
             }
-            
-            wp_die(json_encode(array(
-                'success' => $all_exist,
+
+            $payload = array(
                 'message' => $all_exist ? 'Tutte le tabelle sono state create/verificate con successo.' : 'Alcune tabelle potrebbero non essere state create.',
                 'details' => implode(', ', $details)
-            )));
-            
+            );
+
+            if ($all_exist) {
+                wp_send_json_success($payload);
+            } else {
+                wp_send_json_error($payload);
+            }
         } else {
-            wp_die(json_encode(array(
-                'success' => false,
-                'message' => 'Errore durante la creazione delle tabelle. Controlla i log per maggiori dettagli.'
-            )));
+            wp_send_json_error(array('message' => 'Errore durante la creazione delle tabelle. Controlla i log per maggiori dettagli.'));
         }
-        
     } catch (Exception $e) {
-        wp_die(json_encode(array(
-            'success' => false,
-            'message' => 'Errore: ' . $e->getMessage()
-        )));
+        wp_send_json_error(array('message' => 'Errore: ' . $e->getMessage()));
     }
 }
 
 function hic_ajax_backfill_reservations() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     // Get and validate input parameters
     $from_date = sanitize_text_field($_POST['from_date'] ?? '');
     $to_date = sanitize_text_field($_POST['to_date'] ?? '');
     $date_type = sanitize_text_field($_POST['date_type'] ?? 'checkin');
     $limit = isset($_POST['limit']) ? intval($_POST['limit']) : null;
-    
+
     // Validate date type (based on API documentation: only checkin, checkout, presence are valid for /reservations endpoint)
     if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence".')));
+        wp_send_json_error(array('message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence".'));
     }
-    
+
     // Validate required fields
     if (empty($from_date) || empty($to_date)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Date di inizio e fine sono obbligatorie')));
+        wp_send_json_error(array('message' => 'Date di inizio e fine sono obbligatorie'));
     }
-    
+
     // Call the backfill function
     $result = hic_backfill_reservations($from_date, $to_date, $date_type, $limit);
-    
-    wp_die(json_encode($result));
+
+    if (!empty($result['success'])) {
+        unset($result['success']);
+        wp_send_json_success($result);
+    } else {
+        unset($result['success']);
+        wp_send_json_error($result);
+    }
 }
 
 /**
@@ -799,95 +795,84 @@ function hic_convert_api_booking_to_processor_format($api_booking) {
 }
 
 function hic_ajax_download_latest_bookings() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     try {
         // Get latest bookings (with duplicate prevention)
         $result = hic_get_latest_bookings(5, true);
-        
+
         if (is_wp_error($result)) {
-            wp_die(json_encode(array(
-                'success' => false, 
-                'message' => 'Errore nel recupero prenotazioni: ' . $result->get_error_message()
-            )));
+            wp_send_json_error(array('message' => 'Errore nel recupero prenotazioni: ' . $result->get_error_message()));
         }
-        
+
         if (empty($result)) {
             // Check if we have any bookings at all (without filtering)
             $all_bookings = hic_get_latest_bookings(5, false);
             if (is_wp_error($all_bookings) || empty($all_bookings)) {
-                wp_die(json_encode(array(
-                    'success' => false, 
-                    'message' => 'Nessuna prenotazione trovata nell\'API'
-                )));
+                wp_send_json_error(array('message' => 'Nessuna prenotazione trovata nell\'API'));
             } else {
-                wp_die(json_encode(array(
-                    'success' => false, 
+                wp_send_json_error(array(
                     'message' => 'Tutte le ultime 5 prenotazioni sono già state inviate. Usa il bottone "Reset Download Tracking" per reinviarle.',
                     'already_downloaded' => true
-                )));
+                ));
             }
         }
-        
+
         // Process bookings through the normal integration pipeline
         $processing_results = array();
         $success_count = 0;
         $error_count = 0;
         $booking_ids = array();
-        
+
         foreach ($result as $booking) {
             // Extract booking ID for tracking
             if (isset($booking['id']) && !empty($booking['id'])) {
                 $booking_ids[] = $booking['id'];
             }
-            
+
             // Convert API booking format to processor format
             $processed_data = hic_convert_api_booking_to_processor_format($booking);
-            
+
             // Process the booking through normal integration pipeline
             hic_log("Processing downloaded booking ID: " . ($booking['id'] ?? 'N/A') . " for integrations");
-            
+
             $processing_success = hic_process_booking_data($processed_data);
-            
+
             $processing_results[] = array(
                 'booking_id' => $booking['id'] ?? 'N/A',
                 'email' => $processed_data['email'] ?? 'N/A',
                 'success' => $processing_success,
                 'amount' => $processed_data['amount'] ?? 'N/A'
             );
-            
+
             if ($processing_success) {
                 $success_count++;
             } else {
                 $error_count++;
             }
         }
-        
+
         // Mark these bookings as processed
         if (!empty($booking_ids)) {
             hic_mark_bookings_as_downloaded($booking_ids);
         }
-        
+
         // Get integration status for report
         $integration_status = array(
             'ga4_configured' => !empty(hic_get_measurement_id()) && !empty(hic_get_api_secret()),
             'brevo_configured' => hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key()),
             'facebook_configured' => !empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())
         );
-        
-        wp_die(json_encode(array(
-            'success' => true,
+
+        wp_send_json_success(array(
             'message' => "Prenotazioni inviate alle integrazioni configurate",
             'count' => count($result),
             'success_count' => $success_count,
@@ -895,78 +880,60 @@ function hic_ajax_download_latest_bookings() {
             'booking_ids' => $booking_ids,
             'integration_status' => $integration_status,
             'processing_results' => $processing_results
-        )));
-        
+        ));
     } catch (Exception $e) {
-        wp_die(json_encode(array(
-            'success' => false, 
-            'message' => 'Errore: ' . $e->getMessage()
-        )));
+        wp_send_json_error(array('message' => 'Errore: ' . $e->getMessage()));
     }
 }
 
 function hic_ajax_reset_download_tracking() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     try {
         // Reset the download tracking
         hic_reset_downloaded_bookings();
-        
-        wp_die(json_encode(array(
-            'success' => true,
+
+        wp_send_json_success(array(
             'message' => 'Tracking degli invii resettato con successo. Ora puoi inviare nuovamente tutte le prenotazioni alle integrazioni.'
-        )));
-        
+        ));
     } catch (Exception $e) {
-        wp_die(json_encode(array(
-            'success' => false, 
-            'message' => 'Errore durante il reset: ' . $e->getMessage()
-        )));
+        wp_send_json_error(array('message' => 'Errore durante il reset: ' . $e->getMessage()));
     }
 }
 
 function hic_ajax_force_polling() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     try {
         // Get force flag from request
         $force = isset($_POST['force']) && $_POST['force'] === 'true';
-        
+
         // Check if poller class exists
         if (!class_exists('HIC_Booking_Poller')) {
-            wp_die(json_encode(array(
-                'success' => false, 
-                'message' => 'HIC_Booking_Poller class not found'
-            )));
+            wp_send_json_error(array('message' => 'HIC_Booking_Poller class not found'));
         }
-        
+
         $poller = new HIC_Booking_Poller();
-        
+
         // Get diagnostics before polling
         $diagnostics_before = $poller->get_detailed_diagnostics();
-        
+
         // Execute polling (force or normal)
         if ($force) {
             hic_log('Admin Force Polling: Starting force execution');
@@ -975,25 +942,27 @@ function hic_ajax_force_polling() {
             hic_log('Admin Manual Polling: Starting normal execution');
             $result = $poller->execute_poll();
         }
-        
+
         // Get stats after polling
         $stats_after = $poller->get_stats();
-        
+
         // Prepare response
         $response = array_merge($result, array(
             'diagnostics_before' => $diagnostics_before,
             'stats_after' => $stats_after,
             'force_mode' => $force
         ));
-        
-        wp_die(json_encode($response));
-        
+
+        if (!empty($response['success'])) {
+            unset($response['success']);
+            wp_send_json_success($response);
+        } else {
+            unset($response['success']);
+            wp_send_json_error($response);
+        }
     } catch (Exception $e) {
         hic_log('Admin Polling Error: ' . $e->getMessage());
-        wp_die(json_encode(array(
-            'success' => false, 
-            'message' => 'Errore durante l\'esecuzione del polling: ' . $e->getMessage()
-        )));
+        wp_send_json_error(array('message' => 'Errore durante l\'esecuzione del polling: ' . $e->getMessage()));
     }
 }
 
@@ -1001,59 +970,48 @@ function hic_ajax_force_polling() {
  * AJAX handler for triggering watchdog check
  */
 function hic_ajax_trigger_watchdog() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_admin_action', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     try {
         hic_log('Admin Watchdog: Manual watchdog trigger initiated');
-        
+
         // Check if required functions exist
         if (!function_exists('hic_trigger_watchdog_check')) {
             throw new Exception('Function hic_trigger_watchdog_check not found');
         }
-        
+
         if (!function_exists('hic_force_restart_internal_scheduler')) {
             throw new Exception('Function hic_force_restart_internal_scheduler not found');
         }
-        
+
         // Execute watchdog check
         $watchdog_result = hic_trigger_watchdog_check();
-        
+
         // Also force restart the scheduler for good measure
         $restart_result = hic_force_restart_internal_scheduler();
-        
+
         $response = array(
-            'success' => true,
             'message' => 'Watchdog check completed successfully',
             'watchdog_result' => $watchdog_result,
             'scheduler_restart' => $restart_result
         );
-        
+
         hic_log('Admin Watchdog: Manual watchdog trigger completed successfully');
-        wp_die(json_encode($response));
-        
+        wp_send_json_success($response);
     } catch (Exception $e) {
         hic_log('Admin Watchdog Error: ' . $e->getMessage());
-        wp_die(json_encode(array(
-            'success' => false, 
-            'message' => 'Errore durante l\'esecuzione del watchdog: ' . $e->getMessage()
-        )));
+        wp_send_json_error(array('message' => 'Errore durante l\'esecuzione del watchdog: ' . $e->getMessage()));
     } catch (Error $e) {
         hic_log('Admin Watchdog Fatal Error: ' . $e->getMessage());
-        wp_die(json_encode(array(
-            'success' => false, 
-            'message' => 'Errore fatale durante l\'esecuzione del watchdog: ' . $e->getMessage()
-        )));
+        wp_send_json_error(array('message' => 'Errore fatale durante l\'esecuzione del watchdog: ' . $e->getMessage()));
     }
 }
 
@@ -1061,59 +1019,43 @@ function hic_ajax_trigger_watchdog() {
  * AJAX handler for resetting timestamps (emergency recovery)
  */
 function hic_ajax_reset_timestamps() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_admin_action', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     try {
         hic_log('Admin Timestamp Reset: Manual timestamp reset initiated');
-        
+
         // Execute timestamp recovery using the new method
         if (class_exists('HIC_Booking_Poller')) {
             $poller = new HIC_Booking_Poller();
-            
+
             // Check if the method exists
             if (!method_exists($poller, 'trigger_timestamp_recovery')) {
                 throw new Exception('Method trigger_timestamp_recovery not found in HIC_Booking_Poller class');
             }
-            
+
             $result = $poller->trigger_timestamp_recovery();
-            
-            $response = array(
-                'success' => true,
+
+            wp_send_json_success(array(
                 'message' => 'Timestamp reset completed successfully - all timestamps reset and scheduler restarted',
                 'result' => $result
-            );
+            ));
         } else {
-            $response = array(
-                'success' => false,
-                'message' => 'HIC_Booking_Poller class not available'
-            );
+            wp_send_json_error(array('message' => 'HIC_Booking_Poller class not available'));
         }
-        
-        wp_die(json_encode($response));
-        
     } catch (Exception $e) {
         hic_log('Admin Timestamp Reset Error: ' . $e->getMessage());
-        wp_die(json_encode(array(
-            'success' => false, 
-            'message' => 'Errore durante il reset dei timestamp: ' . $e->getMessage()
-        )));
+        wp_send_json_error(array('message' => 'Errore durante il reset dei timestamp: ' . $e->getMessage()));
     } catch (Error $e) {
         hic_log('Admin Timestamp Reset Fatal Error: ' . $e->getMessage());
-        wp_die(json_encode(array(
-            'success' => false, 
-            'message' => 'Errore fatale durante il reset dei timestamp: ' . $e->getMessage()
-        )));
+        wp_send_json_error(array('message' => 'Errore fatale durante il reset dei timestamp: ' . $e->getMessage()));
     }
 }
 
@@ -1121,41 +1063,31 @@ function hic_ajax_reset_timestamps() {
  * AJAX handler for getting system status updates
  */
 function hic_ajax_get_system_status() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     // Verify nonce
     if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+        wp_send_json_error(array('message' => 'Invalid nonce'));
     }
-    
+
     // Check permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+        wp_send_json_error(array('message' => 'Insufficient permissions'));
     }
-    
+
     try {
         // Get current system status
         $scheduler_status = hic_get_internal_scheduler_status();
-        
+
         $status_data = array(
-            'polling_active' => $scheduler_status['internal_scheduler']['enabled'] && 
+            'polling_active' => $scheduler_status['internal_scheduler']['enabled'] &&
                                $scheduler_status['internal_scheduler']['conditions_met'],
             'last_execution' => $scheduler_status['internal_scheduler']['last_poll_human'] ?? 'Mai eseguito',
             'next_execution' => $scheduler_status['internal_scheduler']['next_run_human'] ?? 'Sconosciuto',
             'system_health' => 'ok' // Could be enhanced with more health checks
         );
-        
-        wp_die(json_encode(array(
-            'success' => true,
-            'data' => $status_data
-        )));
-        
+
+        wp_send_json_success($status_data);
     } catch (Exception $e) {
-        wp_die(json_encode(array(
-            'success' => false, 
-            'message' => 'Errore nel recupero dello stato: ' . $e->getMessage()
-        )));
+        wp_send_json_error(array('message' => 'Errore nel recupero dello stato: ' . $e->getMessage()));
     }
 }
 
@@ -3315,29 +3247,24 @@ function hic_ajax_download_error_logs() {
  * AJAX handler for testing Brevo API connectivity
  */
 function hic_ajax_test_brevo_connectivity() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
     check_admin_referer('hic_admin_action', 'nonce');
-    
+
     if (!hic_get_brevo_api_key()) {
-        wp_die(json_encode(array(
-            'success' => false,
+        wp_send_json_error(array(
             'message' => 'API key Brevo mancante. Configura prima l\'API key nelle impostazioni.'
-        )));
+        ));
     }
-    
+
     // Test contact API
     $contact_test = hic_test_brevo_contact_api();
-    
+
     // Test event API
     $event_test = hic_test_brevo_event_api();
-    
-    wp_die(json_encode(array(
-        'success' => true,
+
+    wp_send_json_success(array(
         'message' => 'Test connettività Brevo completato',
         'contact_api' => $contact_test,
         'event_api' => $event_test
-    )));
+    ));
 }
 
