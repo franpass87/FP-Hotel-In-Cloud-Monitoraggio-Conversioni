@@ -21,6 +21,7 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 - [Come Funziona il Plugin](PLUGIN_FUNZIONAMENTO.md) - Spiegazione dettagliata
 - [Architettura Tecnica](ARCHITETTURA_TECNICA.md) - Diagrammi e flussi
 - [Guida Configurazione](GUIDA_CONFIGURAZIONE.md) - Setup passo-passo
+- [Integrazione Google Tag Manager](GUIDA_GTM_INTEGRAZIONE.md) - GTM vs GA4, prevenzione doppia misurazione
 - [FAQ - Domande Frequenti](FAQ.md) - Risposte alle domande comuni
 
 ## Configurazione API

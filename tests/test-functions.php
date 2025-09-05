@@ -43,6 +43,27 @@ class HICFunctionsTest {
         
         echo "✅ Email validation tests passed\n";
     }
+    
+    public function testGTMHelperFunctions() {
+        // Mock WordPress option functions for testing
+        if (!function_exists('get_option')) {
+            function get_option($name, $default = '') {
+                $options = [
+                    'hic_gtm_enabled' => '1',
+                    'hic_gtm_container_id' => 'GTM-TEST123',
+                    'hic_tracking_mode' => 'hybrid'
+                ];
+                return $options[$name] ?? $default;
+            }
+        }
+        
+        // Test GTM helper functions
+        assert(hic_is_gtm_enabled() === true, 'GTM should be enabled when option is "1"');
+        assert(hic_get_gtm_container_id() === 'GTM-TEST123', 'Should return correct GTM container ID');
+        assert(hic_get_tracking_mode() === 'hybrid', 'Should return correct tracking mode');
+        
+        echo "✅ GTM helper function tests passed\n";
+    }
 
     public function testPriceNormalization() {
         // European format with thousands separator
@@ -90,6 +111,7 @@ class HICFunctionsTest {
         try {
             $this->testBucketNormalization();
             $this->testEmailValidation();
+            $this->testGTMHelperFunctions();
             $this->testPriceNormalization();
             $this->testOTAEmailDetection();
             $this->testConfigurationHelpers();
