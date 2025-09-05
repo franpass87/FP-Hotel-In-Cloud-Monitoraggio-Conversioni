@@ -2511,7 +2511,7 @@ function hic_diagnostics_page() {
                 var $copyBtn = $('<button class="hic-copy-button" title="Copia negli appunti">📋</button>');
                 
                 $copyBtn.click(function() {
-                    const text = textSelector ? $element.find(textSelector).text() : $element.text();
+                    var text = textSelector ? $element.find(textSelector).text() : $element.text();
                     navigator.clipboard.writeText(text).then(function() {
                         $copyBtn.addClass('copied').text('✓');
                         showToast('Copiato negli appunti!', 'success', 2000);
@@ -3166,8 +3166,8 @@ function hic_diagnostics_page() {
         
         // Add ARIA labels to buttons and status indicators
         $('.hic-action-group .button').each(function() {
-            const $btn = $(this);
-            const text = $btn.text().trim();
+            var $btn = $(this);
+            var text = $btn.text().trim();
             $btn.attr('aria-label', 'Azione: ' + text);
         });
         
@@ -3196,7 +3196,7 @@ function hic_diagnostics_page() {
         
         // Add loading states for better screen reader support
         function announceToScreenReader(message) {
-            const announcement = $('<div>')
+            var announcement = $('<div>')
                 .attr('aria-live', 'assertive')
                 .attr('aria-atomic', 'true')
                 .addClass('sr-only')
@@ -3209,7 +3209,7 @@ function hic_diagnostics_page() {
         // Enhanced error handling with better user feedback
         $(document).ajaxError(function(event, xhr, settings, thrownError) {
             if (settings.url && settings.url.includes('admin-ajax.php')) {
-                const action = settings.data && settings.data.includes('action=') ? 
+                var action = settings.data && settings.data.includes('action=') ? 
                     settings.data.match(/action=([^&]*)/)[1] : 'unknown';
                 
                 showToast('Errore durante l\'operazione ' + action + '. Riprova.', 'error');
@@ -3219,7 +3219,7 @@ function hic_diagnostics_page() {
         
         // Add confirmation dialogs for destructive actions
         $('.button-link-delete, #reset-timestamps, #reset-timestamps-advanced').on('click', function(e) {
-            const action = $(this).text().trim();
+            var action = $(this).text().trim();
             announceToScreenReader('Azione di emergenza: ' + action + ' richiede conferma');
         });
     });
