@@ -104,7 +104,7 @@ function hic_send_brevo_event($data, $gclid, $fbclid){
 /**
  * Brevo dispatcher for HIC reservation schema
  */
-function hic_dispatch_brevo_reservation($data, $is_enrichment = false) {
+function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '') {
   if (!hic_get_brevo_api_key()) { 
     hic_log('Brevo disabilitato (API key vuota).'); 
     return; 
@@ -144,22 +144,19 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false) {
   }
 
   // Get gclid/fbclid for legacy compatibility
-  // Note: In API polling mode, these values are only available if the reservation
-  // was originally tracked through the website with tracking parameters
-  $gclid = '';
-  $fbclid = '';
-  if (!empty($data['transaction_id'])) {
+  // Use provided values when available before querying the database
+  if (!empty($data['transaction_id']) && (empty($gclid) || empty($fbclid))) {
     global $wpdb;
     $table = $wpdb->prefix . 'hic_gclids';
-    
+
     // Check if table exists before querying
     $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if ($table_exists) {
       // Try to find tracking data using transaction_id as sid
       $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
-      if ($row) { 
-        $gclid = $row->gclid ?: ''; 
-        $fbclid = $row->fbclid ?: ''; 
+      if ($row) {
+        if (empty($gclid)) { $gclid = $row->gclid ?: ''; }
+        if (empty($fbclid)) { $fbclid = $row->fbclid ?: ''; }
       }
     }
   }
@@ -239,7 +236,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false) {
 /**
  * Send reservation_created event to Brevo for real-time notifications
  */
-function hic_send_brevo_reservation_created_event($data) {
+function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = '') {
   if (!hic_get_brevo_api_key()) { 
     hic_log('Brevo reservation_created event SKIPPED: API key mancante'); 
     return false; 
@@ -271,20 +268,18 @@ function hic_send_brevo_reservation_created_event($data) {
   }
 
   // Get gclid/fbclid for bucket normalization if available
-  $gclid = '';
-  $fbclid = '';
-  if (!empty($data['transaction_id'])) {
+  if (!empty($data['transaction_id']) && (empty($gclid) || empty($fbclid))) {
     global $wpdb;
     $table = $wpdb->prefix . 'hic_gclids';
-    
+
     // Check if table exists before querying
     $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if ($table_exists) {
       // Try to find tracking data using transaction_id as sid
       $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
-      if ($row) { 
-        $gclid = $row->gclid ?: ''; 
-        $fbclid = $row->fbclid ?: ''; 
+      if ($row) {
+        if (empty($gclid)) { $gclid = $row->gclid ?: ''; }
+        if (empty($fbclid)) { $fbclid = $row->fbclid ?: ''; }
       }
     }
   }
@@ -545,7 +540,7 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid) {
   $transformed_data = hic_transform_webhook_data_for_brevo($data);
   
   // Use the modern dispatcher for contact management
-  hic_dispatch_brevo_reservation($transformed_data, false);
+  hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid);
   
   // Send event only if real-time sync is enabled and this is a new reservation
   $reservation_id = hic_extract_reservation_id($data);
@@ -553,7 +548,7 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid) {
     $is_new = hic_is_reservation_new_for_realtime($reservation_id);
     if ($is_new) {
       hic_mark_reservation_new_for_realtime($reservation_id);
-      $event_result = hic_send_brevo_reservation_created_event($transformed_data);
+      $event_result = hic_send_brevo_reservation_created_event($transformed_data, $gclid, $fbclid);
       if ($event_result['success']) {
         hic_mark_reservation_notified_to_brevo($reservation_id);
       } else {
