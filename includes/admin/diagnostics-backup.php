@@ -586,7 +586,6 @@ add_action('wp_ajax_hic_download_error_logs', 'hic_ajax_download_error_logs');
 add_action('wp_ajax_hic_trigger_watchdog', 'hic_ajax_trigger_watchdog');
 add_action('wp_ajax_hic_reset_timestamps', 'hic_ajax_reset_timestamps');
 add_action('wp_ajax_hic_test_brevo_connectivity', 'hic_ajax_test_brevo_connectivity');
-add_action('wp_ajax_hic_get_system_status', 'hic_ajax_get_system_status');
 
 
 
@@ -1101,48 +1100,6 @@ function hic_ajax_reset_timestamps() {
     }
 }
 
-/**
- * AJAX handler for getting system status updates
- */
-function hic_ajax_get_system_status() {
-    // Set JSON content type
-    header('Content-Type: application/json');
-    
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
-    }
-    
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
-    }
-    
-    try {
-        // Get current system status
-        $scheduler_status = hic_get_internal_scheduler_status();
-        
-        $status_data = array(
-            'polling_active' => $scheduler_status['internal_scheduler']['enabled'] && 
-                               $scheduler_status['internal_scheduler']['conditions_met'],
-            'last_execution' => $scheduler_status['internal_scheduler']['last_poll_human'] ?? 'Mai eseguito',
-            'next_execution' => $scheduler_status['internal_scheduler']['next_run_human'] ?? 'Sconosciuto',
-            'system_health' => 'ok' // Could be enhanced with more health checks
-        );
-        
-        wp_die(json_encode(array(
-            'success' => true,
-            'data' => $status_data
-        )));
-        
-    } catch (Exception $e) {
-        wp_die(json_encode(array(
-            'success' => false, 
-            'message' => 'Errore nel recupero dello stato: ' . $e->getMessage()
-        )));
-    }
-}
-
 /* ============ Diagnostics Admin Page ============ */
 
 /**
@@ -1165,376 +1122,938 @@ function hic_diagnostics_page() {
     
     ?>
     <div class="wrap">
-        <h1>🏨 HIC Plugin Diagnostica</h1>
+        <h1>HIC Plugin Diagnostics</h1>
         
         <div class="hic-diagnostics-container">
             
-            <!-- System Overview Section -->
-            <div class="card hic-overview-card" id="system-overview">
-                <h2>📊 Panoramica Sistema
-                    <span class="hic-refresh-indicator" id="refresh-indicator"></span>
-                </h2>
+            <!-- System Status Section -->
+            <div class="card">
+                <h2>Stato Sistema</h2>
                 
-                <div class="hic-overview-grid">
-                    <div class="hic-overview-section">
-                        <h3>🔗 Connessione</h3>
-                        <table class="hic-status-table">
-                            <tr>
-                                <td>Modalità</td>
-                                <td><strong><?php echo esc_html(hic_get_connection_type()); ?></strong></td>
-                                <td>
-                                    <?php if (hic_get_connection_type() === 'api'): ?>
-                                        <span class="status ok">✓ Polling Attivo</span>
-                                    <?php else: ?>
-                                        <span class="status warning">⚠ Webhook</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>API URL</td>
-                                <td><span class="status <?php echo esc_attr($credentials_status['api_url'] ? 'ok' : 'error'); ?>">
-                                    <?php echo esc_html($credentials_status['api_url'] ? 'Configurato' : 'Mancante'); ?>
-                                </span></td>
-                                <td><?php echo $credentials_status['api_url'] ? 'Connessione disponibile' : 'Configurazione richiesta'; ?></td>
-                            </tr>
-                            <tr>
-                                <td>Credenziali</td>
-                                <td><span class="status <?php echo esc_attr($credentials_status['api_email'] && $credentials_status['api_password'] ? 'ok' : 'error'); ?>">
-                                    <?php echo esc_html($credentials_status['api_email'] && $credentials_status['api_password'] ? 'Complete' : 'Incomplete'); ?>
-                                </span></td>
-                                <td>Property ID + Email + Password</td>
-                            </tr>
-                        </table>
+                <!-- Manual Polling Section -->
+                <div class="manual-polling-section" style="margin-top: 15px; padding: 10px; background: #f0f8ff; border-left: 4px solid #0073aa;">
+                    <h3 style="margin-top: 0;">🔄 Controllo Manuale Polling</h3>
+                    <p>Usa questi pulsanti per testare e forzare il sistema di polling manualmente:</p>
+                    <p>
+                        <button class="button button-primary" id="force-polling">Forza Polling Ora</button>
+                        <button class="button button-secondary" id="test-polling">Test Polling (con lock)</button>
+                        <button class="button button-secondary" id="trigger-watchdog">Trigger Watchdog</button>
+                        <button class="button button-secondary" id="reset-timestamps" style="background-color: #dc3232; border-color: #dc3232; color: white;">Reset Timestamps</button>
+                        <button class="button button-secondary" id="download-error-logs" style="margin-left: 10px;">
+                            <span class="dashicons dashicons-download" style="margin-top: 3px;"></span>
+                            Scarica Log Errori
+                        </button>
+                        <span id="polling-status" style="margin-left: 10px; font-weight: bold;"></span>
+                    </p>
+                    
+                    <div id="polling-results" style="display: none; margin-top: 15px; padding: 10px; background: #f7f7f7; border-left: 4px solid #0073aa;">
+                        <h4>Risultati Polling:</h4>
+                        <div id="polling-results-content"></div>
                     </div>
                     
-                    <div class="hic-overview-section">
-                        <h3>⚡ Stato Polling</h3>
-                        <table class="hic-status-table">
-                            <?php 
-                            $polling_active = $scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met'];
-                            $last_poll = $execution_stats['last_successful_poll'];
-                            ?>
-                            <tr>
-                                <td>Sistema</td>
-                                <td>
-                                    <?php if ($polling_active): ?>
-                                        <span class="status ok">✓ Attivo</span>
-                                    <?php else: ?>
-                                        <span class="status error">✗ Inattivo</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?php echo $polling_active ? 'Polling automatico funzionante' : 'Richiede configurazione'; ?></td>
-                            </tr>
-                            <tr>
-                                <td>Ultimo Successo</td>
-                                <td>
-                                    <?php if ($last_poll > 0): ?>
-                                        <?php 
-                                        $time_diff = time() - $last_poll;
-                                        if ($time_diff < 900): // Less than 15 minutes
-                                        ?>
-                                            <span class="status ok"><?php echo esc_html(human_time_diff($last_poll, time())); ?> fa</span>
-                                        <?php elseif ($time_diff < 3600): // Less than 1 hour ?>
-                                            <span class="status warning"><?php echo esc_html(human_time_diff($last_poll, time())); ?> fa</span>
-                                        <?php else: ?>
-                                            <span class="status error"><?php echo esc_html(human_time_diff($last_poll, time())); ?> fa</span>
-                                        <?php endif; ?>
-                                    <?php else: ?>
-                                        <span class="status error">Mai</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>Tempo dall'ultimo polling riuscito</td>
-                            </tr>
-                            <tr>
-                                <td>Prenotazioni</td>
-                                <td><strong><?php echo esc_html(number_format($execution_stats['processed_reservations'])); ?></strong></td>
-                                <td>Totale prenotazioni elaborate</td>
-                            </tr>
-                        </table>
+                    <div class="notice notice-info inline" style="margin-top: 15px;">
+                        <p><strong>Differenza tra i pulsanti:</strong></p>
+                        <ul>
+                            <li><strong>Forza Polling Ora:</strong> Esegue il polling immediatamente, ignorando eventuali lock attivi</li>
+                            <li><strong>Test Polling:</strong> Esegue il polling normale, rispettando i lock esistenti</li>
+                            <li><strong>Trigger Watchdog:</strong> Forza l'esecuzione del watchdog per rilevare e riparare problemi di scheduling</li>
+                            <li><strong>Reset Timestamps:</strong> <span style="color: #dc3232;">EMERGENZA</span> - Resetta tutti i timestamp quando il polling è bloccato da errori di timestamp</li>
+                        </ul>
                     </div>
                 </div>
             </div>
             
-            <!-- Quick Diagnostics Section -->
-            <div class="card hic-quick-card">
-                <h2>🔧 Diagnostica Rapida</h2>
+            <!-- Backfill Section -->
+            <div class="card">
+                <h2>Scarico Storico Prenotazioni (Backfill)</h2>
+                <p>Usa questa funzione per scaricare prenotazioni di un intervallo temporale specifico. Utile per recuperare dati persi o per il primo setup.</p>
                 
-                <div class="hic-quick-actions">
-                    <div class="hic-action-group">
-                        <h3>Test Sistema</h3>
-                        <button class="button button-primary" id="force-polling">
-                            <span class="dashicons dashicons-update"></span>
-                            Test Polling
-                        </button>
-                        <button class="button button-secondary" id="test-connectivity">
-                            <span class="dashicons dashicons-cloud"></span>
-                            Test Connessione
-                        </button>
-                    </div>
-                    
-                    <div class="hic-action-group">
-                        <h3>Risoluzione Problemi</h3>
-                        <button class="button button-secondary" id="trigger-watchdog">
-                            <span class="dashicons dashicons-shield"></span>
-                            Watchdog
-                        </button>
-                        <button class="button button-link-delete" id="reset-timestamps">
-                            <span class="dashicons dashicons-warning"></span>
-                            Reset Emergenza
-                        </button>
-                    </div>
-                    
-                    <div class="hic-action-group">
-                        <h3>Logs & Export</h3>
-                        <button class="button button-secondary" id="download-error-logs">
-                            <span class="dashicons dashicons-download"></span>
-                            Scarica Log
-                        </button>
-                    </div>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="backfill-from-date">Data Inizio</label>
+                        </th>
+                        <td>
+                            <input type="date" id="backfill-from-date" name="backfill_from_date" 
+                                   value="<?php echo esc_attr(date('Y-m-d', strtotime('-7 days'))); ?>" />
+                            <p class="description">Data di inizio per il recupero prenotazioni</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="backfill-to-date">Data Fine</label>
+                        </th>
+                        <td>
+                            <input type="date" id="backfill-to-date" name="backfill_to_date" 
+                                   value="<?php echo esc_attr(date('Y-m-d')); ?>" />
+                            <p class="description">Data di fine per il recupero prenotazioni</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="backfill-date-type">Tipo Data</label>
+                        </th>
+                        <td>
+                            <select id="backfill-date-type" name="backfill_date_type">
+                                <option value="checkin">Data Check-in</option>
+                                <option value="checkout">Data Check-out</option>
+                                <option value="presence">Periodo di presenza</option>
+                            </select>
+                            <p class="description">
+                                <strong>Check-in:</strong> Prenotazioni per arrivi in questo periodo<br>
+                                <strong>Check-out:</strong> Prenotazioni per partenze in questo periodo<br>
+                                <strong>Presenza:</strong> Prenotazioni presenti in qualsiasi momento del periodo<br>
+                                <em>Nota:</em> Per nuove prenotazioni usa il polling automatico che controlla aggiornamenti recenti.
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="backfill-limit">Limite (opzionale)</label>
+                        </th>
+                        <td>
+                            <input type="number" id="backfill-limit" name="backfill_limit" 
+                                   min="1" max="1000" placeholder="Nessun limite" />
+                            <p class="description">Numero massimo di prenotazioni da recuperare (lascia vuoto per tutte)</p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <p>
+                    <button class="button button-primary" id="start-backfill">
+                        <span class="dashicons dashicons-download" style="margin-top: 3px;"></span>
+                        Avvia Backfill
+                    </button>
+                    <span id="backfill-status" style="margin-left: 10px; font-weight: bold;"></span>
+                </p>
+                
+                <div id="backfill-results" style="display: none; margin-top: 15px; padding: 10px; background: #f7f7f7; border-left: 4px solid #0073aa;">
+                    <h4>Risultati Backfill:</h4>
+                    <div id="backfill-results-content"></div>
                 </div>
                 
-                <div id="quick-results" class="hic-results-container" style="display: none;">
-                    <div id="quick-results-content"></div>
+                <div class="notice notice-info inline" style="margin-top: 15px;">
+                    <p><strong>Note:</strong></p>
+                    <ul>
+                        <li>Il backfill elabora solo prenotazioni non già presenti nel sistema</li>
+                        <li>L'intervallo massimo consentito è di 6 mesi</li>
+                        <li>Le prenotazioni duplicate vengono automaticamente saltate</li>
+                        <li>Tutti gli eventi di backfill vengono registrati nei log</li>
+                    </ul>
                 </div>
-                
-                <div id="quick-status" class="hic-status-message"></div>
             </div>
             
-            <!-- Integration Status Section -->
-            <div class="card hic-integrations-card">
-                <h2>🔌 Stato Integrazioni</h2>
-                
-                <div class="hic-integrations-grid">
-                    <div class="hic-integration-item">
-                        <div class="hic-integration-header">
-                            <span class="hic-integration-icon">📊</span>
-                            <h3>Google Analytics 4</h3>
-                            <?php if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())): ?>
-                                <span class="status ok">✓ Attivo</span>
-                            <?php else: ?>
-                                <span class="status error">✗ Inattivo</span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="hic-integration-details">
-                            <p>Tracking conversioni e eventi booking</p>
-                            <?php if (!empty(hic_get_measurement_id())): ?>
-                                <small>ID: <?php echo esc_html(substr(hic_get_measurement_id(), 0, 8)); ?>...</small>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    
-                    <div class="hic-integration-item">
-                        <div class="hic-integration-header">
-                            <span class="hic-integration-icon">📧</span>
-                            <h3>Brevo</h3>
-                            <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
-                                <span class="status ok">✓ Attivo</span>
-                            <?php else: ?>
-                                <span class="status error">✗ Inattivo</span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="hic-integration-details">
-                            <p>Email marketing e automazioni</p>
-                            <?php if (hic_realtime_brevo_sync_enabled()): ?>
-                                <small>Real-time sync: ✓</small>
-                            <?php endif; ?>
-                        </div>
-                        <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
-                        <div class="hic-integration-actions">
-                            <button class="button button-small" id="test-brevo-connectivity">Test API</button>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <div class="hic-integration-item">
-                        <div class="hic-integration-header">
-                            <span class="hic-integration-icon">📱</span>
-                            <h3>Meta/Facebook</h3>
-                            <?php if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())): ?>
-                                <span class="status ok">✓ Attivo</span>
-                            <?php else: ?>
-                                <span class="status error">✗ Inattivo</span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="hic-integration-details">
-                            <p>Facebook Pixel e Conversions API</p>
-                            <?php if (!empty(hic_get_fb_pixel_id())): ?>
-                                <small>Pixel: <?php echo esc_html(substr(hic_get_fb_pixel_id(), 0, 8)); ?>...</small>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
+            <!-- Send Latest Bookings to Integrations Section -->
+            <div class="card">
+                <h2>Invia Ultime Prenotazioni alle Integrazioni</h2>
+                <p>Scarica le ultime 5 prenotazioni da Hotel in Cloud e inviale ai sistemi GA4 e Brevo configurati. Le prenotazioni già inviate vengono automaticamente saltate.</p>
                 
                 <?php 
                 $downloaded_ids = hic_get_downloaded_booking_ids();
                 $downloaded_count = count($downloaded_ids);
                 ?>
                 
-                <div class="hic-integration-actions-section">
-                    <h3>🚀 Azioni Rapide</h3>
-                    <div class="hic-quick-actions">
-                        <button class="button button-primary" id="download-latest-bookings">
-                            <span class="dashicons dashicons-upload"></span>
-                            Invia Ultime 5 Prenotazioni
-                        </button>
+                <!-- Download Tracking Status -->
+                <div class="notice notice-info inline" style="margin-bottom: 15px;">
+                    <p><strong>Status Tracking Invii:</strong></p>
+                    <ul>
+                        <li>Prenotazioni già inviate: <strong><?php echo esc_html($downloaded_count); ?></strong></li>
+                        <li>Sistema anti-duplicazione: <span class="status ok">✓ Attivo</span></li>
                         <?php if ($downloaded_count > 0): ?>
-                            <button class="button button-secondary" id="reset-download-tracking">
-                                <span class="dashicons dashicons-update-alt"></span>
-                                Reset Tracking (<?php echo $downloaded_count; ?> inviate)
-                            </button>
+                            <li>Ultime ID inviate: <code><?php echo esc_html(implode(', ', array_slice($downloaded_ids, -3))); ?></code></li>
                         <?php endif; ?>
-                    </div>
-                    
-                    <div id="download-results" class="hic-results-container" style="display: none;">
-                        <div id="download-results-content"></div>
-                    </div>
-                    
-                    <div id="download-status" class="hic-status-message"></div>
+                    </ul>
                 </div>
-            </div>
-            
-            <!-- Activity Monitor Section -->
-            <div class="card hic-activity-card">
-                <h2>📈 Monitor Attività</h2>
                 
-                <div class="hic-activity-grid">
-                    <div class="hic-activity-section">
-                        <h3>🔄 Statistiche Esecuzione</h3>
-                        <table class="hic-stats-table">
-                            <tr>
-                                <td>Ultimo Polling</td>
-                                <td><?php echo $execution_stats['last_poll_time'] ? esc_html(date('Y-m-d H:i:s', $execution_stats['last_poll_time'])) : 'Mai'; ?></td>
-                            </tr>
-                            <tr>
-                                <td>Prenotazioni Elaborate</td>
-                                <td><strong><?php echo esc_html(number_format($execution_stats['processed_reservations'])); ?></strong></td>
-                            </tr>
-                            <tr>
-                                <td>Ultimo Polling - Trovate</td>
-                                <td>
-                                    <?php 
-                                    $last_count = $execution_stats['last_poll_reservations_found'];
-                                    if ($last_count > 0) {
-                                        echo '<span class="status ok">' . esc_html(number_format($last_count)) . '</span>';
-                                    } else {
-                                        echo '<span class="status warning">0</span>';
-                                    }
-                                    ?>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Durata Ultimo Polling</td>
-                                <td>
-                                    <?php 
-                                    $duration = $execution_stats['last_poll_duration'];
-                                    if ($duration > 0) {
-                                        echo '<span class="status ' . ($duration > 10000 ? 'warning' : 'ok') . '">' . esc_html($duration) . ' ms</span>';
-                                    } else {
-                                        echo '<span class="status neutral">N/A</span>';
-                                    }
-                                    ?>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Errori Recenti</td>
-                                <td><span class="status <?php echo esc_attr($error_stats['error_count'] > 0 ? 'error' : 'ok'); ?>">
-                                    <?php echo esc_html(number_format($error_stats['error_count'])); ?>
-                                </span></td>
-                            </tr>
-                        </table>
-                    </div>
-                    
-                    <div class="hic-activity-section">
-                        <h3>📝 Log Recenti</h3>
-                        <div class="hic-logs-container">
-                            <?php if (empty($recent_logs)): ?>
-                                <p class="hic-no-logs">Nessun log recente disponibile.</p>
+                <!-- Integration Status -->
+                <div class="notice notice-info inline" style="margin-bottom: 15px;">
+                    <p><strong>Integrazioni Configurate:</strong></p>
+                    <ul>
+                        <li>GA4: 
+                            <?php if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())): ?>
+                                <span class="status ok">✓ Configurato</span>
                             <?php else: ?>
-                                <?php foreach (array_slice($recent_logs, 0, 8) as $log_line): ?>
-                                    <div class="hic-log-entry"><?php echo esc_html($log_line); ?></div>
-                                <?php endforeach; ?>
-                                <?php if (count($recent_logs) > 8): ?>
-                                    <div class="hic-log-more">... e altri <?php echo count($recent_logs) - 8; ?> eventi</div>
-                                <?php endif; ?>
+                                <span class="status error">✗ Non configurato</span>
                             <?php endif; ?>
-                        </div>
-                    </div>
+                        </li>
+                        <li>Brevo: 
+                            <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
+                                <span class="status ok">✓ Configurato</span>
+                            <?php else: ?>
+                                <span class="status error">✗ Non configurato</span>
+                            <?php endif; ?>
+                        </li>
+                        <li>Facebook: 
+                            <?php if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())): ?>
+                                <span class="status ok">✓ Configurato</span>
+                            <?php else: ?>
+                                <span class="status error">✗ Non configurato</span>
+                            <?php endif; ?>
+                        </li>
+                    </ul>
+                </div>
+                
+                <p>
+                    <button class="button button-primary" id="download-latest-bookings">
+                        <span class="dashicons dashicons-upload" style="margin-top: 3px;"></span>
+                        Invia Ultime 5 Prenotazioni a GA4 e Brevo
+                    </button>
+                    <?php if ($downloaded_count > 0): ?>
+                        <button class="button button-secondary" id="reset-download-tracking" style="margin-left: 10px;">
+                            <span class="dashicons dashicons-update-alt" style="margin-top: 3px;"></span>
+                            Reset Tracking Invii
+                        </button>
+                    <?php endif; ?>
+                    <span id="download-status" style="margin-left: 10px; font-weight: bold;"></span>
+                </p>
+                
+                <div id="download-results" style="display: none; margin-top: 15px; padding: 10px; background: #f7f7f7; border-left: 4px solid #0073aa;">
+                    <h4>Risultati Invio:</h4>
+                    <div id="download-results-content"></div>
+                </div>
+                
+                <div class="notice notice-info inline" style="margin-top: 15px;">
+                    <p><strong>Note:</strong></p>
+                    <ul>
+                        <li><strong>Anti-duplicazione:</strong> Vengono inviate solo le prenotazioni mai inviate prima</li>
+                        <li><strong>Ordinamento:</strong> Le ultime 5 prenotazioni basate sull'ordine di arrivo dall'API</li>
+                        <li><strong>Tracking automatico:</strong> Il sistema ricorda quali prenotazioni sono state inviate</li>
+                        <li><strong>Reset tracking:</strong> Usa il bottone "Reset" per consentire il nuovo invio delle stesse prenotazioni</li>
+                        <li><strong>Elaborazione completa:</strong> Include invio a GA4, Brevo, Facebook (se configurati) ed email</li>
+                        <li>Richiede connessione API configurata (non funziona in modalità webhook)</li>
+                    </ul>
                 </div>
             </div>
             
-            <!-- Advanced Tools Section -->
-            <div class="card hic-advanced-card">
-                <h2>🛠️ Strumenti Avanzati</h2>
+            <!-- Manual Booking Diagnostics Section -->
+            <div class="card">
+                <h2>Diagnostica Prenotazioni Manuali</h2>
+                <?php 
+                $connection_type = hic_get_connection_type();
+                $webhook_token = hic_get_webhook_token();
+                $manual_booking_issues = array();
                 
-                <details class="hic-advanced-details">
-                    <summary>
-                        <span class="hic-advanced-summary">
-                            <span class="dashicons dashicons-admin-tools"></span>
-                            Mostra Strumenti Avanzati
-                        </span>
-                    </summary>
+                // Check for manual booking configuration issues
+                if ($connection_type === 'webhook') {
+                    if (empty($webhook_token)) {
+                        $manual_booking_issues[] = array(
+                            'type' => 'error',
+                            'message' => 'Webhook token non configurato: le prenotazioni manuali potrebbero non essere inviate automaticamente.'
+                        );
+                    }
+                    $manual_booking_issues[] = array(
+                        'type' => 'warning', 
+                        'message' => 'Modalità Webhook: Hotel in Cloud deve inviare webhook per TUTTE le prenotazioni, incluse quelle manuali.'
+                    );
+                } elseif ($connection_type === 'api') {
+                    if (!$scheduler_status['internal_scheduler']['enabled'] || !$scheduler_status['internal_scheduler']['conditions_met']) {
+                        $manual_booking_issues[] = array(
+                            'type' => 'error',
+                            'message' => 'Sistema di polling interno non attivo: le prenotazioni manuali non verranno recuperate automaticamente.'
+                        );
+                    } else {
+                        $manual_booking_issues[] = array(
+                            'type' => 'info',
+                            'message' => 'Sistema di polling interno attivo: le prenotazioni manuali vengono recuperate automaticamente ogni 5 minuti.'
+                        );
+                    }
+                }
+                ?>
+                
+                <table class="widefat">
+                    <tr>
+                        <td>Modalità Connessione</td>
+                        <td>
+                            <strong><?php echo ucfirst(esc_html($connection_type)); ?></strong>
+                            <?php if ($connection_type === 'api'): ?>
+                                <span class="status ok">✓ Migliore per prenotazioni manuali</span>
+                            <?php else: ?>
+                                <span class="status warning">⚠ Dipende dalla configurazione webhook</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
                     
-                    <div class="hic-advanced-content">
-                        <div class="hic-advanced-section">
-                            <h3>📦 Backfill Storico</h3>
-                            <p>Recupera prenotazioni da un intervallo temporale specifico.</p>
-                            
-                            <div class="hic-backfill-form">
-                                <div class="hic-form-row">
-                                    <label for="backfill-from-date">Da:</label>
-                                    <input type="date" id="backfill-from-date" value="<?php echo esc_attr(date('Y-m-d', strtotime('-7 days'))); ?>" />
-                                    
-                                    <label for="backfill-to-date">A:</label>
-                                    <input type="date" id="backfill-to-date" value="<?php echo esc_attr(date('Y-m-d')); ?>" />
-                                    
-                                    <label for="backfill-date-type">Tipo:</label>
-                                    <select id="backfill-date-type">
-                                        <option value="checkin">Check-in</option>
-                                        <option value="checkout">Check-out</option>
-                                        <option value="presence">Presenza</option>
-                                    </select>
-                                    
-                                    <input type="number" id="backfill-limit" placeholder="Limite (opz.)" min="1" max="1000" />
-                                </div>
-                                
-                                <div class="hic-form-actions">
-                                    <button class="button button-primary" id="start-backfill">
-                                        <span class="dashicons dashicons-download"></span>
-                                        Avvia Backfill
-                                    </button>
-                                    <span id="backfill-status" class="hic-status-message"></span>
-                                </div>
-                                
-                                <div id="backfill-results" class="hic-results-container" style="display: none;">
-                                    <div id="backfill-results-content"></div>
-                                </div>
-                            </div>
+                    <?php if ($connection_type === 'webhook'): ?>
+                    <tr>
+                        <td>Webhook Token</td>
+                        <td>
+                            <?php if (!empty($webhook_token)): ?>
+                                <span class="status ok">✓ Configurato</span>
+                            <?php else: ?>
+                                <span class="status error">✗ NON configurato</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>URL Webhook</td>
+                        <td>
+                            <code><?php 
+                            if (!empty($webhook_token)) {
+                                echo esc_url(home_url('/wp-json/hic/v1/conversion?token=***')); 
+                            } else {
+                                echo esc_url(home_url('/wp-json/hic/v1/conversion?token=CONFIGURA_TOKEN_PRIMA'));
+                            }
+                            ?></code>
+                            <?php if (empty($webhook_token)): ?>
+                                <br><small style="color: #dc3232;">⚠ Configura il token nelle impostazioni prima di usare questo URL</small>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                    
+                    <?php if ($connection_type === 'api'): ?>
+                    <tr>
+                        <td>Sistema Polling</td>
+                        <td>
+                            <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
+                                <span class="status ok">
+                                    <?php 
+                                    echo 'Attivo (WP-Cron)';
+                                    if ($scheduler_status['internal_scheduler']['last_poll_human'] !== 'Mai eseguito') {
+                                        echo ' - Ultimo: ' . esc_html($scheduler_status['internal_scheduler']['last_poll_human']);
+                                    }
+                                    ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="status error">Non attivo</span>
+                                <br><small style="color: #dc3232;">
+                                    <?php
+                                    $polling_issues = array();
+                                    if (!hic_reliable_polling_enabled()) {
+                                        $polling_issues[] = "Polling affidabile disabilitato nelle impostazioni";
+                                    }
+                                    if (hic_get_connection_type() !== 'api') {
+                                        $polling_issues[] = "Tipo connessione non è 'API Polling' (attuale: " . hic_get_connection_type() . ")";
+                                    }
+                                    if (!hic_get_api_url()) {
+                                        $polling_issues[] = "URL API non configurato";
+                                    }
+                                    if (!hic_has_basic_auth_credentials()) {
+                                        $polling_issues[] = "Credenziali Basic Auth mancanti (serve Property ID + Email + Password)";
+                                    }
+                                    echo implode('<br>', $polling_issues);
+                                    ?>
+                                </small>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
+                
+                <?php if (!empty($manual_booking_issues)): ?>
+                <div class="manual-booking-alerts">
+                    <h3>Avvisi e Raccomandazioni</h3>
+                    <?php foreach ($manual_booking_issues as $issue): ?>
+                        <div class="notice notice-<?php echo esc_attr($issue['type'] === 'error' ? 'error' : ($issue['type'] === 'warning' ? 'warning' : 'info')); ?> inline">
+                            <p><?php echo esc_html($issue['message']); ?></p>
                         </div>
-                        
-                        <div class="hic-advanced-section">
-                            <h3>⚠️ Strumenti di Emergenza</h3>
-                            <p class="hic-warning-text">
-                                <span class="dashicons dashicons-warning"></span>
-                                Usa solo in caso di problemi gravi del sistema.
-                            </p>
-                            
-                            <div class="hic-emergency-tools">
-                                <button class="button button-secondary" id="reset-timestamps">
-                                    <span class="dashicons dashicons-update"></span>
-                                    Reset Timestamp
-                                </button>
-                                
-                                <div class="hic-brevo-test" <?php echo (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) ? '' : 'style="display:none;"'; ?>>
-                                    <button class="button button-secondary" id="test-brevo-connectivity">
-                                        <span class="dashicons dashicons-cloud"></span>
-                                        Test Brevo API
-                                    </button>
-                                    <div id="brevo-test-results" class="hic-results-container" style="display: none;"></div>
-                                </div>
-                            </div>
-                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                
+                <div class="manual-booking-recommendations">
+                    <h3>Raccomandazioni per Prenotazioni Manuali</h3>
+                    <ul>
+                        <?php if ($connection_type === 'webhook'): ?>
+                            <li><strong>Verifica configurazione Hotel in Cloud:</strong> Assicurati che i webhook siano configurati per inviare TUTTE le prenotazioni</li>
+                            <li><strong>Considera API Polling:</strong> Per maggiore affidabilità, valuta il passaggio alla modalità "API Polling"</li>
+                        <?php else: ?>
+                            <li><strong>Modalità consigliata:</strong> API Polling è la modalità migliore per catturare automaticamente le prenotazioni manuali</li>
+                            <li><strong>Frequenza polling:</strong> Il sistema utilizza un approccio dual-mode: polling continuo ogni minuto + deep check ogni 10 minuti con lookback di 5 giorni</li>
+                            <li><strong>Verifica credenziali:</strong> Assicurati che le credenziali API siano corrette</li>
+                        <?php endif; ?>
+                        <li><strong>Monitoraggio log:</strong> Controlla la sezione "Log Recenti" per errori o problemi</li>
+                    </ul>
+                </div>
+                
+                <?php if ($connection_type === 'api' && (!$scheduler_status['internal_scheduler']['enabled'] || !$scheduler_status['internal_scheduler']['conditions_met'])): ?>
+                <div class="polling-troubleshoot">
+                    <h3 style="color: #d63638;">⚠ Risoluzione Problemi Polling</h3>
+                    <div class="notice notice-error inline">
+                        <p><strong>Il sistema di polling non è attivo!</strong> Per far funzionare il monitoraggio automatico:</p>
+                        <ol>
+                            <li><strong>Verifica tipo connessione:</strong> Vai su <em>Impostazioni → HIC Monitoring</em> e assicurati che "Tipo Connessione" sia impostato su "<strong>API Polling</strong>"</li>
+                            <li><strong>Configura credenziali API:</strong> Inserisci i seguenti dati nelle impostazioni:
+                                <ul>
+                                    <li>API URL (fornito da Hotel in Cloud)</li>
+                                    <li>ID Struttura (Property ID)</li>
+                                    <li>Email e Password API <em>oppure</em> API Key</li>
+                                </ul>
+                            </li>
+                            <li><strong>Abilita Polling Affidabile:</strong> Assicurati che l'opzione "Polling Affidabile" sia attivata</li>
+                            <li><strong>Test connessione:</strong> Usa il pulsante "Test Connessione API" per verificare che tutto funzioni</li>
+                        </ol>
+                        <p><strong>Nota:</strong> Senza queste configurazioni, il contatore rimarrà sempre a 0 perché il sistema non può scaricare le prenotazioni da Hotel in Cloud.</p>
+                        <p><strong>Scheduler Interno WP-Cron:</strong> Il sistema utilizza WordPress WP-Cron per eseguire due tipi di controlli: polling continuo ogni minuto per le prenotazioni recenti e manuali, e deep check ogni 10 minuti che controlla indietro di 5 giorni per recuperare eventuali prenotazioni perse. Richiede WP-Cron attivo per funzionare.</p>
                     </div>
-                </details>
+                </div>
+                <?php endif; ?>
+            </div>
+            
+            <!-- System Configuration Section -->
+            <div class="card">
+                <h2>Configurazione Sistema</h2>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Valore</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Tipo Connessione</td>
+                            <td><strong><?php echo esc_html(hic_get_connection_type()); ?></strong></td>
+                            <td>Modalità di comunicazione con Hotel in Cloud</td>
+                        </tr>
+                        <tr>
+                            <td>Sistema Polling Interno</td>
+                            <td>
+                                <?php if (hic_reliable_polling_enabled()): ?>
+                                    <span class="status ok">✓ Abilitato</span>
+                                <?php else: ?>
+                                    <span class="status warning">⚠ Disabilitato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Sistema di polling interno con WP-Cron</td>
+                        </tr>
+                        <tr>
+                            <td>API URL</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['api_url'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['api_url'] ? 'Configurato' : 'Mancante'); ?>
+                            </span></td>
+                            <td>URL base per le chiamate API</td>
+                        </tr>
+                        <tr>
+                            <td>Property ID</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['property_id'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['property_id'] ? 'Configurato' : 'Mancante'); ?>
+                            </span></td>
+                            <td>ID della struttura alberghiera</td>
+                        </tr>
+                        <tr>
+                            <td>Credenziali API</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['api_email'] && $credentials_status['api_password'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['api_email'] && $credentials_status['api_password'] ? 'Configurate' : 'Mancanti'); ?>
+                            </span></td>
+                            <td>Email e password per autenticazione API</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>Integrazioni Configurate</h3>
+                <table class="widefat">
+                    <tbody>
+                        <tr>
+                            <td>GA4</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['ga4_configured'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['ga4_configured'] ? '✓ Configurato' : '✗ Non configurato'); ?>
+                            </span></td>
+                        </tr>
+                        <tr>
+                            <td>Brevo</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['brevo_configured'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['brevo_configured'] ? '✓ Configurato' : '✗ Non configurato'); ?>
+                            </span></td>
+                        </tr>
+                        <tr>
+                            <td>Facebook</td>
+                            <td><span class="status <?php echo esc_attr($credentials_status['facebook_configured'] ? 'ok' : 'error'); ?>">
+                                <?php echo esc_html($credentials_status['facebook_configured'] ? '✓ Configurato' : '✗ Non configurato'); ?>
+                            </span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>Real-time Sync</h3>
+                <table class="widefat">
+                    <tbody>
+                        <tr>
+                            <td>Real-time Sync Brevo</td>
+                            <td>
+                                <?php if (hic_realtime_brevo_sync_enabled()): ?>
+                                    <span class="status ok">✓ Abilitato</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Disabilitato</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Updates Enrichment</td>
+                            <td>
+                                <?php if (hic_updates_enrich_contacts()): ?>
+                                    <span class="status ok">✓ Abilitato</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Disabilitato</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php if (isset($scheduler_status['realtime_sync']['table_exists']) && $scheduler_status['realtime_sync']['table_exists'] !== false): ?>
+                        <tr>
+                            <td>Prenotazioni Tracciate</td>
+                            <td><?php echo isset($scheduler_status['realtime_sync']['total_tracked']) ? intval($scheduler_status['realtime_sync']['total_tracked']) : '0'; ?></td>
+                        </tr>
+                        <tr>
+                            <td>Sync Riuscite / Fallite</td>
+                            <td>
+                                <?php 
+                                $notified = isset($scheduler_status['realtime_sync']['notified']) ? intval($scheduler_status['realtime_sync']['notified']) : 0;
+                                $failed = isset($scheduler_status['realtime_sync']['failed']) ? intval($scheduler_status['realtime_sync']['failed']) : 0;
+                                ?>
+                                <span class="status ok"><?php echo $notified; ?></span> / 
+                                <span class="status <?php echo $failed > 0 ? 'error' : 'ok'; ?>"><?php echo $failed; ?></span>
+                            </td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+                
+                <!-- Brevo API Test Section -->
+                <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
+                <div style="margin-top: 15px; padding: 10px; background: #f0f8ff; border-left: 4px solid #0073aa;">
+                    <h3 style="margin-top: 0;">🔗 Test Connettività Brevo</h3>
+                    <p>Testa la connettività con le API di Brevo per verificare che l'integrazione funzioni correttamente:</p>
+                    <p>
+                        <button class="button button-primary" id="test-brevo-connectivity">
+                            <span class="dashicons dashicons-cloud" style="margin-top: 3px;"></span>
+                            Test Connettività Brevo
+                        </button>
+                    </p>
+                    <div id="brevo-test-results" style="display: none; margin-top: 10px;"></div>
+                </div>
+                <?php endif; ?>
+            </div>
+            
+            <!-- Detailed Polling Diagnostics Section -->
+            <div class="card">
+                <h2>🔍 Diagnostica Polling Dettagliata</h2>
+                <?php
+                // Get detailed polling diagnostics
+                $poller_diagnostics = null;
+                if (class_exists('HIC_Booking_Poller')) {
+                    $poller = new HIC_Booking_Poller();
+                    $poller_diagnostics = $poller->get_detailed_diagnostics();
+                }
+                ?>
+                
+                <?php if ($poller_diagnostics): ?>
+                    <h3>Condizioni per il Polling</h3>
+                    <table class="widefat">
+                        <thead>
+                            <tr>
+                                <th>Condizione</th>
+                                <th>Stato</th>
+                                <th>Descrizione</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($poller_diagnostics['conditions'] as $condition => $status): ?>
+                            <tr>
+                                <td><?php echo esc_html(str_replace('_', ' ', ucfirst($condition))); ?></td>
+                                <td>
+                                    <span class="status <?php echo $status ? 'ok' : 'error'; ?>">
+                                        <?php echo $status ? '✅ Sì' : '❌ No'; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php
+                                    $descriptions = array(
+                                        'reliable_polling_enabled' => 'Sistema di polling affidabile attivato nelle impostazioni',
+                                        'connection_type_api' => 'Tipo connessione impostato su "API Polling"',
+                                        'api_url_configured' => 'URL API configurato',
+                                        'has_credentials' => 'Credenziali Basic Auth disponibili',
+                                        'basic_auth_complete' => 'Credenziali Basic Auth complete (Property ID + Email + Password)',
+                                        'credentials_type' => 'Tipo di credenziali utilizzate'
+                                    );
+                                    echo esc_html($descriptions[$condition] ?? 'Controllo sistema');
+                                    ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <h3>Configurazione Attuale</h3>
+                    <table class="widefat">
+                        <tbody>
+                            <?php foreach ($poller_diagnostics['configuration'] as $key => $value): ?>
+                            <tr>
+                                <td><?php echo esc_html(str_replace('_', ' ', ucfirst($key))); ?></td>
+                                <td>
+                                    <span class="status <?php echo ($value === 'configured') ? 'ok' : 'error'; ?>">
+                                        <?php echo esc_html($value); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <h3>Stato Lock di Polling</h3>
+                    <table class="widefat">
+                        <tbody>
+                            <tr>
+                                <td>Lock Attivo</td>
+                                <td>
+                                    <span class="status <?php echo $poller_diagnostics['lock_status']['active'] ? 'warning' : 'ok'; ?>">
+                                        <?php echo $poller_diagnostics['lock_status']['active'] ? '🔒 Sì' : '🔓 No'; ?>
+                                    </span>
+                                </td>
+                            </tr>
+                            <?php if ($poller_diagnostics['lock_status']['active']): ?>
+                            <tr>
+                                <td>Lock Timestamp</td>
+                                <td><?php echo esc_html($poller_diagnostics['lock_status']['timestamp']); ?></td>
+                            </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                    
+                    <div class="notice notice-info inline" style="margin-top: 15px;">
+                        <p><strong>Interpretazione:</strong></p>
+                        <ul>
+                            <li>Per funzionare, il polling richiede che <strong>tutte</strong> le condizioni sopra siano soddisfatte</li>
+                            <li>Se una condizione fallisce, il polling automatico non verrà eseguito</li>
+                            <li>Il lock impedisce esecuzioni multiple simultanee del polling</li>
+                            <li>Se il lock è attivo da più di 5 minuti, potrebbe indicare un polling bloccato</li>
+                        </ul>
+                        <p><strong>⚠ Importante per le Credenziali:</strong></p>
+                        <ul>
+                            <li><strong>Basic Auth (Richiesto):</strong> Property ID + Email + Password</li>
+                            <li><strong>Richiesto:</strong> Tutti i campi Basic Auth devono essere configurati</li>
+                        </ul>
+                    </div>
+                    
+                    <?php
+                    // Check if all conditions are met
+                    $all_conditions_met = true;
+                    
+                    foreach ($poller_diagnostics['conditions'] as $condition => $status) {
+                        if (!$status) {
+                            $all_conditions_met = false;
+                            break;
+                        }
+                    }
+                    ?>
+                    
+                    <?php if (!$all_conditions_met): ?>
+                    <div class="notice notice-error inline" style="margin-top: 15px;">
+                        <p><strong>⚠ Problema Identificato:</strong> Non tutte le condizioni per il polling sono soddisfatte. Il sistema di polling automatico non è attivo.</p>
+                        <p><strong>Azione consigliata:</strong> Correggi le condizioni mancanti nelle impostazioni del plugin, poi usa il pulsante "Forza Polling Ora" per testare.</p>
+                    </div>
+                    <?php else: ?>
+                    <div class="notice notice-success inline" style="margin-top: 15px;">
+                        <p><strong>✅ Tutte le condizioni sono soddisfatte!</strong> Il polling dovrebbe funzionare automaticamente.</p>
+                        <p><strong>Se il polling non funziona:</strong> Usa il pulsante "Forza Polling Ora" per testare immediatamente.</p>
+                    </div>
+                    <?php endif; ?>
+                    
+                <?php else: ?>
+                    <p>Impossibile ottenere diagnostiche dettagliate. La classe HIC_Booking_Poller non è disponibile.</p>
+                <?php endif; ?>
+            </div>
+
+            <!-- Execution Stats Section -->
+            <div class="card">
+                <h2>Statistiche Esecuzione</h2>
+                <table class="widefat" id="hic-execution-stats">
+                    <tr>
+                        <td>Ultimo Polling</td>
+                        <td><?php echo $execution_stats['last_poll_time'] ? esc_html(date('Y-m-d H:i:s', $execution_stats['last_poll_time'])) : 'Mai'; ?></td>
+                    </tr>
+                    <tr>
+                        <td>Ultimo Updates Polling</td>
+                        <td><?php echo $execution_stats['last_updates_time'] ? esc_html(date('Y-m-d H:i:s', $execution_stats['last_updates_time'])) : 'Mai'; ?></td>
+                    </tr>
+                    <tr>
+                        <td>Prenotazioni Elaborate</td>
+                        <td><?php echo esc_html(number_format($execution_stats['processed_reservations'])); ?></td>
+                    </tr>
+                    <tr>
+                        <td>Ultimo Polling - Prenotazioni Trovate</td>
+                        <td>
+                            <?php 
+                            $last_count = $execution_stats['last_poll_reservations_found'];
+                            if ($last_count > 0) {
+                                echo '<span class="status ok">' . esc_html(number_format($last_count)) . '</span>';
+                            } else {
+                                echo '<span class="status warning">0</span>';
+                            }
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Ultimo Polling - Prenotazioni Saltate</td>
+                        <td><?php echo esc_html(number_format($execution_stats['last_poll_skipped'])); ?></td>
+                    </tr>
+                    <tr>
+                        <td>Ultimo Polling - Durata</td>
+                        <td>
+                            <?php 
+                            $duration = $execution_stats['last_poll_duration'];
+                            if ($duration > 0) {
+                                echo '<span class="status ' . ($duration > 10000 ? 'warning' : 'ok') . '">' . esc_html($duration) . ' ms</span>';
+                            } else {
+                                echo '<span class="status neutral">N/A</span>';
+                            }
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Ultimo Polling Riuscito</td>
+                        <td>
+                            <?php 
+                            $last_successful = $execution_stats['last_successful_poll'];
+                            if ($last_successful > 0) {
+                                $time_diff = time() - $last_successful;
+                                if ($time_diff < 300) { // Less than 5 minutes
+                                    echo '<span class="status ok">' . esc_html(human_time_diff($last_successful, time())) . ' fa</span>';
+                                } elseif ($time_diff < 3600) { // Less than 1 hour
+                                    echo '<span class="status warning">' . esc_html(human_time_diff($last_successful, time())) . ' fa</span>';
+                                } else {
+                                    echo '<span class="status error">' . esc_html(human_time_diff($last_successful, time())) . ' fa</span>';
+                                }
+                            } else {
+                                echo '<span class="status error">Mai</span>';
+                            }
+                            ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Email Arricchite</td>
+                        <td><?php echo esc_html(number_format($execution_stats['enriched_emails'])); ?></td>
+                    </tr>
+                    <tr>
+                        <td>File di Log</td>
+                        <td><?php echo $execution_stats['log_file_exists'] ? esc_html('Esiste (' . size_format($execution_stats['log_file_size']) . ')') : 'Non trovato'; ?></td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- Reliable Polling Diagnostics -->
+            <div class="card">
+                <h2>Sistema Polling Affidabile</h2>
+                <?php 
+                $reliable_stats = array();
+                if (class_exists('HIC_Booking_Poller')) {
+                    $poller = new HIC_Booking_Poller();
+                    $reliable_stats = $poller->get_stats();
+                }
+                ?>
+                
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Stato</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Scheduler Interno</td>
+                            <td>
+                                <?php if ($scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met']): ?>
+                                    <span class="status ok">✓ Attivo</span><br>
+                                    <small>
+                                        <strong>Sistema:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['scheduler_type'] ?? 'WP-Cron'); ?><br>
+                                        <strong>Polling Continuo (1 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_continuous_human'] ?? 'Mai eseguito'); ?><br>
+                                        <strong>Deep Check (10 min):</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['last_deep_human'] ?? 'Mai eseguito'); ?><br>
+                                        <strong>Prossimo continuo:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['next_continuous_human'] ?? 'Sconosciuto'); ?><br>
+                                        <strong>Prossimo deep:</strong> <?php echo esc_html($scheduler_status['internal_scheduler']['next_deep_human'] ?? 'Sconosciuto'); ?>
+                                    </small>
+                                <?php else: ?>
+                                    <span class="status error">✗ Non attivo</span><br>
+                                    <small>Verificare configurazione API</small>
+                                <?php endif; ?>
+                            </td>
+                            <td>Sistema WP-Cron: Polling continuo ogni minuto + deep check ogni 10 minuti (5 giorni lookback)</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Parametro</th>
+                            <th>Valore</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Sistema Attivo</td>
+                            <td>
+                                <?php if (class_exists('HIC_Booking_Poller')): ?>
+                                    <span class="status ok">✓ Attivo</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Non Caricato</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Sistema di polling interno con WP-Cron</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Tabella Queue</td>
+                            <td>
+                                <?php 
+                                global $wpdb;
+                                $queue_table = $wpdb->prefix . 'hic_booking_events';
+                                $queue_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $queue_table)) === $queue_table;
+                                ?>
+                                <?php if ($queue_exists): ?>
+                                    <span class="status ok">✓ Trovata</span>
+                                <?php else: ?>
+                                    <span class="status error">✗ Queue table not found</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Tabella per la gestione degli eventi e deduplicazione</td>
+                        </tr>
+                        
+                        <?php if (!empty($reliable_stats) && !isset($reliable_stats['error'])): ?>
+                        <tr>
+                            <td>Ultimo Polling</td>
+                            <td>
+                                <?php if ($reliable_stats['last_poll'] > 0): ?>
+                                    <span class="status ok"><?php echo esc_html(date('Y-m-d H:i:s', $reliable_stats['last_poll'])); ?></span><br>
+                                    <small><?php echo esc_html($reliable_stats['last_poll_human']); ?></small>
+                                <?php else: ?>
+                                    <span class="status warning">Mai</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Ultimo tentativo di polling eseguito</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Lag Polling</td>
+                            <td>
+                                <?php 
+                                $lag = $reliable_stats['lag_seconds'];
+                                if ($lag < 600): // Less than 10 minutes ?>
+                                    <span class="status ok"><?php echo esc_html($lag); ?> secondi</span>
+                                <?php elseif ($lag < 1800): // Less than 30 minutes ?>
+                                    <span class="status warning"><?php echo esc_html($lag); ?> secondi</span>
+                                <?php else: ?>
+                                    <span class="status error"><?php echo esc_html($lag); ?> secondi</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Tempo trascorso dall'ultimo polling (watchdog attivo oltre 15 min)</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Lock Attivo</td>
+                            <td>
+                                <?php if ($reliable_stats['lock_active']): ?>
+                                    <span class="status warning">🔒 Attivo</span>
+                                    <?php if (isset($reliable_stats['lock_age'])): ?>
+                                        <br><small>Da <?php echo esc_html($reliable_stats['lock_age']); ?> secondi</small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="status ok">🔓 Libero</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>Lock TTL anti-overlap (max 4 minuti)</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi in Coda</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['total_events'] > 0 ? 'ok' : 'warning'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['total_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Totale eventi prenotazioni nella tabella queue</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi Processati</td>
+                            <td>
+                                <span class="status ok">
+                                    <?php echo esc_html(number_format($reliable_stats['processed_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi elaborati con successo</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi in Attesa</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['pending_events'] > 0 ? 'warning' : 'ok'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['pending_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi non ancora processati</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Eventi con Errore</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['error_events'] > 0 ? 'error' : 'ok'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['error_events'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi con errori di processamento</td>
+                        </tr>
+                        
+                        <tr>
+                            <td>Attività 24h</td>
+                            <td>
+                                <span class="status <?php echo $reliable_stats['events_24h'] > 0 ? 'ok' : 'warning'; ?>">
+                                    <?php echo esc_html(number_format($reliable_stats['events_24h'])); ?>
+                                </span>
+                            </td>
+                            <td>Eventi ricevuti nelle ultime 24 ore</td>
+                        </tr>
+                        
+                        <?php else: ?>
+                        <tr>
+                            <td colspan="3">
+                                <span class="status error">
+                                    <?php if (isset($reliable_stats['error'])): ?>
+                                        Errore: <?php echo esc_html($reliable_stats['error']); ?>
+                                    <?php else: ?>
+                                        Statistiche non disponibili
+                                    <?php endif; ?>
+                                </span>
+                            </td>
+                        </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Error Summary Section -->
+            <div class="card">
+                <h2>Riepilogo Errori</h2>
+                <table class="widefat">
+                    <tr>
+                        <td>Errori Recenti (ultimi log)</td>
+                        <td><span class="status <?php echo esc_attr($error_stats['error_count'] > 0 ? 'error' : 'ok'); ?>">
+                            <?php echo esc_html(number_format($error_stats['error_count'])); ?>
+                        </span></td>
+                    </tr>
+                    <?php if ($error_stats['last_error']): ?>
+                    <tr>
+                        <td>Ultimo Errore</td>
+                        <td><small><?php echo esc_html($error_stats['last_error']); ?></small></td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
+            </div>
+            
+            <!-- Recent Logs Section -->
+            <div class="card">
+                <h2>Log Recenti (Errori e Eventi Importanti)</h2>
+                <div id="hic-recent-logs" style="max-height: 300px; overflow-y: auto; background: #f9f9f9; padding: 10px; font-family: monospace; font-size: 12px;">
+                    <?php if (empty($recent_logs)): ?>
+                        <p>Nessun log recente trovato.</p>
+                    <?php else: ?>
+                        <?php foreach ($recent_logs as $log_line): ?>
+                            <div><?php echo esc_html($log_line); ?></div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
             </div>
             
         </div>
@@ -1544,17 +2063,11 @@ function hic_diagnostics_page() {
     </div>
     
     <style>
-        /* Modern, Clean Diagnostic Interface */
+        /* Fix width issues - ensure full width usage */
         .wrap {
             max-width: none !important;
             margin: 0 20px 0 0;
             width: calc(100% - 20px) !important;
-        }
-        
-        .wrap h1 {
-            color: #1d2327;
-            font-size: 28px;
-            margin-bottom: 20px;
         }
         
         .hic-diagnostics-container {
@@ -1562,615 +2075,126 @@ function hic_diagnostics_page() {
             width: 100%;
             margin: 0;
             padding: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
         }
         
-        /* Card Styling */
         .hic-diagnostics-container .card {
             background: #fff;
-            border: 1px solid #e1e5e8;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-            padding: 24px;
+            border: 1px solid #ccd0d4;
+            box-shadow: 0 1px 1px rgba(0,0,0,.04);
+            margin-bottom: 20px;
+            padding: 20px;
             width: 100%;
             box-sizing: border-box;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-        
-        .hic-diagnostics-container .card:hover {
-            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
-            transform: translateY(-2px);
         }
         
         .hic-diagnostics-container .card h2 {
-            margin: 0 0 20px 0;
-            font-size: 20px;
-            font-weight: 600;
-            color: #1d2327;
-            border-bottom: 2px solid #f0f0f1;
-            padding-bottom: 12px;
-            position: relative;
-        }
-        
-        /* Auto-refresh indicator */
-        .hic-refresh-indicator {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #00a32a;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .hic-refresh-indicator.active {
-            opacity: 1;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.2); }
-        }
-        
-        /* Loading States */
-        .hic-loading {
-            position: relative;
-            pointer-events: none;
-            opacity: 0.7;
-        }
-        
-        .hic-loading::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 20px;
-            height: 20px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #0073aa;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
+            margin-top: 0;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            font-size: 18px;
         }
         
         .hic-diagnostics-container .card h3 {
-            margin: 20px 0 12px 0;
+            margin-top: 20px;
+            margin-bottom: 15px;
             font-size: 16px;
-            font-weight: 600;
             color: #1d2327;
         }
         
-        /* Overview Grid */
-        .hic-overview-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-top: 16px;
-        }
-        
-        .hic-overview-section h3 {
-            margin-top: 0;
-            margin-bottom: 16px;
-            font-size: 14px;
-            font-weight: 600;
-            text-transform: uppercase;
-            color: #646970;
-            border-bottom: 1px solid #e1e5e8;
-            padding-bottom: 8px;
-        }
-        
-        /* Status Tables */
-        .hic-status-table, .hic-stats-table {
+        .hic-diagnostics-container .widefat {
             width: 100%;
-            border-collapse: collapse;
-            background: #f8f9fa;
-            border-radius: 6px;
-            overflow: hidden;
+            max-width: none;
+            margin-bottom: 15px;
+            table-layout: fixed;
         }
         
-        .hic-status-table td, .hic-stats-table td {
-            padding: 12px 16px;
-            border-bottom: 1px solid #e1e5e8;
+        .hic-diagnostics-container .widefat td,
+        .hic-diagnostics-container .widefat th {
+            padding: 12px 15px;
             vertical-align: top;
+            word-wrap: break-word;
         }
         
-        .hic-status-table td:first-child, .hic-stats-table td:first-child {
-            font-weight: 600;
-            width: 140px;
-            background: #f1f3f4;
+        .hic-diagnostics-container .form-table {
+            width: 100%;
+            max-width: none;
         }
         
-        .hic-status-table td:last-child {
-            color: #646970;
-            font-size: 13px;
+        .hic-diagnostics-container .form-table th {
+            width: 200px;
+            padding: 15px 10px 15px 0;
         }
         
-        .hic-status-table tr:last-child td, .hic-stats-table tr:last-child td {
-            border-bottom: none;
+        .hic-diagnostics-container .form-table td {
+            padding: 15px 10px;
         }
         
-        /* Status Indicators */
-        .status {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-weight: 600;
-            font-size: 13px;
+        .status.ok { color: #46b450; font-weight: bold; }
+        .status.error { color: #dc3232; font-weight: bold; }
+        .status.warning { color: #ffb900; font-weight: bold; }
+        .status.neutral { color: #666; font-weight: normal; }
+        
+        .manual-booking-alerts {
+            margin-top: 15px;
         }
-        
-        .status.ok { color: #00a32a; }
-        .status.error { color: #d63638; }
-        .status.warning { color: #dba617; }
-        .status.neutral { color: #646970; }
-        
-        /* Quick Actions */
-        .hic-quick-actions {
-            display: flex;
-            gap: 32px;
-            margin-top: 16px;
-            flex-wrap: wrap;
-        }
-        
-        .hic-action-group {
-            flex: 1;
-            min-width: 200px;
-        }
-        
-        .hic-action-group h3 {
-            margin: 0 0 12px 0;
+        .manual-booking-alerts h3 {
+            margin-bottom: 10px;
             font-size: 14px;
             font-weight: 600;
-            color: #646970;
-            text-transform: uppercase;
         }
-        
-        .hic-action-group .button {
-            display: block;
-            width: 100%;
-            margin-bottom: 8px;
-            text-align: center;
-            padding: 10px 16px;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-            position: relative;
-            overflow: hidden;
+        .manual-booking-recommendations {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f7f7f7;
+            border-left: 4px solid #0073aa;
         }
-        
-        .hic-action-group .button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-        
-        .hic-action-group .button:active {
-            transform: translateY(0);
-        }
-        
-        .hic-action-group .button:disabled {
-            transform: none;
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        
-        .hic-action-group .button .dashicons {
-            margin-right: 6px;
+        .manual-booking-recommendations h3 {
             margin-top: 0;
-            transition: transform 0.2s ease;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
         }
-        
-        .hic-action-group .button:hover .dashicons {
-            transform: scale(1.1);
-        }
-        
-        /* Enhanced button states */
-        .hic-action-group .button.loading::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            right: 12px;
-            transform: translateY(-50%);
-            width: 12px;
-            height: 12px;
-            border: 1px solid currentColor;
-            border-top: 1px solid transparent;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        /* Integration Grid */
-        .hic-integrations-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-top: 16px;
-        }
-        
-        .hic-integration-item {
-            background: #f8f9fa;
-            border: 1px solid #e1e5e8;
-            border-radius: 8px;
-            padding: 20px;
-            position: relative;
-        }
-        
-        .hic-integration-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-        
-        .hic-integration-icon {
-            font-size: 24px;
-        }
-        
-        .hic-integration-header h3 {
+        .manual-booking-recommendations ul {
             margin: 0;
-            font-size: 16px;
-            font-weight: 600;
-            flex: 1;
+            padding-left: 20px;
         }
-        
-        .hic-integration-details p {
-            margin: 0 0 8px 0;
-            color: #646970;
-            font-size: 14px;
-        }
-        
-        .hic-integration-details small {
-            color: #646970;
-            font-size: 12px;
-        }
-        
-        .hic-integration-actions {
-            margin-top: 12px;
-        }
-        
-        .hic-integration-actions .button {
-            font-size: 12px;
-            padding: 4px 12px;
-        }
-        
-        .hic-integration-actions-section {
-            margin-top: 24px;
-            padding-top: 24px;
-            border-top: 1px solid #e1e5e8;
-        }
-        
-        .hic-integration-actions-section h3 {
-            margin-top: 0;
-        }
-        
-        .hic-integration-actions-section .hic-quick-actions {
-            margin-top: 12px;
-        }
-        
-        .hic-integration-actions-section .button {
-            margin-right: 12px;
+        .manual-booking-recommendations li {
             margin-bottom: 8px;
         }
         
-        /* Activity Grid */
-        .hic-activity-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-top: 16px;
-        }
-        
-        .hic-activity-section h3 {
-            margin-top: 0;
-            margin-bottom: 16px;
-            font-size: 14px;
-            font-weight: 600;
-            text-transform: uppercase;
-            color: #646970;
-            border-bottom: 1px solid #e1e5e8;
-            padding-bottom: 8px;
-        }
-        
-        /* Logs Container */
-        .hic-logs-container {
-            max-height: 280px;
-            overflow-y: auto;
-            background: #f8f9fa;
-            border: 1px solid #e1e5e8;
-            border-radius: 6px;
-            padding: 12px;
-            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+        #hic-recent-logs { 
+            max-height: 300px; 
+            overflow-y: auto; 
+            background: #f9f9f9; 
+            padding: 15px; 
+            font-family: 'Courier New', Courier, monospace; 
             font-size: 12px;
-            line-height: 1.4;
-        }
-        
-        .hic-log-entry {
-            padding: 4px 0;
-            border-bottom: 1px solid #e1e5e8;
-            word-break: break-word;
-        }
-        
-        .hic-log-entry:last-child {
-            border-bottom: none;
-        }
-        
-        .hic-log-more {
-            color: #646970;
-            font-style: italic;
-            margin-top: 8px;
-            text-align: center;
-        }
-        
-        .hic-no-logs {
-            color: #646970;
-            text-align: center;
-            font-style: italic;
-            margin: 20px 0;
-        }
-        
-        /* Advanced Tools */
-        .hic-advanced-details {
-            border: 1px solid #e1e5e8;
-            border-radius: 6px;
-            margin-top: 16px;
-        }
-        
-        .hic-advanced-details summary {
-            padding: 16px;
-            cursor: pointer;
-            background: #f8f9fa;
-            border-radius: 6px 6px 0 0;
-            user-select: none;
-        }
-        
-        .hic-advanced-details[open] summary {
-            border-bottom: 1px solid #e1e5e8;
-            border-radius: 6px 6px 0 0;
-        }
-        
-        .hic-advanced-summary {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-            color: #1d2327;
-        }
-        
-        .hic-advanced-content {
-            padding: 20px;
-        }
-        
-        .hic-advanced-section {
-            margin-bottom: 24px;
-            padding-bottom: 24px;
-            border-bottom: 1px solid #e1e5e8;
-        }
-        
-        .hic-advanced-section:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-            border-bottom: none;
-        }
-        
-        .hic-advanced-section h3 {
-            margin-top: 0;
-            margin-bottom: 12px;
-        }
-        
-        .hic-advanced-section p {
-            margin-bottom: 16px;
-            color: #646970;
-        }
-        
-        /* Backfill Form */
-        .hic-backfill-form {
-            background: #f8f9fa;
-            border: 1px solid #e1e5e8;
-            border-radius: 6px;
-            padding: 16px;
-        }
-        
-        .hic-form-row {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
-        }
-        
-        .hic-form-row label {
-            font-weight: 600;
-            font-size: 14px;
-            color: #1d2327;
-            min-width: 40px;
-        }
-        
-        .hic-form-row input, .hic-form-row select {
-            flex: 1;
-            min-width: 120px;
-            padding: 6px 12px;
-            border: 1px solid #ccd0d4;
-            border-radius: 4px;
-        }
-        
-        .hic-form-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        /* Emergency Tools */
-        .hic-emergency-tools {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        
-        .hic-warning-text {
-            color: #d63638;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 12px;
-        }
-        
-        .hic-brevo-test {
-            margin-top: 12px;
-        }
-        
-        /* Results and Status */
-        .hic-results-container {
-            margin-top: 16px;
-            padding: 16px;
-            background: #f8f9fa;
-            border: 1px solid #e1e5e8;
-            border-radius: 6px;
-            border-left: 4px solid #0073aa;
-        }
-        
-        .hic-status-message {
-            margin-left: 12px;
-            font-weight: 600;
-        }
-        
-        /* Toast Notifications */
-        .hic-toast-container {
-            position: fixed;
-            top: 32px;
-            right: 20px;
-            z-index: 9999;
-            pointer-events: none;
-        }
-        
-        .hic-toast {
-            background: white;
-            border: 1px solid #e1e5e8;
-            border-radius: 6px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-            padding: 16px 20px;
-            margin-bottom: 12px;
-            min-width: 300px;
-            pointer-events: auto;
-            transform: translateX(100%);
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .hic-toast.show {
-            transform: translateX(0);
-        }
-        
-        .hic-toast.success {
-            border-left: 4px solid #00a32a;
-        }
-        
-        .hic-toast.error {
-            border-left: 4px solid #d63638;
-        }
-        
-        .hic-toast.warning {
-            border-left: 4px solid #dba617;
-        }
-        
-        .hic-toast.info {
-            border-left: 4px solid #0073aa;
-        }
-        
-        .hic-toast-content {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .hic-toast-icon {
-            font-size: 20px;
-            line-height: 1;
-        }
-        
-        .hic-toast-message {
-            flex: 1;
-            font-size: 14px;
-            line-height: 1.4;
-        }
-        
-        .hic-toast-close {
-            background: none;
-            border: none;
-            font-size: 16px;
-            cursor: pointer;
-            color: #646970;
-            padding: 0;
-            margin-left: 8px;
-        }
-        
-        .hic-toast-close:hover {
-            color: #1d2327;
-        }
-        
-        /* Progress bars for long operations */
-        .hic-progress-bar {
             width: 100%;
-            height: 4px;
-            background: #f0f0f1;
-            border-radius: 2px;
-            overflow: hidden;
-            margin-top: 12px;
-        }
-        
-        .hic-progress-fill {
-            height: 100%;
-            background: #0073aa;
-            border-radius: 2px;
-            transition: width 0.3s ease;
-            width: 0%;
-        }
-        
-        /* Copy to clipboard functionality */
-        .hic-copy-button {
-            background: none;
-            border: 1px solid #e1e5e8;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
             border-radius: 4px;
-            padding: 4px 8px;
-            font-size: 12px;
-            cursor: pointer;
-            color: #646970;
-            margin-left: 8px;
-            transition: all 0.2s ease;
         }
         
-        .hic-copy-button:hover {
-            background: #f8f9fa;
-            color: #1d2327;
+        #hic-recent-logs div { 
+            margin-bottom: 3px; 
+            padding: 2px 0;
+            border-bottom: 1px solid #eee;
         }
         
-        .hic-copy-button.copied {
-            background: #00a32a;
-            color: white;
-            border-color: #00a32a;
+        .button {
+            margin-right: 10px;
+            margin-bottom: 5px;
         }
         
-        /* Responsive Design */
+        /* Better responsive design */
         @media (max-width: 1200px) {
-            .hic-overview-grid,
-            .hic-activity-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .hic-integrations-grid {
-                grid-template-columns: 1fr;
+            .wrap {
+                width: calc(100% - 10px) !important;
+                margin-right: 10px;
             }
         }
         
+        /* Responsive improvements */
         @media (max-width: 782px) {
             .wrap {
                 width: 100% !important;
@@ -2178,354 +2202,47 @@ function hic_diagnostics_page() {
             }
             
             .hic-diagnostics-container .card {
-                padding: 16px;
-                margin-bottom: 12px;
+                padding: 15px;
+                margin-bottom: 15px;
             }
             
-            .hic-quick-actions {
-                flex-direction: column;
-                gap: 16px;
-            }
-            
-            .hic-action-group {
-                min-width: auto;
-            }
-            
-            .hic-form-row {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .hic-form-row label {
-                min-width: auto;
-            }
-            
-            .hic-emergency-tools {
-                flex-direction: column;
-            }
-            
-            .hic-toast {
-                min-width: 280px;
-                max-width: calc(100vw - 40px);
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .hic-action-group .button {
-                padding: 12px 16px;
+            .hic-diagnostics-container .widefat {
                 font-size: 14px;
-                min-height: 44px; /* Better touch targets */
             }
             
-            .hic-overview-section h3 {
-                font-size: 12px;
+            .hic-diagnostics-container .widefat td,
+            .hic-diagnostics-container .widefat th {
+                padding: 8px 10px;
             }
             
-            .hic-status-table td {
-                padding: 8px 12px;
-                font-size: 13px;
+            .hic-diagnostics-container .form-table th {
+                width: 150px;
             }
         }
         
-        /* Accessibility Improvements */
-        .sr-only {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
-        
-        /* High contrast mode support */
-        .high-contrast .card {
-            border: 2px solid #000;
-            box-shadow: none;
-        }
-        
-        .high-contrast .button {
-            border: 2px solid #000;
-            font-weight: bold;
-        }
-        
-        .high-contrast .status.ok {
-            color: #000;
-            background: #fff;
-            padding: 2px 4px;
-            border: 1px solid #000;
-        }
-        
-        .high-contrast .status.error {
-            color: #fff;
-            background: #000;
-            padding: 2px 4px;
-        }
-        
-        /* Enhanced focus indicators for keyboard navigation */
-        .button:focus,
-        .hic-copy-button:focus,
-        .hic-advanced-details summary:focus {
-            outline: 3px solid #0073aa;
-            outline-offset: 2px;
-            box-shadow: 0 0 0 3px rgba(0, 115, 170, 0.3);
-        }
-        
-        /* Improved touch targets for mobile accessibility */
-        @media (max-width: 768px) {
-            .button,
-            .hic-copy-button,
-            .hic-toast-close {
-                min-height: 44px;
-                min-width: 44px;
-            }
-        }
-        
-        /* Button Improvements */
-        .button {
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-        
-        .button:hover {
-            transform: translateY(-1px);
-        }
-        
-        .button-primary {
-            background: #0073aa;
-            border-color: #0073aa;
-        }
-        
-        .button-primary:hover {
-            background: #005a87;
-            border-color: #005a87;
-        }
-        
-        .button-link-delete {
-            color: #d63638;
-            border-color: #d63638;
-        }
-        
-        .button-link-delete:hover {
-            background: #d63638;
-            color: white;
-        }
-        
-        /* Tables */
-        .widefat {
-            border-collapse: collapse;
+        /* Ensure tables don't overflow and use full width */
+        .hic-diagnostics-container table {
+            table-layout: fixed;
             width: 100%;
-            background: #fff;
-            border: 1px solid #e1e5e8;
-            border-radius: 6px;
-            overflow: hidden;
+            word-wrap: break-word;
         }
         
-        .widefat th,
-        .widefat td {
-            padding: 12px 16px;
-            text-align: left;
-            border-bottom: 1px solid #e1e5e8;
+        .hic-diagnostics-container code {
+            word-break: break-all;
+            background: #f1f1f1;
+            padding: 2px 4px;
+            border-radius: 3px;
         }
         
-        .widefat th {
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #1d2327;
-        }
-        
-        .widefat tr:last-child td {
-            border-bottom: none;
-        }
-        
-        /* Notices */
+        /* Better styling for notices */
         .notice.inline {
-            margin: 16px 0;
-            padding: 12px 16px;
-            border-radius: 6px;
-        }
-        
-        .notice-success {
-            background: #f0f8f0;
-            border-left-color: #00a32a;
-        }
-        
-        .notice-error {
-            background: #fef7f7;
-            border-left-color: #d63638;
-        }
-        
-        .notice-warning {
-            background: #fef8f0;
-            border-left-color: #dba617;
-        }
-        
-        .notice-info {
-            background: #f0f8ff;
-            border-left-color: #0073aa;
+            margin: 15px 0;
+            padding: 12px;
         }
     </style>
     
     <script type="text/javascript">
     jQuery(document).ready(function($) {
-        
-        // Enhanced UI functionality
-        
-        // Toast notification system
-        function showToast(message, type = 'info', duration = 5000) {
-            const toastContainer = $('#hic-toast-container');
-            if (toastContainer.length === 0) {
-                $('body').append('<div id="hic-toast-container" class="hic-toast-container"></div>');
-            }
-            
-            const icons = {
-                success: '✓',
-                error: '✗',
-                warning: '⚠',
-                info: 'ℹ'
-            };
-            
-            const toast = $(`
-                <div class="hic-toast ${type}">
-                    <div class="hic-toast-content">
-                        <span class="hic-toast-icon">${icons[type] || icons.info}</span>
-                        <span class="hic-toast-message">${message}</span>
-                        <button class="hic-toast-close">&times;</button>
-                    </div>
-                </div>
-            `);
-            
-            $('#hic-toast-container').append(toast);
-            
-            // Show toast
-            setTimeout(() => toast.addClass('show'), 100);
-            
-            // Auto remove
-            const autoRemove = setTimeout(() => {
-                toast.removeClass('show');
-                setTimeout(() => toast.remove(), 300);
-            }, duration);
-            
-            // Manual close
-            toast.find('.hic-toast-close').click(function() {
-                clearTimeout(autoRemove);
-                toast.removeClass('show');
-                setTimeout(() => toast.remove(), 300);
-            });
-        }
-        
-        // Auto-refresh system status every 30 seconds
-        let refreshInterval;
-        function startAutoRefresh() {
-            refreshInterval = setInterval(function() {
-                $('#refresh-indicator').addClass('active');
-                
-                // Refresh connection status and key metrics
-                $.post(ajaxurl, {
-                    action: 'hic_get_system_status',
-                    nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
-                }, function(response) {
-                    if (response.success) {
-                        // Update polling status
-                        const pollingStatus = response.data.polling_active ? 
-                            '<span class="status ok">✓ Attivo</span>' : 
-                            '<span class="status error">✗ Inattivo</span>';
-                        
-                        // Find and update the polling status
-                        $('#system-overview').find('td').each(function() {
-                            if ($(this).text().includes('Polling Attivo') || $(this).text().includes('Polling Inattivo')) {
-                                $(this).html(pollingStatus);
-                            }
-                        });
-                        
-                        // Update last execution time if available
-                        if (response.data.last_execution) {
-                            $('#system-overview').find('td').each(function() {
-                                if ($(this).prev().text() === 'Ultimo Polling') {
-                                    $(this).text(response.data.last_execution);
-                                }
-                            });
-                        }
-                    }
-                }).always(function() {
-                    setTimeout(() => $('#refresh-indicator').removeClass('active'), 1000);
-                });
-            }, 30000);
-        }
-        
-        // Enhanced button interactions
-        function enhanceButton($button, loadingText = null) {
-            const originalText = $button.html();
-            const originalClass = $button.attr('class');
-            
-            return {
-                setLoading: function() {
-                    $button.addClass('loading').prop('disabled', true);
-                    if (loadingText) {
-                        $button.text(loadingText);
-                    }
-                },
-                setSuccess: function(message = null) {
-                    $button.removeClass('loading').addClass('success');
-                    if (message) {
-                        showToast(message, 'success');
-                    }
-                    setTimeout(() => {
-                        $button.removeClass('success').prop('disabled', false).html(originalText);
-                    }, 2000);
-                },
-                setError: function(message = null) {
-                    $button.removeClass('loading').addClass('error');
-                    if (message) {
-                        showToast(message, 'error');
-                    }
-                    setTimeout(() => {
-                        $button.removeClass('error').prop('disabled', false).html(originalText);
-                    }, 3000);
-                },
-                reset: function() {
-                    $button.removeClass('loading success error').prop('disabled', false).html(originalText);
-                }
-            };
-        }
-        
-        // Copy to clipboard functionality
-        function addCopyButton(selector, textSelector = null) {
-            $(selector).each(function() {
-                const $element = $(this);
-                const $copyBtn = $('<button class="hic-copy-button" title="Copia negli appunti">📋</button>');
-                
-                $copyBtn.click(function() {
-                    const text = textSelector ? $element.find(textSelector).text() : $element.text();
-                    navigator.clipboard.writeText(text).then(function() {
-                        $copyBtn.addClass('copied').text('✓');
-                        showToast('Copiato negli appunti!', 'success', 2000);
-                        setTimeout(() => {
-                            $copyBtn.removeClass('copied').text('📋');
-                        }, 2000);
-                    }).catch(function() {
-                        showToast('Errore nella copia', 'error');
-                    });
-                });
-                
-                $element.append($copyBtn);
-            });
-        }
-        
-        // Initialize enhanced features
-        startAutoRefresh();
-        addCopyButton('.hic-log-entry');
-        
-        // Add progress bar to long operations
-        function createProgressBar() {
-            return $('<div class="hic-progress-bar"><div class="hic-progress-fill"></div></div>');
-        }
-        
-        function updateProgress($progressBar, percent) {
-            $progressBar.find('.hic-progress-fill').css('width', percent + '%');
-        }
         
         // Backfill handler
         $('#start-backfill').click(function() {
@@ -2774,57 +2491,60 @@ function hic_diagnostics_page() {
             });
         });
         
-        // Force Polling handler (updated for new design with enhanced UX)
+        // Force Polling handler
         $('#force-polling').click(function() {
             var $btn = $(this);
-            var buttonController = enhanceButton($btn, 'Eseguendo...');
-            var $status = $('#quick-status');
-            var $results = $('#quick-results');
-            var $resultsContent = $('#quick-results-content');
+            var $status = $('#polling-status');
+            var $results = $('#polling-results');
+            var $resultsContent = $('#polling-results-content');
             
-            buttonController.setLoading();
-            $status.text('Test polling in corso...').css('color', '#0073aa');
+            $btn.prop('disabled', true).text('Eseguendo polling forzato...');
+            $status.text('Avvio...').css('color', '#0073aa');
             $results.hide();
-            
-            // Add progress bar
-            var $progressBar = createProgressBar();
-            $status.after($progressBar);
-            updateProgress($progressBar, 20);
             
             $.post(ajaxurl, {
                 action: 'hic_force_polling',
                 force: 'true',
                 nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
             }, function(response) {
-                updateProgress($progressBar, 80);
                 var result = JSON.parse(response);
                 
                 if (result.success) {
-                    updateProgress($progressBar, 100);
-                    buttonController.setSuccess('Test completato con successo!');
-                    $status.text('✓ Test completato!').css('color', '#00a32a');
+                    $status.text('Polling completato!').css('color', '#46b450');
                     
-                    var html = '<div class="notice notice-success inline"><p><strong>Test Polling Completato:</strong><br>';
-                    html += result.message + '<br>';
+                    var html = '<div class="notice notice-success inline"><p><strong>Polling Forzato Completato:</strong><br>';
+                    html += 'Messaggio: ' + result.message + '<br>';
                     if (result.execution_time) {
                         html += 'Tempo esecuzione: ' + result.execution_time + ' secondi<br>';
                     }
+                    if (result.lock_cleared) {
+                        html += 'Lock esistente rimosso per l\'esecuzione<br>';
+                    }
                     html += '</p></div>';
+                    
+                    // Add diagnostics info if available
+                    if (result.diagnostics_before && result.diagnostics_before.conditions) {
+                        html += '<div style="margin-top: 10px;"><strong>Condizioni Polling:</strong><ul>';
+                        var conditions = result.diagnostics_before.conditions;
+                        Object.keys(conditions).forEach(function(key) {
+                            var status = conditions[key] ? '✅' : '❌';
+                            html += '<li>' + status + ' ' + key + ': ' + conditions[key] + '</li>';
+                        });
+                        html += '</ul></div>';
+                    }
                     
                     $resultsContent.html(html);
                     $results.show();
                     
                     // Refresh page after 3 seconds
                     setTimeout(function() {
-                        showToast('Aggiornamento dati...', 'info', 2000);
                         location.reload();
                     }, 3000);
                     
                 } else {
-                    buttonController.setError('Test fallito: ' + (result.message || 'Errore sconosciuto'));
-                    $status.text('✗ Test fallito').css('color', '#d63638');
+                    $status.text('Errore durante il polling').css('color', '#dc3232');
                     
-                    var html = '<div class="notice notice-error inline"><p><strong>Errore Test:</strong><br>';
+                    var html = '<div class="notice notice-error inline"><p><strong>Errore Polling:</strong><br>';
                     html += result.message || 'Errore sconosciuto';
                     html += '</p></div>';
                     
@@ -2832,29 +2552,25 @@ function hic_diagnostics_page() {
                     $results.show();
                 }
                 
-                // Remove progress bar
-                setTimeout(() => $progressBar.remove(), 1000);
+                $btn.prop('disabled', false).text('Forza Polling Ora');
                 
             }).fail(function() {
-                buttonController.setError('Errore di comunicazione con il server');
-                $status.text('✗ Errore comunicazione').css('color', '#d63638');
-                $progressBar.remove();
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+                $btn.prop('disabled', false).text('Forza Polling Ora');
             });
         });
         
-        // Test Connectivity handler (enhanced with better UX)
-        $('#test-connectivity').click(function() {
+        // Test Polling handler (normal execution)
+        $('#test-polling').click(function() {
             var $btn = $(this);
-            var buttonController = enhanceButton($btn, 'Testando...');
-            var $status = $('#quick-status');
-            var $results = $('#quick-results');
-            var $resultsContent = $('#quick-results-content');
+            var $status = $('#polling-status');
+            var $results = $('#polling-results');
+            var $resultsContent = $('#polling-results-content');
             
-            buttonController.setLoading();
-            $status.text('Test connessione in corso...').css('color', '#0073aa');
+            $btn.prop('disabled', true).text('Testando polling...');
+            $status.text('Test in corso...').css('color', '#0073aa');
             $results.hide();
             
-            // Use the existing force polling but without force flag for normal test
             $.post(ajaxurl, {
                 action: 'hic_force_polling',
                 force: 'false',
@@ -2863,39 +2579,64 @@ function hic_diagnostics_page() {
                 var result = JSON.parse(response);
                 
                 if (result.success) {
-                    buttonController.setSuccess('Connessione verificata!');
-                    $status.text('✓ Connessione OK').css('color', '#00a32a');
+                    $status.text('Test completato!').css('color', '#46b450');
                     
-                    var html = '<div class="notice notice-success inline"><p><strong>Test Connessione Riuscito:</strong><br>';
-                    html += result.message + '</p></div>';
+                    var html = '<div class="notice notice-success inline"><p><strong>Test Polling Completato:</strong><br>';
+                    html += 'Messaggio: ' + result.message + '<br>';
+                    if (result.execution_time) {
+                        html += 'Tempo esecuzione: ' + result.execution_time + ' secondi<br>';
+                    }
+                    html += '</p></div>';
                     
                 } else {
-                    buttonController.setError('Connessione fallita');
-                    $status.text('✗ Connessione fallita').css('color', '#d63638');
+                    $status.text('Test fallito').css('color', '#dc3232');
                     
-                    var html = '<div class="notice notice-warning inline"><p><strong>Test Connessione Fallito:</strong><br>';
+                    var html = '<div class="notice notice-warning inline"><p><strong>Test Polling Fallito:</strong><br>';
                     html += result.message || 'Errore sconosciuto';
+                    
+                    // Add detailed diagnostics for troubleshooting
+                    if (result.diagnostics_before) {
+                        html += '<br><br><strong>Diagnostica:</strong><ul>';
+                        var conditions = result.diagnostics_before.conditions;
+                        if (conditions) {
+                            Object.keys(conditions).forEach(function(key) {
+                                var status = conditions[key] ? '✅' : '❌';
+                                html += '<li>' + status + ' ' + key + ': ' + conditions[key] + '</li>';
+                            });
+                        }
+                        html += '</ul>';
+                        
+                        if (result.diagnostics_before.configuration) {
+                            html += '<strong>Configurazione:</strong><ul>';
+                            var config = result.diagnostics_before.configuration;
+                            Object.keys(config).forEach(function(key) {
+                                html += '<li>' + key + ': ' + config[key] + '</li>';
+                            });
+                            html += '</ul>';
+                        }
+                    }
+                    
                     html += '</p></div>';
                 }
                 
                 $resultsContent.html(html);
                 $results.show();
+                $btn.prop('disabled', false).text('Test Polling (con lock)');
                 
             }).fail(function() {
-                buttonController.setError('Errore di comunicazione');
-                $status.text('✗ Errore comunicazione').css('color', '#d63638');
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+                $btn.prop('disabled', false).text('Test Polling (con lock)');
             });
         });
         
-        // Trigger Watchdog handler (enhanced with better UX)
+        // Trigger Watchdog handler
         $('#trigger-watchdog').click(function() {
             var $btn = $(this);
-            var buttonController = enhanceButton($btn, 'Eseguendo...');
-            var $status = $('#quick-status');
-            var $results = $('#quick-results');
-            var $resultsContent = $('#quick-results-content');
+            var $status = $('#polling-status');
+            var $results = $('#polling-results');
+            var $resultsContent = $('#polling-results-content');
             
-            buttonController.setLoading();
+            $btn.prop('disabled', true).text('Eseguendo watchdog...');
             $status.text('Watchdog in corso...').css('color', '#0073aa');
             $results.hide();
             
@@ -2904,17 +2645,22 @@ function hic_diagnostics_page() {
                 nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
             }).done(function(response) {
                 if (response.success) {
-                    buttonController.setSuccess('Watchdog completato con successo!');
-                    $status.text('✓ Watchdog completato').css('color', '#00a32a');
+                    $status.text('Watchdog completato!').css('color', '#46b450');
                     
                     var html = '<div class="notice notice-success inline"><p><strong>Watchdog Completato:</strong><br>';
-                    html += response.message + '</p></div>';
+                    html += response.message + '<br><br>';
+                    if (response.watchdog_result) {
+                        html += '<strong>Risultato Watchdog:</strong><br>' + JSON.stringify(response.watchdog_result, null, 2).replace(/\n/g, '<br>').replace(/ {2}/g, '&nbsp;&nbsp;') + '<br><br>';
+                    }
+                    if (response.scheduler_restart) {
+                        html += '<strong>Scheduler Restart:</strong><br>' + JSON.stringify(response.scheduler_restart, null, 2).replace(/\n/g, '<br>').replace(/ {2}/g, '&nbsp;&nbsp;');
+                    }
+                    html += '</p></div>';
                     
                     $resultsContent.html(html);
                     $results.show();
                 } else {
-                    buttonController.setError('Watchdog fallito: ' + (response.message || 'Errore sconosciuto'));
-                    $status.text('✗ Watchdog fallito').css('color', '#d63638');
+                    $status.text('Watchdog fallito').css('color', '#dc3232');
                     
                     var html = '<div class="notice notice-warning inline"><p><strong>Watchdog Fallito:</strong><br>';
                     html += response.message || 'Errore sconosciuto';
@@ -2924,68 +2670,52 @@ function hic_diagnostics_page() {
                     $results.show();
                 }
                 
+                // Log the response for debugging
+                console.log('Watchdog response:', response);
+                
                 setTimeout(function() {
-                    showToast('Aggiornamento dati...', 'info', 2000);
                     location.reload();
                 }, 3000);
                 
             }).fail(function() {
-                buttonController.setError('Errore di comunicazione con il server');
-                $status.text('✗ Errore comunicazione').css('color', '#d63638');
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
+            }).always(function() {
+                $btn.prop('disabled', false).text('Trigger Watchdog');
             });
         });
         
-        // Reset Timestamps handler (enhanced with better UX and warnings)
+        // Reset Timestamps handler (emergency recovery)
         $('#reset-timestamps').click(function() {
             var $btn = $(this);
-            var buttonController = enhanceButton($btn, 'Resettando...');
-            var $status = $('#quick-status');
-            var $results = $('#quick-results');
-            var $resultsContent = $('#quick-results-content');
+            var $status = $('#polling-status');
+            var $results = $('#polling-results');
+            var $resultsContent = $('#polling-results-content');
             
-            // Enhanced confirmation with more details
-            var confirmMessage = 'ATTENZIONE: Reset Timestamp di Emergenza\n\n' +
-                               'Questa azione resetterà TUTTI i timestamp del sistema:\n' +
-                               '• Ultimo polling eseguito\n' +
-                               '• Orari di scheduling\n' +
-                               '• Cache delle prenotazioni\n\n' +
-                               'Utilizzare SOLO se il polling è completamente bloccato.\n\n' +
-                               'Sei sicuro di voler procedere?';
-            
-            if (!confirm(confirmMessage)) {
+            // Confirm before proceeding since this is an emergency action
+            if (!confirm('ATTENZIONE: Questa è un\'azione di emergenza che resetterà tutti i timestamp del sistema. Proseguire solo se il polling è bloccato da errori di timestamp. Continuare?')) {
                 return;
             }
             
-            // Second confirmation for safety
-            if (!confirm('Ultima conferma: procedere con il reset di emergenza?')) {
-                return;
-            }
-            
-            buttonController.setLoading();
-            $status.text('Reset emergenza in corso...').css('color', '#d63638');
+            $btn.prop('disabled', true).text('Resettando timestamp...');
+            $status.text('Reset timestamp in corso...').css('color', '#dc3232');
             $results.hide();
-            
-            showToast('Reset di emergenza avviato...', 'warning');
             
             $.post(ajaxurl, {
                 action: 'hic_reset_timestamps',
                 nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
             }).done(function(response) {
                 if (response.success) {
-                    buttonController.setSuccess('Reset completato!');
-                    $status.text('✓ Reset completato').css('color', '#00a32a');
+                    $status.text('Reset completato!').css('color', '#46b450');
                     
                     var html = '<div class="notice notice-success inline"><p><strong>Reset Timestamp Completato:</strong><br>';
-                    html += response.message + '<br><br>';
-                    html += '<em>Il sistema dovrebbe riprendere il polling normalmente.</em></p></div>';
+                    html += response.message + '<br>';
+                    html += 'Il sistema di polling è stato riavviato e dovrebbe funzionare normalmente.';
+                    html += '</p></div>';
                     
                     $resultsContent.html(html);
                     $results.show();
-                    
-                    showToast('Sistema ripristinato! La pagina si aggiornerà automaticamente.', 'success');
                 } else {
-                    buttonController.setError('Reset fallito: ' + (response.message || 'Errore sconosciuto'));
-                    $status.text('✗ Reset fallito').css('color', '#d63638');
+                    $status.text('Reset fallito').css('color', '#dc3232');
                     
                     var html = '<div class="notice notice-error inline"><p><strong>Reset Fallito:</strong><br>';
                     html += response.message || 'Errore sconosciuto';
@@ -2995,30 +2725,21 @@ function hic_diagnostics_page() {
                     $results.show();
                 }
                 
-                setTimeout(function() {
-                    showToast('Aggiornamento dati...', 'info', 2000);
-                    location.reload();
-                }, 4000);
-                
-            }).fail(function() {
-                buttonController.setError('Errore di comunicazione con il server');
-                $status.text('✗ Errore comunicazione').css('color', '#d63638');
-                showToast('Errore di comunicazione durante il reset', 'error');
-            });
-        });
+                // Log the response for debugging
+                console.log('Timestamp reset response:', response);
                 
                 setTimeout(function() {
                     location.reload();
                 }, 3000);
                 
             }).fail(function() {
-                $status.text('✗ Errore comunicazione').css('color', '#d63638');
+                $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
             }).always(function() {
-                $btn.prop('disabled', false).html('<span class="dashicons dashicons-warning"></span> Reset Emergenza');
+                $btn.prop('disabled', false).text('Reset Timestamps');
             });
         });
         
-        // Log download handler (same functionality)
+        // Log download handler
         $('#download-error-logs').click(function() {
             var $btn = $(this);
             
@@ -3050,15 +2771,14 @@ function hic_diagnostics_page() {
             document.body.appendChild(form);
             form.submit();
             document.body.removeChild(form);
-        
         });
         
-        // Brevo connectivity test handler (same functionality, using existing structure)
+        // Brevo connectivity test handler
         $('#test-brevo-connectivity').click(function() {
             var $btn = $(this);
             var $results = $('#brevo-test-results');
             
-            $btn.prop('disabled', true).text('Testando...');
+            $btn.prop('disabled', true).text('Testando connettività...');
             $results.hide();
             
             $.post(ajaxurl, {
@@ -3071,19 +2791,25 @@ function hic_diagnostics_page() {
                     html += '<div class="notice notice-success inline"><p><strong>Test Connettività Brevo Completato</strong></p>';
                     
                     // Contact API results
-                    html += '<h4>API Contatti:</h4>';
+                    html += '<h4>API Contatti (v3/contacts):</h4>';
                     if (response.contact_api.success) {
                         html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.contact_api.http_code + '</p>';
                     } else {
                         html += '<p><span class="status error">✗ Errore</span> - ' + response.contact_api.error + '</p>';
+                        if (response.contact_api.log_data && response.contact_api.log_data.brevo_error_message) {
+                            html += '<p><small>Dettaglio Brevo: ' + response.contact_api.log_data.brevo_error_message + '</small></p>';
+                        }
                     }
                     
                     // Event API results
-                    html += '<h4>API Eventi:</h4>';
+                    html += '<h4>API Eventi (v2/trackEvent):</h4>';
                     if (response.event_api.success) {
                         html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.event_api.http_code + '</p>';
                     } else {
                         html += '<p><span class="status error">✗ Errore</span> - ' + response.event_api.error + '</p>';
+                        if (response.event_api.log_data && response.event_api.log_data.brevo_error_message) {
+                            html += '<p><small>Dettaglio Brevo: ' + response.event_api.log_data.brevo_error_message + '</small></p>';
+                        }
                     }
                     
                     html += '</div>';
@@ -3096,69 +2822,8 @@ function hic_diagnostics_page() {
             }).fail(function() {
                 $results.html('<div class="notice notice-error inline"><p><strong>Errore di comunicazione con il server</strong></p></div>').show();
             }).always(function() {
-                $btn.prop('disabled', false).text('Test API');
+                $btn.prop('disabled', false).text('Test Connettività Brevo');
             });
-        });
-        
-        // Accessibility and keyboard navigation improvements
-        
-        // Add ARIA labels to buttons and status indicators
-        $('.hic-action-group .button').each(function() {
-            const $btn = $(this);
-            const text = $btn.text().trim();
-            $btn.attr('aria-label', 'Azione: ' + text);
-        });
-        
-        // Add role attributes for status indicators
-        $('.status').attr('role', 'status').attr('aria-live', 'polite');
-        
-        // Enhanced keyboard navigation
-        $(document).on('keydown', function(e) {
-            // ESC to close any open details/dialogs
-            if (e.key === 'Escape') {
-                $('.hic-advanced-details[open]').removeAttr('open');
-                $('.hic-toast').removeClass('show');
-            }
-            
-            // Ctrl+R to refresh (prevent default and use our auto-refresh)
-            if (e.ctrlKey && e.key === 'r') {
-                e.preventDefault();
-                showToast('Aggiornamento automatico attivo ogni 30 secondi', 'info');
-            }
-        });
-        
-        // Add high contrast mode toggle for accessibility
-        if (window.matchMedia && window.matchMedia('(prefers-contrast: high)').matches) {
-            $('body').addClass('high-contrast');
-        }
-        
-        // Add loading states for better screen reader support
-        function announceToScreenReader(message) {
-            const announcement = $('<div>')
-                .attr('aria-live', 'assertive')
-                .attr('aria-atomic', 'true')
-                .addClass('sr-only')
-                .text(message);
-            
-            $('body').append(announcement);
-            setTimeout(() => announcement.remove(), 1000);
-        }
-        
-        // Enhanced error handling with better user feedback
-        $(document).ajaxError(function(event, xhr, settings, thrownError) {
-            if (settings.url && settings.url.includes('admin-ajax.php')) {
-                const action = settings.data && settings.data.includes('action=') ? 
-                    settings.data.match(/action=([^&]*)/)[1] : 'unknown';
-                
-                showToast(`Errore durante l'operazione ${action}. Riprova.`, 'error');
-                announceToScreenReader(`Errore durante l'operazione ${action}`);
-            }
-        });
-        
-        // Add confirmation dialogs for destructive actions
-        $('.button-link-delete, #reset-timestamps').on('click', function(e) {
-            const action = $(this).text().trim();
-            announceToScreenReader(`Azione di emergenza: ${action} richiede conferma`);
         });
     });
     </script>
