@@ -257,18 +257,19 @@ class HIC_Booking_Poller {
                 // Handle stuck polling due to timestamp errors
                 hic_log("Recovery: Resetting all timestamps due to timestamp errors");
                 $safe_timestamp = time() - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
+                $recent_timestamp = time() - 300; // 5 minutes ago for polling timestamps
                 update_option('hic_last_updates_since', $safe_timestamp);
                 update_option('hic_last_update_check', $safe_timestamp);
                 update_option('hic_last_continuous_check', $safe_timestamp);
-                update_option('hic_last_continuous_poll', 0);
-                update_option('hic_last_deep_check', 0);
+                update_option('hic_last_continuous_poll', $recent_timestamp);
+                update_option('hic_last_deep_check', $recent_timestamp);
                 
                 // Also restart the scheduler to ensure clean state
                 $this->clear_all_scheduled_events();
                 sleep(1);
                 $this->ensure_scheduler_is_active();
                 
-                hic_log("Recovery: All timestamps reset to " . date('Y-m-d H:i:s', $safe_timestamp) . " and scheduler restarted");
+                hic_log("Recovery: All timestamps reset - data timestamps to " . date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restarted");
                 break;
         }
         
