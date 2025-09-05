@@ -3014,17 +3014,6 @@ function hic_diagnostics_page() {
                 showToast('Errore di comunicazione durante il reset', 'error');
             });
         });
-                
-                setTimeout(function() {
-                    location.reload();
-                }, 3000);
-                
-            }).fail(function() {
-                $status.text('✗ Errore comunicazione').css('color', '#d63638');
-            }).always(function() {
-                $btn.prop('disabled', false).html('<span class="dashicons dashicons-warning"></span> Reset Emergenza');
-            });
-        });
         
         // Advanced Reset Timestamps handler (for the second button)
         $('#reset-timestamps-advanced').click(function() {
