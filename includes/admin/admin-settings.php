@@ -208,13 +208,37 @@ function hic_admin_enqueue_scripts($hook) {
     if ($hook === 'settings_page_hic-diagnostics' || $hook === 'settings_page_hic-monitoring') {
         // Ensure jQuery is loaded
         wp_enqueue_script('jquery');
-        
+
         // Create inline script to ensure ajaxurl is available
         wp_add_inline_script('jquery', '
             if (typeof ajaxurl === "undefined") {
                 var ajaxurl = "' . esc_js(admin_url('admin-ajax.php')) . '";
             }
         ');
+    }
+
+    if ($hook === 'settings_page_hic-diagnostics') {
+        wp_enqueue_style(
+            'hic-diagnostics',
+            plugin_dir_url(__FILE__) . '../../assets/css/diagnostics.css',
+            array(),
+            HIC_PLUGIN_VERSION
+        );
+        wp_enqueue_script(
+            'hic-diagnostics',
+            plugin_dir_url(__FILE__) . '../../assets/js/diagnostics.js',
+            array('jquery'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_localize_script('hic-diagnostics', 'hicDiagnostics', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'diagnostics_nonce' => wp_create_nonce('hic_diagnostics_nonce'),
+            'admin_nonce' => wp_create_nonce('hic_admin_action'),
+            'is_api_connection' => (hic_get_connection_type() === 'api'),
+            'has_basic_auth' => hic_has_basic_auth_credentials(),
+            'has_property_id' => (bool) hic_get_property_id(),
+        ));
     }
 }
 
