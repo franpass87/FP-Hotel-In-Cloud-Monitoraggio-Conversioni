@@ -67,6 +67,9 @@ add_action('init', function() {
     
     // Initialize config validator
     hic_get_config_validator();
+    
+    // Initialize health monitor
+    hic_get_health_monitor();
 });
 
 // Enqueue frontend JavaScript

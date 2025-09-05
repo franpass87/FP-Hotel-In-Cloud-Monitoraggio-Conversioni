@@ -513,12 +513,24 @@ class HIC_Health_Monitor {
 }
 
 /**
+ * Get or create global HIC_Health_Monitor instance
+ */
+function hic_get_health_monitor() {
+    if (!isset($GLOBALS['hic_health_monitor'])) {
+        // Only instantiate if WordPress is loaded and functions are available
+        if (HIC_FEATURE_HEALTH_MONITORING && function_exists('add_action') && function_exists('get_option')) {
+            $GLOBALS['hic_health_monitor'] = new HIC_Health_Monitor();
+        }
+    }
+    return isset($GLOBALS['hic_health_monitor']) ? $GLOBALS['hic_health_monitor'] : null;
+}
+
+/**
  * Initialize health monitor safely
  */
 function hic_init_health_monitor() {
-    if (HIC_FEATURE_HEALTH_MONITORING && function_exists('add_action') && function_exists('get_option')) {
-        new HIC_Health_Monitor();
-    }
+    // Use the global getter to ensure consistent instance management
+    hic_get_health_monitor();
 }
 
 // Initialize health monitor when WordPress is ready
