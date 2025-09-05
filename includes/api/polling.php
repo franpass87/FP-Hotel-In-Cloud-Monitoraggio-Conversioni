@@ -785,7 +785,8 @@ function hic_process_single_reservation($reservation) {
     if ($transformed !== false && is_array($transformed)) {
         hic_dispatch_reservation($transformed, $reservation);
     } else {
-        throw new Exception("Failed to transform reservation " . ($reservation['id'] ?? 'unknown'));
+        $uid = hic_booking_uid($reservation);
+        throw new Exception('Failed to transform reservation ' . ($uid ?: 'unknown'));
     }
 }
 
