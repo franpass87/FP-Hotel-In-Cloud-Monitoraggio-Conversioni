@@ -540,6 +540,70 @@ function hic_test_email_configuration($recipient_email = null) {
     return $result;
 }
 
+/* ============ Email Diagnostics and Troubleshooting ============ */
+function hic_diagnose_email_issues() {
+    $issues = array();
+    $suggestions = array();
+    
+    // Check 1: Admin email configuration
+    $admin_email = hic_get_admin_email();
+    if (empty($admin_email)) {
+        $issues[] = 'Email amministratore non configurato';
+        $suggestions[] = 'Configura un indirizzo email nelle impostazioni HIC';
+    } elseif (!hic_is_valid_email($admin_email)) {
+        $issues[] = 'Email amministratore non valido: ' . $admin_email;
+        $suggestions[] = 'Correggi l\'indirizzo email nelle impostazioni';
+    }
+    
+    // Check 2: WordPress mail function
+    if (!function_exists('wp_mail')) {
+        $issues[] = 'Funzione wp_mail non disponibile';
+        $suggestions[] = 'Problema critico di WordPress - contatta lo sviluppatore';
+    }
+    
+    // Check 3: PHP mail function
+    if (!function_exists('mail')) {
+        $issues[] = 'Funzione mail() PHP non disponibile sul server';
+        $suggestions[] = 'Contatta il provider hosting per abilitare la funzione mail()';
+    }
+    
+    // Check 4: Server configuration
+    if (function_exists('ini_get')) {
+        $smtp_config = ini_get('SMTP');
+        $sendmail_path = ini_get('sendmail_path');
+        
+        if (empty($smtp_config) && empty($sendmail_path)) {
+            $issues[] = 'Configurazione email server non trovata';
+            $suggestions[] = 'Installa un plugin SMTP (WP Mail SMTP, Easy WP SMTP) o contatta l\'hosting';
+        }
+    }
+    
+    // Check 5: Recent email sending attempts (if function exists)
+    $email_errors = 0;
+    $log_file = hic_get_log_file();
+    if (file_exists($log_file) && is_readable($log_file)) {
+        $log_contents = file_get_contents($log_file);
+        $lines = explode("\n", $log_contents);
+        $recent_lines = array_slice($lines, -50); // Last 50 lines
+        
+        foreach ($recent_lines as $line) {
+            if (strpos($line, 'ERRORE invio email') !== false) {
+                $email_errors++;
+            }
+        }
+    }
+    
+    if ($email_errors > 0) {
+        $issues[] = "$email_errors errori email negli ultimi log";
+        $suggestions[] = 'Controlla i log dettagliati nella sezione Diagnostics';
+    }
+    
+    return array(
+        'issues' => $issues,
+        'suggestions' => $suggestions,
+        'has_issues' => !empty($issues)
+    );
+}
 
 /* ============ Email Enrichment Functions ============ */
 function hic_mark_email_enriched($reservation_id, $real_email) {

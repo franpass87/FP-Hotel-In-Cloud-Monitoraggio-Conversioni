@@ -347,6 +347,29 @@ function hic_admin_email_render() {
     }
     echo '</p>';
     
+    // Add troubleshooting guide
+    echo '<div class="hic-email-troubleshooting" style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9;">';
+    echo '<h4 style="margin-top: 0;">🔧 Risoluzione Problemi Email</h4>';
+    echo '<details>';
+    echo '<summary style="cursor: pointer; font-weight: bold;">Se le email non arrivano, segui questi passi:</summary>';
+    echo '<ol style="margin: 10px 0;">';
+    echo '<li><strong>Testa la configurazione:</strong> Usa il pulsante "Test Email" sopra per verificare l\'invio</li>';
+    echo '<li><strong>Controlla lo spam:</strong> Verifica la cartella spam/junk della casella email</li>';
+    echo '<li><strong>Verifica l\'indirizzo email:</strong> Assicurati che l\'email sia corretta e funzionante</li>';
+    echo '<li><strong>Controlla i log:</strong> Vai in Diagnostics per vedere i log dettagliati degli invii</li>';
+    echo '<li><strong>Configurazione SMTP:</strong> Se il test fallisce, potrebbe servire un plugin SMTP (WP Mail SMTP, Easy WP SMTP)</li>';
+    echo '<li><strong>Contatta l\'hosting:</strong> Se tutto sopra è OK, il problema potrebbe essere nel server email</li>';
+    echo '</ol>';
+    echo '<p><strong>Configurazioni comuni che causano problemi:</strong></p>';
+    echo '<ul>';
+    echo '<li>Server senza funzione mail() PHP abilitata</li>';
+    echo '<li>Provider hosting che blocca l\'invio email</li>';
+    echo '<li>Mancanza di configurazione SMTP</li>';
+    echo '<li>Email che finiscono in blacklist per spam</li>';
+    echo '</ul>';
+    echo '</details>';
+    echo '</div>';
+    
     // Add JavaScript for email testing
     echo '<script>
     function hicTestEmail() {

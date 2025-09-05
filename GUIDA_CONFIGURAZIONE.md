@@ -131,6 +131,22 @@ Il nuovo sistema è **già ottimizzato** e non richiede configurazioni aggiuntiv
 2. Controlla che le liste contatti esistano
 3. Verifica email prenotazione non sia già presente
 
+### Problema: "Email Notifiche Non Arrivano"
+**Soluzione**:
+1. **Test Email**: Usa il pulsante "Test Email" nelle impostazioni HIC per verificare la configurazione
+2. **Controlla Spam**: Verifica cartella spam/junk dell'email di destinazione
+3. **Verifica Email**: Assicurati che l'indirizzo email amministratore sia corretto
+4. **Diagnostics**: Controlla i log nella sezione Diagnostics per errori email dettagliati
+5. **Plugin SMTP**: Se il test fallisce, installa un plugin SMTP (WP Mail SMTP, Easy WP SMTP)
+6. **Hosting**: Contatta il provider hosting se la funzione mail() PHP non è disponibile
+7. **Server Mail**: Verifica che il server abbia configurazione email/SMTP funzionante
+
+**Errori comuni**:
+- Server senza funzione mail() abilitata
+- Provider hosting che blocca invio email
+- Mancanza configurazione SMTP  
+- Email finiscono in blacklist spam
+
 ### Problema: "Backfill Errore 400 / Sistema Non Scarica Niente"
 **Soluzione**:
 1. Verifica che il tipo connessione sia "API Polling" (non webhook)
