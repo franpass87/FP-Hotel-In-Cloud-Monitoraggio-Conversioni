@@ -2834,6 +2834,7 @@ function hic_diagnostics_page() {
                     }, 3000);
                     
                 } else {
+                    updateProgress($progressBar, 100);
                     buttonController.setError('Test fallito: ' + (result.message || 'Errore sconosciuto'));
                     $status.text('✗ Test fallito').css('color', '#d63638');
                     
@@ -2849,9 +2850,12 @@ function hic_diagnostics_page() {
                 setTimeout(function() { $progressBar.remove(); }, 1000);
                 
             }).fail(function() {
+                updateProgress($progressBar, 100);
                 buttonController.setError('Errore di comunicazione con il server');
                 $status.text('✗ Errore comunicazione').css('color', '#d63638');
-                $progressBar.remove();
+                
+                // Remove progress bar after showing completion
+                setTimeout(function() { $progressBar.remove(); }, 1000);
             });
         });
         
