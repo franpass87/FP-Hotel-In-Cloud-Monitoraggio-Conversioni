@@ -586,6 +586,7 @@ add_action('wp_ajax_hic_download_error_logs', 'hic_ajax_download_error_logs');
 add_action('wp_ajax_hic_trigger_watchdog', 'hic_ajax_trigger_watchdog');
 add_action('wp_ajax_hic_reset_timestamps', 'hic_ajax_reset_timestamps');
 add_action('wp_ajax_hic_test_brevo_connectivity', 'hic_ajax_test_brevo_connectivity');
+add_action('wp_ajax_hic_get_system_status', 'hic_ajax_get_system_status');
 
 
 
@@ -1100,6 +1101,48 @@ function hic_ajax_reset_timestamps() {
     }
 }
 
+/**
+ * AJAX handler for getting system status updates
+ */
+function hic_ajax_get_system_status() {
+    // Set JSON content type
+    header('Content-Type: application/json');
+    
+    // Verify nonce
+    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Invalid nonce')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_die(json_encode(array('success' => false, 'message' => 'Insufficient permissions')));
+    }
+    
+    try {
+        // Get current system status
+        $scheduler_status = hic_get_internal_scheduler_status();
+        
+        $status_data = array(
+            'polling_active' => $scheduler_status['internal_scheduler']['enabled'] && 
+                               $scheduler_status['internal_scheduler']['conditions_met'],
+            'last_execution' => $scheduler_status['internal_scheduler']['last_poll_human'] ?? 'Mai eseguito',
+            'next_execution' => $scheduler_status['internal_scheduler']['next_run_human'] ?? 'Sconosciuto',
+            'system_health' => 'ok' // Could be enhanced with more health checks
+        );
+        
+        wp_die(json_encode(array(
+            'success' => true,
+            'data' => $status_data
+        )));
+        
+    } catch (Exception $e) {
+        wp_die(json_encode(array(
+            'success' => false, 
+            'message' => 'Errore nel recupero dello stato: ' . $e->getMessage()
+        )));
+    }
+}
+
 /* ============ Diagnostics Admin Page ============ */
 
 /**
@@ -1127,8 +1170,10 @@ function hic_diagnostics_page() {
         <div class="hic-diagnostics-container">
             
             <!-- System Overview Section -->
-            <div class="card hic-overview-card">
-                <h2>📊 Panoramica Sistema</h2>
+            <div class="card hic-overview-card" id="system-overview">
+                <h2>📊 Panoramica Sistema
+                    <span class="hic-refresh-indicator" id="refresh-indicator"></span>
+                </h2>
                 
                 <div class="hic-overview-grid">
                     <div class="hic-overview-section">
@@ -1531,11 +1576,13 @@ function hic_diagnostics_page() {
             padding: 24px;
             width: 100%;
             box-sizing: border-box;
-            transition: box-shadow 0.2s ease;
+            transition: all 0.3s ease;
+            position: relative;
         }
         
         .hic-diagnostics-container .card:hover {
-            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
         }
         
         .hic-diagnostics-container .card h2 {
@@ -1545,6 +1592,56 @@ function hic_diagnostics_page() {
             color: #1d2327;
             border-bottom: 2px solid #f0f0f1;
             padding-bottom: 12px;
+            position: relative;
+        }
+        
+        /* Auto-refresh indicator */
+        .hic-refresh-indicator {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00a32a;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .hic-refresh-indicator.active {
+            opacity: 1;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.2); }
+        }
+        
+        /* Loading States */
+        .hic-loading {
+            position: relative;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        
+        .hic-loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #0073aa;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
         }
         
         .hic-diagnostics-container .card h3 {
@@ -1643,13 +1740,51 @@ function hic_diagnostics_page() {
             width: 100%;
             margin-bottom: 8px;
             text-align: center;
-            padding: 8px 16px;
+            padding: 10px 16px;
             border-radius: 6px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hic-action-group .button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .hic-action-group .button:active {
+            transform: translateY(0);
+        }
+        
+        .hic-action-group .button:disabled {
+            transform: none;
+            opacity: 0.6;
+            cursor: not-allowed;
         }
         
         .hic-action-group .button .dashicons {
             margin-right: 6px;
             margin-top: 0;
+            transition: transform 0.2s ease;
+        }
+        
+        .hic-action-group .button:hover .dashicons {
+            transform: scale(1.1);
+        }
+        
+        /* Enhanced button states */
+        .hic-action-group .button.loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: 12px;
+            transform: translateY(-50%);
+            width: 12px;
+            height: 12px;
+            border: 1px solid currentColor;
+            border-top: 1px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
         
         /* Integration Grid */
@@ -1907,6 +2042,123 @@ function hic_diagnostics_page() {
             font-weight: 600;
         }
         
+        /* Toast Notifications */
+        .hic-toast-container {
+            position: fixed;
+            top: 32px;
+            right: 20px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+        
+        .hic-toast {
+            background: white;
+            border: 1px solid #e1e5e8;
+            border-radius: 6px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            min-width: 300px;
+            pointer-events: auto;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hic-toast.show {
+            transform: translateX(0);
+        }
+        
+        .hic-toast.success {
+            border-left: 4px solid #00a32a;
+        }
+        
+        .hic-toast.error {
+            border-left: 4px solid #d63638;
+        }
+        
+        .hic-toast.warning {
+            border-left: 4px solid #dba617;
+        }
+        
+        .hic-toast.info {
+            border-left: 4px solid #0073aa;
+        }
+        
+        .hic-toast-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .hic-toast-icon {
+            font-size: 20px;
+            line-height: 1;
+        }
+        
+        .hic-toast-message {
+            flex: 1;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .hic-toast-close {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: #646970;
+            padding: 0;
+            margin-left: 8px;
+        }
+        
+        .hic-toast-close:hover {
+            color: #1d2327;
+        }
+        
+        /* Progress bars for long operations */
+        .hic-progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #f0f0f1;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+        
+        .hic-progress-fill {
+            height: 100%;
+            background: #0073aa;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        /* Copy to clipboard functionality */
+        .hic-copy-button {
+            background: none;
+            border: 1px solid #e1e5e8;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #646970;
+            margin-left: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .hic-copy-button:hover {
+            background: #f8f9fa;
+            color: #1d2327;
+        }
+        
+        .hic-copy-button.copied {
+            background: #00a32a;
+            color: white;
+            border-color: #00a32a;
+        }
+        
         /* Responsive Design */
         @media (max-width: 1200px) {
             .hic-overview-grid,
@@ -1950,6 +2202,84 @@ function hic_diagnostics_page() {
             
             .hic-emergency-tools {
                 flex-direction: column;
+            }
+            
+            .hic-toast {
+                min-width: 280px;
+                max-width: calc(100vw - 40px);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .hic-action-group .button {
+                padding: 12px 16px;
+                font-size: 14px;
+                min-height: 44px; /* Better touch targets */
+            }
+            
+            .hic-overview-section h3 {
+                font-size: 12px;
+            }
+            
+            .hic-status-table td {
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+        }
+        
+        /* Accessibility Improvements */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* High contrast mode support */
+        .high-contrast .card {
+            border: 2px solid #000;
+            box-shadow: none;
+        }
+        
+        .high-contrast .button {
+            border: 2px solid #000;
+            font-weight: bold;
+        }
+        
+        .high-contrast .status.ok {
+            color: #000;
+            background: #fff;
+            padding: 2px 4px;
+            border: 1px solid #000;
+        }
+        
+        .high-contrast .status.error {
+            color: #fff;
+            background: #000;
+            padding: 2px 4px;
+        }
+        
+        /* Enhanced focus indicators for keyboard navigation */
+        .button:focus,
+        .hic-copy-button:focus,
+        .hic-advanced-details summary:focus {
+            outline: 3px solid #0073aa;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 3px rgba(0, 115, 170, 0.3);
+        }
+        
+        /* Improved touch targets for mobile accessibility */
+        @media (max-width: 768px) {
+            .button,
+            .hic-copy-button,
+            .hic-toast-close {
+                min-height: 44px;
+                min-width: 44px;
             }
         }
         
@@ -2040,6 +2370,162 @@ function hic_diagnostics_page() {
     
     <script type="text/javascript">
     jQuery(document).ready(function($) {
+        
+        // Enhanced UI functionality
+        
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 5000) {
+            const toastContainer = $('#hic-toast-container');
+            if (toastContainer.length === 0) {
+                $('body').append('<div id="hic-toast-container" class="hic-toast-container"></div>');
+            }
+            
+            const icons = {
+                success: '✓',
+                error: '✗',
+                warning: '⚠',
+                info: 'ℹ'
+            };
+            
+            const toast = $(`
+                <div class="hic-toast ${type}">
+                    <div class="hic-toast-content">
+                        <span class="hic-toast-icon">${icons[type] || icons.info}</span>
+                        <span class="hic-toast-message">${message}</span>
+                        <button class="hic-toast-close">&times;</button>
+                    </div>
+                </div>
+            `);
+            
+            $('#hic-toast-container').append(toast);
+            
+            // Show toast
+            setTimeout(() => toast.addClass('show'), 100);
+            
+            // Auto remove
+            const autoRemove = setTimeout(() => {
+                toast.removeClass('show');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+            
+            // Manual close
+            toast.find('.hic-toast-close').click(function() {
+                clearTimeout(autoRemove);
+                toast.removeClass('show');
+                setTimeout(() => toast.remove(), 300);
+            });
+        }
+        
+        // Auto-refresh system status every 30 seconds
+        let refreshInterval;
+        function startAutoRefresh() {
+            refreshInterval = setInterval(function() {
+                $('#refresh-indicator').addClass('active');
+                
+                // Refresh connection status and key metrics
+                $.post(ajaxurl, {
+                    action: 'hic_get_system_status',
+                    nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
+                }, function(response) {
+                    if (response.success) {
+                        // Update polling status
+                        const pollingStatus = response.data.polling_active ? 
+                            '<span class="status ok">✓ Attivo</span>' : 
+                            '<span class="status error">✗ Inattivo</span>';
+                        
+                        // Find and update the polling status
+                        $('#system-overview').find('td').each(function() {
+                            if ($(this).text().includes('Polling Attivo') || $(this).text().includes('Polling Inattivo')) {
+                                $(this).html(pollingStatus);
+                            }
+                        });
+                        
+                        // Update last execution time if available
+                        if (response.data.last_execution) {
+                            $('#system-overview').find('td').each(function() {
+                                if ($(this).prev().text() === 'Ultimo Polling') {
+                                    $(this).text(response.data.last_execution);
+                                }
+                            });
+                        }
+                    }
+                }).always(function() {
+                    setTimeout(() => $('#refresh-indicator').removeClass('active'), 1000);
+                });
+            }, 30000);
+        }
+        
+        // Enhanced button interactions
+        function enhanceButton($button, loadingText = null) {
+            const originalText = $button.html();
+            const originalClass = $button.attr('class');
+            
+            return {
+                setLoading: function() {
+                    $button.addClass('loading').prop('disabled', true);
+                    if (loadingText) {
+                        $button.text(loadingText);
+                    }
+                },
+                setSuccess: function(message = null) {
+                    $button.removeClass('loading').addClass('success');
+                    if (message) {
+                        showToast(message, 'success');
+                    }
+                    setTimeout(() => {
+                        $button.removeClass('success').prop('disabled', false).html(originalText);
+                    }, 2000);
+                },
+                setError: function(message = null) {
+                    $button.removeClass('loading').addClass('error');
+                    if (message) {
+                        showToast(message, 'error');
+                    }
+                    setTimeout(() => {
+                        $button.removeClass('error').prop('disabled', false).html(originalText);
+                    }, 3000);
+                },
+                reset: function() {
+                    $button.removeClass('loading success error').prop('disabled', false).html(originalText);
+                }
+            };
+        }
+        
+        // Copy to clipboard functionality
+        function addCopyButton(selector, textSelector = null) {
+            $(selector).each(function() {
+                const $element = $(this);
+                const $copyBtn = $('<button class="hic-copy-button" title="Copia negli appunti">📋</button>');
+                
+                $copyBtn.click(function() {
+                    const text = textSelector ? $element.find(textSelector).text() : $element.text();
+                    navigator.clipboard.writeText(text).then(function() {
+                        $copyBtn.addClass('copied').text('✓');
+                        showToast('Copiato negli appunti!', 'success', 2000);
+                        setTimeout(() => {
+                            $copyBtn.removeClass('copied').text('📋');
+                        }, 2000);
+                    }).catch(function() {
+                        showToast('Errore nella copia', 'error');
+                    });
+                });
+                
+                $element.append($copyBtn);
+            });
+        }
+        
+        // Initialize enhanced features
+        startAutoRefresh();
+        addCopyButton('.hic-log-entry');
+        
+        // Add progress bar to long operations
+        function createProgressBar() {
+            return $('<div class="hic-progress-bar"><div class="hic-progress-fill"></div></div>');
+        }
+        
+        function updateProgress($progressBar, percent) {
+            $progressBar.find('.hic-progress-fill').css('width', percent + '%');
+        }
         
         // Backfill handler
         $('#start-backfill').click(function() {
@@ -2288,25 +2774,34 @@ function hic_diagnostics_page() {
             });
         });
         
-        // Force Polling handler (updated for new design)
+        // Force Polling handler (updated for new design with enhanced UX)
         $('#force-polling').click(function() {
             var $btn = $(this);
+            var buttonController = enhanceButton($btn, 'Eseguendo...');
             var $status = $('#quick-status');
             var $results = $('#quick-results');
             var $resultsContent = $('#quick-results-content');
             
-            $btn.prop('disabled', true).text('Eseguendo...');
+            buttonController.setLoading();
             $status.text('Test polling in corso...').css('color', '#0073aa');
             $results.hide();
+            
+            // Add progress bar
+            var $progressBar = createProgressBar();
+            $status.after($progressBar);
+            updateProgress($progressBar, 20);
             
             $.post(ajaxurl, {
                 action: 'hic_force_polling',
                 force: 'true',
                 nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
             }, function(response) {
+                updateProgress($progressBar, 80);
                 var result = JSON.parse(response);
                 
                 if (result.success) {
+                    updateProgress($progressBar, 100);
+                    buttonController.setSuccess('Test completato con successo!');
                     $status.text('✓ Test completato!').css('color', '#00a32a');
                     
                     var html = '<div class="notice notice-success inline"><p><strong>Test Polling Completato:</strong><br>';
@@ -2321,10 +2816,12 @@ function hic_diagnostics_page() {
                     
                     // Refresh page after 3 seconds
                     setTimeout(function() {
+                        showToast('Aggiornamento dati...', 'info', 2000);
                         location.reload();
                     }, 3000);
                     
                 } else {
+                    buttonController.setError('Test fallito: ' + (result.message || 'Errore sconosciuto'));
                     $status.text('✗ Test fallito').css('color', '#d63638');
                     
                     var html = '<div class="notice notice-error inline"><p><strong>Errore Test:</strong><br>';
@@ -2335,22 +2832,25 @@ function hic_diagnostics_page() {
                     $results.show();
                 }
                 
-                $btn.prop('disabled', false).html('<span class="dashicons dashicons-update"></span> Test Polling');
+                // Remove progress bar
+                setTimeout(() => $progressBar.remove(), 1000);
                 
             }).fail(function() {
+                buttonController.setError('Errore di comunicazione con il server');
                 $status.text('✗ Errore comunicazione').css('color', '#d63638');
-                $btn.prop('disabled', false).html('<span class="dashicons dashicons-update"></span> Test Polling');
+                $progressBar.remove();
             });
         });
         
-        // Test Connectivity handler (new functionality)
+        // Test Connectivity handler (enhanced with better UX)
         $('#test-connectivity').click(function() {
             var $btn = $(this);
+            var buttonController = enhanceButton($btn, 'Testando...');
             var $status = $('#quick-status');
             var $results = $('#quick-results');
             var $resultsContent = $('#quick-results-content');
             
-            $btn.prop('disabled', true).text('Testando...');
+            buttonController.setLoading();
             $status.text('Test connessione in corso...').css('color', '#0073aa');
             $results.hide();
             
@@ -2363,12 +2863,14 @@ function hic_diagnostics_page() {
                 var result = JSON.parse(response);
                 
                 if (result.success) {
+                    buttonController.setSuccess('Connessione verificata!');
                     $status.text('✓ Connessione OK').css('color', '#00a32a');
                     
                     var html = '<div class="notice notice-success inline"><p><strong>Test Connessione Riuscito:</strong><br>';
                     html += result.message + '</p></div>';
                     
                 } else {
+                    buttonController.setError('Connessione fallita');
                     $status.text('✗ Connessione fallita').css('color', '#d63638');
                     
                     var html = '<div class="notice notice-warning inline"><p><strong>Test Connessione Fallito:</strong><br>';
@@ -2378,22 +2880,22 @@ function hic_diagnostics_page() {
                 
                 $resultsContent.html(html);
                 $results.show();
-                $btn.prop('disabled', false).html('<span class="dashicons dashicons-cloud"></span> Test Connessione');
                 
             }).fail(function() {
+                buttonController.setError('Errore di comunicazione');
                 $status.text('✗ Errore comunicazione').css('color', '#d63638');
-                $btn.prop('disabled', false).html('<span class="dashicons dashicons-cloud"></span> Test Connessione');
             });
         });
         
-        // Trigger Watchdog handler (updated for new design)
+        // Trigger Watchdog handler (enhanced with better UX)
         $('#trigger-watchdog').click(function() {
             var $btn = $(this);
+            var buttonController = enhanceButton($btn, 'Eseguendo...');
             var $status = $('#quick-status');
             var $results = $('#quick-results');
             var $resultsContent = $('#quick-results-content');
             
-            $btn.prop('disabled', true).text('Eseguendo...');
+            buttonController.setLoading();
             $status.text('Watchdog in corso...').css('color', '#0073aa');
             $results.hide();
             
@@ -2402,6 +2904,7 @@ function hic_diagnostics_page() {
                 nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
             }).done(function(response) {
                 if (response.success) {
+                    buttonController.setSuccess('Watchdog completato con successo!');
                     $status.text('✓ Watchdog completato').css('color', '#00a32a');
                     
                     var html = '<div class="notice notice-success inline"><p><strong>Watchdog Completato:</strong><br>';
@@ -2410,6 +2913,7 @@ function hic_diagnostics_page() {
                     $resultsContent.html(html);
                     $results.show();
                 } else {
+                    buttonController.setError('Watchdog fallito: ' + (response.message || 'Errore sconosciuto'));
                     $status.text('✗ Watchdog fallito').css('color', '#d63638');
                     
                     var html = '<div class="notice notice-warning inline"><p><strong>Watchdog Fallito:</strong><br>';
@@ -2421,45 +2925,66 @@ function hic_diagnostics_page() {
                 }
                 
                 setTimeout(function() {
+                    showToast('Aggiornamento dati...', 'info', 2000);
                     location.reload();
                 }, 3000);
                 
             }).fail(function() {
+                buttonController.setError('Errore di comunicazione con il server');
                 $status.text('✗ Errore comunicazione').css('color', '#d63638');
-            }).always(function() {
-                $btn.prop('disabled', false).html('<span class="dashicons dashicons-shield"></span> Watchdog');
             });
         });
         
-        // Reset Timestamps handler (updated for new design)
+        // Reset Timestamps handler (enhanced with better UX and warnings)
         $('#reset-timestamps').click(function() {
             var $btn = $(this);
+            var buttonController = enhanceButton($btn, 'Resettando...');
             var $status = $('#quick-status');
             var $results = $('#quick-results');
             var $resultsContent = $('#quick-results-content');
             
-            // Confirm before proceeding since this is an emergency action
-            if (!confirm('ATTENZIONE: Questa è un\'azione di emergenza che resetterà tutti i timestamp del sistema. Proseguire solo se il polling è bloccato da errori di timestamp. Continuare?')) {
+            // Enhanced confirmation with more details
+            var confirmMessage = 'ATTENZIONE: Reset Timestamp di Emergenza\n\n' +
+                               'Questa azione resetterà TUTTI i timestamp del sistema:\n' +
+                               '• Ultimo polling eseguito\n' +
+                               '• Orari di scheduling\n' +
+                               '• Cache delle prenotazioni\n\n' +
+                               'Utilizzare SOLO se il polling è completamente bloccato.\n\n' +
+                               'Sei sicuro di voler procedere?';
+            
+            if (!confirm(confirmMessage)) {
                 return;
             }
             
-            $btn.prop('disabled', true).text('Resettando...');
-            $status.text('Reset in corso...').css('color', '#d63638');
+            // Second confirmation for safety
+            if (!confirm('Ultima conferma: procedere con il reset di emergenza?')) {
+                return;
+            }
+            
+            buttonController.setLoading();
+            $status.text('Reset emergenza in corso...').css('color', '#d63638');
             $results.hide();
+            
+            showToast('Reset di emergenza avviato...', 'warning');
             
             $.post(ajaxurl, {
                 action: 'hic_reset_timestamps',
                 nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
             }).done(function(response) {
                 if (response.success) {
+                    buttonController.setSuccess('Reset completato!');
                     $status.text('✓ Reset completato').css('color', '#00a32a');
                     
                     var html = '<div class="notice notice-success inline"><p><strong>Reset Timestamp Completato:</strong><br>';
-                    html += response.message + '</p></div>';
+                    html += response.message + '<br><br>';
+                    html += '<em>Il sistema dovrebbe riprendere il polling normalmente.</em></p></div>';
                     
                     $resultsContent.html(html);
                     $results.show();
+                    
+                    showToast('Sistema ripristinato! La pagina si aggiornerà automaticamente.', 'success');
                 } else {
+                    buttonController.setError('Reset fallito: ' + (response.message || 'Errore sconosciuto'));
                     $status.text('✗ Reset fallito').css('color', '#d63638');
                     
                     var html = '<div class="notice notice-error inline"><p><strong>Reset Fallito:</strong><br>';
@@ -2469,6 +2994,18 @@ function hic_diagnostics_page() {
                     $resultsContent.html(html);
                     $results.show();
                 }
+                
+                setTimeout(function() {
+                    showToast('Aggiornamento dati...', 'info', 2000);
+                    location.reload();
+                }, 4000);
+                
+            }).fail(function() {
+                buttonController.setError('Errore di comunicazione con il server');
+                $status.text('✗ Errore comunicazione').css('color', '#d63638');
+                showToast('Errore di comunicazione durante il reset', 'error');
+            });
+        });
                 
                 setTimeout(function() {
                     location.reload();
@@ -2561,6 +3098,67 @@ function hic_diagnostics_page() {
             }).always(function() {
                 $btn.prop('disabled', false).text('Test API');
             });
+        });
+        
+        // Accessibility and keyboard navigation improvements
+        
+        // Add ARIA labels to buttons and status indicators
+        $('.hic-action-group .button').each(function() {
+            const $btn = $(this);
+            const text = $btn.text().trim();
+            $btn.attr('aria-label', 'Azione: ' + text);
+        });
+        
+        // Add role attributes for status indicators
+        $('.status').attr('role', 'status').attr('aria-live', 'polite');
+        
+        // Enhanced keyboard navigation
+        $(document).on('keydown', function(e) {
+            // ESC to close any open details/dialogs
+            if (e.key === 'Escape') {
+                $('.hic-advanced-details[open]').removeAttr('open');
+                $('.hic-toast').removeClass('show');
+            }
+            
+            // Ctrl+R to refresh (prevent default and use our auto-refresh)
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault();
+                showToast('Aggiornamento automatico attivo ogni 30 secondi', 'info');
+            }
+        });
+        
+        // Add high contrast mode toggle for accessibility
+        if (window.matchMedia && window.matchMedia('(prefers-contrast: high)').matches) {
+            $('body').addClass('high-contrast');
+        }
+        
+        // Add loading states for better screen reader support
+        function announceToScreenReader(message) {
+            const announcement = $('<div>')
+                .attr('aria-live', 'assertive')
+                .attr('aria-atomic', 'true')
+                .addClass('sr-only')
+                .text(message);
+            
+            $('body').append(announcement);
+            setTimeout(() => announcement.remove(), 1000);
+        }
+        
+        // Enhanced error handling with better user feedback
+        $(document).ajaxError(function(event, xhr, settings, thrownError) {
+            if (settings.url && settings.url.includes('admin-ajax.php')) {
+                const action = settings.data && settings.data.includes('action=') ? 
+                    settings.data.match(/action=([^&]*)/)[1] : 'unknown';
+                
+                showToast(`Errore durante l'operazione ${action}. Riprova.`, 'error');
+                announceToScreenReader(`Errore durante l'operazione ${action}`);
+            }
+        });
+        
+        // Add confirmation dialogs for destructive actions
+        $('.button-link-delete, #reset-timestamps').on('click', function(e) {
+            const action = $(this).text().trim();
+            announceToScreenReader(`Azione di emergenza: ${action} richiede conferma`);
         });
     });
     </script>
