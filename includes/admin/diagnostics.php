@@ -2388,49 +2388,49 @@ function hic_diagnostics_page() {
         
         // Toast notification system
         function showToast(message, type = 'info', duration = 5000) {
-            const toastContainer = $('#hic-toast-container');
+            var toastContainer = $('#hic-toast-container');
             if (toastContainer.length === 0) {
                 $('body').append('<div id="hic-toast-container" class="hic-toast-container"></div>');
             }
             
-            const icons = {
+            var icons = {
                 success: '✓',
                 error: '✗',
                 warning: '⚠',
                 info: 'ℹ'
             };
             
-            const toast = $(`
-                <div class="hic-toast ${type}">
-                    <div class="hic-toast-content">
-                        <span class="hic-toast-icon">${icons[type] || icons.info}</span>
-                        <span class="hic-toast-message">${message}</span>
-                        <button class="hic-toast-close">&times;</button>
-                    </div>
-                </div>
-            `);
+            var toast = $(
+                '<div class="hic-toast ' + type + '">' +
+                    '<div class="hic-toast-content">' +
+                        '<span class="hic-toast-icon">' + (icons[type] || icons.info) + '</span>' +
+                        '<span class="hic-toast-message">' + message + '</span>' +
+                        '<button class="hic-toast-close">&times;</button>' +
+                    '</div>' +
+                '</div>'
+            );
             
             $('#hic-toast-container').append(toast);
             
             // Show toast
-            setTimeout(() => toast.addClass('show'), 100);
+            setTimeout(function() { toast.addClass('show'); }, 100);
             
             // Auto remove
-            const autoRemove = setTimeout(() => {
+            var autoRemove = setTimeout(function() {
                 toast.removeClass('show');
-                setTimeout(() => toast.remove(), 300);
+                setTimeout(function() { toast.remove(); }, 300);
             }, duration);
             
             // Manual close
             toast.find('.hic-toast-close').click(function() {
                 clearTimeout(autoRemove);
                 toast.removeClass('show');
-                setTimeout(() => toast.remove(), 300);
+                setTimeout(function() { toast.remove(); }, 300);
             });
         }
         
         // Auto-refresh system status every 30 seconds
-        let refreshInterval;
+        var refreshInterval;
         function startAutoRefresh() {
             refreshInterval = setInterval(function() {
                 $('#refresh-indicator').addClass('active');
@@ -2442,7 +2442,7 @@ function hic_diagnostics_page() {
                 }, function(response) {
                     if (response.success) {
                         // Update polling status
-                        const pollingStatus = response.data.polling_active ? 
+                        var pollingStatus = response.data.polling_active ? 
                             '<span class="status ok">✓ Attivo</span>' : 
                             '<span class="status error">✗ Inattivo</span>';
                         
@@ -2463,15 +2463,15 @@ function hic_diagnostics_page() {
                         }
                     }
                 }).always(function() {
-                    setTimeout(() => $('#refresh-indicator').removeClass('active'), 1000);
+                    setTimeout(function() { $('#refresh-indicator').removeClass('active'); }, 1000);
                 });
             }, 30000);
         }
         
         // Enhanced button interactions
         function enhanceButton($button, loadingText = null) {
-            const originalText = $button.html();
-            const originalClass = $button.attr('class');
+            var originalText = $button.html();
+            var originalClass = $button.attr('class');
             
             return {
                 setLoading: function() {
@@ -2485,7 +2485,7 @@ function hic_diagnostics_page() {
                     if (message) {
                         showToast(message, 'success');
                     }
-                    setTimeout(() => {
+                    setTimeout(function() {
                         $button.removeClass('success').prop('disabled', false).html(originalText);
                     }, 2000);
                 },
@@ -2494,7 +2494,7 @@ function hic_diagnostics_page() {
                     if (message) {
                         showToast(message, 'error');
                     }
-                    setTimeout(() => {
+                    setTimeout(function() {
                         $button.removeClass('error').prop('disabled', false).html(originalText);
                     }, 3000);
                 },
@@ -2507,15 +2507,15 @@ function hic_diagnostics_page() {
         // Copy to clipboard functionality
         function addCopyButton(selector, textSelector = null) {
             $(selector).each(function() {
-                const $element = $(this);
-                const $copyBtn = $('<button class="hic-copy-button" title="Copia negli appunti">📋</button>');
+                var $element = $(this);
+                var $copyBtn = $('<button class="hic-copy-button" title="Copia negli appunti">📋</button>');
                 
                 $copyBtn.click(function() {
                     const text = textSelector ? $element.find(textSelector).text() : $element.text();
                     navigator.clipboard.writeText(text).then(function() {
                         $copyBtn.addClass('copied').text('✓');
                         showToast('Copiato negli appunti!', 'success', 2000);
-                        setTimeout(() => {
+                        setTimeout(function() {
                             $copyBtn.removeClass('copied').text('📋');
                         }, 2000);
                     }).catch(function() {
@@ -2846,7 +2846,7 @@ function hic_diagnostics_page() {
                 }
                 
                 // Remove progress bar
-                setTimeout(() => $progressBar.remove(), 1000);
+                setTimeout(function() { $progressBar.remove(); }, 1000);
                 
             }).fail(function() {
                 buttonController.setError('Errore di comunicazione con il server');
@@ -3203,7 +3203,7 @@ function hic_diagnostics_page() {
                 .text(message);
             
             $('body').append(announcement);
-            setTimeout(() => announcement.remove(), 1000);
+            setTimeout(function() { announcement.remove(); }, 1000);
         }
         
         // Enhanced error handling with better user feedback
@@ -3212,15 +3212,15 @@ function hic_diagnostics_page() {
                 const action = settings.data && settings.data.includes('action=') ? 
                     settings.data.match(/action=([^&]*)/)[1] : 'unknown';
                 
-                showToast(`Errore durante l'operazione ${action}. Riprova.`, 'error');
-                announceToScreenReader(`Errore durante l'operazione ${action}`);
+                showToast('Errore durante l\'operazione ' + action + '. Riprova.', 'error');
+                announceToScreenReader('Errore durante l\'operazione ' + action);
             }
         });
         
         // Add confirmation dialogs for destructive actions
         $('.button-link-delete, #reset-timestamps, #reset-timestamps-advanced').on('click', function(e) {
             const action = $(this).text().trim();
-            announceToScreenReader(`Azione di emergenza: ${action} richiede conferma`);
+            announceToScreenReader('Azione di emergenza: ' + action + ' richiede conferma');
         });
     });
     </script>
