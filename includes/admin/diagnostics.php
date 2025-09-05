@@ -2379,6 +2379,11 @@ function hic_diagnostics_page() {
     <script type="text/javascript">
     jQuery(document).ready(function($) {
         
+        // Ensure ajaxurl is defined for AJAX calls
+        if (typeof ajaxurl === 'undefined') {
+            var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+        }
+        
         // Enhanced UI functionality
         
         // Toast notification system
