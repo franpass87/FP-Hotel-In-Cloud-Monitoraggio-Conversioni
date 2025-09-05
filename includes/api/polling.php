@@ -443,13 +443,13 @@ function hic_dispatch_reservation($transformed, $original) {
         
         // Brevo - handle differently based on connection type to prevent duplication
         if ($connection_type === 'webhook') {
-            // In webhook mode, only update contact info but don't send events 
+            // In webhook mode, only update contact info but don't send events
             // (events are handled by webhook processor)
             hic_dispatch_brevo_reservation($transformed);
         } else {
             // In polling mode, handle both contact and events
             hic_dispatch_brevo_reservation($transformed);
-            
+
             // Brevo real-time events - send reservation_created event for new reservations
             if (!$is_status_update && hic_realtime_brevo_sync_enabled()) {
                 $event_result = hic_send_brevo_reservation_created_event($transformed);
@@ -458,7 +458,47 @@ function hic_dispatch_reservation($transformed, $original) {
                 }
             }
         }
-        
+
+        // Admin email notification - send only for new reservations to avoid duplicates
+        if (!$is_status_update) {
+            $admin_data = array(
+                'reservation_id' => isset($transformed['transaction_id']) ? $transformed['transaction_id'] : '',
+                'amount'        => isset($transformed['value']) ? $transformed['value'] : 0,
+                'currency'      => isset($transformed['currency']) ? $transformed['currency'] : 'EUR',
+                'first_name'    => isset($transformed['guest_first_name']) ? $transformed['guest_first_name'] : '',
+                'last_name'     => isset($transformed['guest_last_name']) ? $transformed['guest_last_name'] : '',
+                'email'         => isset($transformed['email']) ? $transformed['email'] : '',
+                'lingua'        => isset($transformed['language']) ? $transformed['language'] : '',
+                'room'          => isset($transformed['accommodation_name']) ? $transformed['accommodation_name'] : (isset($transformed['room_name']) ? $transformed['room_name'] : ''),
+                'checkin'       => isset($transformed['from_date']) ? $transformed['from_date'] : '',
+                'checkout'      => isset($transformed['to_date']) ? $transformed['to_date'] : ''
+            );
+
+            // Retrieve gclid and fbclid using same logic as Brevo dispatcher
+            $gclid = '';
+            $fbclid = '';
+            if (!empty($transformed['transaction_id'])) {
+                global $wpdb;
+                $table = $wpdb->prefix . 'hic_gclids';
+                $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+                if ($table_exists) {
+                    $row = $wpdb->get_row(
+                        $wpdb->prepare(
+                            "SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1",
+                            $transformed['transaction_id']
+                        )
+                    );
+                    if ($row) {
+                        $gclid = $row->gclid ? $row->gclid : '';
+                        $fbclid = $row->fbclid ? $row->fbclid : '';
+                    }
+                }
+            }
+
+            $email_result = hic_send_admin_email($admin_data, $gclid, $fbclid, $transformed['transaction_id']);
+            hic_log('Admin email dispatch result for reservation ' . $uid . ': ' . ($email_result ? 'success' : 'failure'));
+        }
+
         hic_log("Reservation $uid dispatched successfully (mode: $connection_type)");
     } catch (Exception $e) {
         hic_log("Error dispatching reservation $uid: " . $e->getMessage());
