@@ -1349,7 +1349,7 @@ function hic_diagnostics_page() {
                         </div>
                         <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
                         <div class="hic-integration-actions">
-                            <button class="button button-small" id="test-brevo-connectivity">Test API</button>
+                            <button class="button button-small" id="test-brevo-connectivity-quick">Test API</button>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -3139,6 +3139,32 @@ function hic_diagnostics_page() {
                 $results.html('<div class="notice notice-error inline"><p><strong>Errore di comunicazione con il server</strong></p></div>').show();
             }).always(function() {
                 $btn.prop('disabled', false).text('Test API');
+            });
+        });
+        
+        // Quick Brevo connectivity test handler (for the integration card button)
+        $('#test-brevo-connectivity-quick').click(function() {
+            var $btn = $(this);
+            
+            $btn.prop('disabled', true).text('Testing...');
+            
+            $.post(ajaxurl, {
+                action: 'hic_test_brevo_connectivity',
+                nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
+            }).done(function(response) {
+                if (response.success) {
+                    $btn.removeClass('button-secondary').addClass('button-primary');
+                    showToast('Brevo API test successful!', 'success');
+                } else {
+                    showToast('Brevo API test failed: ' + response.message, 'error');
+                }
+            }).fail(function() {
+                showToast('Communication error during Brevo API test', 'error');
+            }).always(function() {
+                $btn.prop('disabled', false).text('Test API');
+                setTimeout(function() {
+                    $btn.removeClass('button-primary').addClass('button-secondary');
+                }, 3000);
             });
         });
         
