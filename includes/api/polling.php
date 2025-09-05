@@ -436,23 +436,44 @@ function hic_dispatch_reservation($transformed, $original) {
             }
         }
         
-        // Meta Pixel - only send once unless it's a status update we want to track  
+        // Meta Pixel - only send once unless it's a status update we want to track
         if (!$is_status_update) {
             hic_dispatch_pixel_reservation($transformed);
         }
-        
+
+        // Retrieve gclid and fbclid using reservation ID
+        $gclid = '';
+        $fbclid = '';
+        if (!empty($transformed['transaction_id'])) {
+            global $wpdb;
+            $table = $wpdb->prefix . 'hic_gclids';
+            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+            if ($table_exists) {
+                $row = $wpdb->get_row(
+                    $wpdb->prepare(
+                        "SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1",
+                        $transformed['transaction_id']
+                    )
+                );
+                if ($row) {
+                    $gclid = $row->gclid ? $row->gclid : '';
+                    $fbclid = $row->fbclid ? $row->fbclid : '';
+                }
+            }
+        }
+
         // Brevo - handle differently based on connection type to prevent duplication
         if ($connection_type === 'webhook') {
             // In webhook mode, only update contact info but don't send events
             // (events are handled by webhook processor)
-            hic_dispatch_brevo_reservation($transformed);
+            hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid);
         } else {
             // In polling mode, handle both contact and events
-            hic_dispatch_brevo_reservation($transformed);
+            hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid);
 
             // Brevo real-time events - send reservation_created event for new reservations
             if (!$is_status_update && hic_realtime_brevo_sync_enabled()) {
-                $event_result = hic_send_brevo_reservation_created_event($transformed);
+                $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid);
                 if (!$event_result['success']) {
                     hic_log("Failed to send Brevo reservation_created event in dispatch: " . $event_result['error']);
                 }
@@ -473,27 +494,6 @@ function hic_dispatch_reservation($transformed, $original) {
                 'checkin'       => isset($transformed['from_date']) ? $transformed['from_date'] : '',
                 'checkout'      => isset($transformed['to_date']) ? $transformed['to_date'] : ''
             );
-
-            // Retrieve gclid and fbclid using same logic as Brevo dispatcher
-            $gclid = '';
-            $fbclid = '';
-            if (!empty($transformed['transaction_id'])) {
-                global $wpdb;
-                $table = $wpdb->prefix . 'hic_gclids';
-                $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-                if ($table_exists) {
-                    $row = $wpdb->get_row(
-                        $wpdb->prepare(
-                            "SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1",
-                            $transformed['transaction_id']
-                        )
-                    );
-                    if ($row) {
-                        $gclid = $row->gclid ? $row->gclid : '';
-                        $fbclid = $row->fbclid ? $row->fbclid : '';
-                    }
-                }
-            }
 
             $email_result = hic_send_admin_email($admin_data, $gclid, $fbclid, $transformed['transaction_id']);
             hic_log('Admin email dispatch result for reservation ' . $uid . ': ' . ($email_result ? 'success' : 'failure'));
@@ -1082,17 +1082,38 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
         return;
     }
 
+    // Retrieve gclid and fbclid for tracking
+    $gclid = '';
+    $fbclid = '';
+    if (!empty($transformed['transaction_id'])) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'hic_gclids';
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+        if ($table_exists) {
+            $row = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1",
+                    $transformed['transaction_id']
+                )
+            );
+            if ($row) {
+                $gclid = $row->gclid ? $row->gclid : '';
+                $fbclid = $row->fbclid ? $row->fbclid : '';
+            }
+        }
+    }
+
     // Send reservation_created event to Brevo
-    $event_result = hic_send_brevo_reservation_created_event($transformed);
-    
+    $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid);
+
     if ($event_result['success']) {
         // Mark as successfully notified
         hic_mark_reservation_notified_to_brevo($reservation_id);
         hic_log("Successfully sent reservation_created event to Brevo for reservation $reservation_id");
-        
+
         // Also send/update contact information
         if (hic_is_valid_email($transformed['email']) && !hic_is_ota_alias_email($transformed['email'])) {
-            hic_dispatch_brevo_reservation($transformed, false);
+            hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid);
         }
     } else {
         // Handle failure based on retryability
