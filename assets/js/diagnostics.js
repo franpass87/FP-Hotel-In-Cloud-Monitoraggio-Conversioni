@@ -1,12 +1,30 @@
 jQuery(document).ready(function($) {
-        
+
     // Ensure ajaxurl is defined for AJAX calls
     if (typeof ajaxurl === 'undefined') {
         var ajaxurl = hicDiagnostics.ajax_url;
     }
-        
+
+    // Helper functions for monitoring endpoints with security nonce
+    window.hicRunHealthCheck = function(level, callback) {
+        $.post(ajaxurl, {
+            action: 'hic_health_check',
+            nonce: hicDiagnostics.monitor_nonce,
+            level: level || 'basic'
+        }, callback, 'json');
+    };
+
+    window.hicGetPerformanceMetrics = function(type, days, callback) {
+        $.post(ajaxurl, {
+            action: 'hic_performance_metrics',
+            nonce: hicDiagnostics.monitor_nonce,
+            type: type || 'summary',
+            days: days || 7
+        }, callback, 'json');
+    };
+
         // Enhanced UI functionality
-        
+
         // Toast notification system
         function showToast(message, type = 'info', duration = 5000) {
             var toastContainer = $('#hic-toast-container');
