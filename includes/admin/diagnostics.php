@@ -1349,7 +1349,7 @@ function hic_diagnostics_page() {
                         </div>
                         <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
                         <div class="hic-integration-actions">
-                            <button class="button button-small" id="test-brevo-connectivity">Test API</button>
+                            <button class="button button-small" id="test-brevo-connectivity-quick">Test API</button>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -1527,7 +1527,7 @@ function hic_diagnostics_page() {
                             </p>
                             
                             <div class="hic-emergency-tools">
-                                <button class="button button-secondary" id="reset-timestamps">
+                                <button class="button button-secondary" id="reset-timestamps-advanced">
                                     <span class="dashicons dashicons-update"></span>
                                     Reset Timestamp
                                 </button>
@@ -3026,6 +3026,40 @@ function hic_diagnostics_page() {
             });
         });
         
+        // Advanced Reset Timestamps handler (for the second button)
+        $('#reset-timestamps-advanced').click(function() {
+            var $btn = $(this);
+            var buttonController = enhanceButton($btn, 'Resettando...');
+            
+            // Simple confirmation for advanced users
+            if (!confirm('Procedere con il reset dei timestamp del sistema?')) {
+                return;
+            }
+            
+            buttonController.setLoading();
+            
+            $.post(ajaxurl, {
+                action: 'hic_reset_timestamps',
+                nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
+            }).done(function(response) {
+                if (response.success) {
+                    buttonController.setSuccess('Reset completato!');
+                    showToast('Reset timestamp completato con successo!', 'success');
+                } else {
+                    buttonController.setError('Reset fallito: ' + (response.message || 'Errore sconosciuto'));
+                    showToast('Errore durante il reset', 'error');
+                }
+                
+                setTimeout(function() {
+                    location.reload();
+                }, 2000);
+                
+            }).fail(function() {
+                buttonController.setError('Errore di comunicazione con il server');
+                showToast('Errore di comunicazione durante il reset', 'error');
+            });
+        });
+        
         // Log download handler (same functionality)
         $('#download-error-logs').click(function() {
             var $btn = $(this);
@@ -3108,6 +3142,32 @@ function hic_diagnostics_page() {
             });
         });
         
+        // Quick Brevo connectivity test handler (for the integration card button)
+        $('#test-brevo-connectivity-quick').click(function() {
+            var $btn = $(this);
+            
+            $btn.prop('disabled', true).text('Testing...');
+            
+            $.post(ajaxurl, {
+                action: 'hic_test_brevo_connectivity',
+                nonce: '<?php echo wp_create_nonce('hic_admin_action'); ?>'
+            }).done(function(response) {
+                if (response.success) {
+                    $btn.removeClass('button-secondary').addClass('button-primary');
+                    showToast('Brevo API test successful!', 'success');
+                } else {
+                    showToast('Brevo API test failed: ' + response.message, 'error');
+                }
+            }).fail(function() {
+                showToast('Communication error during Brevo API test', 'error');
+            }).always(function() {
+                $btn.prop('disabled', false).text('Test API');
+                setTimeout(function() {
+                    $btn.removeClass('button-primary').addClass('button-secondary');
+                }, 3000);
+            });
+        });
+        
         // Accessibility and keyboard navigation improvements
         
         // Add ARIA labels to buttons and status indicators
@@ -3164,7 +3224,7 @@ function hic_diagnostics_page() {
         });
         
         // Add confirmation dialogs for destructive actions
-        $('.button-link-delete, #reset-timestamps').on('click', function(e) {
+        $('.button-link-delete, #reset-timestamps, #reset-timestamps-advanced').on('click', function(e) {
             const action = $(this).text().trim();
             announceToScreenReader(`Azione di emergenza: ${action} richiede conferma`);
         });

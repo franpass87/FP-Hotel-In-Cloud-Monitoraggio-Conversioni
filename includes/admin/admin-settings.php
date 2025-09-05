@@ -8,6 +8,7 @@ if (!defined('ABSPATH')) exit;
 /* ============ Admin Settings Page ============ */
 add_action('admin_menu', 'hic_add_admin_menu');
 add_action('admin_init', 'hic_settings_init');
+add_action('admin_enqueue_scripts', 'hic_admin_enqueue_scripts');
 
 // Add AJAX handler for API connection test
 add_action('wp_ajax_hic_test_api_connection', 'hic_ajax_test_api_connection');
@@ -159,6 +160,24 @@ function hic_settings_init() {
     add_settings_field('hic_brevo_event_endpoint', 'Endpoint API Eventi Brevo', 'hic_brevo_event_endpoint_render', 'hic_settings', 'hic_brevo_section');
     
     add_settings_field('hic_debug_verbose', 'Log debug verboso', 'hic_debug_verbose_render', 'hic_settings', 'hic_main_section');
+}
+
+/**
+ * Enqueue admin scripts for HIC plugin pages
+ */
+function hic_admin_enqueue_scripts($hook) {
+    // Only load on our plugin pages
+    if ($hook === 'settings_page_hic-diagnostics' || $hook === 'settings_page_hic-monitoring') {
+        // Ensure jQuery is loaded
+        wp_enqueue_script('jquery');
+        
+        // Create inline script to ensure ajaxurl is available
+        wp_add_inline_script('jquery', '
+            if (typeof ajaxurl === "undefined") {
+                var ajaxurl = "' . esc_js(admin_url('admin-ajax.php')) . '";
+            }
+        ');
+    }
 }
 
 function hic_options_page() {
