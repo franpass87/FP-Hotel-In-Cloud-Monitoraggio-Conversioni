@@ -105,15 +105,15 @@ function hic_send_brevo_event($data, $gclid, $fbclid){
  * Brevo dispatcher for HIC reservation schema
  */
 function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '') {
-  if (!hic_get_brevo_api_key()) { 
-    hic_log('Brevo disabilitato (API key vuota).'); 
-    return; 
+  if (!hic_get_brevo_api_key()) {
+    hic_log('Brevo disabilitato (API key vuota).');
+    return false;
   }
 
   $email = isset($data['email']) ? $data['email'] : '';
-  if (!hic_is_valid_email($email)) { 
-    hic_log('Brevo: email mancante o non valida, skip contatto.'); 
-    return; 
+  if (!hic_is_valid_email($email)) {
+    hic_log('Brevo: email mancante o non valida, skip contatto.');
+    return false;
   }
 
   $is_alias = hic_is_ota_alias_email($email);
@@ -222,15 +222,18 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   ));
   
   $result = hic_handle_brevo_response($res, 'contact', array(
-    'email' => $email, 
-    'res_id' => $data['transaction_id'], 
-    'lists' => $list_ids, 
+    'email' => $email,
+    'res_id' => $data['transaction_id'],
+    'lists' => $list_ids,
     'alias' => $is_alias
   ));
-  
+
   if (!$result['success']) {
     hic_log('Brevo contact dispatch FAILED: ' . $result['error']);
+    return false;
   }
+
+  return true;
 }
 
 /**
@@ -572,8 +575,11 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid) {
   // Transform webhook data to modern format for consistency
   $transformed_data = hic_transform_webhook_data_for_brevo($data);
   
-  // Use the modern dispatcher for contact management
-  hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid);
+  // Use the modern dispatcher for contact management and capture result
+  $contact_updated = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid);
+  if (!$contact_updated) {
+    return false;
+  }
   
   // Send event only if real-time sync is enabled and this is a new reservation
   $reservation_id = hic_extract_reservation_id($data);
@@ -595,8 +601,8 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid) {
       hic_log("Unified Brevo: reservation $reservation_id already processed for real-time sync");
     }
   }
-  
-  // Return true if contact was updated (event sending is optional)
+
+  // Return true since contact update succeeded (event sending is optional)
   return true;
 }
 
