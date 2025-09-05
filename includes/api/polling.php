@@ -11,6 +11,52 @@ define('HIC_POLL_INTERVAL_SECONDS', 300);  // 5 minutes
 define('HIC_RETRY_INTERVAL_SECONDS', 900); // 15 minutes
 
 /**
+ * Validate and sanitize timestamp for API requests
+ * Ensures timestamp is within acceptable range for HIC API
+ * 
+ * @param int $timestamp Unix timestamp to validate
+ * @param string $context Context for logging (e.g., 'continuous_polling', 'deep_check')
+ * @return int Validated and potentially adjusted timestamp
+ */
+function hic_validate_api_timestamp($timestamp, $context = 'api_request') {
+    $current_time = time();
+    $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin from 7-day API limit
+    $max_lookahead_seconds = 1 * DAY_IN_SECONDS; // 1 day in future for safety
+    $earliest_allowed = $current_time - $max_lookback_seconds;
+    $latest_allowed = $current_time + $max_lookahead_seconds;
+    
+    $original_timestamp = $timestamp;
+    $adjusted = false;
+    
+    // Handle invalid/unset timestamps
+    if (empty($timestamp) || !is_numeric($timestamp)) {
+        $timestamp = $current_time - 7200; // Default to 2 hours ago
+        $adjusted = true;
+        hic_log("$context: Invalid timestamp, using default: " . date('Y-m-d H:i:s', $timestamp));
+    }
+    // Handle timestamps that are too old
+    elseif ($timestamp < $earliest_allowed) {
+        $timestamp = $earliest_allowed;
+        $adjusted = true;
+        hic_log("$context: Timestamp too old (" . date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . date('Y-m-d H:i:s', $timestamp));
+    }
+    // Handle timestamps that are too far in the future
+    elseif ($timestamp > $latest_allowed) {
+        $timestamp = $current_time - 3600; // Set to 1 hour ago
+        $adjusted = true;
+        hic_log("$context: Timestamp too far in future (" . date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . date('Y-m-d H:i:s', $timestamp));
+    }
+    // Additional safety check for unreasonable timestamps
+    elseif ($timestamp < 0 || $timestamp < ($current_time - (365 * DAY_IN_SECONDS))) {
+        $timestamp = $earliest_allowed;
+        $adjusted = true;
+        hic_log("$context: Unreasonable timestamp (" . date('Y-m-d H:i:s', $original_timestamp) . "), reset to safe value: " . date('Y-m-d H:i:s', $timestamp));
+    }
+    
+    return $timestamp;
+}
+
+/**
  * Helper function for consistent API error handling
  */
 function hic_handle_api_response($response, $context = 'API call') {
@@ -468,11 +514,14 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
         
         $last_update_check = get_option('hic_last_update_check', $default_check);
         
-        // Validate that the stored timestamp is not too old
-        if ($last_update_check < $earliest_allowed) {
-            hic_log("Quasi-realtime Poll: Stored timestamp too old (" . date('Y-m-d H:i:s', $last_update_check) . "), resetting to earliest allowed: " . date('Y-m-d H:i:s', $earliest_allowed));
-            $last_update_check = $earliest_allowed;
-            update_option('hic_last_update_check', $last_update_check);
+        // Use centralized timestamp validation  
+        $validated_check = hic_validate_api_timestamp($last_update_check, 'Quasi-realtime Poll');
+        
+        // Update stored timestamp if it was adjusted
+        if ($validated_check !== $last_update_check) {
+            update_option('hic_last_update_check', $validated_check);
+            hic_log("Quasi-realtime Poll: Updated stored timestamp from " . date('Y-m-d H:i:s', $last_update_check) . " to " . date('Y-m-d H:i:s', $validated_check));
+            $last_update_check = $validated_check;
         }
         
         hic_log("Internal Scheduler: Checking for updates since " . date('Y-m-d H:i:s', $last_update_check));
@@ -497,15 +546,22 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
             
             // Check if this is a timestamp too old error and reset if necessary
             if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
-                $reset_timestamp = $current_time - (2 * 60 * 60); // Reset to 2 hours ago
-                update_option('hic_last_update_check', $reset_timestamp);
-                hic_log('Quasi-realtime Poll: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $reset_timestamp) . " ($reset_timestamp)");
+                // Use more conservative reset - go back 3 days to ensure we're well within limits
+                $reset_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
                 
-                // Also reset scheduler timestamps to restart polling immediately
-                $recent_timestamp = time() - 300; // 5 minutes ago
-                update_option('hic_last_continuous_poll', $recent_timestamp);
-                update_option('hic_last_deep_check', $recent_timestamp);
-                hic_log('Quasi-realtime Poll: Reset scheduler timestamps to restart polling');
+                // Validate the reset timestamp before using it
+                $validated_reset = hic_validate_api_timestamp($reset_timestamp, 'Quasi-realtime Poll timestamp reset');
+                
+                update_option('hic_last_update_check', $validated_reset);
+                hic_log('Quasi-realtime Poll: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
+                
+                // Also reset scheduler timestamps to restart polling immediately with safe values
+                $recent_timestamp = $current_time - 300; // 5 minutes ago
+                $validated_recent = hic_validate_api_timestamp($recent_timestamp, 'Quasi-realtime Poll scheduler restart');
+                
+                update_option('hic_last_continuous_poll', $validated_recent);
+                update_option('hic_last_deep_check', $validated_recent);
+                hic_log('Quasi-realtime Poll: Reset scheduler timestamps to restart polling: ' . date('Y-m-d H:i:s', $validated_recent));
             }
         }
     
@@ -690,11 +746,14 @@ function hic_api_poll_updates(){
     
     $last_since = get_option('hic_last_updates_since', $default_since);
     
-    // Validate that the stored timestamp is not too old
-    if ($last_since < $earliest_allowed) {
-        hic_log("Internal Scheduler: Stored timestamp too old (" . date('Y-m-d H:i:s', $last_since) . "), resetting to earliest allowed: " . date('Y-m-d H:i:s', $earliest_allowed));
-        $last_since = $earliest_allowed;
-        update_option('hic_last_updates_since', $last_since);
+    // Use centralized timestamp validation
+    $validated_last_since = hic_validate_api_timestamp($last_since, 'Internal Scheduler');
+    
+    // Update stored timestamp if it was adjusted
+    if ($validated_last_since !== $last_since) {
+        update_option('hic_last_updates_since', $validated_last_since);
+        hic_log("Internal Scheduler: Updated stored timestamp from " . date('Y-m-d H:i:s', $last_since) . " to " . date('Y-m-d H:i:s', $validated_last_since));
+        $last_since = $validated_last_since;
     }
     
     $since = max(0, $last_since - $overlap_seconds);
@@ -749,15 +808,22 @@ function hic_api_poll_updates(){
         
         // Check if this is a timestamp too old error and reset if necessary
         if ($out->get_error_code() === 'hic_timestamp_too_old') {
+            // Use a more conservative reset - go back 3 days to ensure we're well within limits
             $reset_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
-            update_option('hic_last_updates_since', $reset_timestamp);
-            hic_log('Internal Scheduler: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $reset_timestamp) . " ($reset_timestamp)");
             
-            // Also reset scheduler timestamps to restart polling immediately
-            $recent_timestamp = time() - 300; // 5 minutes ago
-            update_option('hic_last_continuous_poll', $recent_timestamp);
-            update_option('hic_last_deep_check', $recent_timestamp);
-            hic_log('Internal Scheduler: Reset scheduler timestamps to restart polling');
+            // Validate the reset timestamp before using it
+            $validated_reset = hic_validate_api_timestamp($reset_timestamp, 'Internal Scheduler timestamp reset');
+            
+            update_option('hic_last_updates_since', $validated_reset);
+            hic_log('Internal Scheduler: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
+            
+            // Also reset scheduler timestamps to restart polling immediately with safe values
+            $recent_timestamp = $current_time - 300; // 5 minutes ago
+            $validated_recent = hic_validate_api_timestamp($recent_timestamp, 'Internal Scheduler scheduler restart');
+            
+            update_option('hic_last_continuous_poll', $validated_recent);
+            update_option('hic_last_deep_check', $validated_recent);
+            hic_log('Internal Scheduler: Reset scheduler timestamps to restart polling: ' . date('Y-m-d H:i:s', $validated_recent));
         }
     }
 }
@@ -819,21 +885,15 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
         return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti per updates');
     }
     
-    // Validate timestamp - API rejects timestamps older than 7 days
-    $current_time = time();
-    $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin
-    $earliest_allowed = $current_time - $max_lookback_seconds;
+    // Use centralized timestamp validation
+    $validated_since = hic_validate_api_timestamp($since, 'HIC updates fetch');
     
-    if ($since < $earliest_allowed) {
-        $original_since = $since;
-        $since = $earliest_allowed;
-        hic_log("HIC API timestamp validation: Capped timestamp from " . 
-                date('Y-m-d H:i:s', $original_since) . " to " . 
-                date('Y-m-d H:i:s', $since) . " (6-day limit)");
+    if ($validated_since !== $since) {
+        hic_log("HIC updates fetch: Timestamp adjusted from " . date('Y-m-d H:i:s', $since) . " to " . date('Y-m-d H:i:s', $validated_since));
     }
     
     $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
-    $args = array('updated_after' => $since);
+    $args = array('updated_after' => $validated_since);
     if ($limit) $args['limit'] = $limit;
     $url = add_query_arg($args, $endpoint);
     
@@ -1383,11 +1443,14 @@ function hic_api_poll_bookings_continuous() {
         
         $last_continuous_check = get_option('hic_last_continuous_check', $default_check);
         
-        // Validate that the stored timestamp is not too old
-        if ($last_continuous_check < $earliest_allowed) {
-            hic_log("Continuous Polling: Stored timestamp too old (" . date('Y-m-d H:i:s', $last_continuous_check) . "), resetting to earliest allowed: " . date('Y-m-d H:i:s', $earliest_allowed));
-            $last_continuous_check = $earliest_allowed;
-            update_option('hic_last_continuous_check', $last_continuous_check);
+        // Use centralized timestamp validation
+        $validated_check = hic_validate_api_timestamp($last_continuous_check, 'Continuous Polling');
+        
+        // Update stored timestamp if it was adjusted
+        if ($validated_check !== $last_continuous_check) {
+            update_option('hic_last_continuous_check', $validated_check);
+            hic_log("Continuous Polling: Updated stored timestamp from " . date('Y-m-d H:i:s', $last_continuous_check) . " to " . date('Y-m-d H:i:s', $validated_check));
+            $last_continuous_check = $validated_check;
         }
         
         hic_log("Continuous Polling: Checking for updates since " . date('Y-m-d H:i:s', $last_continuous_check));
@@ -1412,15 +1475,22 @@ function hic_api_poll_bookings_continuous() {
             
             // Check if this is a timestamp too old error and reset if necessary
             if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
-                $reset_timestamp = $current_time - (2 * 60 * 60); // Reset to 2 hours ago for continuous polling
-                update_option('hic_last_continuous_check', $reset_timestamp);
-                hic_log('Continuous Polling: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $reset_timestamp) . " ($reset_timestamp)");
+                // Use more conservative reset - go back 3 days to ensure we're well within limits
+                $reset_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago for continuous polling
                 
-                // Also reset scheduler timestamps to restart polling immediately
-                $recent_timestamp = time() - 300; // 5 minutes ago
-                update_option('hic_last_continuous_poll', $recent_timestamp);
-                update_option('hic_last_deep_check', $recent_timestamp);
-                hic_log('Continuous Polling: Reset scheduler timestamps to restart polling');
+                // Validate the reset timestamp before using it
+                $validated_reset = hic_validate_api_timestamp($reset_timestamp, 'Continuous Polling timestamp reset');
+                
+                update_option('hic_last_continuous_check', $validated_reset);
+                hic_log('Continuous Polling: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
+                
+                // Also reset scheduler timestamps to restart polling immediately with safe values
+                $recent_timestamp = $current_time - 300; // 5 minutes ago
+                $validated_recent = hic_validate_api_timestamp($recent_timestamp, 'Continuous Polling scheduler restart');
+                
+                update_option('hic_last_continuous_poll', $validated_recent);
+                update_option('hic_last_deep_check', $validated_recent);
+                hic_log('Continuous Polling: Reset scheduler timestamps to restart polling: ' . date('Y-m-d H:i:s', $validated_recent));
             }
         }
         
@@ -1521,17 +1591,22 @@ function hic_api_poll_bookings_deep_check() {
                 
                 // Reset all relevant timestamps to safe values to ensure recovery
                 $safe_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
-                update_option('hic_last_updates_since', $safe_timestamp);
-                update_option('hic_last_update_check', $safe_timestamp);
-                update_option('hic_last_continuous_check', $safe_timestamp);
+                
+                // Validate all reset timestamps before using them
+                $validated_safe = hic_validate_api_timestamp($safe_timestamp, 'Deep Check data timestamp reset');
+                $recent_timestamp = $current_time - 300; // 5 minutes ago
+                $validated_recent = hic_validate_api_timestamp($recent_timestamp, 'Deep Check scheduler restart');
+                
+                update_option('hic_last_updates_since', $validated_safe);
+                update_option('hic_last_update_check', $validated_safe);
+                update_option('hic_last_continuous_check', $validated_safe);
                 
                 // Reset scheduler timestamps to restart polling immediately
-                $recent_timestamp = time() - 300; // 5 minutes ago
-                update_option('hic_last_continuous_poll', $recent_timestamp);
-                update_option('hic_last_deep_check', $recent_timestamp);
+                update_option('hic_last_continuous_poll', $validated_recent);
+                update_option('hic_last_deep_check', $validated_recent);
                 
-                hic_log('Deep Check: Reset all timestamps to: ' . date('Y-m-d H:i:s', $safe_timestamp) . " for recovery");
-                hic_log('Deep Check: Reset scheduler timestamps to restart polling immediately');
+                hic_log('Deep Check: Reset all timestamps to: ' . date('Y-m-d H:i:s', $validated_safe) . " for recovery");
+                hic_log('Deep Check: Reset scheduler timestamps to restart polling immediately: ' . date('Y-m-d H:i:s', $validated_recent));
                 
                 // Reduce error count since this is a recoverable error that's now handled
                 $total_errors--;
