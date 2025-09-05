@@ -1371,6 +1371,32 @@ function hic_diagnostics_page() {
                             <?php endif; ?>
                         </div>
                     </div>
+                    
+                    <div class="hic-integration-item">
+                        <div class="hic-integration-header">
+                            <span class="hic-integration-icon">🎯</span>
+                            <h3>Google Ads</h3>
+                            <?php 
+                            // Google Ads tracking is handled via GTM and GA4
+                            $gtm_enabled = !empty(hic_get_gtm_container_id());
+                            $ga4_enabled = !empty(hic_get_measurement_id());
+                            $ads_enabled = $gtm_enabled || $ga4_enabled;
+                            ?>
+                            <?php if ($ads_enabled): ?>
+                                <span class="status ok">✓ Attivo</span>
+                            <?php else: ?>
+                                <span class="status error">✗ Inattivo</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="hic-integration-details">
+                            <p>Conversion tracking via GA4/GTM</p>
+                            <?php if ($gtm_enabled): ?>
+                                <small>GTM: <?php echo esc_html(substr(hic_get_gtm_container_id(), 0, 8)); ?>...</small>
+                            <?php elseif ($ga4_enabled): ?>
+                                <small>Via GA4 measurement</small>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
                 
                 <?php 
@@ -2861,6 +2887,7 @@ function hic_diagnostics_page() {
         
         // Test Connectivity handler (enhanced with better UX)
         $('#test-connectivity').click(function() {
+            console.log('Test connectivity button clicked'); // Debug log
             var $btn = $(this);
             var buttonController = enhanceButton($btn, 'Testando...');
             var $status = $('#quick-status');
@@ -2877,28 +2904,37 @@ function hic_diagnostics_page() {
                 force: 'false',
                 nonce: '<?php echo wp_create_nonce('hic_diagnostics_nonce'); ?>'
             }, function(response) {
-                var result = JSON.parse(response);
-                
-                if (result.success) {
-                    buttonController.setSuccess('Connessione verificata!');
-                    $status.text('✓ Connessione OK').css('color', '#00a32a');
+                console.log('Test connectivity response received:', response); // Debug log
+                try {
+                    var result = JSON.parse(response);
                     
-                    var html = '<div class="notice notice-success inline"><p><strong>Test Connessione Riuscito:</strong><br>';
-                    html += result.message + '</p></div>';
+                    if (result.success) {
+                        buttonController.setSuccess('Connessione verificata!');
+                        $status.text('✓ Connessione OK').css('color', '#00a32a');
+                        
+                        var html = '<div class="notice notice-success inline"><p><strong>Test Connessione Riuscito:</strong><br>';
+                        html += result.message + '</p></div>';
+                        
+                    } else {
+                        buttonController.setError('Connessione fallita');
+                        $status.text('✗ Connessione fallita').css('color', '#d63638');
+                        
+                        var html = '<div class="notice notice-warning inline"><p><strong>Test Connessione Fallito:</strong><br>';
+                        html += result.message || 'Errore sconosciuto';
+                        html += '</p></div>';
+                    }
                     
-                } else {
-                    buttonController.setError('Connessione fallita');
-                    $status.text('✗ Connessione fallita').css('color', '#d63638');
+                    $resultsContent.html(html);
+                    $results.show();
                     
-                    var html = '<div class="notice notice-warning inline"><p><strong>Test Connessione Fallito:</strong><br>';
-                    html += result.message || 'Errore sconosciuto';
-                    html += '</p></div>';
+                } catch (e) {
+                    console.error('Error parsing test connectivity response:', e, response); // Debug log
+                    buttonController.setError('Errore di parsing risposta');
+                    $status.text('✗ Errore parsing').css('color', '#d63638');
                 }
                 
-                $resultsContent.html(html);
-                $results.show();
-                
-            }).fail(function() {
+            }).fail(function(xhr, status, error) {
+                console.error('Test connectivity AJAX failed:', status, error); // Debug log
                 buttonController.setError('Errore di comunicazione');
                 $status.text('✗ Errore comunicazione').css('color', '#d63638');
             });
