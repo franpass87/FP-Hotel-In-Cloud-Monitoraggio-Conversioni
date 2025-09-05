@@ -61,4 +61,6 @@ if (!function_exists('absint')) {
 }
 
 // Include the plugin files
+require_once dirname(__DIR__) . '/includes/constants.php';
 require_once dirname(__DIR__) . '/includes/functions.php';
+require_once dirname(__DIR__) . '/includes/booking-processor.php';
