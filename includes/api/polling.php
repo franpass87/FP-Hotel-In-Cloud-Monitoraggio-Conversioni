@@ -466,10 +466,16 @@ function hic_dispatch_reservation($transformed, $original) {
         if ($connection_type === 'webhook') {
             // In webhook mode, only update contact info but don't send events
             // (events are handled by webhook processor)
-            hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid);
+            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid);
+            if (!$brevo_success) {
+                hic_log('Brevo contact dispatch failed for reservation ' . $uid);
+            }
         } else {
             // In polling mode, handle both contact and events
-            hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid);
+            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid);
+            if (!$brevo_success) {
+                hic_log('Brevo contact dispatch failed for reservation ' . $uid);
+            }
 
             // Brevo real-time events - send reservation_created event for new reservations
             if (!$is_status_update && hic_realtime_brevo_sync_enabled()) {
