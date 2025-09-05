@@ -442,7 +442,7 @@ class HIC_Booking_Poller {
      * Execute continuous polling (every minute)
      * Checks for recent reservations and manual bookings
      */
-    private function execute_continuous_polling() {
+    public function execute_continuous_polling() {
         hic_log("Scheduler: Executing continuous polling (1-minute interval)");
         
         // Update timestamp first to prevent overlapping executions
@@ -460,7 +460,7 @@ class HIC_Booking_Poller {
      * Execute deep check (every 10 minutes)
      * Looks back 5 days to catch any missed reservations
      */
-    private function execute_deep_check() {
+    public function execute_deep_check() {
         hic_log("Scheduler: Executing deep check (10-minute interval, 5-day lookback)");
         
         // Update timestamp first to prevent overlapping executions
