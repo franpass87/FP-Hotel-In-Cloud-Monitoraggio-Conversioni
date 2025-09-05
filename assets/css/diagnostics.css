@@ -1,8 +1,6 @@
 /* Modern, Clean Diagnostic Interface */
         .wrap {
             max-width: none !important;
-            margin: 0 20px 0 0;
-            width: calc(100% - 20px) !important;
         }
         
         .wrap h1 {
@@ -626,11 +624,6 @@
         }
         
         @media (max-width: 782px) {
-            .wrap {
-                width: 100% !important;
-                margin-right: 0;
-            }
-            
             .hic-diagnostics-container .card {
                 padding: 16px;
                 margin-bottom: 12px;
