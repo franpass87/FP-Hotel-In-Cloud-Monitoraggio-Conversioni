@@ -78,10 +78,19 @@ Each condition must be ✅ (green checkmark) for automatic polling to work:
 - Status shows "Prossimo continuo: In attesa di avvio"
 
 **Automatic Solution**: 
-The system automatically detects timestamp errors and resets both polling timestamps and heartbeat scheduler timestamps. Polling should resume within 1-2 minutes.
+The system now includes enhanced timestamp validation that automatically:
+- Validates all timestamps before API calls to prevent "too old" errors
+- Uses conservative 3-day reset logic (instead of 2-hour) to ensure API compatibility
+- Handles edge cases like future timestamps and invalid values
+- Provides consistent recovery across all polling functions
+
+Polling should resume within 1-2 minutes after automatic recovery.
 
 **Manual Solution**: 
-If automatic recovery doesn't work, use "Forza Polling Ora" to immediately restart the polling system.
+If automatic recovery doesn't work, use "Forza Polling Ora" to immediately restart the polling system with fresh timestamps.
+
+**Prevention**: 
+The new validation system prevents most timestamp errors by ensuring all stored timestamps remain within the API's 7-day limit with a 6-day safety margin.
 
 **Technical Details**: 
 This issue occurs when the stored timestamp becomes older than the API's 7-day limit. The fix automatically resets the heartbeat scheduler to restart polling immediately.

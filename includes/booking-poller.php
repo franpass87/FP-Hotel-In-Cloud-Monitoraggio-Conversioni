@@ -258,6 +258,13 @@ class HIC_Booking_Poller {
                 hic_log("Recovery: Resetting all timestamps due to timestamp errors");
                 $safe_timestamp = time() - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
                 $recent_timestamp = time() - 300; // 5 minutes ago for polling timestamps
+                
+                // Validate timestamps before using them (if hic_validate_api_timestamp is available)
+                if (function_exists('hic_validate_api_timestamp')) {
+                    $safe_timestamp = hic_validate_api_timestamp($safe_timestamp, 'Recovery data timestamp reset');
+                    $recent_timestamp = hic_validate_api_timestamp($recent_timestamp, 'Recovery polling timestamp reset');
+                }
+                
                 update_option('hic_last_updates_since', $safe_timestamp);
                 update_option('hic_last_update_check', $safe_timestamp);
                 update_option('hic_last_continuous_check', $safe_timestamp);
