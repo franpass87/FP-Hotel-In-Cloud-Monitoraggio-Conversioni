@@ -48,8 +48,9 @@ function hic_send_to_fb($data, $gclid, $fbclid){
   if (!empty($data['last_name']) && is_string($data['last_name'])) {
     $user_data['ln'] = [ hash('sha256', strtolower(trim($data['last_name']))) ];
   }
-  if (!empty($data['whatsapp']) && is_string($data['whatsapp'])) {
-    $user_data['ph'] = [ hash('sha256', preg_replace('/\D/','', $data['whatsapp'])) ];
+  $phone = $data['whatsapp'] ?? $data['phone'] ?? '';
+  if (!empty($phone) && is_string($phone)) {
+    $user_data['ph'] = [ hash('sha256', preg_replace('/\D/','', $phone)) ];
   }
 
   $payload = [
