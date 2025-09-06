@@ -1,4 +1,5 @@
 <?php
+namespace FpHic;
 /**
  * Google Analytics 4 Integration
  */
@@ -8,31 +9,31 @@ if (!defined('ABSPATH')) exit;
 /* ============ GA4 (purchase + bucket) ============ */
 function hic_send_to_ga4($data, $gclid, $fbclid) {
   // Validate configuration
-  $measurement_id = hic_get_measurement_id();
-  $api_secret = hic_get_api_secret();
+  $measurement_id = Helpers\hic_get_measurement_id();
+  $api_secret = Helpers\hic_get_api_secret();
   
   if (empty($measurement_id) || empty($api_secret)) {
-    hic_log('GA4: measurement ID o API secret mancanti');
+    Helpers\hic_log('GA4: measurement ID o API secret mancanti');
     return false;
   }
 
   // Validate input data
   if (!is_array($data)) {
-    hic_log('GA4: data is not an array');
+    Helpers\hic_log('GA4: data is not an array');
     return false;
   }
 
-  $bucket = fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
   $client_id = $gclid ?: ($fbclid ?: (string) wp_generate_uuid4());
 
   // Validate and normalize amount
   $amount = 0;
   if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-    $amount = hic_normalize_price($data['amount']);
+    $amount = Helpers\hic_normalize_price($data['amount']);
   }
 
   // Generate transaction ID using consistent extraction
-  $transaction_id = hic_extract_reservation_id($data);
+  $transaction_id = Helpers\hic_extract_reservation_id($data);
   if (empty($transaction_id)) {
     $transaction_id = uniqid('hic_ga4_');
   }
@@ -65,7 +66,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    hic_log('GA4: Failed to encode JSON payload');
+    Helpers\hic_log('GA4: Failed to encode JSON payload');
     return false;
   }
 
@@ -85,18 +86,18 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    hic_log($log_msg);
+    Helpers\hic_log($log_msg);
     return false;
   }
   
   if ($code !== 204 && $code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    hic_log($log_msg);
+    Helpers\hic_log($log_msg);
     return false;
   }
   
-  hic_log($log_msg);
+  Helpers\hic_log($log_msg);
   return true;
 }
 
@@ -105,17 +106,17 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
  */
 function hic_dispatch_ga4_reservation($data) {
   // Validate configuration
-  $measurement_id = hic_get_measurement_id();
-  $api_secret = hic_get_api_secret();
+  $measurement_id = Helpers\hic_get_measurement_id();
+  $api_secret = Helpers\hic_get_api_secret();
   
   if (empty($measurement_id) || empty($api_secret)) {
-    hic_log('GA4 HIC dispatch SKIPPED: measurement ID o API secret mancanti');
+    Helpers\hic_log('GA4 HIC dispatch SKIPPED: measurement ID o API secret mancanti');
     return false;
   }
 
   // Validate input data
   if (!is_array($data)) {
-    hic_log('GA4 HIC dispatch: data is not an array');
+    Helpers\hic_log('GA4 HIC dispatch: data is not an array');
     return false;
   }
 
@@ -123,26 +124,26 @@ function hic_dispatch_ga4_reservation($data) {
   $required_fields = ['transaction_id', 'value', 'currency'];
   foreach ($required_fields as $field) {
     if (!isset($data[$field])) {
-      hic_log("GA4 HIC dispatch: Missing required field '$field'");
+      Helpers\hic_log("GA4 HIC dispatch: Missing required field '$field'");
       return false;
     }
   }
 
   $client_id = (string) wp_generate_uuid4();
   $transaction_id = sanitize_text_field($data['transaction_id']);
-  $value = hic_normalize_price($data['value']);
+  $value = Helpers\hic_normalize_price($data['value']);
   $currency = sanitize_text_field($data['currency']);
 
   // Get gclid/fbclid for bucket normalization if available
   $gclid = '';
   $fbclid = '';
   if (!empty($data['transaction_id'])) {
-    $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
+    $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
     $gclid = $tracking['gclid'] ?? '';
     $fbclid = $tracking['fbclid'] ?? '';
   }
 
-  $bucket = fp_normalize_bucket($gclid, $fbclid);
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
 
   $params = [
     'transaction_id' => $transaction_id,
@@ -158,7 +159,7 @@ function hic_dispatch_ga4_reservation($data) {
     'checkout' => sanitize_text_field($data['to_date'] ?? ''),
     'reservation_code' => sanitize_text_field($data['reservation_code'] ?? ''),
     'presence' => sanitize_text_field($data['presence'] ?? ''),
-    'unpaid_balance' => hic_normalize_price($data['unpaid_balance'] ?? 0),
+    'unpaid_balance' => Helpers\hic_normalize_price($data['unpaid_balance'] ?? 0),
     'bucket' => $bucket,             // Use normalized bucket based on attribution
     'vertical' => 'hotel'
   ];
@@ -184,7 +185,7 @@ function hic_dispatch_ga4_reservation($data) {
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    hic_log('GA4 HIC dispatch: Failed to encode JSON payload');
+    Helpers\hic_log('GA4 HIC dispatch: Failed to encode JSON payload');
     return false;
   }
 
@@ -204,17 +205,17 @@ function hic_dispatch_ga4_reservation($data) {
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    hic_log($log_msg);
+    Helpers\hic_log($log_msg);
     return false;
   }
   
   if ($code !== 204 && $code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    hic_log($log_msg);
+    Helpers\hic_log($log_msg);
     return false;
   }
   
-  hic_log($log_msg);
+  Helpers\hic_log($log_msg);
   return true;
 }

@@ -19,7 +19,7 @@ class HIC_Log_Manager {
             return;
         }
         
-        $this->log_file = hic_get_log_file();
+        $this->log_file = Helpers\hic_get_log_file();
         $this->max_size = HIC_LOG_MAX_SIZE;
         $this->retention_days = HIC_LOG_RETENTION_DAYS;
         
@@ -73,7 +73,7 @@ class HIC_Log_Manager {
      * Log debug message (only if debug mode enabled)
      */
     public function debug($message, $context = []) {
-        if (hic_is_debug_verbose()) {
+        if (Helpers\hic_is_debug_verbose()) {
             return $this->log($message, HIC_LOG_LEVEL_DEBUG, $context);
         }
         return true;

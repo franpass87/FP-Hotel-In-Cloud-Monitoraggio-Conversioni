@@ -11,7 +11,7 @@ function hic_create_database_table(){
   
   // Check if wpdb is available
   if (!$wpdb) {
-    hic_log('hic_create_database_table: wpdb is not available');
+    Helpers\hic_log('hic_create_database_table: wpdb is not available');
     return false;
   }
   
@@ -34,18 +34,18 @@ function hic_create_database_table(){
   $result = dbDelta($sql);
   
   if ($result === false) {
-    hic_log('hic_create_database_table: Failed to create table ' . $table);
+    Helpers\hic_log('hic_create_database_table: Failed to create table ' . $table);
     return false;
   }
   
   // Verify table was created
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
-    hic_log('hic_create_database_table: Table creation verification failed for ' . $table);
+    Helpers\hic_log('hic_create_database_table: Table creation verification failed for ' . $table);
     return false;
   }
   
-  hic_log('DB ready: '.$table);
+  Helpers\hic_log('DB ready: '.$table);
   
   // Create real-time sync state table
   return hic_create_realtime_sync_table();
@@ -57,7 +57,7 @@ function hic_create_realtime_sync_table(){
   
   // Check if wpdb is available
   if (!$wpdb) {
-    hic_log('hic_create_realtime_sync_table: wpdb is not available');
+    Helpers\hic_log('hic_create_realtime_sync_table: wpdb is not available');
     return false;
   }
   
@@ -83,18 +83,18 @@ function hic_create_realtime_sync_table(){
   $result = dbDelta($sql);
   
   if ($result === false) {
-    hic_log('hic_create_realtime_sync_table: Failed to create table ' . $table);
+    Helpers\hic_log('hic_create_realtime_sync_table: Failed to create table ' . $table);
     return false;
   }
   
   // Verify table was created
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
-    hic_log('hic_create_realtime_sync_table: Table creation verification failed for ' . $table);
+    Helpers\hic_log('hic_create_realtime_sync_table: Table creation verification failed for ' . $table);
     return false;
   }
   
-  hic_log('DB ready: '.$table.' (realtime sync states)');
+  Helpers\hic_log('DB ready: '.$table.' (realtime sync states)');
   
   // Create booking events queue table
   return hic_create_booking_events_table();
@@ -106,7 +106,7 @@ function hic_create_booking_events_table(){
   
   // Check if wpdb is available
   if (!$wpdb) {
-    hic_log('hic_create_booking_events_table: wpdb is not available');
+    Helpers\hic_log('hic_create_booking_events_table: wpdb is not available');
     return false;
   }
   
@@ -134,18 +134,18 @@ function hic_create_booking_events_table(){
   $result = dbDelta($sql);
   
   if ($result === false) {
-    hic_log('hic_create_booking_events_table: Failed to create table ' . $table);
+    Helpers\hic_log('hic_create_booking_events_table: Failed to create table ' . $table);
     return false;
   }
   
   // Verify table was created
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
-    hic_log('hic_create_booking_events_table: Table creation verification failed for ' . $table);
+    Helpers\hic_log('hic_create_booking_events_table: Table creation verification failed for ' . $table);
     return false;
   }
   
-  hic_log('DB ready: '.$table.' (booking events queue)');
+  Helpers\hic_log('DB ready: '.$table.' (booking events queue)');
   return true;
 }
 
@@ -164,12 +164,12 @@ function hic_capture_tracking_params(){
   // Check if table exists
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
-    hic_log('hic_capture_tracking_params: Table does not exist, creating: ' . $table);
+    Helpers\hic_log('hic_capture_tracking_params: Table does not exist, creating: ' . $table);
     hic_create_database_table();
     // Re-check if table exists after creation
     $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if (!$table_exists) {
-      hic_log('hic_capture_tracking_params: Failed to create table: ' . $table);
+      Helpers\hic_log('hic_capture_tracking_params: Failed to create table: ' . $table);
       return false;
     }
   }
@@ -182,7 +182,7 @@ function hic_capture_tracking_params(){
     
     // Validate gclid format (basic validation)
     if (strlen($gclid) < 10 || strlen($gclid) > 255) {
-      hic_log('hic_capture_tracking_params: Invalid gclid format: ' . $gclid);
+      Helpers\hic_log('hic_capture_tracking_params: Invalid gclid format: ' . $gclid);
       return false;
     }
     
@@ -195,7 +195,7 @@ function hic_capture_tracking_params(){
       if ($cookie_set) {
         $_COOKIE['hic_sid'] = $gclid;
       } else {
-        hic_log('hic_capture_tracking_params: Failed to set gclid cookie');
+        Helpers\hic_log('hic_capture_tracking_params: Failed to set gclid cookie');
       }
     }
     
@@ -206,18 +206,18 @@ function hic_capture_tracking_params(){
     ));
     
     if ($wpdb->last_error) {
-      hic_log('hic_capture_tracking_params: Database error checking existing gclid: ' . $wpdb->last_error);
+      Helpers\hic_log('hic_capture_tracking_params: Database error checking existing gclid: ' . $wpdb->last_error);
       return false;
     }
     
     if (!$existing) {
       $insert_result = $wpdb->insert($table, ['gclid'=>$gclid, 'sid'=>$sid_to_use]);
       if ($insert_result === false) {
-        hic_log('hic_capture_tracking_params: Failed to insert gclid: ' . ($wpdb->last_error ?: 'Unknown error'));
+        Helpers\hic_log('hic_capture_tracking_params: Failed to insert gclid: ' . ($wpdb->last_error ?: 'Unknown error'));
         return false;
       }
     }
-    hic_log("GCLID salvato → $gclid (SID: $sid_to_use)");
+    Helpers\hic_log("GCLID salvato → $gclid (SID: $sid_to_use)");
   }
 
   if (!empty($_GET['fbclid'])) {
@@ -225,7 +225,7 @@ function hic_capture_tracking_params(){
     
     // Validate fbclid format (basic validation)
     if (strlen($fbclid) < 10 || strlen($fbclid) > 255) {
-      hic_log('hic_capture_tracking_params: Invalid fbclid format: ' . $fbclid);
+      Helpers\hic_log('hic_capture_tracking_params: Invalid fbclid format: ' . $fbclid);
       return false;
     }
     
@@ -238,7 +238,7 @@ function hic_capture_tracking_params(){
       if ($cookie_set) {
         $_COOKIE['hic_sid'] = $fbclid;
       } else {
-        hic_log('hic_capture_tracking_params: Failed to set fbclid cookie');
+        Helpers\hic_log('hic_capture_tracking_params: Failed to set fbclid cookie');
       }
     }
     
@@ -249,18 +249,18 @@ function hic_capture_tracking_params(){
     ));
     
     if ($wpdb->last_error) {
-      hic_log('hic_capture_tracking_params: Database error checking existing fbclid: ' . $wpdb->last_error);
+      Helpers\hic_log('hic_capture_tracking_params: Database error checking existing fbclid: ' . $wpdb->last_error);
       return false;
     }
     
     if (!$existing) {
       $insert_result = $wpdb->insert($table, ['fbclid'=>$fbclid, 'sid'=>$sid_to_use]);
       if ($insert_result === false) {
-        hic_log('hic_capture_tracking_params: Failed to insert fbclid: ' . ($wpdb->last_error ?: 'Unknown error'));
+        Helpers\hic_log('hic_capture_tracking_params: Failed to insert fbclid: ' . ($wpdb->last_error ?: 'Unknown error'));
         return false;
       }
     }
-    hic_log("FBCLID salvato → $fbclid (SID: $sid_to_use)");
+    Helpers\hic_log("FBCLID salvato → $fbclid (SID: $sid_to_use)");
   }
   
   return true;
@@ -273,7 +273,7 @@ function hic_capture_tracking_params(){
  */
 function hic_is_reservation_new_for_realtime($reservation_id) {
   if (empty($reservation_id) || !is_scalar($reservation_id)) {
-    hic_log('hic_is_reservation_new_for_realtime: Invalid reservation_id');
+    Helpers\hic_log('hic_is_reservation_new_for_realtime: Invalid reservation_id');
     return false;
   }
   
@@ -281,7 +281,7 @@ function hic_is_reservation_new_for_realtime($reservation_id) {
   
   // Check if wpdb is available
   if (!$wpdb) {
-    hic_log('hic_is_reservation_new_for_realtime: wpdb is not available');
+    Helpers\hic_log('hic_is_reservation_new_for_realtime: wpdb is not available');
     return false;
   }
   
@@ -290,7 +290,7 @@ function hic_is_reservation_new_for_realtime($reservation_id) {
   // Check if table exists
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
-    hic_log('hic_is_reservation_new_for_realtime: Table does not exist: ' . $table);
+    Helpers\hic_log('hic_is_reservation_new_for_realtime: Table does not exist: ' . $table);
     return true; // Assume new if table doesn't exist
   }
   
@@ -300,7 +300,7 @@ function hic_is_reservation_new_for_realtime($reservation_id) {
   ));
   
   if ($wpdb->last_error) {
-    hic_log('hic_is_reservation_new_for_realtime: Database error: ' . $wpdb->last_error);
+    Helpers\hic_log('hic_is_reservation_new_for_realtime: Database error: ' . $wpdb->last_error);
     return true; // Assume new on error
   }
   
@@ -312,7 +312,7 @@ function hic_is_reservation_new_for_realtime($reservation_id) {
  */
 function hic_mark_reservation_new_for_realtime($reservation_id) {
   if (empty($reservation_id) || !is_scalar($reservation_id)) {
-    hic_log('hic_mark_reservation_new_for_realtime: Invalid reservation_id');
+    Helpers\hic_log('hic_mark_reservation_new_for_realtime: Invalid reservation_id');
     return false;
   }
   
@@ -320,7 +320,7 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
   
   // Check if wpdb is available
   if (!$wpdb) {
-    hic_log('hic_mark_reservation_new_for_realtime: wpdb is not available');
+    Helpers\hic_log('hic_mark_reservation_new_for_realtime: wpdb is not available');
     return false;
   }
   
@@ -329,7 +329,7 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
   // Check if table exists
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
-    hic_log('hic_mark_reservation_new_for_realtime: Table does not exist, creating: ' . $table);
+    Helpers\hic_log('hic_mark_reservation_new_for_realtime: Table does not exist, creating: ' . $table);
     if (!hic_create_realtime_sync_table()) {
       return false;
     }
@@ -342,7 +342,7 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
   ));
   
   if ($result === false) {
-    hic_log('hic_mark_reservation_new_for_realtime: Database error: ' . ($wpdb->last_error ?: 'Unknown error'));
+    Helpers\hic_log('hic_mark_reservation_new_for_realtime: Database error: ' . ($wpdb->last_error ?: 'Unknown error'));
     return false;
   }
   
