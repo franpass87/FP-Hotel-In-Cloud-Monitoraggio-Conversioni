@@ -57,7 +57,7 @@ function hic_send_to_fb($data, $gclid, $fbclid){
   $payload = [
     'data' => [[
       'event_name'       => 'Purchase',      // evento standard Meta
-      'event_time'       => time(),
+      'event_time'       => current_time('timestamp'),
       'event_id'         => $event_id,
       'action_source'    => 'website',
       'event_source_url' => home_url(),
@@ -205,7 +205,7 @@ function hic_dispatch_pixel_reservation($data) {
   $payload = [
     'data' => [[
       'event_name' => 'Purchase',
-      'event_time' => time(),
+      'event_time' => current_time('timestamp'),
       'event_id' => $transaction_id,
       'action_source' => 'website',
       'event_source_url' => home_url(),
