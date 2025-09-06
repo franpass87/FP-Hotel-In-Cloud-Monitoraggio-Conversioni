@@ -83,7 +83,7 @@ class HIC_Log_Manager {
      * Format log entry
      */
     private function format_log_entry($message, $level, $context) {
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = current_time('mysql');
         $level_str = strtoupper($level);
         
         // Convert message to string if it's an array or object

@@ -36,7 +36,25 @@ if (!function_exists('update_option')) {
 
 if (!function_exists('current_time')) {
     function current_time($type, $gmt = 0) {
-        return date($type === 'mysql' ? 'Y-m-d H:i:s' : 'U');
+        // Allow tests to override the time
+        if (isset($GLOBALS['hic_test_current_time'])) {
+            return $GLOBALS['hic_test_current_time'];
+        }
+
+        $timezone_string = get_option('timezone_string', 'UTC');
+        try {
+            $timezone = new DateTimeZone($timezone_string);
+        } catch (Exception $e) {
+            $timezone = new DateTimeZone('UTC');
+        }
+
+        $datetime = new DateTime('now', $timezone);
+
+        if ($gmt) {
+            $datetime->setTimezone(new DateTimeZone('UTC'));
+        }
+
+        return $datetime->format($type === 'mysql' ? 'Y-m-d H:i:s' : 'U');
     }
 }
 
