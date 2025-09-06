@@ -173,45 +173,37 @@ if (defined('WP_CLI') && WP_CLI) {
         }
         
         /**
-         * Force poll execution bypassing lock
+         * Force poll execution bypassing lock using public poller methods
          */
         private function force_poll_execution($poller) {
-            // Use reflection to call private methods for force execution
-            $reflection = new ReflectionClass($poller);
-            
-            // Get private methods
-            $perform_polling = $reflection->getMethod('perform_polling');
-            $perform_polling->setAccessible(true);
-            
-            $log_structured = $reflection->getMethod('log_structured');
-            $log_structured->setAccessible(true);
-            
             $start_time = microtime(true);
-            
+
             try {
                 WP_CLI::log('Performing polling (force mode)...');
-                
-                $stats = $perform_polling->invoke($poller);
-                
+
+                // Directly call the public polling method
+                $stats = $poller->perform_polling();
+
                 // Update last poll timestamp
                 update_option('hic_last_reliable_poll', time());
-                
+
                 $execution_time = round(microtime(true) - $start_time, 2);
-                
-                $log_structured->invoke($poller, 'poll_completed_manual', array_merge($stats, array(
+
+                // Log structured event using the public wrapper
+                $poller->log_structured('poll_completed_manual', array_merge($stats, array(
                     'execution_time' => $execution_time,
                     'manual_force' => true
                 )));
-                
+
                 WP_CLI::success("Polling completed in {$execution_time}s");
                 $this->display_stats($stats);
-                
+
             } catch (Exception $e) {
-                $log_structured->invoke($poller, 'poll_error_manual', array(
+                $poller->log_structured('poll_error_manual', array(
                     'error' => $e->getMessage(),
                     'manual_force' => true
                 ));
-                
+
                 WP_CLI::error('Polling failed: ' . $e->getMessage());
             }
         }
