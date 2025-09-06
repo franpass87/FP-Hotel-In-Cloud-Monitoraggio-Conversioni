@@ -617,6 +617,43 @@ class HIC_Booking_Poller {
             return array('success' => false, 'message' => $error);
         }
     }
+
+    /**
+     * Perform polling and return statistics.
+     *
+     * Exposes the core polling routine so it can be used by CLI commands
+     * without relying on reflection. Any existing locks are cleared before
+     * execution to ensure the poll actually runs.
+     *
+     * @return array Polling statistics
+     */
+    public function perform_polling() {
+        // Clear potential locks that would prevent manual execution
+        if (function_exists('delete_transient')) {
+            delete_transient('hic_polling_lock');
+            delete_transient('hic_reliable_polling_lock');
+        }
+
+        // Execute the polling process
+        $this->execute_continuous_polling();
+
+        // Return current stats for convenience
+        return $this->get_stats();
+    }
+
+    /**
+     * Structured logging wrapper.
+     *
+     * Provides a public method for logging structured data primarily for
+     * CLI interactions.
+     *
+     * @param string $event  Event name
+     * @param array  $data   Additional context data
+     * @return void
+     */
+    public function log_structured($event, $data = array()) {
+        Helpers\hic_log($event, HIC_LOG_LEVEL_INFO, is_array($data) ? $data : array());
+    }
     
     /**
      * Get detailed diagnostics including polling conditions
