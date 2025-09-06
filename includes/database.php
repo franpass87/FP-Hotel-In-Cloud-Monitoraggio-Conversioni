@@ -189,6 +189,83 @@ function hic_maybe_upgrade_db() {
   // Set final version
   update_option('hic_db_version', HIC_DB_VERSION);
 }
+
+/**
+ * Store a tracking identifier and manage cookie/DB operations
+ *
+ * @param string      $type         Tracking type (gclid or fbclid)
+ * @param string      $value        Tracking identifier value
+ * @param string|null $existing_sid Existing session identifier
+ *
+ * @return true|WP_Error True on success, WP_Error on failure
+ */
+function hic_store_tracking_id($type, $value, $existing_sid) {
+  global $wpdb;
+
+  // Ensure wpdb is available
+  if (!$wpdb) {
+    return new \WP_Error('no_db', 'wpdb is not available');
+  }
+
+  // Only allow specific tracking types
+  $allowed_types = ['gclid', 'fbclid'];
+  if (!in_array($type, $allowed_types, true)) {
+    Helpers\hic_log('hic_store_tracking_id: Invalid type: ' . $type);
+    return new \WP_Error('invalid_type', 'Invalid tracking type');
+  }
+
+  // Validate value length
+  if (strlen($value) < 10 || strlen($value) > 255) {
+    Helpers\hic_log("hic_store_tracking_id: Invalid $type format: $value");
+    return new \WP_Error('invalid_length', 'Invalid tracking id length');
+  }
+
+  // Determine SID to use
+  $sid_to_use = $existing_sid ?: $value;
+
+  // Set cookie if needed
+  if (!$existing_sid || $existing_sid === $value) {
+    $cookie_set = setcookie('hic_sid', $value, [
+      'expires'  => time() + 60 * 60 * 24 * 90,
+      'path'     => '/',
+      'secure'   => is_ssl(),
+      'httponly' => true,
+      'samesite' => 'Lax',
+    ]);
+    if ($cookie_set) {
+      $_COOKIE['hic_sid'] = $value;
+    } else {
+      Helpers\hic_log("hic_store_tracking_id: Failed to set $type cookie");
+      // Not a fatal error; proceed
+    }
+  }
+
+  $table = $wpdb->prefix . 'hic_gclids';
+
+  // Check for existing association
+  $existing = $wpdb->get_var($wpdb->prepare(
+    "SELECT id FROM $table WHERE {$type} = %s AND sid = %s LIMIT 1",
+    $value,
+    $sid_to_use
+  ));
+
+  if ($wpdb->last_error) {
+    Helpers\hic_log('hic_store_tracking_id: Database error checking existing ' . $type . ': ' . $wpdb->last_error);
+    return new \WP_Error('db_select_error', 'Database error');
+  }
+
+  if (!$existing) {
+    $insert_result = $wpdb->insert($table, [$type => $value, 'sid' => $sid_to_use]);
+    if ($insert_result === false) {
+      Helpers\hic_log('hic_store_tracking_id: Failed to insert ' . $type . ': ' . ($wpdb->last_error ?: 'Unknown error'));
+      return new \WP_Error('db_insert_error', 'Failed to insert tracking id');
+    }
+  }
+
+  Helpers\hic_log(strtoupper($type) . " salvato → $value (SID: $sid_to_use)");
+
+  return true;
+}
 /* ============ Cattura gclid/fbclid → cookie + DB ============ */
 function hic_capture_tracking_params(){
   global $wpdb;
@@ -216,105 +293,23 @@ function hic_capture_tracking_params(){
 
   // Get existing SID or create new one if it doesn't exist
   $existing_sid = isset($_COOKIE['hic_sid']) ? sanitize_text_field($_COOKIE['hic_sid']) : null;
-  
+
   if (!empty($_GET['gclid'])) {
-    $gclid = sanitize_text_field($_GET['gclid']);
-    
-    // Validate gclid format (basic validation)
-    if (strlen($gclid) < 10 || strlen($gclid) > 255) {
-      Helpers\hic_log('hic_capture_tracking_params: Invalid gclid format: ' . $gclid);
+    $result = hic_store_tracking_id('gclid', sanitize_text_field($_GET['gclid']), $existing_sid);
+    if (is_wp_error($result)) {
+      Helpers\hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
     }
-    
-    // Use existing SID if available, otherwise use gclid as SID
-    $sid_to_use = $existing_sid ?: $gclid;
-    
-    // Only update cookie if we don't have an existing SID or if existing SID was the gclid
-    if (!$existing_sid || $existing_sid === $gclid) {
-      $cookie_set = setcookie('hic_sid', $gclid, [
-        'expires'  => time() + 60 * 60 * 24 * 90,
-        'path'     => '/',
-        'secure'   => is_ssl(),
-        'httponly' => true,
-        'samesite' => 'Lax',
-      ]);
-      if ($cookie_set) {
-        $_COOKIE['hic_sid'] = $gclid;
-      } else {
-        Helpers\hic_log('hic_capture_tracking_params: Failed to set gclid cookie');
-      }
-    }
-    
-    // Store the association between gclid and SID (avoid duplicates)
-    $existing = $wpdb->get_var($wpdb->prepare(
-      "SELECT id FROM $table WHERE gclid = %s AND sid = %s LIMIT 1", 
-      $gclid, $sid_to_use
-    ));
-    
-    if ($wpdb->last_error) {
-      Helpers\hic_log('hic_capture_tracking_params: Database error checking existing gclid: ' . $wpdb->last_error);
-      return false;
-    }
-    
-    if (!$existing) {
-      $insert_result = $wpdb->insert($table, ['gclid'=>$gclid, 'sid'=>$sid_to_use]);
-      if ($insert_result === false) {
-        Helpers\hic_log('hic_capture_tracking_params: Failed to insert gclid: ' . ($wpdb->last_error ?: 'Unknown error'));
-        return false;
-      }
-    }
-    Helpers\hic_log("GCLID salvato → $gclid (SID: $sid_to_use)");
   }
 
   if (!empty($_GET['fbclid'])) {
-    $fbclid = sanitize_text_field($_GET['fbclid']);
-    
-    // Validate fbclid format (basic validation)
-    if (strlen($fbclid) < 10 || strlen($fbclid) > 255) {
-      Helpers\hic_log('hic_capture_tracking_params: Invalid fbclid format: ' . $fbclid);
+    $result = hic_store_tracking_id('fbclid', sanitize_text_field($_GET['fbclid']), $existing_sid);
+    if (is_wp_error($result)) {
+      Helpers\hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
     }
-    
-    // Use existing SID if available, otherwise use fbclid as SID
-    $sid_to_use = $existing_sid ?: $fbclid;
-    
-    // Only update cookie if we don't have an existing SID or if existing SID was the fbclid
-    if (!$existing_sid || $existing_sid === $fbclid) {
-      $cookie_set = setcookie('hic_sid', $fbclid, [
-        'expires'  => time() + 60 * 60 * 24 * 90,
-        'path'     => '/',
-        'secure'   => is_ssl(),
-        'httponly' => true,
-        'samesite' => 'Lax',
-      ]);
-      if ($cookie_set) {
-        $_COOKIE['hic_sid'] = $fbclid;
-      } else {
-        Helpers\hic_log('hic_capture_tracking_params: Failed to set fbclid cookie');
-      }
-    }
-    
-    // Store the association between fbclid and SID (avoid duplicates)
-    $existing = $wpdb->get_var($wpdb->prepare(
-      "SELECT id FROM $table WHERE fbclid = %s AND sid = %s LIMIT 1", 
-      $fbclid, $sid_to_use
-    ));
-    
-    if ($wpdb->last_error) {
-      Helpers\hic_log('hic_capture_tracking_params: Database error checking existing fbclid: ' . $wpdb->last_error);
-      return false;
-    }
-    
-    if (!$existing) {
-      $insert_result = $wpdb->insert($table, ['fbclid'=>$fbclid, 'sid'=>$sid_to_use]);
-      if ($insert_result === false) {
-        Helpers\hic_log('hic_capture_tracking_params: Failed to insert fbclid: ' . ($wpdb->last_error ?: 'Unknown error'));
-        return false;
-      }
-    }
-    Helpers\hic_log("FBCLID salvato → $fbclid (SID: $sid_to_use)");
   }
-  
+
   return true;
 }
 
