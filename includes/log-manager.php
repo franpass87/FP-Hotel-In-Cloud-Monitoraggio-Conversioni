@@ -39,7 +39,7 @@ class HIC_Log_Manager {
         }
         
         // Rotate log if needed
-        $this->rotate_log_if_needed();
+        $this->rotate_if_needed();
         
         // Format log entry
         $formatted_message = $this->format_log_entry($message, $level, $context);
@@ -148,19 +148,26 @@ class HIC_Log_Manager {
     }
     
     /**
-     * Rotate log file if it's too large
+     * Rotate log file if it exceeds the configured size
      */
-    private function rotate_log_if_needed() {
+    public function rotate_if_needed() {
         if (!file_exists($this->log_file)) {
-            return;
+            return false;
         }
-        
-        $file_size = filesize($this->log_file);
-        if ($file_size <= $this->max_size) {
-            return;
+
+        // Suppress potential warnings if the file is locked
+        $file_size = @filesize($this->log_file);
+        if ($file_size === false) {
+            error_log('HIC Plugin: Cannot get log file size: ' . $this->log_file);
+            return false;
         }
-        
-        $this->rotate_log();
+
+        if ($file_size > $this->max_size) {
+            $this->rotate_log();
+            return true;
+        }
+
+        return true;
     }
     
     /**

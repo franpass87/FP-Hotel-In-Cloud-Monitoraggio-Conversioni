@@ -239,86 +239,16 @@ function hic_booking_uid($reservation) {
 }
 
 /* ============ Helpers ============ */
-function hic_log($msg){
-  $date = date('Y-m-d H:i:s');
-  $line = '['.$date.'] ' . (is_scalar($msg) ? $msg : print_r($msg, true)) . "\n";
-  
-  $log_file = hic_get_log_file();
-  if (empty($log_file)) {
-    error_log('HIC Plugin: Log file path is empty');
-    return false;
-  }
-  
-  // Check if log directory exists and is writable
-  $log_dir = dirname($log_file);
-  if (!is_dir($log_dir)) {
-    // Use wp_mkdir_p if available, otherwise mkdir
-    if (function_exists('wp_mkdir_p')) {
-      if (!wp_mkdir_p($log_dir)) {
-        error_log('HIC Plugin: Cannot create log directory: ' . $log_dir);
-        return false;
-      }
-    } else {
-      if (!@mkdir($log_dir, 0755, true)) {
-        error_log('HIC Plugin: Cannot create log directory: ' . $log_dir);
-        return false;
-      }
-    }
-  }
-  
-  if (!is_writable($log_dir)) {
-    error_log('HIC Plugin: Log directory is not writable: ' . $log_dir);
-    return false;
-  }
-  
-  $result = file_put_contents($log_file, $line, FILE_APPEND | LOCK_EX);
-  if ($result === false) {
-    error_log('HIC Plugin: Failed to write to log file: ' . $log_file);
-    return false;
-  }
-  
-  return true;
-}
+function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
+    $log_manager = hic_get_log_manager();
 
-/**
- * Rotate log file if it exceeds 5MB
- */
-function hic_rotate_log_if_needed() {
-    $log_file = hic_get_log_file();
-    if (empty($log_file) || !file_exists($log_file)) {
-        return false;
+    if ($log_manager) {
+        return $log_manager->log($msg, $level, $context);
     }
-    
-    // Check if filesize() works (file could be locked)
-    $file_size = @filesize($log_file);
-    if ($file_size === false) {
-        error_log('HIC Plugin: Cannot get log file size: ' . $log_file);
-        return false;
-    }
-    
-    $max_size = 5 * 1024 * 1024; // 5MB
-    if ($file_size > $max_size) {
-        $backup_file = $log_file . '.old';
-        
-        // Remove old backup if exists
-        if (file_exists($backup_file)) {
-            if (!@unlink($backup_file)) {
-                error_log('HIC Plugin: Cannot remove old backup file: ' . $backup_file);
-                return false;
-            }
-        }
-        
-        // Rotate current log to backup
-        if (!@rename($log_file, $backup_file)) {
-            error_log('HIC Plugin: Cannot rotate log file from ' . $log_file . ' to ' . $backup_file);
-            return false;
-        }
-        
-        hic_log('Log rotated: file exceeded 5MB limit');
-        return true;
-    }
-    
-    return true;
+
+    // Fallback to error_log if log manager is not available
+    error_log('HIC Plugin: ' . (is_scalar($msg) ? $msg : print_r($msg, true)));
+    return false;
 }
 
 /**

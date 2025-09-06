@@ -542,16 +542,23 @@ function hic_mark_reservation_processed($reservation) {
 // Wrapper function - now simplified to use continuous polling by default
 function hic_api_poll_bookings(){
     $start_time = microtime(true);
-    hic_log('Internal Scheduler: hic_api_poll_bookings execution started');
-    
-    // Rotate log if needed
-    hic_rotate_log_if_needed();
+    $log_manager = hic_get_log_manager();
+    if ($log_manager) {
+        $log_manager->info('Internal Scheduler: hic_api_poll_bookings execution started');
+        $log_manager->rotate_if_needed();
+    } else {
+        error_log('Internal Scheduler: hic_api_poll_bookings execution started');
+    }
     
     // Use the new simplified continuous polling
     hic_api_poll_bookings_continuous();
     
     $execution_time = round((microtime(true) - $start_time) * 1000, 2);
-    hic_log("Internal Scheduler: hic_api_poll_bookings completed in {$execution_time}ms");
+    if ($log_manager) {
+        $log_manager->info("Internal Scheduler: hic_api_poll_bookings completed in {$execution_time}ms");
+    } else {
+        error_log("Internal Scheduler: hic_api_poll_bookings completed in {$execution_time}ms");
+    }
 }
 
 /**
