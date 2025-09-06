@@ -128,7 +128,7 @@ function hic_get_polling_interval() {
  */
 function hic_acquire_polling_lock($timeout = 300) {
     $lock_key = 'hic_polling_lock';
-    $lock_value = time();
+    $lock_value = current_time('timestamp');
     
     // Check if lock exists and is still valid
     $existing_lock = get_transient($lock_key);
@@ -701,7 +701,7 @@ function hic_acquire_reservation_lock($reservation_id, $timeout = 30) {
   if (empty($reservation_id)) return false;
   
   $lock_key = 'hic_processing_lock_' . md5($reservation_id);
-  $lock_time = time();
+  $lock_time = current_time('timestamp');
   
   // Check if there's already a recent lock
   $existing_lock = get_transient($lock_key);

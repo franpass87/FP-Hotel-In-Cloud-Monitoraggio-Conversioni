@@ -210,7 +210,7 @@ class HIC_Health_Monitor {
         
         $last_continuous = get_option('hic_last_continuous_poll');
         $last_deep = get_option('hic_last_deep_check');
-        $now = time();
+        $now = current_time('timestamp');
         
         $continuous_delay = $last_continuous ? ($now - strtotime($last_continuous)) : null;
         $deep_delay = $last_deep ? ($now - strtotime($last_deep)) : null;

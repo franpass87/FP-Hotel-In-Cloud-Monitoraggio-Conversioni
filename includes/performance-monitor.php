@@ -59,7 +59,7 @@ class HIC_Performance_Monitor {
             'operation' => $operation,
             'duration' => $duration,
             'memory_used' => $memory_used,
-            'timestamp' => time(),
+            'timestamp' => current_time('timestamp'),
             'date' => date('Y-m-d'),
             'additional_data' => $additional_data
         ];
@@ -107,7 +107,7 @@ class HIC_Performance_Monitor {
                 'avg_memory' => 0,
                 'min_duration' => $metric['duration'],
                 'max_duration' => $metric['duration'],
-                'last_updated' => time()
+                'last_updated' => current_time('timestamp')
             ];
         }
         
@@ -119,7 +119,7 @@ class HIC_Performance_Monitor {
         $avg['avg_memory'] = $avg['total_memory'] / $avg['count'];
         $avg['min_duration'] = min($avg['min_duration'], $metric['duration']);
         $avg['max_duration'] = max($avg['max_duration'], $metric['duration']);
-        $avg['last_updated'] = time();
+        $avg['last_updated'] = current_time('timestamp');
         
         update_option('hic_performance_averages', $averages, false);
     }
@@ -263,7 +263,7 @@ class HIC_Performance_Monitor {
             'operation' => 'api_call',
             'duration' => $duration,
             'memory_used' => 0,
-            'timestamp' => time(),
+            'timestamp' => current_time('timestamp'),
             'date' => date('Y-m-d'),
             'additional_data' => [
                 'endpoint' => $endpoint,
@@ -318,7 +318,7 @@ class HIC_Performance_Monitor {
             'operation' => 'booking_processing',
             'duration' => $duration,
             'memory_used' => 0,
-            'timestamp' => time(),
+            'timestamp' => current_time('timestamp'),
             'date' => date('Y-m-d'),
             'additional_data' => [
                 'booking_id' => $booking_id,

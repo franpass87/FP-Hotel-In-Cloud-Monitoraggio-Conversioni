@@ -237,8 +237,8 @@ function hic_get_recent_log_entries($limit = 50) {
 function hic_test_dispatch_functions() {
     // Test data for integrations
     $test_data = array(
-        'reservation_id' => 'TEST_' . time(),
-        'id' => 'TEST_' . time(),
+        'reservation_id' => 'TEST_' . current_time('timestamp'),
+        'id' => 'TEST_' . current_time('timestamp'),
         'amount' => 100.00,
         'currency' => 'EUR',
         'email' => 'test@example.com',
@@ -293,7 +293,7 @@ function hic_test_dispatch_functions() {
         // Test Admin Email
         $admin_email = Helpers\hic_get_admin_email();
         if (!empty($admin_email)) {
-            Helpers\hic_send_admin_email($test_data, $gclid, $fbclid, 'test_' . time());
+            Helpers\hic_send_admin_email($test_data, $gclid, $fbclid, 'test_' . current_time('timestamp'));
             $results['admin_email'] = 'Test email sent to admin: ' . $admin_email;
         } else {
             $results['admin_email'] = 'Admin email not configured';
@@ -1156,14 +1156,14 @@ function hic_diagnostics_page() {
                                 <td>
                                     <?php if ($last_poll > 0): ?>
                                         <?php 
-                                        $time_diff = time() - $last_poll;
+                                        $time_diff = current_time('timestamp') - $last_poll;
                                         if ($time_diff < 900): // Less than 15 minutes
                                         ?>
-                                            <span class="status ok"><?php echo esc_html(human_time_diff($last_poll, time())); ?> fa</span>
+                                            <span class="status ok"><?php echo esc_html(human_time_diff($last_poll, current_time('timestamp'))); ?> fa</span>
                                         <?php elseif ($time_diff < 3600): // Less than 1 hour ?>
-                                            <span class="status warning"><?php echo esc_html(human_time_diff($last_poll, time())); ?> fa</span>
+                                            <span class="status warning"><?php echo esc_html(human_time_diff($last_poll, current_time('timestamp'))); ?> fa</span>
                                         <?php else: ?>
-                                            <span class="status error"><?php echo esc_html(human_time_diff($last_poll, time())); ?> fa</span>
+                                            <span class="status error"><?php echo esc_html(human_time_diff($last_poll, current_time('timestamp'))); ?> fa</span>
                                         <?php endif; ?>
                                     <?php else: ?>
                                         <span class="status error">Mai</span>

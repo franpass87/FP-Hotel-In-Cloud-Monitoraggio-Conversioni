@@ -185,7 +185,7 @@ if (defined('WP_CLI') && WP_CLI) {
                 $stats = $poller->perform_polling();
 
                 // Update last poll timestamp
-                update_option('hic_last_reliable_poll', time());
+                update_option('hic_last_reliable_poll', current_time('timestamp'));
 
                 $execution_time = round(microtime(true) - $start_time, 2);
 
