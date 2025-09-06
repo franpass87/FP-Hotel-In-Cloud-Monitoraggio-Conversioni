@@ -94,11 +94,13 @@ function hic_activate($network_wide)
 
 // Enqueue frontend JavaScript
 \add_action('wp_enqueue_scripts', function() {
-    \wp_enqueue_script(
-        'hic-frontend',
-        \plugin_dir_url(__FILE__) . 'assets/js/frontend.js',
-        array(),
-        HIC_PLUGIN_VERSION,
-        true
-    );
+    if (Helpers\hic_get_tracking_mode() === 'gtm_only') {
+        \wp_enqueue_script(
+            'hic-frontend',
+            \plugin_dir_url(__FILE__) . 'assets/js/frontend.js',
+            array(),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+    }
 });
