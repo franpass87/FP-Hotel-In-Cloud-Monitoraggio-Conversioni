@@ -470,7 +470,7 @@ class HIC_Health_Monitor {
             wp_send_json(['error' => 'Insufficient permissions'], 403);
         }
 
-        $level = sanitize_text_field($_GET['level'] ?? HIC_DIAGNOSTIC_BASIC);
+        $level = sanitize_text_field( wp_unslash( $_GET['level'] ?? HIC_DIAGNOSTIC_BASIC ) );
         $health_data = $this->check_health($level);
 
         wp_send_json($health_data);
@@ -480,7 +480,7 @@ class HIC_Health_Monitor {
      * Public health check (limited info)
      */
     public function public_health_check() {
-        $token = sanitize_text_field($_GET['token'] ?? '');
+        $token = sanitize_text_field( wp_unslash( $_GET['token'] ?? '' ) );
         if (!$this->validate_health_token($token)) {
             wp_send_json(['error' => 'Invalid token'], 403);
         }
