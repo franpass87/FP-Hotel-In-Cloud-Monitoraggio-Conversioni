@@ -28,6 +28,7 @@ define('HIC_LOG_LEVEL_ERROR', 'error');
 define('HIC_LOG_LEVEL_WARNING', 'warning');
 define('HIC_LOG_LEVEL_INFO', 'info');
 define('HIC_LOG_LEVEL_DEBUG', 'debug');
+// Default log level is configured via the 'hic_log_level' option
 
 // === BREVO DEFAULTS ===
 define('HIC_BREVO_DEFAULT_LIST_IT', 20);          // Default Italian list ID

@@ -245,6 +245,17 @@ add_filter( 'hic_log_retention_days', function ( $days ) {
 
 L'hook riceve il numero di giorni di retention configurato dal plugin (default 30) e deve restituire il nuovo valore da applicare.
 
+### Livelli Log
+
+Il plugin supporta i seguenti livelli di log selezionabili nella pagina impostazioni:
+
+- `error` – registra solo gli errori critici
+- `warning` – include anche gli avvisi
+- `info` – aggiunge messaggi informativi (predefinito)
+- `debug` – log dettagliati per sviluppo e analisi
+
+Il livello scelto determina quali messaggi vengono scritti nel file di log.
+
 ### Personalizzazione cookie SID
 
 Il filtro `hic_sid_cookie_args` permette di modificare i parametri del cookie `hic_sid` (scadenza, path, ecc.). Riceve l'array di argomenti di default e il valore del SID.
