@@ -236,19 +236,9 @@ function hic_dispatch_gtm_reservation($data) {
     $gclid = '';
     $fbclid = '';
     if (!empty($data['transaction_id'])) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'hic_gclids';
-        
-        // Check if table exists before querying
-        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-        if ($table_exists) {
-            // Try to find tracking data using transaction_id as sid
-            $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
-            if ($row) { 
-                $gclid = $row->gclid ?: ''; 
-                $fbclid = $row->fbclid ?: ''; 
-            }
-        }
+        $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
+        $gclid = $tracking['gclid'] ?? '';
+        $fbclid = $tracking['fbclid'] ?? '';
     }
 
     $bucket = fp_normalize_bucket($gclid, $fbclid);

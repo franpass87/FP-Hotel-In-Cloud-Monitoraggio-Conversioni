@@ -34,30 +34,9 @@ function hic_process_booking_data($data) {
   $fbclid = null;
 
   if ($sid) {
-    global $wpdb;
-    
-    // Check if wpdb is available
-    if (!$wpdb) {
-      hic_log('hic_process_booking_data: wpdb is not available');
-      return false;
-    }
-    
-    $table = $wpdb->prefix . 'hic_gclids';
-    
-    // Check if table exists before querying
-    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-    if ($table_exists) {
-      $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
-      
-      if ($wpdb->last_error) {
-        hic_log('hic_process_booking_data: Database error retrieving gclid/fbclid: ' . $wpdb->last_error);
-      } else if ($row) { 
-        $gclid = $row->gclid; 
-        $fbclid = $row->fbclid; 
-      }
-    } else {
-      hic_log('hic_process_booking_data: Table does not exist: ' . $table);
-    }
+    $tracking = hic_get_tracking_ids_by_sid($sid);
+    $gclid = $tracking['gclid'];
+    $fbclid = $tracking['fbclid'];
   }
 
   // Validation for amount if present
