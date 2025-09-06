@@ -18,6 +18,8 @@ if (!defined('ABSPATH')) {
 
 // Load Composer autoloader
 require __DIR__ . '/vendor/autoload.php';
+// Ensure plugin constants are loaded before usage
+require_once __DIR__ . '/includes/constants.php';
 require_once __DIR__ . '/includes/booking-poller.php';
 
 // Plugin activation hook
@@ -59,7 +61,7 @@ require_once __DIR__ . '/includes/booking-poller.php';
         'hic-frontend',
         \plugin_dir_url(__FILE__) . 'assets/js/frontend.js',
         array(),
-        '1.4.0',
+        HIC_PLUGIN_VERSION,
         true
     );
 });
