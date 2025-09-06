@@ -624,8 +624,8 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
     'phone' => isset($webhook_data['whatsapp']) ? $webhook_data['whatsapp'] : (isset($webhook_data['phone']) ? $webhook_data['phone'] : ''),
     'original_price' => isset($webhook_data['amount']) ? hic_normalize_price($webhook_data['amount']) : 0,
     'currency' => isset($webhook_data['currency']) ? $webhook_data['currency'] : 'EUR',
-    'from_date' => isset($webhook_data['date']) ? $webhook_data['date'] : '',
-    'to_date' => isset($webhook_data['to_date']) ? $webhook_data['to_date'] : '',
+    'from_date' => $webhook_data['date'] ?? $webhook_data['checkin'] ?? '',
+    'to_date'   => $webhook_data['to_date'] ?? $webhook_data['checkout'] ?? '',
     'accommodation_name' => isset($webhook_data['room']) ? $webhook_data['room'] : '',
     'guests' => isset($webhook_data['guests']) ? $webhook_data['guests'] : 1,
     'language' => isset($webhook_data['lingua']) ? $webhook_data['lingua'] : (isset($webhook_data['lang']) ? $webhook_data['lang'] : '')
