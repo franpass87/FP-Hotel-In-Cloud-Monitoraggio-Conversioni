@@ -43,6 +43,24 @@ function hic_reliable_polling_enabled() { return hic_get_option('reliable_pollin
 function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
 function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR . '/hic-log.txt'); }
 
+function hic_validate_log_path($path) {
+    $default = WP_CONTENT_DIR . '/hic-log.txt';
+
+    $path = sanitize_text_field($path);
+    if (empty($path)) {
+        return $default;
+    }
+
+    $normalized_path = str_replace('\\', '/', $path);
+    $base_path = rtrim(str_replace('\\', '/', WP_CONTENT_DIR), '/') . '/';
+
+    if (strpos($normalized_path, '..') !== false || strpos($normalized_path, $base_path) !== 0) {
+        return $default;
+    }
+
+    return $normalized_path;
+}
+
 // GTM Settings
 function hic_is_gtm_enabled() { return hic_get_option('gtm_enabled', '0') === '1'; }
 function hic_get_gtm_container_id() { return hic_get_option('gtm_container_id', ''); }

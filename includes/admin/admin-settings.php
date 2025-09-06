@@ -119,7 +119,11 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_admin_email', array(
         'sanitize_callback' => 'hic_validate_admin_email'
     ));
-    register_setting('hic_settings', 'hic_log_file');
+    register_setting(
+        'hic_settings',
+        'hic_log_file',
+        array('sanitize_callback' => '\\FpHic\\Helpers\\hic_validate_log_path')
+    );
     register_setting('hic_settings', 'hic_connection_type');
     register_setting('hic_settings', 'hic_api_url');
     // New Basic Auth settings
