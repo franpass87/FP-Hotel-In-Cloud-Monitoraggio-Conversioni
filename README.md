@@ -291,3 +291,9 @@ Per eseguire la suite di test da linea di comando:
 ```bash
 composer test
 ```
+
+Per validare l'integrazione Google Tag Manager:
+```bash
+php tests/validate-gtm.php
+```
+

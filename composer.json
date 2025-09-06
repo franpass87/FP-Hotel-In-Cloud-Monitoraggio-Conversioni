@@ -27,5 +27,11 @@
     },
     "scripts": {
         "test": "php -d auto_prepend_file=tests/preload.php vendor/bin/phpunit"
+    },
+    "archive": {
+        "exclude": [
+            "tests/*"
+        ]
     }
 }
+
