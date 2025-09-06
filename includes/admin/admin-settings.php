@@ -217,13 +217,21 @@ function hic_admin_enqueue_scripts($hook) {
     if ($hook === 'hic-monitoring_page_hic-diagnostics' || $hook === 'toplevel_page_hic-monitoring') {
         // Ensure jQuery is loaded
         wp_enqueue_script('jquery');
+    }
 
-        // Create inline script to ensure ajaxurl is available
-        wp_add_inline_script('jquery', '
-            if (typeof ajaxurl === "undefined") {
-                var ajaxurl = "' . esc_js(admin_url('admin-ajax.php')) . '";
-            }
-        ');
+    if ($hook === 'toplevel_page_hic-monitoring') {
+        wp_enqueue_script(
+            'hic-admin-settings',
+            plugin_dir_url(__FILE__) . '../../assets/js/admin-settings.js',
+            array('jquery'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_localize_script('hic-admin-settings', 'hicAdminSettings', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'api_nonce' => wp_create_nonce('hic_test_api_nonce'),
+            'email_nonce' => wp_create_nonce('hic_test_email'),
+        ));
     }
 
     if ($hook === 'hic-monitoring_page_hic-diagnostics') {
@@ -285,65 +293,6 @@ function hic_options_page() {
         <?php endif; ?>
     </div>
     
-    <script type="text/javascript">
-    jQuery(document).ready(function($) {
-        $('#hic-test-api-btn').click(function() {
-            var $btn = $(this);
-            var $result = $('#hic-test-result');
-            var $loading = $('#hic-test-loading');
-            
-            // Show loading state
-            $btn.prop('disabled', true);
-            $result.hide();
-            $loading.show();
-            
-            // Get current form values
-            var data = {
-                action: 'hic_test_api_connection',
-                nonce: '<?php echo wp_create_nonce('hic_test_api_nonce'); ?>',
-                prop_id: $('input[name="hic_property_id"]').val(),
-                email: $('input[name="hic_api_email"]').val(),
-                password: $('input[name="hic_api_password"]').val()
-            };
-            
-            $.post(ajaxurl, data, function(response) {
-                $loading.hide();
-                $btn.prop('disabled', false);
-                
-                try {
-                    var result = typeof response === 'string' ? JSON.parse(response) : response;
-                    var data = result.data || {};
-
-                    var messageClass = result.success ? 'notice-success' : 'notice-error';
-                    var icon = result.success ? 'dashicons-yes-alt' : 'dashicons-dismiss';
-
-                    var html = '<div class="notice ' + messageClass + ' inline">' +
-                               '<p><span class="dashicons ' + icon + '"></span> ' + data.message;
-
-                    if (result.success && data.data_count !== undefined) {
-                        html += ' (' + data.data_count + ' prenotazioni trovate negli ultimi 7 giorni)';
-                    }
-
-                    html += '</p></div>';
-
-                    $result.html(html).show();
-
-                } catch (e) {
-                    $result.html('<div class="notice notice-error inline">' +
-                               '<p><span class="dashicons dashicons-dismiss"></span> Errore nel parsing della risposta</p>' +
-                               '</div>').show();
-                }
-            }).fail(function(xhr, status, error) {
-                $loading.hide();
-                $btn.prop('disabled', false);
-                $result.html('<div class="notice notice-error inline">' +
-                           '<p><span class="dashicons dashicons-dismiss"></span> Errore di comunicazione: ' + error + '</p>' +
-                           '</div>').show();
-            });
-        });
-    });
-    </script>
-    
     <style>
     .hic-api-test-section .dashicons {
         vertical-align: middle;
@@ -370,7 +319,7 @@ function hic_admin_email_render() {
     $wp_admin_email = get_option('admin_email');
     
     echo '<input type="email" name="hic_admin_email" value="' . esc_attr($current_email) . '" class="regular-text" id="hic_admin_email_field" />';
-    echo '<button type="button" class="button" onclick="hicTestEmail()" style="margin-left: 10px;">Test Email</button>';
+    echo '<button type="button" class="button" id="hic-test-email-btn" style="margin-left: 10px;">Test Email</button>';
     echo '<div id="hic_email_test_result" style="margin-top: 10px;"></div>';
     
     echo '<p class="description">';
@@ -404,47 +353,6 @@ function hic_admin_email_render() {
     echo '</ul>';
     echo '</details>';
     echo '</div>';
-    
-    // Add JavaScript for email testing
-    echo '<script>
-    function hicTestEmail() {
-        var email = document.getElementById("hic_admin_email_field").value;
-        var resultDiv = document.getElementById("hic_email_test_result");
-        
-        if (!email) {
-            resultDiv.innerHTML = "<div style=\"color: red;\">Inserisci un indirizzo email per il test.</div>";
-            return;
-        }
-        
-        resultDiv.innerHTML = "<div style=\"color: blue;\">Invio email di test in corso...</div>";
-        
-        var data = {
-            action: "hic_test_email_ajax",
-            email: email,
-            nonce: "' . wp_create_nonce('hic_test_email') . '"
-        };
-        
-        fetch(ajaxurl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams(data)
-        })
-        .then(response => response.json())
-        .then(result => {
-            var respData = result.data || {};
-            if (result.success) {
-                resultDiv.innerHTML = "<div style=\"color: green;\">✓ " + respData.message + "</div>";
-            } else {
-                resultDiv.innerHTML = "<div style=\"color: red;\">✗ " + respData.message + "</div>";
-            }
-        })
-        .catch(error => {
-            resultDiv.innerHTML = "<div style=\"color: red;\">Errore nella richiesta: " + error + "</div>";
-        });
-    }
-    </script>';
 }
 
 
