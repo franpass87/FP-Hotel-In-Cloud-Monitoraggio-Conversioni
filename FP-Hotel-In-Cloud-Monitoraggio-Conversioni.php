@@ -29,17 +29,18 @@ function hic_activate($network_wide)
         $sites = \get_sites();
         foreach ($sites as $site) {
             \switch_to_blog($site->blog_id);
-            \hic_create_database_table();
+            \hic_maybe_upgrade_db();
             \restore_current_blog();
         }
     } else {
-        \hic_create_database_table();
+        \hic_maybe_upgrade_db();
     }
 }
 
 // Plugin activation hook
 \register_activation_hook(__FILE__, __NAMESPACE__ . '\\hic_activate');
 \register_deactivation_hook(__FILE__, 'hic_deactivate');
+\add_action('plugins_loaded', '\\hic_maybe_upgrade_db');
 
 // Add settings link in plugin list
 \add_filter('plugin_action_links_' . \plugin_basename(__FILE__), function ($links) {
