@@ -598,7 +598,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
         
         // Update stored timestamp if it was adjusted
         if ($validated_check !== $last_update_check) {
-            update_option('hic_last_update_check', $validated_check);
+            update_option('hic_last_update_check', $validated_check, false);
             Helpers\hic_log("Quasi-realtime Poll: Updated stored timestamp from " . date('Y-m-d H:i:s', $last_update_check) . " to " . date('Y-m-d H:i:s', $validated_check));
             $last_update_check = $validated_check;
         }
@@ -617,7 +617,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
             }
             
             // Update the last check timestamp
-            update_option('hic_last_update_check', $current_time);
+            update_option('hic_last_update_check', $current_time, false);
         } else {
             $error_message = $updated_reservations->get_error_message();
             $polling_errors[] = "updates polling: " . $error_message;
@@ -631,15 +631,15 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
                 // Validate the reset timestamp before using it
                 $validated_reset = hic_validate_api_timestamp($reset_timestamp, 'Quasi-realtime Poll timestamp reset');
                 
-                update_option('hic_last_update_check', $validated_reset);
+                update_option('hic_last_update_check', $validated_reset, false);
                 Helpers\hic_log('Quasi-realtime Poll: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
                 
                 // Also reset scheduler timestamps to restart polling immediately with safe values
                 $recent_timestamp = $current_time - 300; // 5 minutes ago
                 $validated_recent = hic_validate_api_timestamp($recent_timestamp, 'Quasi-realtime Poll scheduler restart');
                 
-                update_option('hic_last_continuous_poll', $validated_recent);
-                update_option('hic_last_deep_check', $validated_recent);
+                update_option('hic_last_continuous_poll', $validated_recent, false);
+                update_option('hic_last_deep_check', $validated_recent, false);
                 Helpers\hic_log('Quasi-realtime Poll: Reset scheduler timestamps to restart polling: ' . date('Y-m-d H:i:s', $validated_recent));
             }
         }
@@ -670,14 +670,14 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $execution_time = round((microtime(true) - $start_time) * 1000, 2);
     
     // Store metrics for diagnostics
-    update_option('hic_last_poll_count', $total_new);
-    update_option('hic_last_poll_skipped', $total_skipped);
-    update_option('hic_last_poll_duration', $execution_time);
+    update_option('hic_last_poll_count', $total_new, false);
+    update_option('hic_last_poll_skipped', $total_skipped, false);
+    update_option('hic_last_poll_duration', $execution_time, false);
     
     // Update last successful run only if polling was successful
     $polling_successful = empty($polling_errors) && $total_errors === 0;
     if ($polling_successful) {
-        update_option('hic_last_successful_poll', $current_time);
+        update_option('hic_last_successful_poll', $current_time, false);
         Helpers\hic_log("Internal Scheduler: Updated last successful poll timestamp");
     }
     
@@ -817,7 +817,7 @@ function hic_api_poll_updates(){
     Helpers\hic_log('Internal Scheduler: hic_api_poll_updates execution started');
     
     // Always update execution timestamp regardless of results
-    update_option('hic_last_api_poll', current_time('timestamp'));
+    update_option('hic_last_api_poll', current_time('timestamp'), false);
     
     $prop = Helpers\hic_get_property_id();
     
@@ -837,7 +837,7 @@ function hic_api_poll_updates(){
     
     // Update stored timestamp if it was adjusted
     if ($validated_last_since !== $last_since) {
-        update_option('hic_last_updates_since', $validated_last_since);
+        update_option('hic_last_updates_since', $validated_last_since, false);
         Helpers\hic_log("Internal Scheduler: Updated stored timestamp from " . date('Y-m-d H:i:s', $last_since) . " to " . date('Y-m-d H:i:s', $validated_last_since));
         $last_since = $validated_last_since;
     }
@@ -886,7 +886,7 @@ function hic_api_poll_updates(){
             }
         }
         
-        update_option('hic_last_updates_since', $new_timestamp);
+        update_option('hic_last_updates_since', $new_timestamp, false);
         Helpers\hic_log('Internal Scheduler: hic_api_poll_updates completed successfully');
     } else {
         $error_message = $out->get_error_message();
@@ -900,15 +900,15 @@ function hic_api_poll_updates(){
             // Validate the reset timestamp before using it
             $validated_reset = hic_validate_api_timestamp($reset_timestamp, 'Internal Scheduler timestamp reset');
             
-            update_option('hic_last_updates_since', $validated_reset);
+            update_option('hic_last_updates_since', $validated_reset, false);
             Helpers\hic_log('Internal Scheduler: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
             
             // Also reset scheduler timestamps to restart polling immediately with safe values
             $recent_timestamp = $current_time - 300; // 5 minutes ago
             $validated_recent = hic_validate_api_timestamp($recent_timestamp, 'Internal Scheduler scheduler restart');
             
-            update_option('hic_last_continuous_poll', $validated_recent);
-            update_option('hic_last_deep_check', $validated_recent);
+            update_option('hic_last_continuous_poll', $validated_recent, false);
+            update_option('hic_last_deep_check', $validated_recent, false);
             Helpers\hic_log('Internal Scheduler: Reset scheduler timestamps to restart polling: ' . date('Y-m-d H:i:s', $validated_recent));
         }
     }
@@ -1564,7 +1564,7 @@ function hic_api_poll_bookings_continuous() {
         
         // Update stored timestamp if it was adjusted
         if ($validated_check !== $last_continuous_check) {
-            update_option('hic_last_continuous_check', $validated_check);
+            update_option('hic_last_continuous_check', $validated_check, false);
             Helpers\hic_log("Continuous Polling: Updated stored timestamp from " . date('Y-m-d H:i:s', $last_continuous_check) . " to " . date('Y-m-d H:i:s', $validated_check));
             $last_continuous_check = $validated_check;
         }
@@ -1583,7 +1583,7 @@ function hic_api_poll_bookings_continuous() {
             }
             
             // Update the last check timestamp
-            update_option('hic_last_continuous_check', $current_time);
+            update_option('hic_last_continuous_check', $current_time, false);
         } else {
             $error_message = $updated_reservations->get_error_message();
             Helpers\hic_log("Continuous Polling: Error checking for updates: " . $error_message);
@@ -1597,15 +1597,15 @@ function hic_api_poll_bookings_continuous() {
                 // Validate the reset timestamp before using it
                 $validated_reset = hic_validate_api_timestamp($reset_timestamp, 'Continuous Polling timestamp reset');
                 
-                update_option('hic_last_continuous_check', $validated_reset);
+                update_option('hic_last_continuous_check', $validated_reset, false);
                 Helpers\hic_log('Continuous Polling: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
                 
                 // Also reset scheduler timestamps to restart polling immediately with safe values
                 $recent_timestamp = $current_time - 300; // 5 minutes ago
                 $validated_recent = hic_validate_api_timestamp($recent_timestamp, 'Continuous Polling scheduler restart');
                 
-                update_option('hic_last_continuous_poll', $validated_recent);
-                update_option('hic_last_deep_check', $validated_recent);
+                update_option('hic_last_continuous_poll', $validated_recent, false);
+                update_option('hic_last_deep_check', $validated_recent, false);
                 Helpers\hic_log('Continuous Polling: Reset scheduler timestamps to restart polling: ' . date('Y-m-d H:i:s', $validated_recent));
             }
         }
@@ -1630,8 +1630,8 @@ function hic_api_poll_bookings_continuous() {
         $execution_time = round((microtime(true) - $start_time) * 1000, 2);
         
         // Store metrics for diagnostics
-        update_option('hic_last_continuous_poll_count', $total_new);
-        update_option('hic_last_continuous_poll_duration', $execution_time);
+        update_option('hic_last_continuous_poll_count', $total_new, false);
+        update_option('hic_last_continuous_poll_duration', $execution_time, false);
         
         Helpers\hic_log("Continuous Polling: Completed in {$execution_time}ms - New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
         
@@ -1713,13 +1713,13 @@ function hic_api_poll_bookings_deep_check() {
                 $recent_timestamp = $current_time - 300; // 5 minutes ago
                 $validated_recent = hic_validate_api_timestamp($recent_timestamp, 'Deep Check scheduler restart');
                 
-                update_option('hic_last_updates_since', $validated_safe);
-                update_option('hic_last_update_check', $validated_safe);
-                update_option('hic_last_continuous_check', $validated_safe);
+                update_option('hic_last_updates_since', $validated_safe, false);
+                update_option('hic_last_update_check', $validated_safe, false);
+                update_option('hic_last_continuous_check', $validated_safe, false);
                 
                 // Reset scheduler timestamps to restart polling immediately
-                update_option('hic_last_continuous_poll', $validated_recent);
-                update_option('hic_last_deep_check', $validated_recent);
+                update_option('hic_last_continuous_poll', $validated_recent, false);
+                update_option('hic_last_deep_check', $validated_recent, false);
                 
                 Helpers\hic_log('Deep Check: Reset all timestamps to: ' . date('Y-m-d H:i:s', $validated_safe) . " for recovery");
                 Helpers\hic_log('Deep Check: Reset scheduler timestamps to restart polling immediately: ' . date('Y-m-d H:i:s', $validated_recent));
@@ -1752,12 +1752,12 @@ function hic_api_poll_bookings_deep_check() {
         $execution_time = round((microtime(true) - $start_time) * 1000, 2);
         
         // Store metrics for diagnostics
-        update_option('hic_last_deep_check_count', $total_new);
-        update_option('hic_last_deep_check_duration', $execution_time);
+        update_option('hic_last_deep_check_count', $total_new, false);
+        update_option('hic_last_deep_check_duration', $execution_time, false);
         
         // Update last successful deep check if no errors
         if ($total_errors === 0) {
-            update_option('hic_last_successful_deep_check', $current_time);
+            update_option('hic_last_successful_deep_check', $current_time, false);
         }
         
         Helpers\hic_log("Deep Check: Completed in {$execution_time}ms - Window: $from_date to $to_date, New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
