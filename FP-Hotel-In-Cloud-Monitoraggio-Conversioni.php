@@ -32,7 +32,11 @@ require_once __DIR__ . '/includes/booking-poller.php';
 });
 
 // Initialize tracking parameters capture
-\add_action('init', 'hic_capture_tracking_params');
+\add_action('init', function () {
+    if (!\is_admin() && \php_sapi_name() !== 'cli') {
+        \hic_capture_tracking_params();
+    }
+});
 
 // Initialize enhanced systems when WordPress is ready
 \add_action('init', function() {
