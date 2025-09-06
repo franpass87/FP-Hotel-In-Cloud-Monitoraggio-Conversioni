@@ -1135,7 +1135,7 @@ function hic_diagnostics_page() {
                                 <td><span class="status <?php echo esc_attr($credentials_status['api_url'] ? 'ok' : 'error'); ?>">
                                     <?php echo esc_html($credentials_status['api_url'] ? 'Configurato' : 'Mancante'); ?>
                                 </span></td>
-                                <td><?php echo $credentials_status['api_url'] ? 'Connessione disponibile' : 'Configurazione richiesta'; ?></td>
+                                <td><?php echo esc_html($credentials_status['api_url'] ? 'Connessione disponibile' : 'Configurazione richiesta'); ?></td>
                             </tr>
                             <tr>
                                 <td>Credenziali</td>
@@ -1163,7 +1163,7 @@ function hic_diagnostics_page() {
                                         <span class="status error">✗ Inattivo</span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo $polling_active ? 'Polling automatico funzionante' : 'Richiede configurazione'; ?></td>
+                                <td><?php echo esc_html($polling_active ? 'Polling automatico funzionante' : 'Richiede configurazione'); ?></td>
                             </tr>
                             <tr>
                                 <td>Ultimo Successo</td>
@@ -1346,7 +1346,7 @@ function hic_diagnostics_page() {
                         <?php if ($downloaded_count > 0): ?>
                             <button class="button button-secondary" id="reset-download-tracking">
                                 <span class="dashicons dashicons-update-alt"></span>
-                                Reset Tracking (<?php echo $downloaded_count; ?> inviate)
+                                Reset Tracking (<?php echo esc_html($downloaded_count); ?> inviate)
                             </button>
                         <?php endif; ?>
                     </div>
@@ -1369,7 +1369,7 @@ function hic_diagnostics_page() {
                         <table class="hic-stats-table">
                             <tr>
                                 <td>Ultimo Polling</td>
-                                <td><?php echo $execution_stats['last_poll_time'] ? esc_html(date('Y-m-d H:i:s', $execution_stats['last_poll_time'])) : 'Mai'; ?></td>
+                                <td><?php echo esc_html($execution_stats['last_poll_time'] ? date('Y-m-d H:i:s', $execution_stats['last_poll_time']) : 'Mai'); ?></td>
                             </tr>
                             <tr>
                                 <td>Prenotazioni Elaborate</td>
@@ -1394,7 +1394,7 @@ function hic_diagnostics_page() {
                                     <?php 
                                     $duration = $execution_stats['last_poll_duration'];
                                     if ($duration > 0) {
-                                        echo '<span class="status ' . ($duration > 10000 ? 'warning' : 'ok') . '">' . esc_html($duration) . ' ms</span>';
+                                        echo '<span class="status ' . esc_attr($duration > 10000 ? 'warning' : 'ok') . '">' . esc_html($duration) . ' ms</span>';
                                     } else {
                                         echo '<span class="status neutral">N/A</span>';
                                     }
@@ -1420,7 +1420,7 @@ function hic_diagnostics_page() {
                                     <div class="hic-log-entry"><?php echo esc_html($log_line); ?></div>
                                 <?php endforeach; ?>
                                 <?php if (count($recent_logs) > 8): ?>
-                                    <div class="hic-log-more">... e altri <?php echo count($recent_logs) - 8; ?> eventi</div>
+                                    <div class="hic-log-more">... e altri <?php echo esc_html(count($recent_logs) - 8); ?> eventi</div>
                                 <?php endif; ?>
                             <?php endif; ?>
                         </div>
