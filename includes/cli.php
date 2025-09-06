@@ -104,7 +104,63 @@ if (defined('WP_CLI') && WP_CLI) {
             
             WP_CLI::success('Polling state reset successfully');
         }
-        
+
+        /**
+         * Run cleanup routines.
+         *
+         * ## OPTIONS
+         *
+         * [--logs]            Clean up old log files
+         * [--gclids]          Remove expired tracking identifiers
+         * [--booking-events]  Remove processed booking events
+         *
+         * ## EXAMPLES
+         *
+         *     wp hic cleanup --logs
+         *     wp hic cleanup --gclids --booking-events
+         *
+         * @param array $args
+         * @param array $assoc_args
+         */
+        public function cleanup($args, $assoc_args) {
+            $performed = false;
+
+            if (isset($assoc_args['logs'])) {
+                $performed = true;
+                $log_manager = function_exists('hic_get_log_manager') ? hic_get_log_manager() : null;
+                if ($log_manager) {
+                    $log_manager->cleanup_old_logs();
+                    WP_CLI::success('Logs cleanup completed');
+                } else {
+                    WP_CLI::warning('Log manager not available');
+                }
+            }
+
+            if (isset($assoc_args['gclids'])) {
+                $performed = true;
+                if (function_exists('hic_cleanup_old_gclids')) {
+                    $deleted = hic_cleanup_old_gclids();
+                    WP_CLI::success("GCLIDs cleanup completed ({$deleted} removed)");
+                } else {
+                    WP_CLI::warning('hic_cleanup_old_gclids function not found');
+                }
+            }
+
+            if (isset($assoc_args['booking-events'])) {
+                $performed = true;
+                if (function_exists('hic_cleanup_booking_events')) {
+                    $deleted = hic_cleanup_booking_events();
+                    WP_CLI::success("Booking events cleanup completed ({$deleted} removed)");
+                } else {
+                    WP_CLI::warning('hic_cleanup_booking_events function not found');
+                }
+            }
+
+            if (!$performed) {
+                WP_CLI::warning('Specify at least one cleanup target: --logs, --gclids, or --booking-events');
+            }
+        }
+
         /**
          * Show queue table contents
          * 

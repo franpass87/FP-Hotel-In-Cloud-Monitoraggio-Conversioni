@@ -140,6 +140,9 @@ wp hic reset --confirm
 
 # Visualizza la coda degli eventi
 wp hic queue --limit=10 --status=pending
+
+# Esegui le routine di pulizia
+wp hic cleanup --logs --gclids --booking-events
 ```
 
 ### Gestione manuale degli eventi
