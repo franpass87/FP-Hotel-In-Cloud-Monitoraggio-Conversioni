@@ -593,7 +593,7 @@ add_action('wp_ajax_hic_get_system_status', 'hic_ajax_get_system_status');
 
 
 function hic_ajax_refresh_diagnostics() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -621,7 +621,7 @@ function hic_ajax_refresh_diagnostics() {
 }
 
 function hic_ajax_test_dispatch() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -640,7 +640,7 @@ function hic_ajax_test_dispatch() {
 }
 
 function hic_ajax_force_reschedule() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -653,7 +653,7 @@ function hic_ajax_force_reschedule() {
 }
 
 function hic_ajax_create_tables() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -708,7 +708,7 @@ function hic_ajax_create_tables() {
 }
 
 function hic_ajax_backfill_reservations() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -771,7 +771,7 @@ function hic_convert_api_booking_to_processor_format($api_booking) {
 }
 
 function hic_ajax_download_latest_bookings() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -861,7 +861,7 @@ function hic_ajax_download_latest_bookings() {
 }
 
 function hic_ajax_reset_download_tracking() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -882,7 +882,7 @@ function hic_ajax_reset_download_tracking() {
 }
 
 function hic_ajax_force_polling() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -940,7 +940,7 @@ function hic_ajax_force_polling() {
  * AJAX handler for triggering watchdog check
  */
 function hic_ajax_trigger_watchdog() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -987,7 +987,7 @@ function hic_ajax_trigger_watchdog() {
  * AJAX handler for resetting timestamps (emergency recovery)
  */
 function hic_ajax_reset_timestamps() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -1029,7 +1029,7 @@ function hic_ajax_reset_timestamps() {
  * AJAX handler for getting system status updates
  */
 function hic_ajax_get_system_status() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
@@ -1061,7 +1061,7 @@ function hic_ajax_get_system_status() {
  * HIC Diagnostics Admin Page
  */
 function hic_diagnostics_page() {
-    if (!current_user_can('manage_options')) {
+    if (!current_user_can('hic_manage')) {
         wp_die( __( 'Non hai i permessi necessari per accedere a questa pagina.', 'hotel-in-cloud' ) );
     }
     
@@ -1488,7 +1488,7 @@ function hic_diagnostics_page() {
  * AJAX handler for downloading error logs
  */
 function hic_ajax_download_error_logs() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_die( __( 'Permessi insufficienti', 'hotel-in-cloud' ) );
     }
 
@@ -1522,7 +1522,7 @@ function hic_ajax_download_error_logs() {
  * AJAX handler for testing Brevo API connectivity
  */
 function hic_ajax_test_brevo_connectivity() {
-    if ( ! current_user_can( 'manage_options' ) ) {
+    if ( ! current_user_can('hic_manage') ) {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 

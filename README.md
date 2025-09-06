@@ -30,6 +30,21 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 2. Caricare il plugin normalmente in WordPress.
 3. In installazioni WordPress Multisite, l'attivazione a livello di rete inizializza le tabelle del database per ogni sito.
 
+### Permessi
+
+Durante l'attivazione il plugin assegna automaticamente la capability `hic_manage` agli amministratori.  
+Per concedere l'accesso ad altri ruoli è possibile utilizzare un plugin di gestione ruoli oppure aggiungere una semplice funzione personalizzata:
+
+```php
+add_action('init', function () {
+    if ($role = get_role('editor')) {
+        $role->add_cap('hic_manage');
+    }
+});
+```
+
+Il ruolo scelto otterrà così i permessi per configurare il plugin e visualizzare le pagine di amministrazione.
+
 ## Configurazione API
 
 ### API Hotel in Cloud

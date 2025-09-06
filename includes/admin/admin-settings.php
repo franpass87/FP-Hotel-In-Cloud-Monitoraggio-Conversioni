@@ -25,7 +25,7 @@ function hic_ajax_test_email() {
     }
     
     // Check user permissions
-    if (!current_user_can('manage_options')) {
+    if (!current_user_can('hic_manage')) {
         wp_send_json_error(array(
             'message' => 'Permessi insufficienti.'
         ));
@@ -62,7 +62,7 @@ function hic_ajax_test_api_connection() {
     }
     
     // Check user permissions
-    if (!current_user_can('manage_options')) {
+    if (!current_user_can('hic_manage')) {
         wp_send_json_error(array(
             'message' => 'Permessi insufficienti.'
         ));
@@ -90,7 +90,7 @@ function hic_add_admin_menu() {
     add_menu_page(
         'HIC Monitoring Settings',
         'HIC Monitoring',
-        'manage_options',
+        'hic_manage',
         'hic-monitoring',
         'hic_options_page'
     );
@@ -100,7 +100,7 @@ function hic_add_admin_menu() {
         'hic-monitoring',
         'Diagnostics',
         'Diagnostics',
-        'manage_options',
+        'hic_manage',
         'hic-diagnostics',
         'hic_diagnostics_page'
     );

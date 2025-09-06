@@ -466,7 +466,7 @@ class HIC_Health_Monitor {
             wp_send_json(['error' => 'Invalid nonce'], 403);
         }
 
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('hic_manage')) {
             wp_send_json(['error' => 'Insufficient permissions'], 403);
         }
 
@@ -501,7 +501,7 @@ class HIC_Health_Monitor {
         $level = $request->get_param('level') ?: HIC_DIAGNOSTIC_BASIC;
         
         // Public endpoint only returns basic info
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('hic_manage')) {
             $level = HIC_DIAGNOSTIC_BASIC;
         }
         
