@@ -228,13 +228,14 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
 
   // Set cookie if needed
   if (!$existing_sid || $existing_sid === $value) {
-    $cookie_set = setcookie('hic_sid', $value, [
-      'expires'  => time() + 60 * 60 * 24 * 90,
+    $cookie_args = apply_filters('hic_sid_cookie_args', [
+      'expires'  => time() + 60*60*24*90,
       'path'     => '/',
       'secure'   => is_ssl(),
       'httponly' => true,
       'samesite' => 'Lax',
-    ]);
+    ], $value);
+    $cookie_set = setcookie('hic_sid', $value, $cookie_args);
     if ($cookie_set) {
       $_COOKIE['hic_sid'] = $value;
     } else {
