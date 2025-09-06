@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
  * @return int Validated and potentially adjusted timestamp
  */
 function hic_validate_api_timestamp($timestamp, $context = 'api_request') {
-    $current_time = time();
+    $current_time = current_time('timestamp');
     $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin from 7-day API limit
     $max_lookahead_seconds = 1 * DAY_IN_SECONDS; // 1 day in future for safety
     $earliest_allowed = $current_time - $max_lookback_seconds;
@@ -566,7 +566,7 @@ function hic_api_poll_bookings(){
  * Quasi-realtime polling with moving window approach
  */
 function hic_quasi_realtime_poll($prop_id, $start_time) {
-    $current_time = time();
+    $current_time = current_time('timestamp');
     
     // Moving window: 15 minutes back + 5 minutes forward
     $window_back_minutes = 15;
@@ -817,7 +817,7 @@ function hic_api_poll_updates(){
     Helpers\hic_log('Internal Scheduler: hic_api_poll_updates execution started');
     
     // Always update execution timestamp regardless of results
-    update_option('hic_last_api_poll', time());
+    update_option('hic_last_api_poll', current_time('timestamp'));
     
     $prop = Helpers\hic_get_property_id();
     
@@ -825,7 +825,7 @@ function hic_api_poll_updates(){
     $overlap_seconds = 300; // 5 minute overlap for safety
     
     // Ensure we never use a timestamp older than 6 days (API limit is 7 days)
-    $current_time = time();
+    $current_time = current_time('timestamp');
     $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin
     $earliest_allowed = $current_time - $max_lookback_seconds;
     $default_since = max($earliest_allowed, $current_time - DAY_IN_SECONDS); // Default to 1 day ago or earliest allowed
@@ -867,16 +867,16 @@ function hic_api_poll_updates(){
                 }
             }
             
-            // Use the max updated_at if found, otherwise use current time
-            if ($max_updated_at > 0) {
-                $new_timestamp = $max_updated_at;
-                Helpers\hic_log("Internal Scheduler: Using max updated_at timestamp: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
-            } else {
-                Helpers\hic_log("Internal Scheduler: No updated_at field found, using current time: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
-            }
+              // Use the max updated_at if found, otherwise use current time
+              if ($max_updated_at > 0) {
+                  $new_timestamp = $max_updated_at;
+                  Helpers\hic_log("Internal Scheduler: Using max updated_at timestamp: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+              } else {
+                  Helpers\hic_log("Internal Scheduler: No updated_at field found, using current time: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+              }
         } else {
             // No updates found - advance timestamp only if enough time has passed to prevent infinite polling
-            $time_since_last_poll = $current_time - $last_since;
+              $time_since_last_poll = $current_time - $last_since;
             if ($time_since_last_poll > 3600) { // 1 hour
                 Helpers\hic_log("Internal Scheduler: No updates found but 1+ hour passed, advancing timestamp to prevent infinite polling");
             } else {
@@ -1533,7 +1533,7 @@ function hic_api_poll_bookings_continuous() {
             return;
         }
         
-        $current_time = time();
+        $current_time = current_time('timestamp');
         
         // Check recent reservations (last 2 hours) to catch new bookings and updates
         $window_back_minutes = 120; // 2 hours back
@@ -1661,7 +1661,7 @@ function hic_api_poll_bookings_deep_check() {
             return;
         }
         
-        $current_time = time();
+        $current_time = current_time('timestamp');
         $lookback_seconds = 5 * DAY_IN_SECONDS; // 5 days
         
         $from_date = date('Y-m-d', $current_time - $lookback_seconds);
