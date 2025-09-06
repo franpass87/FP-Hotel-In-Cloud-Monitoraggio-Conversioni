@@ -10,13 +10,34 @@ if (!defined('ABSPATH')) {
 }
 
 /* ================= CONFIG FUNCTIONS ================= */
-function hic_get_option($key, $default = '') {
+function &hic_option_cache() {
     static $cache = [];
+    return $cache;
+}
+
+function hic_get_option($key, $default = '') {
+    $cache = &hic_option_cache();
     if (!array_key_exists($key, $cache)) {
         $cache[$key] = get_option('hic_' . $key, $default);
     }
     return $cache[$key];
 }
+
+function hic_clear_option_cache($key = null) {
+    $cache = &hic_option_cache();
+    if ($key === null) {
+        $cache = [];
+        return;
+    }
+
+    if (strpos($key, 'hic_') === 0) {
+        $key = substr($key, 4);
+    }
+
+    unset($cache[$key]);
+}
+
+add_action('updated_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
 
 // Helper functions to get configuration values
 function hic_get_measurement_id() { return hic_get_option('measurement_id', ''); }
@@ -667,7 +688,9 @@ function hic_mark_email_enriched($reservation_id, $real_email) {
         $email_map = array_slice($email_map, -5000, null, true);
     }
     
-    return update_option('hic_res_email_map', $email_map, false); // autoload=false
+    $result = update_option('hic_res_email_map', $email_map, false); // autoload=false
+    hic_clear_option_cache('hic_res_email_map');
+    return $result;
 }
 
 function hic_get_reservation_email($reservation_id) {
@@ -725,6 +748,7 @@ function hic_mark_reservation_processed_by_id($reservation_id) {
         }
         
         update_option('hic_synced_res_ids', $synced, false); // autoload=false
+        hic_clear_option_cache('hic_synced_res_ids');
         hic_log("Marked reservation $reservation_id as processed for deduplication");
         return true;
     }

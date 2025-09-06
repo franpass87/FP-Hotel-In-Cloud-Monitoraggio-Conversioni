@@ -437,6 +437,7 @@ function hic_mark_bookings_as_downloaded($booking_ids) {
     }
     
     update_option('hic_downloaded_booking_ids', $downloaded_ids, false);
+    Helpers\hic_clear_option_cache('hic_downloaded_booking_ids');
     
     Helpers\hic_log("Marked " . count($booking_ids) . " bookings as downloaded. Total tracked: " . count($downloaded_ids));
 }

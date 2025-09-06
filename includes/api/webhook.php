@@ -71,6 +71,7 @@ function hic_webhook_handler(WP_REST_Request $request) {
     
     // Update last webhook processing time for diagnostics
     update_option('hic_last_webhook_processing', current_time('mysql'), false);
+    Helpers\hic_clear_option_cache('hic_last_webhook_processing');
     
     if ($result === false) {
       Helpers\hic_log('Webhook: elaborazione fallita per dati ricevuti');

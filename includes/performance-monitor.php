@@ -122,6 +122,7 @@ class HIC_Performance_Monitor {
         $avg['last_updated'] = current_time('timestamp');
         
         update_option('hic_performance_averages', $averages, false);
+        \FpHic\Helpers\hic_clear_option_cache('hic_performance_averages');
     }
     
     /**
@@ -391,11 +392,15 @@ class HIC_Performance_Monitor {
         
         if ($last_init !== $today) {
             update_option('hic_metrics_last_init', $today, false);
-            
+            \FpHic\Helpers\hic_clear_option_cache('hic_metrics_last_init');
+
             // Reset daily counters
             update_option('hic_api_calls_today', 0, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_api_calls_today');
             update_option('hic_successful_bookings_today', 0, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_successful_bookings_today');
             update_option('hic_failed_bookings_today', 0, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_failed_bookings_today');
         }
     }
     

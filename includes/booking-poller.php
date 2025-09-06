@@ -278,10 +278,15 @@ class HIC_Booking_Poller {
                 }
                 
                 update_option('hic_last_updates_since', $safe_timestamp, false);
+                \FpHic\Helpers\hic_clear_option_cache('hic_last_updates_since');
                 update_option('hic_last_update_check', $safe_timestamp, false);
+                \FpHic\Helpers\hic_clear_option_cache('hic_last_update_check');
                 update_option('hic_last_continuous_check', $safe_timestamp, false);
+                \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_check');
                 update_option('hic_last_continuous_poll', $recent_timestamp, false);
+                \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
                 update_option('hic_last_deep_check', $recent_timestamp, false);
+                \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
                 
                 // Also restart the scheduler to ensure clean state
                 $this->clear_all_scheduled_events();
@@ -459,6 +464,7 @@ class HIC_Booking_Poller {
         
         // Update timestamp first to prevent overlapping executions
         update_option('hic_last_continuous_poll', current_time('timestamp'), false);
+        \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
         
         if (function_exists('hic_api_poll_bookings_continuous')) {
             hic_api_poll_bookings_continuous();
@@ -477,6 +483,7 @@ class HIC_Booking_Poller {
         
         // Update timestamp first to prevent overlapping executions
         update_option('hic_last_deep_check', current_time('timestamp'), false);
+        \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
         
         if (function_exists('hic_api_poll_bookings_deep_check')) {
             hic_api_poll_bookings_deep_check();

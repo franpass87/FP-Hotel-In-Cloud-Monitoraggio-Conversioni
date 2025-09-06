@@ -172,6 +172,7 @@ function hic_maybe_upgrade_db() {
   // Fresh install
   if (!$installed_version) {
     update_option('hic_db_version', HIC_DB_VERSION);
+    Helpers\hic_clear_option_cache('hic_db_version');
     return;
   }
 
@@ -183,11 +184,13 @@ function hic_maybe_upgrade_db() {
       $wpdb->query("ALTER TABLE $table ADD COLUMN brevo_event_sent TINYINT(1) DEFAULT 0");
     }
     update_option('hic_db_version', '1.1');
+    Helpers\hic_clear_option_cache('hic_db_version');
     $installed_version = '1.1';
   }
 
   // Set final version
   update_option('hic_db_version', HIC_DB_VERSION);
+  Helpers\hic_clear_option_cache('hic_db_version');
 }
 
 /**

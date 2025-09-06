@@ -91,6 +91,7 @@ function hic_queue_gtm_event($event_data) {
     }
     
     update_option('hic_gtm_queued_events', $queued_events);
+    Helpers\hic_clear_option_cache('hic_gtm_queued_events');
 }
 
 /**
