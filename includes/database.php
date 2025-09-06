@@ -537,3 +537,34 @@ function hic_cleanup_old_gclids($days = 90) {
 
   return $deleted;
 }
+
+/* ============ Cleanup processed booking events ============ */
+function hic_cleanup_booking_events($days = 30) {
+  if ($days <= 0) return 0;
+
+  global $wpdb;
+
+  // Check if wpdb is available
+  if (!$wpdb) {
+    Helpers\hic_log('hic_cleanup_booking_events: wpdb is not available');
+    return false;
+  }
+
+  $table = $wpdb->prefix . 'hic_booking_events';
+  $cutoff = gmdate('Y-m-d H:i:s', strtotime("-{$days} days"));
+
+  // Delete processed records older than cutoff
+  $deleted = $wpdb->query($wpdb->prepare(
+    "DELETE FROM $table WHERE processed = 1 AND processed_at IS NOT NULL AND processed_at < %s",
+    $cutoff
+  ));
+
+  if ($deleted === false) {
+    Helpers\hic_log('hic_cleanup_booking_events: Database error: ' . $wpdb->last_error);
+    return false;
+  }
+
+  Helpers\hic_log("hic_cleanup_booking_events: Removed $deleted processed booking events older than $days days");
+
+  return $deleted;
+}

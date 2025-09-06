@@ -119,6 +119,7 @@ Il token deve corrispondere al valore salvato nell'opzione `hic_health_token`.
 - `hic_continuous_poll_event` – polling continuo ogni minuto
 - `hic_deep_check_event` – verifica approfondita ogni 10 minuti
 - `hic_cleanup_event` – pulizia giornaliera degli identificatori
+- `hic_booking_events_cleanup` – pulizia giornaliera degli eventi di prenotazione processati
 - `hic_fallback_poll_event` – attivato in caso di ritardi o errori
 - `hic_health_monitor_event` – controllo periodico dello stato del plugin
 
