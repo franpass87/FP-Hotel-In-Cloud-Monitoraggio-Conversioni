@@ -311,6 +311,17 @@ function hic_booking_uid($reservation) {
 
 /* ============ Helpers ============ */
 function hic_http_request($url, $args = []) {
+    $validated_url = wp_http_validate_url($url);
+    if (!$validated_url) {
+        hic_log('HTTP request rifiutata: URL non valido ' . $url, HIC_LOG_LEVEL_ERROR);
+        return new WP_Error('invalid_url', 'URL non valido');
+    }
+    if ('https' !== parse_url($validated_url, PHP_URL_SCHEME)) {
+        hic_log('HTTP request rifiutata: solo HTTPS consentito ' . $url, HIC_LOG_LEVEL_ERROR);
+        return new WP_Error('invalid_url', 'Solo HTTPS consentito');
+    }
+    $url = $validated_url;
+
     if (!isset($args['timeout'])) {
         $args['timeout'] = defined('HIC_API_TIMEOUT') ? HIC_API_TIMEOUT : 15;
     }
@@ -319,7 +330,7 @@ function hic_http_request($url, $args = []) {
         $args['user-agent'] = 'HIC/' . $version;
     }
 
-    $response = wp_remote_request($url, $args);
+    $response = wp_safe_remote_request($url, $args);
 
     if (is_wp_error($response)) {
         hic_log('HTTP request error: ' . $response->get_error_message(), HIC_LOG_LEVEL_ERROR);
