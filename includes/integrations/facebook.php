@@ -66,7 +66,7 @@ function hic_send_to_fb($data, $gclid, $fbclid){
         'value'        => $amount,
         'order_id'     => $event_id,
         'bucket'       => $bucket,           // per creare custom conversions per fbads/organic/gads
-        'content_name' => sanitize_text_field($data['room'] ?? 'Prenotazione'),
+        'content_name' => sanitize_text_field($data['room'] ?? $data['accommodation_name'] ?? 'Prenotazione'),
         'vertical'     => 'hotel'
       ]
     ]]

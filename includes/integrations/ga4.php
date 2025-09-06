@@ -42,7 +42,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
     'currency'       => sanitize_text_field($data['currency'] ?? 'EUR'),
     'value'          => $amount,
     'items'          => [[
-      'item_name' => sanitize_text_field($data['room'] ?? 'Prenotazione'),
+      'item_name' => sanitize_text_field($data['room'] ?? $data['accommodation_name'] ?? 'Prenotazione'),
       'quantity'  => 1,
       'price'     => $amount
     ]],
