@@ -403,6 +403,7 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   $body .= "Importo: " . (isset($data['amount']) ? hic_normalize_price($data['amount']) : '0') . " " . ($data['currency'] ?? 'EUR') . "\n";
   $body .= "Nome: " . trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? '')) . "\n";
   $body .= "Email: " . ($data['email'] ?? 'n/a') . "\n";
+  $body .= "Telefono: " . ($data['phone'] ?? 'n/a') . "\n";
   $body .= "Lingua: " . ($data['lingua'] ?? ($data['lang'] ?? 'n/a')) . "\n";
   $body .= "Camera: " . ($data['room'] ?? 'n/a') . "\n";
   $body .= "Check-in: " . ($data['checkin'] ?? 'n/a') . "\n";

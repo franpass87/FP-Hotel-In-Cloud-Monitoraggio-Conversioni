@@ -94,8 +94,23 @@ class HICFunctionsTest {
         assert(is_string(hic_get_api_secret()), 'API Secret should return string');
         assert(is_bool(hic_is_brevo_enabled()), 'Brevo enabled should return boolean');
         assert(is_bool(hic_is_debug_verbose()), 'Debug verbose should return boolean');
-        
+
         echo "✅ Configuration helper tests passed\n";
+    }
+
+    public function testReservationPhoneFallback() {
+        if (!function_exists('add_action')) {
+            function add_action(...$args) {}
+        }
+        require_once dirname(__DIR__) . '/includes/api/polling.php';
+
+        $res = hic_transform_reservation(['whatsapp' => '12345']);
+        assert($res['phone'] === '12345', 'Should use whatsapp when phone is missing');
+
+        $res2 = hic_transform_reservation(['phone' => '67890', 'whatsapp' => '12345']);
+        assert($res2['phone'] === '67890', 'Should prioritize phone over whatsapp');
+
+        echo "✅ Reservation phone fallback tests passed\n";
     }
     
     public function runAll() {
@@ -108,7 +123,8 @@ class HICFunctionsTest {
             $this->testPriceNormalization();
             $this->testOTAEmailDetection();
             $this->testConfigurationHelpers();
-            
+            $this->testReservationPhoneFallback();
+
             echo "\n🎉 All tests passed successfully!\n";
         } catch (AssertionError $e) {
             echo "\n❌ Test failed: " . $e->getMessage() . "\n";
