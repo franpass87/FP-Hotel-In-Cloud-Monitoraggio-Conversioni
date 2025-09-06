@@ -149,6 +149,46 @@ function hic_create_booking_events_table(){
   return true;
 }
 
+/* ============ DB: migrations ============ */
+function hic_maybe_upgrade_db() {
+  global $wpdb;
+
+  // Ensure wpdb is available
+  if (!$wpdb) {
+    Helpers\hic_log('hic_maybe_upgrade_db: wpdb is not available');
+    return;
+  }
+
+  $installed_version = get_option('hic_db_version');
+
+  // If up to date, nothing to do
+  if ($installed_version === HIC_DB_VERSION) {
+    return;
+  }
+
+  // Make sure base tables exist
+  hic_create_database_table();
+
+  // Fresh install
+  if (!$installed_version) {
+    update_option('hic_db_version', HIC_DB_VERSION);
+    return;
+  }
+
+  // Example migration to version 1.1
+  if (version_compare($installed_version, '1.1', '<')) {
+    $table = $wpdb->prefix . 'hic_realtime_sync';
+    $column_exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", 'brevo_event_sent'));
+    if (empty($column_exists)) {
+      $wpdb->query("ALTER TABLE $table ADD COLUMN brevo_event_sent TINYINT(1) DEFAULT 0");
+    }
+    update_option('hic_db_version', '1.1');
+    $installed_version = '1.1';
+  }
+
+  // Set final version
+  update_option('hic_db_version', HIC_DB_VERSION);
+}
 /* ============ Cattura gclid/fbclid → cookie + DB ============ */
 function hic_capture_tracking_params(){
   global $wpdb;
