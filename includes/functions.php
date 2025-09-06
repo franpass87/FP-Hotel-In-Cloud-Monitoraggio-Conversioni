@@ -410,6 +410,10 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   $body .= "FBCLID: " . ($fbclid ?? 'n/a') . "\n";
   $body .= "Bucket: " . $bucket . "\n";
 
+  // Allow customization of admin email subject and body
+  $subject = apply_filters('hic_admin_email_subject', $subject, $data);
+  $body    = apply_filters('hic_admin_email_body', $body, $data);
+
   $content_type_filter = function(){ return 'text/plain; charset=UTF-8'; };
   add_filter('wp_mail_content_type', $content_type_filter);
   
