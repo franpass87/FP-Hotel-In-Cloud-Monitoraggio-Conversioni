@@ -1075,8 +1075,8 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
         return;
     }
 
-    $reservation_id = isset($reservation_data['id']) ? $reservation_data['id'] : null;
-    if (empty($reservation_id)) {
+    $reservation_id = hic_extract_reservation_id($reservation_data);
+    if (!$reservation_id) {
         hic_log('Cannot process new reservation: missing reservation ID');
         return;
     }
