@@ -1113,15 +1113,17 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
     // Send reservation_created event to Brevo
     $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid);
 
+    // Also send/update contact information regardless of event result
+    if (hic_is_valid_email($transformed['email']) && !hic_is_ota_alias_email($transformed['email'])) {
+        if (!hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid)) {
+            hic_log("Failed to update Brevo contact for reservation $reservation_id");
+        }
+    }
+
     if (is_array($event_result) && $event_result['success']) {
         // Mark as successfully notified
         hic_mark_reservation_notified_to_brevo($reservation_id);
         hic_log("Successfully sent reservation_created event to Brevo for reservation $reservation_id");
-
-        // Also send/update contact information
-        if (hic_is_valid_email($transformed['email']) && !hic_is_ota_alias_email($transformed['email'])) {
-            hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid);
-        }
     } elseif (is_array($event_result)) {
         // Handle failure based on retryability
         if (!empty($event_result['skipped'])) {
