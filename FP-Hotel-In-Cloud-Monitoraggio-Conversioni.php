@@ -25,6 +25,10 @@ require_once __DIR__ . '/includes/booking-poller.php';
 // Plugin activation handler
 function hic_activate($network_wide)
 {
+    if (\version_compare(PHP_VERSION, HIC_MIN_PHP_VERSION, '<') || \version_compare(\get_bloginfo('version'), HIC_MIN_WP_VERSION, '<')) {
+        \deactivate_plugins(\plugin_basename(__FILE__));
+        \wp_die(\sprintf(\__('Richiede almeno PHP %s e WordPress %s', 'hotel-in-cloud'), HIC_MIN_PHP_VERSION, HIC_MIN_WP_VERSION));
+    }
     if ($network_wide) {
         $sites = \get_sites();
         foreach ($sites as $site) {
