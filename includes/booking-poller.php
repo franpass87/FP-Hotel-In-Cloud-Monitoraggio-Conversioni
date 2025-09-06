@@ -694,5 +694,49 @@ function hic_init_booking_poller() {
     }
 }
 
+/**
+ * Clean up scheduled events and temporary data on plugin deactivation
+ */
+function hic_deactivate() {
+    $hooks = array(
+        'hic_continuous_poll_event',
+        'hic_deep_check_event',
+        'hic_fallback_poll_event',
+        'hic_health_monitor_event',
+        'hic_performance_cleanup',
+        'hic_reliable_poll_event',
+        'hic_api_poll_event',
+        'hic_api_updates_event',
+        'hic_retry_failed_notifications_event',
+    );
+
+    foreach ($hooks as $hook) {
+        wp_clear_scheduled_hook($hook);
+    }
+
+    $transients = array(
+        'hic_polling_lock',
+        'hic_reliable_polling_lock',
+        'hic_fallback_polling_lock',
+    );
+
+    foreach ($transients as $transient) {
+        delete_transient($transient);
+    }
+
+    global $wpdb;
+    if (isset($wpdb)) {
+        // Clear all hic_* transients including processing locks
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_hic_%' OR option_name LIKE '_transient_timeout_hic_%'");
+
+        // Remove temporary options related to polling and locks
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE 'hic_last_%' OR option_name LIKE 'hic_%_lock'");
+    }
+
+    delete_option('hic_api_calls_today');
+    delete_option('hic_successful_bookings_today');
+    delete_option('hic_failed_bookings_today');
+}
+
 // Initialize booking poller when WordPress is ready
 add_action('init', 'hic_init_booking_poller');

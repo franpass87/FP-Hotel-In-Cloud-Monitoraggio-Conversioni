@@ -14,9 +14,11 @@ if (!defined('ABSPATH')) {
 
 // Load Composer autoloader
 require __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/includes/booking-poller.php';
 
 // Plugin activation hook
 \register_activation_hook(__FILE__, 'hic_create_database_table');
+\register_deactivation_hook(__FILE__, 'hic_deactivate');
 
 // Initialize tracking parameters capture
 \add_action('init', 'hic_capture_tracking_params');
