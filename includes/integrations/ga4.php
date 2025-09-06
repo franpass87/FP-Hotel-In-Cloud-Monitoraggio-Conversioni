@@ -75,10 +75,10 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
        . '&api_secret='
        . rawurlencode($api_secret);
 
-  $res = wp_remote_post($url, [
+  $res = Helpers\hic_http_request($url, [
+    'method'  => 'POST',
     'headers' => ['Content-Type'=>'application/json'],
     'body'    => $json_payload,
-    'timeout' => 15
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
@@ -194,10 +194,10 @@ function hic_dispatch_ga4_reservation($data) {
        . '&api_secret='
        . rawurlencode($api_secret);
 
-  $res = wp_remote_post($url, [
+  $res = Helpers\hic_http_request($url, [
+    'method'  => 'POST',
     'headers' => ['Content-Type' => 'application/json'],
-    'body' => $json_payload,
-    'timeout' => 15
+    'body'    => $json_payload,
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);

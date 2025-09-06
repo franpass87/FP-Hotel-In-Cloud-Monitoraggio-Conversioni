@@ -81,10 +81,10 @@ function hic_send_to_fb($data, $gclid, $fbclid){
   }
 
   $url = 'https://graph.facebook.com/v19.0/' . Helpers\hic_get_fb_pixel_id() . '/events?access_token=' . Helpers\hic_get_fb_access_token();
-  $res = wp_remote_post($url, [
+  $res = Helpers\hic_http_request($url, [
+    'method'  => 'POST',
     'headers' => ['Content-Type'=>'application/json'],
     'body'    => $json_payload,
-    'timeout' => 15
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
@@ -222,10 +222,10 @@ function hic_dispatch_pixel_reservation($data) {
   }
 
   $url = 'https://graph.facebook.com/v19.0/' . Helpers\hic_get_fb_pixel_id() . '/events?access_token=' . Helpers\hic_get_fb_access_token();
-  $res = wp_remote_post($url, [
+  $res = Helpers\hic_http_request($url, [
+    'method'  => 'POST',
     'headers' => ['Content-Type' => 'application/json'],
-    'body' => $json_payload,
-    'timeout' => 15
+    'body'    => $json_payload,
   ]);
   
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);

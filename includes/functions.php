@@ -306,6 +306,29 @@ function hic_booking_uid($reservation) {
 }
 
 /* ============ Helpers ============ */
+function hic_http_request($url, $args = []) {
+    if (!isset($args['timeout'])) {
+        $args['timeout'] = defined('HIC_API_TIMEOUT') ? HIC_API_TIMEOUT : 15;
+    }
+    if (!isset($args['user-agent'])) {
+        $version = defined('HIC_PLUGIN_VERSION') ? HIC_PLUGIN_VERSION : '1.0';
+        $args['user-agent'] = 'HIC/' . $version;
+    }
+
+    $response = wp_remote_request($url, $args);
+
+    if (is_wp_error($response)) {
+        hic_log('HTTP request error: ' . $response->get_error_message(), HIC_LOG_LEVEL_ERROR);
+    } else {
+        $code = wp_remote_retrieve_response_code($response);
+        if ($code >= 400) {
+            hic_log('HTTP request to ' . $url . ' failed with status ' . $code, HIC_LOG_LEVEL_ERROR);
+        }
+    }
+
+    return $response;
+}
+
 function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
     $log_manager = function_exists('FpHic\\hic_get_log_manager') ? \FpHic\hic_get_log_manager() : null;
 
@@ -813,6 +836,7 @@ function hic_safe_wp_clear_scheduled_hook($hook, $args = array()) {
 
 // Global wrappers for backward compatibility
 namespace {
+    function hic_http_request($url, $args = array()) { return \FpHic\Helpers\hic_http_request($url, $args); }
     function hic_get_option($key, $default = '') { return \FpHic\Helpers\hic_get_option($key, $default); }
     function hic_get_measurement_id() { return \FpHic\Helpers\hic_get_measurement_id(); }
     function hic_get_api_secret() { return \FpHic\Helpers\hic_get_api_secret(); }
