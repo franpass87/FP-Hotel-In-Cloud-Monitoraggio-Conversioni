@@ -606,16 +606,17 @@ function hic_diagnose_email_issues() {
     
     // Check 5: Recent email sending attempts (if function exists)
     $email_errors = 0;
-    $log_file = hic_get_log_file();
-    if (file_exists($log_file) && is_readable($log_file)) {
-        $log_contents = file_get_contents($log_file);
-        $lines = explode("\n", $log_contents);
-        $recent_lines = array_slice($lines, -50); // Last 50 lines
-        
-        foreach ($recent_lines as $line) {
-            if (strpos($line, 'ERRORE invio email') !== false) {
-                $email_errors++;
-            }
+    $log_manager = function_exists('FpHic\\hic_get_log_manager') ? \FpHic\hic_get_log_manager() : null;
+    $recent_lines = $log_manager ? $log_manager->get_recent_logs(50) : array();
+
+    foreach ($recent_lines as $line) {
+        // Handle both raw string lines and parsed log entries
+        if (is_array($line)) {
+            $line = $line['message'] ?? '';
+        }
+
+        if (strpos($line, 'ERRORE invio email') !== false) {
+            $email_errors++;
         }
     }
     
