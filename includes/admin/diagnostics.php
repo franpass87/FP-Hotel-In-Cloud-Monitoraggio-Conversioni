@@ -302,7 +302,7 @@ function hic_test_dispatch_functions() {
         return array('success' => true, 'results' => $results);
         
     } catch (Exception $e) {
-        return array('success' => false, 'message' => 'Error: ' . $e->getMessage());
+        return array('success' => false, 'message' => sprintf( __( 'Errore: %s', 'hotel-in-cloud' ), $e->getMessage() ) );
     }
 }
 
@@ -607,14 +607,12 @@ add_action('wp_ajax_hic_get_system_status', 'hic_ajax_get_system_status');
 
 
 function hic_ajax_refresh_diagnostics() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     try {
@@ -629,22 +627,20 @@ function hic_ajax_refresh_diagnostics() {
         wp_send_json_success($data);
     } catch (Exception $e) {
         Helpers\hic_log('AJAX Refresh Diagnostics Error: ' . $e->getMessage());
-        wp_send_json_error(array('message' => 'Errore durante il caricamento diagnostiche: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante il caricamento diagnostiche: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     } catch (Error $e) {
         Helpers\hic_log('AJAX Refresh Diagnostics Fatal Error: ' . $e->getMessage());
-        wp_send_json_error(array('message' => 'Errore fatale durante il caricamento diagnostiche: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore fatale durante il caricamento diagnostiche: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
 
 function hic_ajax_test_dispatch() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     $result = hic_test_dispatch_functions();
@@ -658,29 +654,25 @@ function hic_ajax_test_dispatch() {
 }
 
 function hic_ajax_force_reschedule() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     $results = hic_force_restart_internal_scheduler();
-    wp_send_json_success(array('results' => $results));
+    wp_send_json_success( [ 'results' => $results ] );
 }
 
 function hic_ajax_create_tables() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     try {
@@ -712,7 +704,7 @@ function hic_ajax_create_tables() {
             }
 
             $payload = array(
-                'message' => $all_exist ? 'Tutte le tabelle sono state create/verificate con successo.' : 'Alcune tabelle potrebbero non essere state create.',
+                'message' => $all_exist ? __( 'Tutte le tabelle sono state create/verificate con successo.', 'hotel-in-cloud' ) : __( 'Alcune tabelle potrebbero non essere state create.', 'hotel-in-cloud' ),
                 'details' => implode(', ', $details)
             );
 
@@ -722,22 +714,20 @@ function hic_ajax_create_tables() {
                 wp_send_json_error($payload);
             }
         } else {
-            wp_send_json_error(array('message' => 'Errore durante la creazione delle tabelle. Controlla i log per maggiori dettagli.'));
+            wp_send_json_error( [ 'message' => __( 'Errore durante la creazione delle tabelle. Controlla i log per maggiori dettagli.', 'hotel-in-cloud' ) ] );
         }
     } catch (Exception $e) {
-        wp_send_json_error(array('message' => 'Errore: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
 
 function hic_ajax_backfill_reservations() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     // Get and validate input parameters
@@ -748,12 +738,12 @@ function hic_ajax_backfill_reservations() {
 
     // Validate date type (based on API documentation: only checkin, checkout, presence are valid for /reservations endpoint)
     if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
-        wp_send_json_error(array('message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence".'));
+        wp_send_json_error( [ 'message' => __( 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence".', 'hotel-in-cloud' ) ] );
     }
 
     // Validate required fields
     if (empty($from_date) || empty($to_date)) {
-        wp_send_json_error(array('message' => 'Date di inizio e fine sono obbligatorie'));
+        wp_send_json_error( [ 'message' => __( 'Date di inizio e fine sono obbligatorie', 'hotel-in-cloud' ) ] );
     }
 
     // Call the backfill function
@@ -795,14 +785,12 @@ function hic_convert_api_booking_to_processor_format($api_booking) {
 }
 
 function hic_ajax_download_latest_bookings() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     try {
@@ -810,19 +798,19 @@ function hic_ajax_download_latest_bookings() {
         $result = hic_get_latest_bookings(5, true);
 
         if (is_wp_error($result)) {
-            wp_send_json_error(array('message' => 'Errore nel recupero prenotazioni: ' . $result->get_error_message()));
+            wp_send_json_error( [ 'message' => sprintf( __( 'Errore nel recupero prenotazioni: %s', 'hotel-in-cloud' ), $result->get_error_message() ) ] );
         }
 
         if (empty($result)) {
             // Check if we have any bookings at all (without filtering)
             $all_bookings = hic_get_latest_bookings(5, false);
             if (is_wp_error($all_bookings) || empty($all_bookings)) {
-                wp_send_json_error(array('message' => 'Nessuna prenotazione trovata nell\'API'));
+                wp_send_json_error( [ 'message' => __( 'Nessuna prenotazione trovata nell\'API', 'hotel-in-cloud' ) ] );
             } else {
-                wp_send_json_error(array(
-                    'message' => 'Tutte le ultime 5 prenotazioni sono già state inviate. Usa il bottone "Reset Download Tracking" per reinviarle.',
+                wp_send_json_error( [
+                    'message' => __( 'Tutte le ultime 5 prenotazioni sono già state inviate. Usa il bottone "Reset Download Tracking" per reinviarle.', 'hotel-in-cloud' ),
                     'already_downloaded' => true
-                ));
+                ] );
             }
         }
 
@@ -872,52 +860,48 @@ function hic_ajax_download_latest_bookings() {
             'facebook_configured' => !empty(Helpers\hic_get_fb_pixel_id()) && !empty(Helpers\hic_get_fb_access_token())
         );
 
-        wp_send_json_success(array(
-            'message' => "Prenotazioni inviate alle integrazioni configurate",
+        wp_send_json_success( array(
+            'message' => __( 'Prenotazioni inviate alle integrazioni configurate', 'hotel-in-cloud' ),
             'count' => count($result),
             'success_count' => $success_count,
             'error_count' => $error_count,
             'booking_ids' => $booking_ids,
             'integration_status' => $integration_status,
             'processing_results' => $processing_results
-        ));
+        ) );
     } catch (Exception $e) {
-        wp_send_json_error(array('message' => 'Errore: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
 
 function hic_ajax_reset_download_tracking() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     try {
         // Reset the download tracking
         hic_reset_downloaded_bookings();
 
-        wp_send_json_success(array(
-            'message' => 'Tracking degli invii resettato con successo. Ora puoi inviare nuovamente tutte le prenotazioni alle integrazioni.'
-        ));
+        wp_send_json_success( array(
+            'message' => __( 'Tracking degli invii resettato con successo. Ora puoi inviare nuovamente tutte le prenotazioni alle integrazioni.', 'hotel-in-cloud' )
+        ) );
     } catch (Exception $e) {
-        wp_send_json_error(array('message' => 'Errore durante il reset: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante il reset: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
 
 function hic_ajax_force_polling() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     try {
@@ -926,7 +910,7 @@ function hic_ajax_force_polling() {
 
         // Check if poller class exists
         if (!class_exists('HIC_Booking_Poller')) {
-            wp_send_json_error(array('message' => 'HIC_Booking_Poller class not found'));
+            wp_send_json_error( [ 'message' => __( 'Classe HIC_Booking_Poller non trovata', 'hotel-in-cloud' ) ] );
         }
 
         $poller = new HIC_Booking_Poller();
@@ -962,7 +946,7 @@ function hic_ajax_force_polling() {
         }
     } catch (Exception $e) {
         Helpers\hic_log('Admin Polling Error: ' . $e->getMessage());
-        wp_send_json_error(array('message' => 'Errore durante l\'esecuzione del polling: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante l\'esecuzione del polling: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
 
@@ -970,14 +954,12 @@ function hic_ajax_force_polling() {
  * AJAX handler for triggering watchdog check
  */
 function hic_ajax_trigger_watchdog() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_admin_action', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_admin_action', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     try {
@@ -999,7 +981,7 @@ function hic_ajax_trigger_watchdog() {
         $restart_result = hic_force_restart_internal_scheduler();
 
         $response = array(
-            'message' => 'Watchdog check completed successfully',
+            'message' => __( 'Watchdog check completed successfully', 'hotel-in-cloud' ),
             'watchdog_result' => $watchdog_result,
             'scheduler_restart' => $restart_result
         );
@@ -1008,10 +990,10 @@ function hic_ajax_trigger_watchdog() {
         wp_send_json_success($response);
     } catch (Exception $e) {
         Helpers\hic_log('Admin Watchdog Error: ' . $e->getMessage());
-        wp_send_json_error(array('message' => 'Errore durante l\'esecuzione del watchdog: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante l\'esecuzione del watchdog: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     } catch (Error $e) {
         Helpers\hic_log('Admin Watchdog Fatal Error: ' . $e->getMessage());
-        wp_send_json_error(array('message' => 'Errore fatale durante l\'esecuzione del watchdog: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore fatale durante l\'esecuzione del watchdog: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
 
@@ -1019,14 +1001,12 @@ function hic_ajax_trigger_watchdog() {
  * AJAX handler for resetting timestamps (emergency recovery)
  */
 function hic_ajax_reset_timestamps() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_admin_action', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_admin_action', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     try {
@@ -1043,19 +1023,19 @@ function hic_ajax_reset_timestamps() {
 
             $result = $poller->trigger_timestamp_recovery();
 
-            wp_send_json_success(array(
-                'message' => 'Timestamp reset completed successfully - all timestamps reset and scheduler restarted',
+            wp_send_json_success( array(
+                'message' => __( 'Timestamp reset completed successfully - all timestamps reset and scheduler restarted', 'hotel-in-cloud' ),
                 'result' => $result
-            ));
+            ) );
         } else {
-            wp_send_json_error(array('message' => 'HIC_Booking_Poller class not available'));
+            wp_send_json_error( [ 'message' => __( 'Classe HIC_Booking_Poller non disponibile', 'hotel-in-cloud' ) ] );
         }
     } catch (Exception $e) {
         Helpers\hic_log('Admin Timestamp Reset Error: ' . $e->getMessage());
-        wp_send_json_error(array('message' => 'Errore durante il reset dei timestamp: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante il reset dei timestamp: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     } catch (Error $e) {
         Helpers\hic_log('Admin Timestamp Reset Fatal Error: ' . $e->getMessage());
-        wp_send_json_error(array('message' => 'Errore fatale durante il reset dei timestamp: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore fatale durante il reset dei timestamp: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
 
@@ -1063,14 +1043,12 @@ function hic_ajax_reset_timestamps() {
  * AJAX handler for getting system status updates
  */
 function hic_ajax_get_system_status() {
-    // Verify nonce
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_send_json_error(array('message' => 'Invalid nonce'));
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => 'Insufficient permissions'));
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
     try {
@@ -1087,7 +1065,7 @@ function hic_ajax_get_system_status() {
 
         wp_send_json_success($status_data);
     } catch (Exception $e) {
-        wp_send_json_error(array('message' => 'Errore nel recupero dello stato: ' . $e->getMessage()));
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore nel recupero dello stato: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
 
@@ -1098,7 +1076,7 @@ function hic_ajax_get_system_status() {
  */
 function hic_diagnostics_page() {
     if (!current_user_can('manage_options')) {
-        wp_die(__('You do not have sufficient permissions to access this page.'));
+        wp_die( __( 'Non hai i permessi necessari per accedere a questa pagina.', 'hotel-in-cloud' ) );
     }
     
     // Get initial data
@@ -1524,20 +1502,18 @@ function hic_diagnostics_page() {
  * AJAX handler for downloading error logs
  */
 function hic_ajax_download_error_logs() {
-    // Verify nonce for security
-    if (!check_ajax_referer('hic_diagnostics_nonce', 'nonce', false)) {
-        wp_die('Nonce verification failed');
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( __( 'Permessi insufficienti', 'hotel-in-cloud' ) );
     }
-    
-    // Check if user has permission
-    if (!current_user_can('manage_options')) {
-        wp_die('Insufficient permissions');
+
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_die( __( 'Nonce non valido', 'hotel-in-cloud' ) );
     }
-    
+
     $log_file = Helpers\hic_get_log_file();
-    
+
     if (!file_exists($log_file) || !is_readable($log_file)) {
-        wp_die('Log file not found or not readable');
+        wp_die( __( 'File di log non trovato o non leggibile', 'hotel-in-cloud' ) );
     }
     
     // Set headers for file download
@@ -1559,12 +1535,16 @@ function hic_ajax_download_error_logs() {
  * AJAX handler for testing Brevo API connectivity
  */
 function hic_ajax_test_brevo_connectivity() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
+    }
+
     check_admin_referer('hic_admin_action', 'nonce');
 
     if (!Helpers\hic_get_brevo_api_key()) {
-        wp_send_json_error(array(
-            'message' => 'API key Brevo mancante. Configura prima l\'API key nelle impostazioni.'
-        ));
+        wp_send_json_error( [
+            'message' => __( 'API key Brevo mancante. Configura prima l\'API key nelle impostazioni.', 'hotel-in-cloud' )
+        ] );
     }
 
     // Test contact API
@@ -1573,10 +1553,10 @@ function hic_ajax_test_brevo_connectivity() {
     // Test event API
     $event_test = hic_test_brevo_event_api();
 
-    wp_send_json_success(array(
-        'message' => 'Test connettività Brevo completato',
+    wp_send_json_success( array(
+        'message' => __( 'Test connettività Brevo completato', 'hotel-in-cloud' ),
         'contact_api' => $contact_test,
         'event_api' => $event_test
-    ));
+    ) );
 }
 
