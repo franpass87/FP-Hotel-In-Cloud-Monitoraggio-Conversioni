@@ -269,10 +269,10 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
 /* ============ Cattura gclid/fbclid → cookie + DB ============ */
 function hic_capture_tracking_params(){
   global $wpdb;
-  
+
   // Check if wpdb is available
   if (!$wpdb) {
-    error_log('HIC Plugin: wpdb is not available in hic_capture_tracking_params');
+    Helpers\hic_log('hic_capture_tracking_params: wpdb is not available', HIC_LOG_LEVEL_ERROR);
     return false;
   }
   

@@ -339,9 +339,6 @@ function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
     if ($log_manager) {
         return $log_manager->log($msg, $level, $context);
     }
-
-    // Fallback to error_log if log manager is not available
-    error_log('HIC Plugin: ' . (is_scalar($msg) ? $msg : print_r($msg, true)));
     return false;
 }
 
