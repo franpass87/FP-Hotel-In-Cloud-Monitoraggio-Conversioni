@@ -17,7 +17,11 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 - **API Polling (Raccomandato)**: WordPress controlla HIC ogni 1-5 minuti per nuove prenotazioni
 - **Webhook**: HIC invia immediatamente le prenotazioni a WordPress (richiede configurazione su HIC)
 
-📖 **Documentazione Completa**: 
+### Caricamento dello script frontend
+
+Il file JavaScript che aggiunge il parametro SID ai link di prenotazione viene caricato solo quando la modalità di tracciamento è impostata su `gtm_only`. Per disabilitarlo è sufficiente selezionare una modalità differente nelle impostazioni del plugin; per riattivarlo ripristinare `gtm_only`.
+
+📖 **Documentazione Completa**:
 - [Come Funziona il Plugin](PLUGIN_FUNZIONAMENTO.md) - Spiegazione dettagliata
 - [Architettura Tecnica](ARCHITETTURA_TECNICA.md) - Diagrammi e flussi
 - [Guida Configurazione](GUIDA_CONFIGURAZIONE.md) - Setup passo-passo
