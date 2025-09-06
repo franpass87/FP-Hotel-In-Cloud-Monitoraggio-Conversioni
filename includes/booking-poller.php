@@ -20,6 +20,7 @@ class HIC_Booking_Poller {
         add_action('hic_continuous_poll_event', array($this, 'execute_continuous_polling'));
         add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
         add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
+        add_action('hic_cleanup_event', 'hic_cleanup_old_gclids');
         
         // Initialize scheduler on activation
         add_action('init', array($this, 'ensure_scheduler_is_active'), 20);
@@ -82,6 +83,17 @@ class HIC_Booking_Poller {
                 Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
             }
         }
+
+        // Schedule daily cleanup event
+        $cleanup_next = Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
+        if (!$cleanup_next) {
+            $scheduled = Helpers\hic_safe_wp_schedule_event(time(), 'daily', 'hic_cleanup_event');
+            if ($scheduled) {
+                Helpers\hic_log('WP-Cron Scheduler: Scheduled daily cleanup event');
+            } else {
+                Helpers\hic_log('WP-Cron Scheduler: FAILED to schedule cleanup event');
+            }
+        }
         
         // Log current scheduling status
         $this->log_scheduler_status();
@@ -108,6 +120,7 @@ class HIC_Booking_Poller {
     public function clear_all_scheduled_events() {
         Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
         Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+        Helpers\hic_safe_wp_clear_scheduled_hook('hic_cleanup_event');
         Helpers\hic_log('WP-Cron Scheduler: Cleared all scheduled events');
     }
     
@@ -124,18 +137,20 @@ class HIC_Booking_Poller {
         // Check if events are scheduled
         $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         $deep_next = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
-        
-        $is_working = ($continuous_next !== false && $deep_next !== false);
-        
+        $cleanup_next = Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
+
+        $is_working = ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false);
+
         if (!$is_working) {
             $debug_info = sprintf(
-                'WP-Cron events check: continuous=%s, deep=%s',
+                'WP-Cron events check: continuous=%s, deep=%s, cleanup=%s',
                 $continuous_next ? date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
-                $deep_next ? date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED'
+                $deep_next ? date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
+                $cleanup_next ? date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED'
             );
             Helpers\hic_log('WP-Cron not working: ' . $debug_info);
         }
-        
+
         return $is_working;
     }
     
@@ -145,6 +160,7 @@ class HIC_Booking_Poller {
     private function log_scheduler_status() {
         $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         $deep_next = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        $cleanup_next = Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         
         // Check polling conditions
         $should_poll = $this->should_poll();
@@ -154,9 +170,10 @@ class HIC_Booking_Poller {
         $has_auth = Helpers\hic_has_basic_auth_credentials();
         
         $status_msg = sprintf(
-            'WP-Cron Status: Continuous next=%s, Deep next=%s, WP-Cron disabled=%s, Should poll=%s (reliable=%s, type=%s, url=%s, auth=%s)',
+            'WP-Cron Status: Continuous next=%s, Deep next=%s, Cleanup next=%s, WP-Cron disabled=%s, Should poll=%s (reliable=%s, type=%s, url=%s, auth=%s)',
             $continuous_next ? date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
             $deep_next ? date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
+            $cleanup_next ? date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
             (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) ? 'YES' : 'NO',
             $should_poll ? 'YES' : 'NO',
             $reliable_polling ? 'YES' : 'NO',
