@@ -292,7 +292,7 @@ function hic_capture_tracking_params(){
   }
 
   // Get existing SID or create new one if it doesn't exist
-  $existing_sid = isset($_COOKIE['hic_sid']) ? sanitize_text_field($_COOKIE['hic_sid']) : null;
+  $existing_sid = isset($_COOKIE['hic_sid']) ? sanitize_text_field( wp_unslash( $_COOKIE['hic_sid'] ) ) : null;
 
   if (!empty($_GET['gclid'])) {
     $gclid = sanitize_text_field( wp_unslash( $_GET['gclid'] ) );
