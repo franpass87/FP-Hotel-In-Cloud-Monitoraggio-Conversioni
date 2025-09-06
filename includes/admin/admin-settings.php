@@ -231,6 +231,11 @@ function hic_admin_enqueue_scripts($hook) {
             HIC_PLUGIN_VERSION,
             true
         );
+        wp_set_script_translations(
+            'hic-admin-settings',
+            'hotel-in-cloud',
+            plugin_dir_path(__FILE__) . '../../languages'
+        );
         wp_localize_script('hic-admin-settings', 'hicAdminSettings', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'api_nonce' => wp_create_nonce('hic_test_api_nonce'),
@@ -251,6 +256,11 @@ function hic_admin_enqueue_scripts($hook) {
             array('jquery'),
             HIC_PLUGIN_VERSION,
             true
+        );
+        wp_set_script_translations(
+            'hic-diagnostics',
+            'hotel-in-cloud',
+            plugin_dir_path(__FILE__) . '../../languages'
         );
         wp_localize_script('hic-diagnostics', 'hicDiagnostics', array(
             'ajax_url' => admin_url('admin-ajax.php'),

@@ -5,6 +5,20 @@
 
 if (!defined('ABSPATH')) exit;
 
+add_action(
+    'admin_enqueue_scripts',
+    function ($hook) {
+        if ($hook === 'hic-monitoring_page_hic-diagnostics') {
+            wp_set_script_translations(
+                'hic-diagnostics',
+                'hotel-in-cloud',
+                plugin_dir_path(__FILE__) . '../../languages'
+            );
+        }
+    },
+    20
+);
+
 /* ============ Cron Diagnostics Functions ============ */
 
 /**
