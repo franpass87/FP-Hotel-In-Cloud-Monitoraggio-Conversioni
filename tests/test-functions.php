@@ -112,6 +112,85 @@ class HICFunctionsTest {
 
         echo "✅ Reservation phone fallback tests passed\n";
     }
+
+    public function testEventRoomNameFallback() {
+        // Ensure required WordPress stubs exist
+        if (!function_exists('home_url')) {
+            function home_url() { return 'https://example.com'; }
+        }
+        if (!function_exists('wp_generate_uuid4')) {
+            function wp_generate_uuid4() { return 'uuid-4'; }
+        }
+        if (!function_exists('wp_json_encode')) {
+            function wp_json_encode($data) { return json_encode($data); }
+        }
+        if (!function_exists('wp_remote_post')) {
+            function wp_remote_post($url, $args) {
+                global $hic_last_post;
+                $hic_last_post = ['url' => $url, 'args' => $args];
+                return ['response' => ['code' => 200], 'body' => '{}'];
+            }
+        }
+        if (!function_exists('wp_remote_retrieve_response_code')) {
+            function wp_remote_retrieve_response_code($res) { return $res['response']['code'] ?? 0; }
+        }
+        if (!function_exists('wp_remote_retrieve_body')) {
+            function wp_remote_retrieve_body($res) { return $res['body'] ?? ''; }
+        }
+        if (!function_exists('is_wp_error')) {
+            function is_wp_error($thing) { return false; }
+        }
+
+        require_once dirname(__DIR__) . '/includes/integrations/ga4.php';
+        require_once dirname(__DIR__) . '/includes/integrations/facebook.php';
+
+        // Configure required options
+        update_option('hic_measurement_id', 'G-TEST');
+        update_option('hic_api_secret', 'secret');
+        update_option('hic_fb_pixel_id', 'FBTEST');
+        update_option('hic_fb_access_token', 'FBTOKEN');
+        update_option('hic_log_file', sys_get_temp_dir() . '/hic-test.log');
+
+        global $hic_last_post;
+
+        // GA4 room name
+        $data = ['room' => 'Camera Deluxe', 'currency' => 'EUR', 'amount' => 100];
+        hic_send_to_ga4($data, null, null);
+        $payload = json_decode($hic_last_post['args']['body'], true);
+        assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Camera Deluxe', 'GA4 should use room name');
+
+        // GA4 accommodation_name fallback
+        $data = ['accommodation_name' => 'Suite', 'currency' => 'EUR', 'amount' => 100];
+        hic_send_to_ga4($data, null, null);
+        $payload = json_decode($hic_last_post['args']['body'], true);
+        assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Suite', 'GA4 should use accommodation name');
+
+        // GA4 default
+        $data = ['currency' => 'EUR', 'amount' => 100];
+        hic_send_to_ga4($data, null, null);
+        $payload = json_decode($hic_last_post['args']['body'], true);
+        assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Prenotazione', 'GA4 should default to Prenotazione');
+
+        // FB room name
+        $data = ['email' => 'user@example.com', 'room' => 'Camera Deluxe', 'currency' => 'EUR', 'amount' => 100];
+        hic_send_to_fb($data, null, null);
+        $payload = json_decode($hic_last_post['args']['body'], true);
+        assert($payload['data'][0]['custom_data']['content_name'] === 'Camera Deluxe', 'FB should use room name');
+
+        // FB accommodation_name fallback
+        $data = ['email' => 'user@example.com', 'accommodation_name' => 'Suite', 'currency' => 'EUR', 'amount' => 100];
+        hic_send_to_fb($data, null, null);
+        $payload = json_decode($hic_last_post['args']['body'], true);
+        assert($payload['data'][0]['custom_data']['content_name'] === 'Suite', 'FB should use accommodation name');
+
+        // FB default
+        $data = ['email' => 'user@example.com', 'currency' => 'EUR', 'amount' => 100];
+        hic_send_to_fb($data, null, null);
+        $payload = json_decode($hic_last_post['args']['body'], true);
+        assert($payload['data'][0]['custom_data']['content_name'] === 'Prenotazione', 'FB should default to Prenotazione');
+
+        echo "✅ Event room name fallback tests passed\n";
+    }
     
     public function runAll() {
         echo "Running HIC Plugin Tests...\n\n";
@@ -124,6 +203,7 @@ class HICFunctionsTest {
             $this->testOTAEmailDetection();
             $this->testConfigurationHelpers();
             $this->testReservationPhoneFallback();
+            $this->testEventRoomNameFallback();
 
             echo "\n🎉 All tests passed successfully!\n";
         } catch (AssertionError $e) {
