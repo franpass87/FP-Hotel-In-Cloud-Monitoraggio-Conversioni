@@ -4,6 +4,10 @@
  * Description: Tracciamento prenotazioni Hotel in Cloud → GA4 (purchase), Meta CAPI (Purchase) e Brevo (contact+event), con bucket gads/fbads/organic. Salvataggio gclid/fbclid↔sid e append sid ai link HIC.
  * Version: 1.4.0
  * Author: Francesco Passeri
+ * Requires at least: 5.8
+ * Requires PHP: 7.4
+ * Text Domain: hotel-in-cloud
+ * Domain Path: /languages
  */
 
 namespace FpHic;
