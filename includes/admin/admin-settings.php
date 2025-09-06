@@ -107,15 +107,15 @@ function hic_add_admin_menu() {
 }
 
 function hic_settings_init() {
-    register_setting('hic_settings', 'hic_measurement_id');
-    register_setting('hic_settings', 'hic_api_secret');
-    register_setting('hic_settings', 'hic_brevo_enabled');
-    register_setting('hic_settings', 'hic_brevo_api_key');
+    register_setting('hic_settings', 'hic_measurement_id', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_api_secret', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_brevo_enabled', array('sanitize_callback' => 'rest_sanitize_boolean'));
+    register_setting('hic_settings', 'hic_brevo_api_key', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_brevo_list_it', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_brevo_list_en', array('sanitize_callback' => 'absint'));
-    register_setting('hic_settings', 'hic_fb_pixel_id');
-    register_setting('hic_settings', 'hic_fb_access_token');
-    register_setting('hic_settings', 'hic_webhook_token');
+    register_setting('hic_settings', 'hic_fb_pixel_id', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_fb_access_token', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_webhook_token', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_admin_email', array(
         'sanitize_callback' => 'hic_validate_admin_email'
     ));
@@ -124,35 +124,35 @@ function hic_settings_init() {
         'hic_log_file',
         array('sanitize_callback' => '\\FpHic\\Helpers\\hic_validate_log_path')
     );
-    register_setting('hic_settings', 'hic_connection_type');
-    register_setting('hic_settings', 'hic_api_url');
+    register_setting('hic_settings', 'hic_connection_type', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_api_url', array('sanitize_callback' => 'sanitize_text_field'));
     // New Basic Auth settings
     register_setting('hic_settings', 'hic_api_email', array('sanitize_callback' => 'sanitize_email'));
     register_setting('hic_settings', 'hic_api_password', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_property_id', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_polling_interval', array('sanitize_callback' => 'sanitize_text_field'));
-    register_setting('hic_settings', 'hic_reliable_polling_enabled');
-    
+    register_setting('hic_settings', 'hic_reliable_polling_enabled', array('sanitize_callback' => 'rest_sanitize_boolean'));
+
     // New HIC Extended Integration settings
     register_setting('hic_settings', 'hic_currency', array('sanitize_callback' => 'sanitize_text_field'));
-    register_setting('hic_settings', 'hic_ga4_use_net_value');
-    register_setting('hic_settings', 'hic_process_invalid');
-    register_setting('hic_settings', 'hic_allow_status_updates');
+    register_setting('hic_settings', 'hic_ga4_use_net_value', array('sanitize_callback' => 'rest_sanitize_boolean'));
+    register_setting('hic_settings', 'hic_process_invalid', array('sanitize_callback' => 'rest_sanitize_boolean'));
+    register_setting('hic_settings', 'hic_allow_status_updates', array('sanitize_callback' => 'rest_sanitize_boolean'));
     register_setting('hic_settings', 'hic_brevo_list_default', array('sanitize_callback' => 'absint'));
-    register_setting('hic_settings', 'hic_brevo_optin_default');
-    register_setting('hic_settings', 'hic_debug_verbose');
-    
+    register_setting('hic_settings', 'hic_brevo_optin_default', array('sanitize_callback' => 'rest_sanitize_boolean'));
+    register_setting('hic_settings', 'hic_debug_verbose', array('sanitize_callback' => 'rest_sanitize_boolean'));
+
     // New email enrichment settings
-    register_setting('hic_settings', 'hic_updates_enrich_contacts');
-    register_setting('hic_settings', 'hic_realtime_brevo_sync');
+    register_setting('hic_settings', 'hic_updates_enrich_contacts', array('sanitize_callback' => 'rest_sanitize_boolean'));
+    register_setting('hic_settings', 'hic_realtime_brevo_sync', array('sanitize_callback' => 'rest_sanitize_boolean'));
     register_setting('hic_settings', 'hic_brevo_list_alias', array('sanitize_callback' => 'absint'));
-    register_setting('hic_settings', 'hic_brevo_double_optin_on_enrich');
+    register_setting('hic_settings', 'hic_brevo_double_optin_on_enrich', array('sanitize_callback' => 'rest_sanitize_boolean'));
     register_setting('hic_settings', 'hic_brevo_event_endpoint', array('sanitize_callback' => 'esc_url_raw'));
-    
+
     // GTM Settings
     register_setting('hic_settings', 'hic_gtm_container_id', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_tracking_mode', array('sanitize_callback' => 'sanitize_text_field'));
-    register_setting('hic_settings', 'hic_gtm_enabled');
+    register_setting('hic_settings', 'hic_gtm_enabled', array('sanitize_callback' => 'rest_sanitize_boolean'));
 
     add_settings_section('hic_main_section', 'Configurazione Principale', null, 'hic_settings');
     add_settings_section('hic_ga4_section', 'Google Analytics 4', null, 'hic_settings');
