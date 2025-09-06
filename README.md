@@ -242,6 +242,19 @@ add_filter( 'hic_log_retention_days', function ( $days ) {
 
 L'hook riceve il numero di giorni di retention configurato dal plugin (default 30) e deve restituire il nuovo valore da applicare.
 
+### Personalizzazione cookie SID
+
+Il filtro `hic_sid_cookie_args` permette di modificare i parametri del cookie `hic_sid` (scadenza, path, ecc.). Riceve l'array di argomenti di default e il valore del SID.
+
+```php
+add_filter( 'hic_sid_cookie_args', function ( $args, $sid ) {
+    $args['secure'] = false; // esempio: invio cookie anche su HTTP
+    return $args;
+}, 10, 2 );
+```
+
+Il filtro deve restituire l'array di argomenti che verrà passato a `setcookie()`.
+
 ## Note su Privacy e Rate Limits
 
 - Il plugin rispetta i rate limits delle API Hotel in Cloud
