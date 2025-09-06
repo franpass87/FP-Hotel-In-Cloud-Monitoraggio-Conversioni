@@ -1526,7 +1526,9 @@ function hic_ajax_test_brevo_connectivity() {
         wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
     }
 
-    check_admin_referer('hic_admin_action', 'nonce');
+    if ( ! check_ajax_referer( 'hic_admin_action', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
+    }
 
     if (!Helpers\hic_get_brevo_api_key()) {
         wp_send_json_error( [
