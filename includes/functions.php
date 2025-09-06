@@ -11,7 +11,11 @@ if (!defined('ABSPATH')) {
 
 /* ================= CONFIG FUNCTIONS ================= */
 function hic_get_option($key, $default = '') {
-    return get_option('hic_' . $key, $default);
+    static $cache = [];
+    if (!array_key_exists($key, $cache)) {
+        $cache[$key] = get_option('hic_' . $key, $default);
+    }
+    return $cache[$key];
 }
 
 // Helper functions to get configuration values
