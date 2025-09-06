@@ -186,6 +186,7 @@ if (defined('WP_CLI') && WP_CLI) {
 
                 // Update last poll timestamp
                 update_option('hic_last_reliable_poll', current_time('timestamp'));
+                \FpHic\Helpers\hic_clear_option_cache('hic_last_reliable_poll');
 
                 $execution_time = round(microtime(true) - $start_time, 2);
 
