@@ -215,34 +215,6 @@ function hic_get_execution_stats() {
     );
 }
 
-/**
- * Get recent log entries (errors and important events)
- */
-function hic_get_recent_log_entries($limit = 50) {
-    $log_file = Helpers\hic_get_log_file();
-    if (!file_exists($log_file)) {
-        return array();
-    }
-    
-    $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if (!$lines) {
-        return array();
-    }
-    
-    // Get last $limit lines
-    $recent_lines = array_slice($lines, -$limit);
-    
-    // Filter for important entries (errors, dispatches, etc.)
-    $important_entries = array();
-    foreach ($recent_lines as $line) {
-        if (preg_match('/error|errore|fallita|HTTP [45]\d\d|dispatched|inviato/i', $line)) {
-            $important_entries[] = $line;
-        }
-    }
-    
-    return array_reverse($important_entries); // Most recent first
-}
-
 
 
 /**
@@ -634,7 +606,7 @@ function hic_ajax_refresh_diagnostics() {
             'scheduler_status' => hic_get_internal_scheduler_status(),
             'credentials_status' => hic_get_credentials_status(),
             'execution_stats' => hic_get_execution_stats(),
-            'recent_logs' => hic_get_recent_log_entries(20),
+            'recent_logs' => hic_get_log_manager()->get_recent_logs(20),
             'error_stats' => hic_get_error_stats()
         );
 
@@ -1097,7 +1069,7 @@ function hic_diagnostics_page() {
     $scheduler_status = hic_get_internal_scheduler_status();
     $credentials_status = hic_get_credentials_status();
     $execution_stats = hic_get_execution_stats();
-    $recent_logs = hic_get_recent_log_entries(20);
+    $recent_logs = hic_get_log_manager()->get_recent_logs(20);
     $schedules = wp_get_schedules();
     $error_stats = hic_get_error_stats();
     
@@ -1416,8 +1388,8 @@ function hic_diagnostics_page() {
                             <?php if (empty($recent_logs)): ?>
                                 <p class="hic-no-logs">Nessun log recente disponibile.</p>
                             <?php else: ?>
-                                <?php foreach (array_slice($recent_logs, 0, 8) as $log_line): ?>
-                                    <div class="hic-log-entry"><?php echo esc_html($log_line); ?></div>
+                                <?php foreach (array_slice($recent_logs, 0, 8) as $log_entry): ?>
+                                    <div class="hic-log-entry"><?php echo esc_html(sprintf('[%s] [%s] [%s] %s', $log_entry['timestamp'], $log_entry['level'], $log_entry['memory'], $log_entry['message'])); ?></div>
                                 <?php endforeach; ?>
                                 <?php if (count($recent_logs) > 8): ?>
                                     <div class="hic-log-more">... e altri <?php echo esc_html(count($recent_logs) - 8); ?> eventi</div>
