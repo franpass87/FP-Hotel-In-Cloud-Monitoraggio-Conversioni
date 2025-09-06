@@ -1,0 +1,15 @@
+.hic-api-test-section .dashicons {
+    vertical-align: middle;
+    margin-right: 5px;
+}
+.hic-api-test-section .notice {
+    margin: 0;
+    padding: 10px;
+}
+.hic-api-test-section .notice p {
+    margin: 0;
+}
+.hic-api-test-section .spinner {
+    visibility: visible;
+}
+
