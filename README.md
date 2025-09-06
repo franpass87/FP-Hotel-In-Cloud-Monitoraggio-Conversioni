@@ -215,6 +215,21 @@ add_filter( 'hic_ga4_payload', function ( $payload, $data, $gclid, $fbclid ) {
 
 Il valore restituito dal filtro verrà inviato a GA4 come parte dell'evento.
 
+### Personalizzazione payload Facebook
+
+Il filtro `hic_fb_payload` consente di modificare il payload inviato a Facebook Meta prima della codifica JSON. Il filtro riceve il payload generato dal plugin, i dati originali della prenotazione e gli identificatori di tracciamento `gclid` e `fbclid`.
+
+Esempio di aggiunta di un parametro personalizzato:
+
+```php
+add_filter( 'hic_fb_payload', function ( $payload, $data, $gclid, $fbclid ) {
+    $payload['data'][0]['custom_data']['coupon'] = 'SUMMER_PROMO';
+    return $payload;
+}, 10, 4 );
+```
+
+Il valore restituito dal filtro verrà inviato a Meta come parte dell'evento.
+
 ### Personalizzazione Log
 
 È possibile modificare i giorni di conservazione dei log tramite il filtro WordPress `hic_log_retention_days`:
