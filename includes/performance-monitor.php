@@ -451,7 +451,7 @@ class HIC_Performance_Monitor {
             wp_send_json(['error' => 'Invalid nonce'], 403);
         }
 
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('hic_manage')) {
             wp_send_json(['error' => 'Insufficient permissions'], 403);
         }
 

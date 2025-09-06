@@ -30,10 +30,18 @@ function hic_activate($network_wide)
         foreach ($sites as $site) {
             \switch_to_blog($site->blog_id);
             \hic_maybe_upgrade_db();
+            $role = \get_role('administrator');
+            if ($role && !$role->has_cap('hic_manage')) {
+                $role->add_cap('hic_manage');
+            }
             \restore_current_blog();
         }
     } else {
         \hic_maybe_upgrade_db();
+        $role = \get_role('administrator');
+        if ($role && !$role->has_cap('hic_manage')) {
+            $role->add_cap('hic_manage');
+        }
     }
 }
 
