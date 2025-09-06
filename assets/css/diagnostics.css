@@ -1,6 +1,8 @@
 /* Modern, Clean Diagnostic Interface */
         .wrap {
+            width: 100% !important;
             max-width: none !important;
+            margin: 0;
         }
         
         .wrap h1 {
