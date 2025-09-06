@@ -628,7 +628,7 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
  * Test Brevo Contact API connectivity
  */
 function hic_test_brevo_contact_api() {
-  $test_email = 'test-' . time() . '@example.com';
+  $test_email = 'test-' . current_time('timestamp') . '@example.com';
   
   $body = array(
     'email' => $test_email,
@@ -668,7 +668,7 @@ function hic_test_brevo_contact_api() {
  */
 function hic_test_brevo_event_api() {
   $endpoint = Helpers\hic_get_brevo_event_endpoint();
-  $test_email = 'test-' . time() . '@example.com';
+  $test_email = 'test-' . current_time('timestamp') . '@example.com';
   
   $body = array(
     'event' => 'test_connectivity',

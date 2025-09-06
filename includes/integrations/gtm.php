@@ -81,7 +81,7 @@ function hic_queue_gtm_event($event_data) {
     $queued_events = get_option('hic_gtm_queued_events', []);
     
     // Add timestamp to avoid conflicts
-    $event_data['event_timestamp'] = time();
+    $event_data['event_timestamp'] = current_time('timestamp');
     
     $queued_events[] = $event_data;
     
