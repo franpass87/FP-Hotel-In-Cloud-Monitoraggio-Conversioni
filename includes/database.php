@@ -193,7 +193,7 @@ function hic_capture_tracking_params(){
     if (!$existing_sid || $existing_sid === $gclid) {
       $secure_flag = is_ssl();
       $httponly_flag = true;
-      $cookie_set = setcookie('hic_sid', $gclid, time() + 60*60*24*90, '/', $secure_flag, $httponly_flag);
+      $cookie_set = setcookie('hic_sid', $gclid, time() + 60*60*24*90, '/', '', $secure_flag, $httponly_flag);
       if ($cookie_set) {
         $_COOKIE['hic_sid'] = $gclid;
       } else {
@@ -238,7 +238,7 @@ function hic_capture_tracking_params(){
     if (!$existing_sid || $existing_sid === $fbclid) {
       $secure_flag = is_ssl();
       $httponly_flag = true;
-      $cookie_set = setcookie('hic_sid', $fbclid, time() + 60*60*24*90, '/', $secure_flag, $httponly_flag);
+      $cookie_set = setcookie('hic_sid', $fbclid, time() + 60*60*24*90, '/', '', $secure_flag, $httponly_flag);
       if ($cookie_set) {
         $_COOKIE['hic_sid'] = $fbclid;
       } else {
