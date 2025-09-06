@@ -19,51 +19,53 @@ add_action('wp_ajax_hic_test_email_ajax', 'hic_ajax_test_email');
 function hic_ajax_test_email() {
     // Verify nonce for security
     if (!check_ajax_referer('hic_test_email', 'nonce', false)) {
-        wp_die(json_encode(array(
-            'success' => false,
+        wp_send_json_error(array(
             'message' => 'Nonce di sicurezza non valido.'
-        )));
+        ));
     }
     
     // Check user permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array(
-            'success' => false,
+        wp_send_json_error(array(
             'message' => 'Permessi insufficienti.'
-        )));
+        ));
     }
     
     // Get email from request
     $test_email = sanitize_email($_POST['email'] ?? '');
     
     if (empty($test_email) || !is_email($test_email)) {
-        wp_die(json_encode(array(
-            'success' => false,
+        wp_send_json_error(array(
             'message' => 'Indirizzo email non valido.'
-        )));
+        ));
     }
     
     // Run email configuration test
     $test_result = Helpers\hic_test_email_configuration($test_email);
-    
-    wp_die(json_encode($test_result));
+
+    $success = !empty($test_result['success']);
+    unset($test_result['success']);
+
+    if ($success) {
+        wp_send_json_success($test_result);
+    } else {
+        wp_send_json_error($test_result);
+    }
 }
 
 function hic_ajax_test_api_connection() {
     // Verify nonce for security
     if (!check_ajax_referer('hic_test_api_nonce', 'nonce', false)) {
-        wp_die(json_encode(array(
-            'success' => false,
+        wp_send_json_error(array(
             'message' => 'Nonce di sicurezza non valido.'
-        )));
+        ));
     }
     
     // Check user permissions
     if (!current_user_can('manage_options')) {
-        wp_die(json_encode(array(
-            'success' => false,
+        wp_send_json_error(array(
             'message' => 'Permessi insufficienti.'
-        )));
+        ));
     }
     
     // Get credentials from AJAX request or settings
@@ -73,9 +75,15 @@ function hic_ajax_test_api_connection() {
     
     // Test the API connection
     $result = hic_test_api_connection($prop_id, $email, $password);
-    
-    // Return JSON response
-    wp_die(json_encode($result));
+
+    $success = !empty($result['success']);
+    unset($result['success']);
+
+    if ($success) {
+        wp_send_json_success($result);
+    } else {
+        wp_send_json_error($result);
+    }
 }
 
 function hic_add_admin_menu() {
@@ -303,21 +311,22 @@ function hic_options_page() {
                 
                 try {
                     var result = typeof response === 'string' ? JSON.parse(response) : response;
-                    
+                    var data = result.data || {};
+
                     var messageClass = result.success ? 'notice-success' : 'notice-error';
                     var icon = result.success ? 'dashicons-yes-alt' : 'dashicons-dismiss';
-                    
+
                     var html = '<div class="notice ' + messageClass + ' inline">' +
-                               '<p><span class="dashicons ' + icon + '"></span> ' + result.message;
-                    
-                    if (result.success && result.data_count !== undefined) {
-                        html += ' (' + result.data_count + ' prenotazioni trovate negli ultimi 7 giorni)';
+                               '<p><span class="dashicons ' + icon + '"></span> ' + data.message;
+
+                    if (result.success && data.data_count !== undefined) {
+                        html += ' (' + data.data_count + ' prenotazioni trovate negli ultimi 7 giorni)';
                     }
-                    
+
                     html += '</p></div>';
-                    
+
                     $result.html(html).show();
-                    
+
                 } catch (e) {
                     $result.html('<div class="notice notice-error inline">' +
                                '<p><span class="dashicons dashicons-dismiss"></span> Errore nel parsing della risposta</p>' +
@@ -422,11 +431,12 @@ function hic_admin_email_render() {
             body: new URLSearchParams(data)
         })
         .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                resultDiv.innerHTML = "<div style=\"color: green;\">✓ " + data.message + "</div>";
+        .then(result => {
+            var respData = result.data || {};
+            if (result.success) {
+                resultDiv.innerHTML = "<div style=\"color: green;\">✓ " + respData.message + "</div>";
             } else {
-                resultDiv.innerHTML = "<div style=\"color: red;\">✗ " + data.message + "</div>";
+                resultDiv.innerHTML = "<div style=\"color: red;\">✗ " + respData.message + "</div>";
             }
         })
         .catch(error => {
