@@ -22,8 +22,23 @@ require __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/includes/constants.php';
 require_once __DIR__ . '/includes/booking-poller.php';
 
+// Plugin activation handler
+function hic_activate($network_wide)
+{
+    if ($network_wide) {
+        $sites = \get_sites();
+        foreach ($sites as $site) {
+            \switch_to_blog($site->blog_id);
+            \hic_create_database_table();
+            \restore_current_blog();
+        }
+    } else {
+        \hic_create_database_table();
+    }
+}
+
 // Plugin activation hook
-\register_activation_hook(__FILE__, 'hic_create_database_table');
+\register_activation_hook(__FILE__, __NAMESPACE__ . '\\hic_activate');
 \register_deactivation_hook(__FILE__, 'hic_deactivate');
 
 // Add settings link in plugin list

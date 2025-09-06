@@ -28,6 +28,7 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 
 1. Eseguire `composer install` per generare il loader delle classi.
 2. Caricare il plugin normalmente in WordPress.
+3. In installazioni WordPress Multisite, l'attivazione a livello di rete inizializza le tabelle del database per ogni sito.
 
 ## Configurazione API
 
