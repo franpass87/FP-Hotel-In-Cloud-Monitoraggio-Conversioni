@@ -191,7 +191,9 @@ function hic_capture_tracking_params(){
     
     // Only update cookie if we don't have an existing SID or if existing SID was the gclid
     if (!$existing_sid || $existing_sid === $gclid) {
-      $cookie_set = setcookie('hic_sid', $gclid, time() + 60*60*24*90, '/', '', is_ssl(), true);
+      $secure_flag = is_ssl();
+      $httponly_flag = true;
+      $cookie_set = setcookie('hic_sid', $gclid, time() + 60*60*24*90, '/', $secure_flag, $httponly_flag);
       if ($cookie_set) {
         $_COOKIE['hic_sid'] = $gclid;
       } else {
@@ -234,7 +236,9 @@ function hic_capture_tracking_params(){
     
     // Only update cookie if we don't have an existing SID or if existing SID was the fbclid
     if (!$existing_sid || $existing_sid === $fbclid) {
-      $cookie_set = setcookie('hic_sid', $fbclid, time() + 60*60*24*90, '/', '', is_ssl(), true);
+      $secure_flag = is_ssl();
+      $httponly_flag = true;
+      $cookie_set = setcookie('hic_sid', $fbclid, time() + 60*60*24*90, '/', $secure_flag, $httponly_flag);
       if ($cookie_set) {
         $_COOKIE['hic_sid'] = $fbclid;
       } else {
