@@ -4,7 +4,9 @@
  */
 
 // Define WordPress test environment
-define('ABSPATH', dirname(__DIR__) . '/');
+if (!defined('ABSPATH')) {
+    define('ABSPATH', dirname(__DIR__) . '/');
+}
 if (!defined('WP_CONTENT_DIR')) {
     define('WP_CONTENT_DIR', sys_get_temp_dir());
 }
