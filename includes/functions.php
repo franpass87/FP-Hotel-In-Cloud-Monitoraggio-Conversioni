@@ -139,6 +139,51 @@ function hic_should_schedule_retry_event() {
 }
 
 /* ============ New Helper Functions ============ */
+
+/**
+ * Retrieve tracking IDs (gclid and fbclid) for a given SID from database.
+ *
+ * @param string $sid Session identifier
+ * @return array{gclid:?string, fbclid:?string}
+ */
+function hic_get_tracking_ids_by_sid($sid) {
+    $sid = sanitize_text_field($sid);
+    if (empty($sid)) {
+        return ['gclid' => null, 'fbclid' => null];
+    }
+
+    global $wpdb;
+    if (!$wpdb) {
+        hic_log('hic_get_tracking_ids_by_sid: wpdb is not available');
+        return ['gclid' => null, 'fbclid' => null];
+    }
+
+    $table = $wpdb->prefix . 'hic_gclids';
+
+    // Ensure table exists before querying
+    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+    if (!$table_exists) {
+        hic_log('hic_get_tracking_ids_by_sid: Table does not exist: ' . $table);
+        return ['gclid' => null, 'fbclid' => null];
+    }
+
+    $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
+
+    if ($wpdb->last_error) {
+        hic_log('hic_get_tracking_ids_by_sid: Database error retrieving gclid/fbclid: ' . $wpdb->last_error);
+        return ['gclid' => null, 'fbclid' => null];
+    }
+
+    if ($row) {
+        return [
+            'gclid' => $row->gclid,
+            'fbclid' => $row->fbclid,
+        ];
+    }
+
+    return ['gclid' => null, 'fbclid' => null];
+}
+
 function hic_normalize_price($value) {
     if (empty($value) || (!is_numeric($value) && !is_string($value))) return 0.0;
 

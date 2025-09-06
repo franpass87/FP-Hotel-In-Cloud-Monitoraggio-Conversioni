@@ -146,19 +146,9 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   // Get gclid/fbclid for legacy compatibility
   // Use provided values when available before querying the database
   if (!empty($data['transaction_id']) && (empty($gclid) || empty($fbclid))) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'hic_gclids';
-
-    // Check if table exists before querying
-    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-    if ($table_exists) {
-      // Try to find tracking data using transaction_id as sid
-      $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
-      if ($row) {
-        if (empty($gclid)) { $gclid = $row->gclid ?: ''; }
-        if (empty($fbclid)) { $fbclid = $row->fbclid ?: ''; }
-      }
-    }
+    $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
+    if (empty($gclid)) { $gclid = $tracking['gclid'] ?? ''; }
+    if (empty($fbclid)) { $fbclid = $tracking['fbclid'] ?? ''; }
   }
 
   $attributes = array(
@@ -303,19 +293,9 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
 
   // Get gclid/fbclid for bucket normalization if available
   if (!empty($data['transaction_id']) && (empty($gclid) || empty($fbclid))) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'hic_gclids';
-
-    // Check if table exists before querying
-    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-    if ($table_exists) {
-      // Try to find tracking data using transaction_id as sid
-      $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $data['transaction_id']));
-      if ($row) {
-        if (empty($gclid)) { $gclid = $row->gclid ?: ''; }
-        if (empty($fbclid)) { $fbclid = $row->fbclid ?: ''; }
-      }
-    }
+    $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
+    if (empty($gclid)) { $gclid = $tracking['gclid'] ?? ''; }
+    if (empty($fbclid)) { $fbclid = $tracking['fbclid'] ?? ''; }
   }
 
   $bucket = fp_normalize_bucket($gclid, $fbclid);
