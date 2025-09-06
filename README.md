@@ -133,6 +133,18 @@ add_filter( 'hic_admin_email_body', function ( $body, $data ) {
 
 I parametri `$subject` e `$body` rappresentano rispettivamente oggetto e corpo generati dal plugin, mentre `$data` contiene i dettagli della prenotazione.
 
+### Personalizzazione Log
+
+È possibile modificare i giorni di conservazione dei log tramite il filtro WordPress `hic_log_retention_days`:
+
+```php
+add_filter( 'hic_log_retention_days', function ( $days ) {
+    return 7; // Conserva i log per 7 giorni invece dei 30 predefiniti
+} );
+```
+
+L'hook riceve il numero di giorni di retention configurato dal plugin (default 30) e deve restituire il nuovo valore da applicare.
+
 ## Note su Privacy e Rate Limits
 
 - Il plugin rispetta i rate limits delle API Hotel in Cloud
