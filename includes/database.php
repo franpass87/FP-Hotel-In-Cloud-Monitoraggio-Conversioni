@@ -458,3 +458,34 @@ function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_m
   
   return $results ? $results : array();
 }
+
+/* ============ Cleanup old GCLIDs ============ */
+function hic_cleanup_old_gclids($days = 90) {
+  if ($days <= 0) return 0;
+
+  global $wpdb;
+
+  // Check if wpdb is available
+  if (!$wpdb) {
+    Helpers\hic_log('hic_cleanup_old_gclids: wpdb is not available');
+    return false;
+  }
+
+  $table = $wpdb->prefix . 'hic_gclids';
+  $cutoff = gmdate('Y-m-d H:i:s', strtotime("-{$days} days"));
+
+  // Delete records older than cutoff
+  $deleted = $wpdb->query($wpdb->prepare(
+    "DELETE FROM $table WHERE created_at < %s",
+    $cutoff
+  ));
+
+  if ($deleted === false) {
+    Helpers\hic_log('hic_cleanup_old_gclids: Database error: ' . $wpdb->last_error);
+    return false;
+  }
+
+  Helpers\hic_log("hic_cleanup_old_gclids: Removed $deleted records older than $days days");
+
+  return $deleted;
+}
