@@ -200,6 +200,21 @@ add_filter( 'hic_admin_email_body', function ( $body, $data ) {
 
 I parametri `$subject` e `$body` rappresentano rispettivamente oggetto e corpo generati dal plugin, mentre `$data` contiene i dettagli della prenotazione.
 
+### Personalizzazione payload GA4
+
+Il filtro `hic_ga4_payload` consente di modificare il payload inviato a Google Analytics 4 prima della codifica JSON. Il filtro riceve il payload generato dal plugin, i dati originali della prenotazione e gli identificatori di tracciamento `gclid` e `fbclid`.
+
+Esempio di aggiunta di un parametro personalizzato:
+
+```php
+add_filter( 'hic_ga4_payload', function ( $payload, $data, $gclid, $fbclid ) {
+    $payload['events'][0]['params']['coupon'] = 'SUMMER_PROMO';
+    return $payload;
+}, 10, 4 );
+```
+
+Il valore restituito dal filtro verrà inviato a GA4 come parte dell'evento.
+
 ### Personalizzazione Log
 
 È possibile modificare i giorni di conservazione dei log tramite il filtro WordPress `hic_log_retention_days`:

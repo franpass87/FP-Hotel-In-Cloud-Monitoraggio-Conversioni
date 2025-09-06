@@ -63,6 +63,8 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
     ]]
   ];
 
+  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid);
+
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
@@ -181,6 +183,8 @@ function hic_dispatch_ga4_reservation($data) {
       'params' => $params
     ]]
   ];
+
+  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
