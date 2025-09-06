@@ -224,6 +224,12 @@ function hic_admin_enqueue_scripts($hook) {
     }
 
     if ($hook === 'toplevel_page_hic-monitoring') {
+        wp_enqueue_style(
+            'hic-admin-settings',
+            plugin_dir_url(__FILE__) . '../../assets/css/admin-settings.css',
+            array(),
+            HIC_PLUGIN_VERSION
+        );
         wp_enqueue_script(
             'hic-admin-settings',
             plugin_dir_url(__FILE__) . '../../assets/js/admin-settings.js',
@@ -306,23 +312,6 @@ function hic_options_page() {
         </div>
         <?php endif; ?>
     </div>
-    
-    <style>
-    .hic-api-test-section .dashicons {
-        vertical-align: middle;
-        margin-right: 5px;
-    }
-    .hic-api-test-section .notice {
-        margin: 0;
-        padding: 10px;
-    }
-    .hic-api-test-section .notice p {
-        margin: 0;
-    }
-    .hic-api-test-section .spinner {
-        visibility: visible;
-    }
-    </style>
     <?php
 }
 
