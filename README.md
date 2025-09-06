@@ -269,3 +269,8 @@ Il sistema include test completi per tutte le combinazioni:
 - **Test Dispatch**: Simulazione booking per ogni scenario
 
 Accedi ai test dalla dashboard admin: **Impostazioni HIC > Diagnostics**
+
+Per eseguire la suite di test da linea di comando:
+```bash
+composer test
+```
