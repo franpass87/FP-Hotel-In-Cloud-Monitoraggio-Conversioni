@@ -1,0 +1,25 @@
+{
+    "name": "fp-hotel-in-cloud/monitoraggio-conversioni",
+    "description": "HIC GA4 + Brevo + Meta plugin",
+    "type": "wordpress-plugin",
+    "autoload": {
+        "psr-4": {
+            "FpHic\\": "includes/"
+        },
+        "files": [
+            "includes/constants.php",
+            "includes/functions.php",
+            "includes/database.php",
+            "includes/booking-processor.php",
+            "includes/integrations/ga4.php",
+            "includes/integrations/gtm.php",
+            "includes/integrations/facebook.php",
+            "includes/integrations/brevo.php",
+            "includes/api/webhook.php",
+            "includes/api/polling.php",
+            "includes/cli.php",
+            "includes/admin/admin-settings.php",
+            "includes/admin/diagnostics.php"
+        ]
+    }
+}

@@ -23,3 +23,6 @@ hic-log*.txt
 # Temporary files
 *.tmp
 *.temp
+
+# Composer
+vendor/
