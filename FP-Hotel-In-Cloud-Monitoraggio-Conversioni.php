@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 /**
  * Plugin Name: HIC GA4 + Brevo + Meta (bucket strategy)
  * Description: Tracciamento prenotazioni Hotel in Cloud → GA4 (purchase), Meta CAPI (Purchase) e Brevo (contact+event), con bucket gads/fbads/organic. Salvataggio gclid/fbclid↔sid e append sid ai link HIC.
