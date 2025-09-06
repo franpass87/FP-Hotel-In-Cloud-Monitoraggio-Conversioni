@@ -440,7 +440,7 @@ function hic_webhook_token_render() {
 }
 
 function hic_api_url_render() {
-    echo '<input type="url" name="hic_api_url" value="' . esc_attr(Helpers\hic_get_api_url()) . '" class="regular-text" />';
+    echo '<input type="url" name="hic_api_url" value="' . esc_url(Helpers\hic_get_api_url()) . '" class="regular-text" />';
     echo '<p class="description">URL delle API Hotel in Cloud (solo se si usa API Polling)</p>';
 }
 
@@ -515,17 +515,17 @@ function hic_currency_render() {
 
 function hic_ga4_use_net_value_render() {
     $checked = Helpers\hic_use_net_value() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_ga4_use_net_value" value="1" ' . $checked . ' /> Usa price - unpaid_balance come valore per GA4/Pixel';
+    echo '<input type="checkbox" name="hic_ga4_use_net_value" value="1" ' . esc_attr($checked) . ' /> Usa price - unpaid_balance come valore per GA4/Pixel';
 }
 
 function hic_process_invalid_render() {
     $checked = Helpers\hic_process_invalid() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_process_invalid" value="1" ' . $checked . ' /> Processa anche prenotazioni con valid=0';
+    echo '<input type="checkbox" name="hic_process_invalid" value="1" ' . esc_attr($checked) . ' /> Processa anche prenotazioni con valid=0';
 }
 
 function hic_allow_status_updates_render() {
     $checked = Helpers\hic_allow_status_updates() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_allow_status_updates" value="1" ' . $checked . ' /> Permetti aggiornamenti quando cambia presence';
+    echo '<input type="checkbox" name="hic_allow_status_updates" value="1" ' . esc_attr($checked) . ' /> Permetti aggiornamenti quando cambia presence';
 }
 
 function hic_brevo_list_it_render() {
@@ -545,23 +545,23 @@ function hic_brevo_list_default_render() {
 
 function hic_brevo_optin_default_render() {
     $checked = Helpers\hic_get_brevo_optin_default() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_brevo_optin_default" value="1" ' . $checked . ' /> Opt-in marketing di default per nuovi contatti';
+    echo '<input type="checkbox" name="hic_brevo_optin_default" value="1" ' . esc_attr($checked) . ' /> Opt-in marketing di default per nuovi contatti';
 }
 
 function hic_debug_verbose_render() {
     $checked = Helpers\hic_is_debug_verbose() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_debug_verbose" value="1" ' . $checked . ' /> Abilita log debug estesi (solo per test)';
+    echo '<input type="checkbox" name="hic_debug_verbose" value="1" ' . esc_attr($checked) . ' /> Abilita log debug estesi (solo per test)';
 }
 
 // Email enrichment render functions
 function hic_updates_enrich_contacts_render() {
     $checked = Helpers\hic_updates_enrich_contacts() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_updates_enrich_contacts" value="1" ' . $checked . ' /> Aggiorna contatti Brevo quando arriva email reale da updates';
+    echo '<input type="checkbox" name="hic_updates_enrich_contacts" value="1" ' . esc_attr($checked) . ' /> Aggiorna contatti Brevo quando arriva email reale da updates';
 }
 
 function hic_realtime_brevo_sync_render() {
     $checked = Helpers\hic_realtime_brevo_sync_enabled() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_realtime_brevo_sync" value="1" ' . $checked . ' /> Invia eventi "reservation_created" a Brevo in tempo reale per nuove prenotazioni';
+    echo '<input type="checkbox" name="hic_realtime_brevo_sync" value="1" ' . esc_attr($checked) . ' /> Invia eventi "reservation_created" a Brevo in tempo reale per nuove prenotazioni';
     echo '<p class="description">Quando abilitato, le nuove prenotazioni rilevate dal polling updates invieranno automaticamente eventi a Brevo per automazioni e tracciamento.</p>';
 }
 
@@ -572,12 +572,12 @@ function hic_brevo_list_alias_render() {
 
 function hic_brevo_double_optin_on_enrich_render() {
     $checked = Helpers\hic_brevo_double_optin_on_enrich() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_brevo_double_optin_on_enrich" value="1" ' . $checked . ' /> Invia double opt-in quando arriva email reale';
+    echo '<input type="checkbox" name="hic_brevo_double_optin_on_enrich" value="1" ' . esc_attr($checked) . ' /> Invia double opt-in quando arriva email reale';
 }
 
 function hic_brevo_event_endpoint_render() {
     $endpoint = Helpers\hic_get_brevo_event_endpoint();
-    echo '<input type="url" name="hic_brevo_event_endpoint" value="' . esc_attr($endpoint) . '" style="width: 100%;" />';
+    echo '<input type="url" name="hic_brevo_event_endpoint" value="' . esc_url($endpoint) . '" style="width: 100%;" />';
     echo '<p class="description">Endpoint API per eventi Brevo. Default: https://in-automate.brevo.com/api/v2/trackEvent<br>';
     echo 'Modificare solo se Brevo cambia il proprio endpoint per gli eventi o se si utilizza un endpoint personalizzato.</p>';
 }
