@@ -455,8 +455,8 @@ class HIC_Performance_Monitor {
             wp_send_json(['error' => 'Insufficient permissions'], 403);
         }
 
-        $type = sanitize_text_field($_GET['type'] ?? 'summary');
-        $days = absint($_GET['days'] ?? 7);
+        $type = sanitize_text_field( wp_unslash( $_GET['type'] ?? 'summary' ) );
+        $days = absint( wp_unslash( $_GET['days'] ?? 7 ) );
 
         switch ($type) {
             case 'summary':

@@ -295,7 +295,8 @@ function hic_capture_tracking_params(){
   $existing_sid = isset($_COOKIE['hic_sid']) ? sanitize_text_field($_COOKIE['hic_sid']) : null;
 
   if (!empty($_GET['gclid'])) {
-    $result = hic_store_tracking_id('gclid', sanitize_text_field($_GET['gclid']), $existing_sid);
+    $gclid = sanitize_text_field( wp_unslash( $_GET['gclid'] ) );
+    $result = hic_store_tracking_id('gclid', $gclid, $existing_sid);
     if (is_wp_error($result)) {
       Helpers\hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
@@ -303,7 +304,8 @@ function hic_capture_tracking_params(){
   }
 
   if (!empty($_GET['fbclid'])) {
-    $result = hic_store_tracking_id('fbclid', sanitize_text_field($_GET['fbclid']), $existing_sid);
+    $fbclid = sanitize_text_field( wp_unslash( $_GET['fbclid'] ) );
+    $result = hic_store_tracking_id('fbclid', $fbclid, $existing_sid);
     if (is_wp_error($result)) {
       Helpers\hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
