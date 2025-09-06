@@ -20,11 +20,15 @@ if (!defined('ABSPATH')) {
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require __DIR__ . '/vendor/autoload.php';
 } else {
-    error_log('HIC Plugin: vendor/autoload.php non trovato.');
+    require_once __DIR__ . '/includes/constants.php';
+    require_once __DIR__ . '/includes/functions.php';
+    require_once __DIR__ . '/includes/log-manager.php';
+    Helpers\hic_log('HIC Plugin: vendor/autoload.php non trovato.', HIC_LOG_LEVEL_ERROR);
     return;
 }
 // Ensure plugin constants are loaded before usage
 require_once __DIR__ . '/includes/constants.php';
+require_once __DIR__ . '/includes/log-manager.php';
 require_once __DIR__ . '/includes/booking-poller.php';
 
 // Plugin activation handler

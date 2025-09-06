@@ -132,7 +132,7 @@ class HIC_Log_Manager {
         
         // Check if directory is writable
         if (!is_writable($log_dir)) {
-            error_log('HIC Plugin: Log directory is not writable: ' . $log_dir);
+            // Cannot write to log directory
             return false;
         }
         
@@ -140,7 +140,7 @@ class HIC_Log_Manager {
         $result = file_put_contents($this->log_file, $formatted_message, FILE_APPEND | LOCK_EX);
         
         if ($result === false) {
-            error_log('HIC Plugin: Failed to write to log file: ' . $this->log_file);
+            // Failed to write to log file
             return false;
         }
         
@@ -158,7 +158,7 @@ class HIC_Log_Manager {
         // Suppress potential warnings if the file is locked
         $file_size = @filesize($this->log_file);
         if ($file_size === false) {
-            error_log('HIC Plugin: Cannot get log file size: ' . $this->log_file);
+            // Cannot get log file size
             return false;
         }
 
