@@ -39,7 +39,13 @@ class HIC_Health_Monitor {
         register_rest_route('hic/v1', '/health', [
             'methods' => 'GET',
             'callback' => [$this, 'rest_health_check'],
-            'permission_callback' => '__return_true'
+            'permission_callback' => [$this, 'rest_token_permission'],
+            'args' => [
+                'token' => [
+                    'required' => true,
+                    'type' => 'string'
+                ],
+            ]
         ]);
     }
     
@@ -435,7 +441,23 @@ class HIC_Health_Monitor {
             Helpers\hic_safe_wp_schedule_event(time(), 'hourly', 'hic_health_monitor_event');
         }
     }
-    
+
+    /**
+     * Validate public health check token
+     */
+    private function validate_health_token($token) {
+        $saved = get_option('hic_health_token');
+        return !empty($token) && !empty($saved) && hash_equals($saved, $token);
+    }
+
+    /**
+     * Permission callback for REST health endpoint
+     */
+    public function rest_token_permission($request) {
+        $token = sanitize_text_field($request->get_param('token'));
+        return $this->validate_health_token($token);
+    }
+
     /**
      * AJAX health check handler
      */
@@ -458,6 +480,11 @@ class HIC_Health_Monitor {
      * Public health check (limited info)
      */
     public function public_health_check() {
+        $token = sanitize_text_field($_GET['token'] ?? '');
+        if (!$this->validate_health_token($token)) {
+            wp_send_json(['error' => 'Invalid token'], 403);
+        }
+
         $health_data = [
             'status' => get_transient(HIC_TRANSIENT_HEALTH_CHECK)['status'] ?? 'unknown',
             'timestamp' => current_time('mysql'),

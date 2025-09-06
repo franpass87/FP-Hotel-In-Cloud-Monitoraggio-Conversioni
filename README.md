@@ -83,6 +83,15 @@ La funzione "Test Dispatch Funzioni" permette di testare tutte le integrazioni c
 
 **Nota**: Le email di test vengono inviate agli indirizzi configurati nelle impostazioni del plugin, permettendo di verificare che il sistema di notifiche email funzioni correttamente.
 
+### Endpoint Health Check
+
+Per monitorare lo stato del plugin dall'esterno è disponibile un endpoint pubblico che richiede un token:
+
+- `GET /wp-json/hic/v1/health?token=IL_TUO_TOKEN`
+- `GET /wp-admin/admin-ajax.php?action=hic_health_check&token=IL_TUO_TOKEN`
+
+Il token deve corrispondere al valore salvato nell'opzione `hic_health_token`.
+
 ## Notifiche Email
 
 Il plugin invia automaticamente email di notifica all'amministratore per ogni nuova prenotazione ricevuta.
