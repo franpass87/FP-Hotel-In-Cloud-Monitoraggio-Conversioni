@@ -32,7 +32,7 @@ function hic_ajax_test_email() {
     }
     
     // Get email from request
-    $test_email = sanitize_email($_POST['email'] ?? '');
+    $test_email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
     
     if (empty($test_email) || !is_email($test_email)) {
         wp_send_json_error(array(
@@ -69,9 +69,9 @@ function hic_ajax_test_api_connection() {
     }
     
     // Get credentials from AJAX request or settings
-    $prop_id = sanitize_text_field($_POST['prop_id'] ?? '');
-    $email = sanitize_email($_POST['email'] ?? '');
-    $password = sanitize_text_field($_POST['password'] ?? '');
+    $prop_id = sanitize_text_field( wp_unslash( $_POST['prop_id'] ?? '' ) );
+    $email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+    $password = sanitize_text_field( wp_unslash( $_POST['password'] ?? '' ) );
     
     // Test the API connection
     $result = hic_test_api_connection($prop_id, $email, $password);
