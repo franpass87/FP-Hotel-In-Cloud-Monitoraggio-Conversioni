@@ -87,18 +87,19 @@ function hic_ajax_test_api_connection() {
 }
 
 function hic_add_admin_menu() {
-    add_options_page(
+    add_menu_page(
         'HIC Monitoring Settings',
         'HIC Monitoring',
         'manage_options',
         'hic-monitoring',
         'hic_options_page'
     );
-    
+
     // Add diagnostics submenu
-    add_options_page(
-        'HIC Diagnostics',
-        'HIC Diagnostics',
+    add_submenu_page(
+        'hic-monitoring',
+        'Diagnostics',
+        'Diagnostics',
         'manage_options',
         'hic-diagnostics',
         'hic_diagnostics_page'
@@ -213,7 +214,7 @@ function hic_settings_init() {
  */
 function hic_admin_enqueue_scripts($hook) {
     // Only load on our plugin pages
-    if ($hook === 'settings_page_hic-diagnostics' || $hook === 'settings_page_hic-monitoring') {
+    if ($hook === 'hic-monitoring_page_hic-diagnostics' || $hook === 'toplevel_page_hic-monitoring') {
         // Ensure jQuery is loaded
         wp_enqueue_script('jquery');
 
@@ -225,7 +226,7 @@ function hic_admin_enqueue_scripts($hook) {
         ');
     }
 
-    if ($hook === 'settings_page_hic-diagnostics') {
+    if ($hook === 'hic-monitoring_page_hic-diagnostics') {
         wp_enqueue_style(
             'hic-diagnostics',
             plugin_dir_url(__FILE__) . '../../assets/css/diagnostics.css',
