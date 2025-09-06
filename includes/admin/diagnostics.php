@@ -1518,7 +1518,8 @@ function hic_ajax_download_error_logs() {
     
     // Set headers for file download
     $filename = 'hic-error-log-' . date('Y-m-d-H-i-s') . '.txt';
-    
+
+    nocache_headers();
     header('Content-Type: text/plain');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Content-Length: ' . filesize($log_file));
@@ -1527,8 +1528,8 @@ function hic_ajax_download_error_logs() {
     
     // Output the file content
     readfile($log_file);
-    
-    wp_die(); // Stop execution after download
+
+    exit; // Stop execution after download
 }
 
 /**
