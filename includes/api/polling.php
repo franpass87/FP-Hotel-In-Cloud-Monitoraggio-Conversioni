@@ -255,12 +255,18 @@ add_action('hic_fetch_reservations', function($prop_id, $date_type, $from_date, 
  */
 function hic_should_process_reservation($reservation) {
     // Only require essential booking data - dates are critical for booking logic
-    $critical_fields = ['from_date', 'to_date'];
-    foreach ($critical_fields as $field) {
-        if (empty($reservation[$field])) {
-            hic_log("Reservation skipped: missing critical field '$field'");
-            return false;
+    $from = $reservation['from_date'] ?? $reservation['checkin'] ?? '';
+    $to   = $reservation['to_date']   ?? $reservation['checkout'] ?? '';
+    if (empty($from) || empty($to)) {
+        $missing = array();
+        if (empty($from)) {
+            $missing[] = 'from_date/checkin';
         }
+        if (empty($to)) {
+            $missing[] = 'to_date/checkout';
+        }
+        hic_log('Reservation skipped: missing critical field(s) ' . implode(', ', $missing));
+        return false;
     }
     
     // Check for any valid ID field (more flexible than requiring specific 'id' field)
@@ -377,7 +383,10 @@ function hic_transform_reservation($reservation) {
     if (!is_string($email)) {
         $email = '';
     }
-    
+
+    $from = $reservation['from_date'] ?? $reservation['checkin'] ?? '';
+    $to   = $reservation['to_date']   ?? $reservation['checkout'] ?? '';
+
     return array(
         'transaction_id' => $transaction_id,
         'reservation_code' => isset($reservation['reservation_code']) ? $reservation['reservation_code'] : '',
@@ -387,8 +396,8 @@ function hic_transform_reservation($reservation) {
         'accommodation_name' => $accommodation_name,
         'room_name' => isset($reservation['room_name']) ? $reservation['room_name'] : '',
         'guests' => $guests,
-        'from_date' => isset($reservation['from_date']) ? $reservation['from_date'] : '',
-        'to_date' => isset($reservation['to_date']) ? $reservation['to_date'] : '',
+        'from_date' => $from,
+        'to_date' => $to,
         'presence' => isset($reservation['presence']) ? $reservation['presence'] : '',
         'unpaid_balance' => $unpaid_balance,
         'guest_first_name' => $first,
