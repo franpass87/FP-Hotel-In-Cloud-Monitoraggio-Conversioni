@@ -21,7 +21,7 @@ class HIC_Log_Manager {
         
         $this->log_file = Helpers\hic_get_log_file();
         $this->max_size = HIC_LOG_MAX_SIZE;
-        $this->retention_days = HIC_LOG_RETENTION_DAYS;
+        $this->retention_days = apply_filters( 'hic_log_retention_days', HIC_LOG_RETENTION_DAYS );
         
         // Hook into WordPress shutdown to clean up logs (only if add_action exists)
         if (function_exists('add_action')) {
