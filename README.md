@@ -116,6 +116,23 @@ Se le email non arrivano:
 
 Il sistema include diagnostica avanzata per identificare automaticamente problemi comuni di configurazione email.
 
+### Personalizzazione Notifiche Email
+
+Il plugin espone filtri WordPress per modificare oggetto e contenuto delle notifiche inviate all'amministratore:
+
+```php
+add_filter( 'hic_admin_email_subject', function ( $subject, $data ) {
+    return '[Prenotazione] ' . $subject;
+}, 10, 2 );
+
+add_filter( 'hic_admin_email_body', function ( $body, $data ) {
+    $body .= "\nFonte: " . ( $data['source'] ?? 'sconosciuta' );
+    return $body;
+}, 10, 2 );
+```
+
+I parametri `$subject` e `$body` rappresentano rispettivamente oggetto e corpo generati dal plugin, mentre `$data` contiene i dettagli della prenotazione.
+
 ## Note su Privacy e Rate Limits
 
 - Il plugin rispetta i rate limits delle API Hotel in Cloud
