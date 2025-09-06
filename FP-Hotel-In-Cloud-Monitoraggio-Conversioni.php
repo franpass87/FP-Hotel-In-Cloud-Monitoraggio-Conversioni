@@ -24,6 +24,13 @@ require_once __DIR__ . '/includes/booking-poller.php';
 \register_activation_hook(__FILE__, 'hic_create_database_table');
 \register_deactivation_hook(__FILE__, 'hic_deactivate');
 
+// Add settings link in plugin list
+\add_filter('plugin_action_links_' . \plugin_basename(__FILE__), function ($links) {
+    $settings_link = '<a href="' . \admin_url('options-general.php?page=hic-monitoring') . '">' . \__('Impostazioni', 'hotel-in-cloud') . '</a>';
+    \array_unshift($links, $settings_link);
+    return $links;
+});
+
 // Initialize tracking parameters capture
 \add_action('init', 'hic_capture_tracking_params');
 
