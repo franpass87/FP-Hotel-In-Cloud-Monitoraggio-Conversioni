@@ -60,26 +60,28 @@ function hic_send_brevo_contact($data, $gclid, $fbclid){
 }
 
 /* ============ Brevo: evento personalizzato (purchase + bucket) ============ */
-function hic_send_brevo_event($data, $gclid, $fbclid){
+function hic_send_brevo_event($reservation, $gclid, $fbclid){
   if (!Helpers\hic_get_brevo_api_key()) { return; }
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
 
-  $body = array(
+  $event_data = array(
     'event' => 'purchase', // puoi rinominare in 'hic_booking' se preferisci
-    'email' => isset($data['email']) ? $data['email'] : '',
+    'email' => isset($reservation['email']) ? $reservation['email'] : '',
     'properties' => array(
-      'reservation_id' => isset($data['reservation_id']) ? $data['reservation_id'] : (isset($data['id']) ? $data['id'] : ''),
-      'amount'         => isset($data['amount']) ? Helpers\hic_normalize_price($data['amount']) : 0,
-      'currency'       => isset($data['currency']) ? $data['currency'] : 'EUR',
-      'date'           => isset($data['date']) ? $data['date'] : date('Y-m-d'),
-      'whatsapp'       => isset($data['whatsapp']) ? $data['whatsapp'] : '',
-      'lingua'         => isset($data['lingua']) ? $data['lingua'] : (isset($data['lang']) ? $data['lang'] : ''),
-      'firstname'      => isset($data['first_name']) ? $data['first_name'] : '',
-      'lastname'       => isset($data['last_name']) ? $data['last_name'] : '',
+      'reservation_id' => isset($reservation['reservation_id']) ? $reservation['reservation_id'] : (isset($reservation['id']) ? $reservation['id'] : ''),
+      'amount'         => isset($reservation['amount']) ? Helpers\hic_normalize_price($reservation['amount']) : 0,
+      'currency'       => isset($reservation['currency']) ? $reservation['currency'] : 'EUR',
+      'date'           => isset($reservation['date']) ? $reservation['date'] : date('Y-m-d'),
+      'whatsapp'       => isset($reservation['whatsapp']) ? $reservation['whatsapp'] : '',
+      'lingua'         => isset($reservation['lingua']) ? $reservation['lingua'] : (isset($reservation['lang']) ? $reservation['lang'] : ''),
+      'firstname'      => isset($reservation['first_name']) ? $reservation['first_name'] : '',
+      'lastname'       => isset($reservation['last_name']) ? $reservation['last_name'] : '',
       'bucket'         => $bucket,
       'vertical'       => 'hotel'
     )
   );
+
+  $event_data = apply_filters('hic_brevo_event', $event_data, $reservation);
 
   $res = Helpers\hic_http_request(Helpers\hic_get_brevo_event_endpoint(), array(
     'method'  => 'POST',
@@ -88,13 +90,13 @@ function hic_send_brevo_event($data, $gclid, $fbclid){
       'content-type' => 'application/json',
       'api-key'      => Helpers\hic_get_brevo_api_key()
     ),
-    'body'    => wp_json_encode($body),
+    'body'    => wp_json_encode($event_data),
   ));
-  
+
   $result = hic_handle_brevo_response($res, 'event_legacy', array(
     'event' => 'purchase',
     'bucket' => $bucket,
-    'email' => $body['email']
+    'email' => $event_data['email']
   ));
   
   if (!$result['success']) {

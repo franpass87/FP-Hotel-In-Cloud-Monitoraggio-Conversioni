@@ -48,3 +48,17 @@ Il plugin invia automaticamente eventi "purchase" con queste proprietà:
 - whatsapp, lingua, firstname, lastname, bucket
 
 Questi eventi possono essere usati per automazioni in Brevo.
+
+### Personalizzare l'evento
+
+Prima dell'invio della richiesta HTTP il plugin applica il filtro **`hic_brevo_event`** che consente di modificare il payload:
+
+```php
+add_filter('hic_brevo_event', function( $event_data, $reservation ) {
+    // Aggiungi o modifica i dati dell'evento
+    return $event_data;
+}, 10, 2);
+```
+
+- `$event_data`: array dell'evento inviato a Brevo
+- `$reservation`: dati originali della prenotazione
