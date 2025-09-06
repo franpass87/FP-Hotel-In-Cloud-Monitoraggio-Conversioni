@@ -39,14 +39,14 @@ function hic_send_brevo_contact($data, $gclid, $fbclid){
     'updateEnabled' => true
   );
 
-  $res = wp_remote_post('https://api.brevo.com/v3/contacts', array(
+  $res = Helpers\hic_http_request('https://api.brevo.com/v3/contacts', array(
+    'method'  => 'POST',
     'headers' => array(
       'accept'       => 'application/json',
       'api-key'      => Helpers\hic_get_brevo_api_key(),
       'content-type' => 'application/json'
     ),
     'body'    => wp_json_encode($body),
-    'timeout' => 15
   ));
   
   $result = hic_handle_brevo_response($res, 'contact_legacy', array(
@@ -81,14 +81,14 @@ function hic_send_brevo_event($data, $gclid, $fbclid){
     )
   );
 
-  $res = wp_remote_post(Helpers\hic_get_brevo_event_endpoint(), array(
+  $res = Helpers\hic_http_request(Helpers\hic_get_brevo_event_endpoint(), array(
+    'method'  => 'POST',
     'headers' => array(
       'accept'       => 'application/json',
       'content-type' => 'application/json',
       'api-key'      => Helpers\hic_get_brevo_api_key()
     ),
     'body'    => wp_json_encode($body),
-    'timeout' => 15
   ));
   
   $result = hic_handle_brevo_response($res, 'event_legacy', array(
@@ -202,14 +202,14 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     }
   }
 
-  $res = wp_remote_post('https://api.brevo.com/v3/contacts', array(
+  $res = Helpers\hic_http_request('https://api.brevo.com/v3/contacts', array(
+    'method'  => 'POST',
     'headers' => array(
       'accept' => 'application/json',
       'api-key' => Helpers\hic_get_brevo_api_key(),
       'content-type' => 'application/json'
     ),
     'body' => wp_json_encode($body),
-    'timeout' => 15
   ));
   
   $result = hic_handle_brevo_response($res, 'contact', array(
@@ -336,14 +336,14 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     'full_payload' => $body
   )));
 
-  $res = wp_remote_post(Helpers\hic_get_brevo_event_endpoint(), array(
+  $res = Helpers\hic_http_request(Helpers\hic_get_brevo_event_endpoint(), array(
+    'method'  => 'POST',
     'headers' => array(
       'accept' => 'application/json',
       'content-type' => 'application/json',
       'api-key' => Helpers\hic_get_brevo_api_key()
     ),
     'body' => wp_json_encode($body),
-    'timeout' => 15
   ));
   
   $result = hic_handle_brevo_response($res, 'event', array(
@@ -640,14 +640,14 @@ function hic_test_brevo_contact_api() {
     'updateEnabled' => false // Don't update if exists
   );
   
-  $res = wp_remote_post('https://api.brevo.com/v3/contacts', array(
+  $res = Helpers\hic_http_request('https://api.brevo.com/v3/contacts', array(
+    'method'  => 'POST',
     'headers' => array(
       'accept' => 'application/json',
       'api-key' => Helpers\hic_get_brevo_api_key(),
       'content-type' => 'application/json'
     ),
     'body' => wp_json_encode($body),
-    'timeout' => 15
   ));
   
   $result = hic_handle_brevo_response($res, 'contact_test', array(
@@ -686,14 +686,14 @@ function hic_test_brevo_event_api() {
     'payload' => $body
   )));
   
-  $res = wp_remote_post($endpoint, array(
+  $res = Helpers\hic_http_request($endpoint, array(
+    'method'  => 'POST',
     'headers' => array(
       'accept' => 'application/json',
       'content-type' => 'application/json',
       'api-key' => Helpers\hic_get_brevo_api_key()
     ),
     'body' => wp_json_encode($body),
-    'timeout' => 15
   ));
   
   $result = hic_handle_brevo_response($res, 'event_test', array(
@@ -718,14 +718,14 @@ function hic_test_brevo_event_api() {
       'reason' => 'Primary endpoint failed'
     )));
     
-    $alt_res = wp_remote_post($alt_endpoint, array(
+    $alt_res = Helpers\hic_http_request($alt_endpoint, array(
+      'method'  => 'POST',
       'headers' => array(
         'accept' => 'application/json',
         'content-type' => 'application/json',
         'api-key' => Helpers\hic_get_brevo_api_key()
       ),
       'body' => wp_json_encode($body),
-      'timeout' => 15
     ));
     
     $alt_result = hic_handle_brevo_response($alt_res, 'event_test_alt', array(
