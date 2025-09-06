@@ -24,6 +24,11 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 - [Integrazione Google Tag Manager](GUIDA_GTM_INTEGRAZIONE.md) - GTM vs GA4, prevenzione doppia misurazione
 - [FAQ - Domande Frequenti](FAQ.md) - Risposte alle domande comuni
 
+## Installazione
+
+1. Eseguire `composer install` per generare il loader delle classi.
+2. Caricare il plugin normalmente in WordPress.
+
 ## Configurazione API
 
 ### API Hotel in Cloud

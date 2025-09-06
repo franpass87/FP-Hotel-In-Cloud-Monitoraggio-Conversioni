@@ -12,49 +12,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Include constants first
-require_once __DIR__ . '/includes/constants.php';
-
-// Include core functionality files
-require_once __DIR__ . '/includes/functions.php';
-require_once __DIR__ . '/includes/database.php';
-require_once __DIR__ . '/includes/booking-processor.php';
-
-// Include integration files
-require_once __DIR__ . '/includes/integrations/ga4.php';
-require_once __DIR__ . '/includes/integrations/gtm.php';
-require_once __DIR__ . '/includes/integrations/facebook.php';
-require_once __DIR__ . '/includes/integrations/brevo.php';
-
-// Include API handlers
-require_once __DIR__ . '/includes/api/webhook.php';
-require_once __DIR__ . '/includes/api/polling.php';
-
-// Include new reliable booking poller
-require_once __DIR__ . '/includes/booking-poller.php';
-
-// Include enhanced log management
-require_once __DIR__ . '/includes/log-manager.php';
-
-// Include configuration validator
-require_once __DIR__ . '/includes/config-validator.php';
-
-// Include performance monitoring
-require_once __DIR__ . '/includes/performance-monitor.php';
-
-// Include health monitoring system
-require_once __DIR__ . '/includes/health-monitor.php';
-
-// Include CLI commands (only if WP-CLI is available)
-if (defined('WP_CLI') && WP_CLI) {
-    require_once __DIR__ . '/includes/cli.php';
-}
-
-// Include admin interface (only in admin area)
-if (is_admin()) {
-    require_once __DIR__ . '/includes/admin/admin-settings.php';
-    require_once __DIR__ . '/includes/admin/diagnostics.php';
-}
+// Load Composer autoloader
+require __DIR__ . '/vendor/autoload.php';
 
 // Plugin activation hook
 \register_activation_hook(__FILE__, 'hic_create_database_table');
@@ -65,16 +24,16 @@ if (is_admin()) {
 // Initialize enhanced systems when WordPress is ready
 \add_action('init', function() {
     // Initialize log manager
-    hic_get_log_manager();
+    \hic_get_log_manager();
 
     // Initialize performance monitor
-    hic_get_performance_monitor();
+    \hic_get_performance_monitor();
 
     // Initialize config validator
-    hic_get_config_validator();
+    \hic_get_config_validator();
 
     // Initialize health monitor
-    hic_get_health_monitor();
+    \hic_get_health_monitor();
 });
 
 // Enqueue frontend JavaScript
