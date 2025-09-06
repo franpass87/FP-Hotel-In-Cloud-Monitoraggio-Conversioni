@@ -1,4 +1,5 @@
 <?php
+namespace FpHic;
 /**
  * Google Tag Manager Integration
  */
@@ -11,26 +12,26 @@ if (!defined('ABSPATH')) exit;
  */
 function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
     // Only proceed if GTM is enabled
-    if (!hic_is_gtm_enabled()) {
+    if (!Helpers\hic_is_gtm_enabled()) {
         return false;
     }
 
     // Validate input data
     if (!is_array($data)) {
-        hic_log('GTM DataLayer: data is not an array');
+        Helpers\hic_log('GTM DataLayer: data is not an array');
         return false;
     }
 
-    $bucket = fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+    $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
 
     // Validate and normalize amount
     $amount = 0;
     if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-        $amount = hic_normalize_price($data['amount']);
+        $amount = Helpers\hic_normalize_price($data['amount']);
     }
 
     // Generate transaction ID using consistent extraction
-    $transaction_id = hic_extract_reservation_id($data);
+    $transaction_id = Helpers\hic_extract_reservation_id($data);
     if (empty($transaction_id)) {
         $transaction_id = uniqid('hic_gtm_');
     }
@@ -68,7 +69,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
     // Store the data to be pushed to dataLayer on next page load
     hic_queue_gtm_event($gtm_data);
 
-    hic_log("GTM DataLayer: queued purchase event for transaction_id=$transaction_id, bucket=$bucket, value=$amount");
+    Helpers\hic_log("GTM DataLayer: queued purchase event for transaction_id=$transaction_id, bucket=$bucket, value=$amount");
     return true;
 }
 
@@ -105,18 +106,18 @@ function hic_get_and_clear_gtm_events() {
  * Output GTM container code in <head>
  */
 function hic_output_gtm_head_code() {
-    if (!hic_is_gtm_enabled()) {
+    if (!Helpers\hic_is_gtm_enabled()) {
         return;
     }
     
-    $container_id = hic_get_gtm_container_id();
+    $container_id = Helpers\hic_get_gtm_container_id();
     if (empty($container_id)) {
         return;
     }
     
     // Validate GTM container ID format
     if (!preg_match('/^GTM-[A-Z0-9]+$/', $container_id)) {
-        hic_log("GTM: Invalid container ID format: $container_id");
+        Helpers\hic_log("GTM: Invalid container ID format: $container_id");
         return;
     }
     
@@ -135,11 +136,11 @@ function hic_output_gtm_head_code() {
  * Output GTM noscript code in <body>
  */
 function hic_output_gtm_body_code() {
-    if (!hic_is_gtm_enabled()) {
+    if (!Helpers\hic_is_gtm_enabled()) {
         return;
     }
     
-    $container_id = hic_get_gtm_container_id();
+    $container_id = Helpers\hic_get_gtm_container_id();
     if (empty($container_id) || !preg_match('/^GTM-[A-Z0-9]+$/', $container_id)) {
         return;
     }
@@ -156,7 +157,7 @@ function hic_output_gtm_body_code() {
  * Output queued GTM events to dataLayer
  */
 function hic_output_gtm_events() {
-    if (!hic_is_gtm_enabled()) {
+    if (!Helpers\hic_is_gtm_enabled()) {
         return;
     }
     
@@ -179,7 +180,7 @@ function hic_output_gtm_events() {
  * Hook GTM scripts into WordPress
  */
 function hic_init_gtm_hooks() {
-    if (!hic_is_gtm_enabled()) {
+    if (!Helpers\hic_is_gtm_enabled()) {
         return;
     }
     
@@ -209,13 +210,13 @@ add_action('init', 'hic_init_gtm_hooks');
  */
 function hic_dispatch_gtm_reservation($data) {
     // Only proceed if GTM is enabled
-    if (!hic_is_gtm_enabled()) {
+    if (!Helpers\hic_is_gtm_enabled()) {
         return false;
     }
 
     // Validate input data
     if (!is_array($data)) {
-        hic_log('GTM dispatch: data is not an array');
+        Helpers\hic_log('GTM dispatch: data is not an array');
         return false;
     }
 
@@ -223,25 +224,25 @@ function hic_dispatch_gtm_reservation($data) {
     $required_fields = ['transaction_id', 'value', 'currency'];
     foreach ($required_fields as $field) {
         if (!isset($data[$field])) {
-            hic_log("GTM dispatch: Missing required field '$field'");
+            Helpers\hic_log("GTM dispatch: Missing required field '$field'");
             return false;
         }
     }
 
     $transaction_id = sanitize_text_field($data['transaction_id']);
-    $value = hic_normalize_price($data['value']);
+    $value = Helpers\hic_normalize_price($data['value']);
     $currency = sanitize_text_field($data['currency']);
 
     // Get gclid/fbclid for bucket normalization if available
     $gclid = '';
     $fbclid = '';
     if (!empty($data['transaction_id'])) {
-        $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
+        $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
         $gclid = $tracking['gclid'] ?? '';
         $fbclid = $tracking['fbclid'] ?? '';
     }
 
-    $bucket = fp_normalize_bucket($gclid, $fbclid);
+    $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
 
     // Prepare GTM ecommerce data
     $gtm_data = [
@@ -264,7 +265,7 @@ function hic_dispatch_gtm_reservation($data) {
         'checkout' => sanitize_text_field($data['to_date'] ?? ''),
         'reservation_code' => sanitize_text_field($data['reservation_code'] ?? ''),
         'presence' => sanitize_text_field($data['presence'] ?? ''),
-        'unpaid_balance' => hic_normalize_price($data['unpaid_balance'] ?? 0),
+        'unpaid_balance' => Helpers\hic_normalize_price($data['unpaid_balance'] ?? 0),
         'bucket' => $bucket,
         'vertical' => 'hotel'
     ];
@@ -280,6 +281,6 @@ function hic_dispatch_gtm_reservation($data) {
     // Queue the event
     hic_queue_gtm_event($gtm_data);
 
-    hic_log("GTM dispatch: queued purchase event for bucket=$bucket vertical=hotel transaction_id=$transaction_id value=$value $currency");
+    Helpers\hic_log("GTM dispatch: queued purchase event for bucket=$bucket vertical=hotel transaction_id=$transaction_id value=$value $currency");
     return true;
 }

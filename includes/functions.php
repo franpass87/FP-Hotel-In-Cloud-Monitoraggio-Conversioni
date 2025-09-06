@@ -1,9 +1,13 @@
 <?php
+namespace FpHic\Helpers {
+
 /**
  * Helper functions for HIC Plugin
  */
 
-if (!defined('ABSPATH')) exit;
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 /* ================= CONFIG FUNCTIONS ================= */
 function hic_get_option($key, $default = '') {
@@ -285,7 +289,7 @@ function hic_booking_uid($reservation) {
 
 /* ============ Helpers ============ */
 function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
-    $log_manager = hic_get_log_manager();
+    $log_manager = function_exists('FpHic\\hic_get_log_manager') ? \FpHic\hic_get_log_manager() : null;
 
     if ($log_manager) {
         return $log_manager->log($msg, $level, $context);
@@ -781,4 +785,72 @@ function hic_safe_wp_clear_scheduled_hook($hook, $args = array()) {
         return false;
     }
     return wp_clear_scheduled_hook($hook, $args);
+}
+
+}
+
+// Global wrappers for backward compatibility
+namespace {
+    function hic_get_option($key, $default = '') { return \FpHic\Helpers\hic_get_option($key, $default); }
+    function hic_get_measurement_id() { return \FpHic\Helpers\hic_get_measurement_id(); }
+    function hic_get_api_secret() { return \FpHic\Helpers\hic_get_api_secret(); }
+    function hic_get_brevo_api_key() { return \FpHic\Helpers\hic_get_brevo_api_key(); }
+    function hic_get_brevo_list_it() { return \FpHic\Helpers\hic_get_brevo_list_it(); }
+    function hic_get_brevo_list_en() { return \FpHic\Helpers\hic_get_brevo_list_en(); }
+    function hic_get_brevo_list_default() { return \FpHic\Helpers\hic_get_brevo_list_default(); }
+    function hic_get_brevo_optin_default() { return \FpHic\Helpers\hic_get_brevo_optin_default(); }
+    function hic_is_brevo_enabled() { return \FpHic\Helpers\hic_is_brevo_enabled(); }
+    function hic_is_debug_verbose() { return \FpHic\Helpers\hic_is_debug_verbose(); }
+    function hic_updates_enrich_contacts() { return \FpHic\Helpers\hic_updates_enrich_contacts(); }
+    function hic_get_brevo_list_alias() { return \FpHic\Helpers\hic_get_brevo_list_alias(); }
+    function hic_brevo_double_optin_on_enrich() { return \FpHic\Helpers\hic_brevo_double_optin_on_enrich(); }
+    function hic_realtime_brevo_sync_enabled() { return \FpHic\Helpers\hic_realtime_brevo_sync_enabled(); }
+    function hic_get_brevo_event_endpoint() { return \FpHic\Helpers\hic_get_brevo_event_endpoint(); }
+    function hic_reliable_polling_enabled() { return \FpHic\Helpers\hic_reliable_polling_enabled(); }
+    function hic_get_admin_email() { return \FpHic\Helpers\hic_get_admin_email(); }
+    function hic_get_log_file() { return \FpHic\Helpers\hic_get_log_file(); }
+    function hic_is_gtm_enabled() { return \FpHic\Helpers\hic_is_gtm_enabled(); }
+    function hic_get_gtm_container_id() { return \FpHic\Helpers\hic_get_gtm_container_id(); }
+    function hic_get_tracking_mode() { return \FpHic\Helpers\hic_get_tracking_mode(); }
+    function hic_get_fb_pixel_id() { return \FpHic\Helpers\hic_get_fb_pixel_id(); }
+    function hic_get_fb_access_token() { return \FpHic\Helpers\hic_get_fb_access_token(); }
+    function hic_get_connection_type() { return \FpHic\Helpers\hic_get_connection_type(); }
+    function hic_get_webhook_token() { return \FpHic\Helpers\hic_get_webhook_token(); }
+    function hic_get_api_url() { return \FpHic\Helpers\hic_get_api_url(); }
+    function hic_get_api_key() { return \FpHic\Helpers\hic_get_api_key(); }
+    function hic_get_api_email() { return \FpHic\Helpers\hic_get_api_email(); }
+    function hic_get_api_password() { return \FpHic\Helpers\hic_get_api_password(); }
+    function hic_get_property_id() { return \FpHic\Helpers\hic_get_property_id(); }
+    function hic_has_basic_auth_credentials() { return \FpHic\Helpers\hic_has_basic_auth_credentials(); }
+    function hic_get_currency() { return \FpHic\Helpers\hic_get_currency(); }
+    function hic_use_net_value() { return \FpHic\Helpers\hic_use_net_value(); }
+    function hic_process_invalid() { return \FpHic\Helpers\hic_process_invalid(); }
+    function hic_allow_status_updates() { return \FpHic\Helpers\hic_allow_status_updates(); }
+    function hic_get_polling_range_extension_days() { return \FpHic\Helpers\hic_get_polling_range_extension_days(); }
+    function hic_get_polling_interval() { return \FpHic\Helpers\hic_get_polling_interval(); }
+    function hic_acquire_polling_lock($timeout = 300) { return \FpHic\Helpers\hic_acquire_polling_lock($timeout); }
+    function hic_release_polling_lock() { return \FpHic\Helpers\hic_release_polling_lock(); }
+    function hic_should_schedule_retry_event() { return \FpHic\Helpers\hic_should_schedule_retry_event(); }
+    function hic_get_tracking_ids_by_sid($sid) { return \FpHic\Helpers\hic_get_tracking_ids_by_sid($sid); }
+    function hic_normalize_price($value) { return \FpHic\Helpers\hic_normalize_price($value); }
+    function hic_is_valid_email($email) { return \FpHic\Helpers\hic_is_valid_email($email); }
+    function hic_is_ota_alias_email($e) { return \FpHic\Helpers\hic_is_ota_alias_email($e); }
+    function hic_booking_uid($reservation) { return \FpHic\Helpers\hic_booking_uid($reservation); }
+    function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) { return \FpHic\Helpers\hic_log($msg, $level, $context); }
+    function fp_normalize_bucket($gclid, $fbclid) { return \FpHic\Helpers\fp_normalize_bucket($gclid, $fbclid); }
+    function hic_get_bucket($gclid, $fbclid) { return \FpHic\Helpers\hic_get_bucket($gclid, $fbclid); }
+    function hic_send_admin_email($data, $gclid, $fbclid, $sid) { return \FpHic\Helpers\hic_send_admin_email($data, $gclid, $fbclid, $sid); }
+    function hic_test_email_configuration($recipient_email = null) { return \FpHic\Helpers\hic_test_email_configuration($recipient_email); }
+    function hic_diagnose_email_issues() { return \FpHic\Helpers\hic_diagnose_email_issues(); }
+    function hic_mark_email_enriched($reservation_id, $real_email) { return \FpHic\Helpers\hic_mark_email_enriched($reservation_id, $real_email); }
+    function hic_get_reservation_email($reservation_id) { return \FpHic\Helpers\hic_get_reservation_email($reservation_id); }
+    function hic_extract_reservation_id($data) { return \FpHic\Helpers\hic_extract_reservation_id($data); }
+    function hic_mark_reservation_processed_by_id($reservation_id) { return \FpHic\Helpers\hic_mark_reservation_processed_by_id($reservation_id); }
+    function hic_acquire_reservation_lock($reservation_id, $timeout = 30) { return \FpHic\Helpers\hic_acquire_reservation_lock($reservation_id, $timeout); }
+    function hic_release_reservation_lock($reservation_id) { return \FpHic\Helpers\hic_release_reservation_lock($reservation_id); }
+    function hic_is_reservation_already_processed($reservation_id) { return \FpHic\Helpers\hic_is_reservation_already_processed($reservation_id); }
+    function hic_get_processing_statistics() { return \FpHic\Helpers\hic_get_processing_statistics(); }
+    function hic_safe_wp_next_scheduled($hook) { return \FpHic\Helpers\hic_safe_wp_next_scheduled($hook); }
+    function hic_safe_wp_schedule_event($timestamp, $recurrence, $hook, $args = array()) { return \FpHic\Helpers\hic_safe_wp_schedule_event($timestamp, $recurrence, $hook, $args); }
+    function hic_safe_wp_clear_scheduled_hook($hook, $args = array()) { return \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook($hook, $args); }
 }

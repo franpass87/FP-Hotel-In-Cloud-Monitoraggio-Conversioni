@@ -1,4 +1,5 @@
 <?php
+namespace FpHic;
 /**
  * Facebook Meta CAPI Integration
  */
@@ -7,26 +8,26 @@ if (!defined('ABSPATH')) exit;
 
 /* ============ Meta CAPI (Purchase + bucket) ============ */
 function hic_send_to_fb($data, $gclid, $fbclid){
-  if (!hic_get_fb_pixel_id() || !hic_get_fb_access_token()) {
-    hic_log('FB Pixel non configurato.');
+  if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
+    Helpers\hic_log('FB Pixel non configurato.');
     return false;
   }
   
   // Validate required data
   if (!is_array($data)) {
-    hic_log('FB: data is not an array');
+    Helpers\hic_log('FB: data is not an array');
     return false;
   }
   
-  if (empty($data['email']) || !hic_is_valid_email($data['email'])) {
-    hic_log('FB: email mancante o non valida, evento non inviato');
+  if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
+    Helpers\hic_log('FB: email mancante o non valida, evento non inviato');
     return false;
   }
   
-  $bucket = fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
   
   // Generate event ID using consistent extraction
-  $event_id = hic_extract_reservation_id($data);
+  $event_id = Helpers\hic_extract_reservation_id($data);
   if (empty($event_id)) {
     $event_id = uniqid('fb_');
   }
@@ -34,7 +35,7 @@ function hic_send_to_fb($data, $gclid, $fbclid){
   // Validate and sanitize amount
   $amount = 0;
   if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-    $amount = hic_normalize_price($data['amount']);
+    $amount = Helpers\hic_normalize_price($data['amount']);
   }
 
   $user_data = [
@@ -75,11 +76,11 @@ function hic_send_to_fb($data, $gclid, $fbclid){
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    hic_log('FB: Failed to encode JSON payload');
+    Helpers\hic_log('FB: Failed to encode JSON payload');
     return false;
   }
 
-  $url = 'https://graph.facebook.com/v19.0/' . hic_get_fb_pixel_id() . '/events?access_token=' . hic_get_fb_access_token();
+  $url = 'https://graph.facebook.com/v19.0/' . Helpers\hic_get_fb_pixel_id() . '/events?access_token=' . Helpers\hic_get_fb_access_token();
   $res = wp_remote_post($url, [
     'headers' => ['Content-Type'=>'application/json'],
     'body'    => $json_payload,
@@ -91,14 +92,14 @@ function hic_send_to_fb($data, $gclid, $fbclid){
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    hic_log($log_msg);
+    Helpers\hic_log($log_msg);
     return false;
   }
   
   if ($code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    hic_log($log_msg);
+    Helpers\hic_log($log_msg);
     return false;
   }
   
@@ -107,16 +108,16 @@ function hic_send_to_fb($data, $gclid, $fbclid){
   $response_data = json_decode($response_body, true);
   
   if (json_last_error() !== JSON_ERROR_NONE) {
-    hic_log('FB: Invalid JSON response: ' . json_last_error_msg());
+    Helpers\hic_log('FB: Invalid JSON response: ' . json_last_error_msg());
     return false;
   }
   
   if (isset($response_data['error'])) {
-    hic_log('FB: API Error: ' . json_encode($response_data['error']));
+    Helpers\hic_log('FB: API Error: ' . json_encode($response_data['error']));
     return false;
   }
   
-  hic_log($log_msg);
+  Helpers\hic_log($log_msg);
   return true;
 }
 
@@ -124,20 +125,20 @@ function hic_send_to_fb($data, $gclid, $fbclid){
  * Meta Pixel dispatcher for HIC reservation schema
  */
 function hic_dispatch_pixel_reservation($data) {
-  if (!hic_get_fb_pixel_id() || !hic_get_fb_access_token()) {
-    hic_log('FB HIC dispatch SKIPPED: Pixel ID o Access Token mancanti');
+  if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
+    Helpers\hic_log('FB HIC dispatch SKIPPED: Pixel ID o Access Token mancanti');
     return false;
   }
   
   // Validate input data
   if (!is_array($data)) {
-    hic_log('FB HIC dispatch: data is not an array');
+    Helpers\hic_log('FB HIC dispatch: data is not an array');
     return false;
   }
   
   // Validate required data
-  if (empty($data['email']) || !hic_is_valid_email($data['email'])) {
-    hic_log('FB HIC dispatch: email mancante o non valida, evento non inviato');
+  if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
+    Helpers\hic_log('FB HIC dispatch: email mancante o non valida, evento non inviato');
     return false;
   }
   
@@ -145,25 +146,25 @@ function hic_dispatch_pixel_reservation($data) {
   $required_fields = ['transaction_id', 'value', 'currency'];
   foreach ($required_fields as $field) {
     if (!isset($data[$field])) {
-      hic_log("FB HIC dispatch: Missing required field '$field'");
+      Helpers\hic_log("FB HIC dispatch: Missing required field '$field'");
       return false;
     }
   }
   
   $transaction_id = sanitize_text_field($data['transaction_id']);
-  $value = hic_normalize_price($data['value']);
+  $value = Helpers\hic_normalize_price($data['value']);
   $currency = sanitize_text_field($data['currency']);
 
   // Get gclid/fbclid for bucket normalization if available
   $gclid = '';
   $fbclid = '';
   if (!empty($data['transaction_id'])) {
-    $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
+    $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
     $gclid = $tracking['gclid'] ?? '';
     $fbclid = $tracking['fbclid'] ?? '';
   }
 
-  $bucket = fp_normalize_bucket($gclid, $fbclid);
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
 
   $user_data = [
     'em' => [hash('sha256', strtolower(trim($data['email'])))]
@@ -216,11 +217,11 @@ function hic_dispatch_pixel_reservation($data) {
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    hic_log('FB HIC dispatch: Failed to encode JSON payload');
+    Helpers\hic_log('FB HIC dispatch: Failed to encode JSON payload');
     return false;
   }
 
-  $url = 'https://graph.facebook.com/v19.0/' . hic_get_fb_pixel_id() . '/events?access_token=' . hic_get_fb_access_token();
+  $url = 'https://graph.facebook.com/v19.0/' . Helpers\hic_get_fb_pixel_id() . '/events?access_token=' . Helpers\hic_get_fb_access_token();
   $res = wp_remote_post($url, [
     'headers' => ['Content-Type' => 'application/json'],
     'body' => $json_payload,
@@ -232,14 +233,14 @@ function hic_dispatch_pixel_reservation($data) {
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    hic_log($log_msg);
+    Helpers\hic_log($log_msg);
     return false;
   }
   
   if ($code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    hic_log($log_msg);
+    Helpers\hic_log($log_msg);
     return false;
   }
   
@@ -248,15 +249,15 @@ function hic_dispatch_pixel_reservation($data) {
   $response_data = json_decode($response_body, true);
   
   if (json_last_error() !== JSON_ERROR_NONE) {
-    hic_log('FB HIC dispatch: Invalid JSON response: ' . json_last_error_msg());
+    Helpers\hic_log('FB HIC dispatch: Invalid JSON response: ' . json_last_error_msg());
     return false;
   }
   
   if (isset($response_data['error'])) {
-    hic_log('FB HIC dispatch: API Error: ' . json_encode($response_data['error']));
+    Helpers\hic_log('FB HIC dispatch: API Error: ' . json_encode($response_data['error']));
     return false;
   }
   
-  hic_log($log_msg);
+  Helpers\hic_log($log_msg);
   return true;
 }

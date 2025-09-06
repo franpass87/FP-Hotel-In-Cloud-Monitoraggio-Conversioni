@@ -438,8 +438,8 @@ class HIC_Performance_Monitor {
      */
     private function schedule_cleanup() {
         // Use safe WordPress cron functions
-        if (!hic_safe_wp_next_scheduled('hic_performance_cleanup')) {
-            hic_safe_wp_schedule_event(time(), 'daily', 'hic_performance_cleanup');
+        if (!Helpers\hic_safe_wp_next_scheduled('hic_performance_cleanup')) {
+            Helpers\hic_safe_wp_schedule_event(time(), 'daily', 'hic_performance_cleanup');
         }
     }
     
