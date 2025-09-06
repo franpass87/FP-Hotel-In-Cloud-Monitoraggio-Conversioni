@@ -72,7 +72,7 @@ function hic_activate($network_wide)
 
 // Initialize tracking parameters capture
 \add_action('init', function () {
-    if (!\is_admin() && \php_sapi_name() !== 'cli') {
+    if ( ! \is_admin() && ! \wp_doing_cron() && ( ! \defined('WP_CLI') || ! \WP_CLI ) ) {
         \hic_capture_tracking_params();
     }
 });
