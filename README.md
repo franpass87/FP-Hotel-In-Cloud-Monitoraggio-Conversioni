@@ -108,6 +108,53 @@ Per monitorare lo stato del plugin dall'esterno è disponibile un endpoint pubbl
 
 Il token deve corrispondere al valore salvato nell'opzione `hic_health_token`.
 
+## Cron & CLI
+
+### Hook Cron principali
+
+- `hic_continuous_poll_event` – polling continuo ogni minuto
+- `hic_deep_check_event` – verifica approfondita ogni 10 minuti
+- `hic_cleanup_event` – pulizia giornaliera degli identificatori
+- `hic_fallback_poll_event` – attivato in caso di ritardi o errori
+- `hic_health_monitor_event` – controllo periodico dello stato del plugin
+
+### Comandi WP-CLI
+
+```bash
+# Esegui un polling manuale
+wp hic poll
+
+# Forza il polling ignorando eventuali lock
+wp hic poll --force
+
+# Mostra le statistiche del poller
+wp hic stats
+
+# Resetta lo stato del poller (richiede conferma)
+wp hic reset --confirm
+
+# Visualizza la coda degli eventi
+wp hic queue --limit=10 --status=pending
+```
+
+### Gestione manuale degli eventi
+
+Gli hook possono essere eseguiti o rimossi tramite WP-CLI:
+
+```bash
+# Elenco degli eventi programmati
+wp cron event list --fields=hook,next_run
+
+# Esecuzione manuale di un evento
+wp cron event run hic_continuous_poll_event
+
+# Disattiva un evento
+wp cron event delete hic_continuous_poll_event
+
+# Riattiva un evento immediatamente
+wp cron event schedule now hic_continuous_poll_event
+```
+
 ## Notifiche Email
 
 Il plugin invia automaticamente email di notifica all'amministratore per ogni nuova prenotazione ricevuta.
