@@ -124,6 +124,7 @@ function hic_settings_init() {
         'hic_log_file',
         array('sanitize_callback' => '\\FpHic\\Helpers\\hic_validate_log_path')
     );
+    register_setting('hic_settings', 'hic_log_level', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_connection_type', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_api_url', array('sanitize_callback' => 'sanitize_text_field'));
     // New Basic Auth settings
@@ -164,6 +165,7 @@ function hic_settings_init() {
     // Main settings
     add_settings_field('hic_admin_email', 'Email Amministratore', 'hic_admin_email_render', 'hic_settings', 'hic_main_section');
     add_settings_field('hic_log_file', 'File di Log', 'hic_log_file_render', 'hic_settings', 'hic_main_section');
+    add_settings_field('hic_log_level', 'Log Level', 'hic_log_level_render', 'hic_settings', 'hic_main_section');
     
     // GA4 settings
     add_settings_field('hic_measurement_id', 'Measurement ID', 'hic_measurement_id_render', 'hic_settings', 'hic_ga4_section');
@@ -361,7 +363,17 @@ function hic_admin_email_render() {
 
 
 function hic_log_file_render() {
-    echo '<input type="text" name="hic_log_file" value="' . esc_attr(Helpers\hic_get_log_file()) . '" class="regular-text" />';
+    echo '<input type="text" name="hic_log_file" value="' . esc_attr(hic_get_log_file()) . '" class="regular-text" />';
+}
+
+function hic_log_level_render() {
+    $level = hic_get_option('log_level', HIC_LOG_LEVEL_INFO);
+    echo '<select name="hic_log_level" class="regular-text">';
+    echo '<option value="' . esc_attr(HIC_LOG_LEVEL_ERROR) . '"' . selected($level, HIC_LOG_LEVEL_ERROR, false) . '>Error</option>';
+    echo '<option value="' . esc_attr(HIC_LOG_LEVEL_WARNING) . '"' . selected($level, HIC_LOG_LEVEL_WARNING, false) . '>Warning</option>';
+    echo '<option value="' . esc_attr(HIC_LOG_LEVEL_INFO) . '"' . selected($level, HIC_LOG_LEVEL_INFO, false) . '>Info</option>';
+    echo '<option value="' . esc_attr(HIC_LOG_LEVEL_DEBUG) . '"' . selected($level, HIC_LOG_LEVEL_DEBUG, false) . '>Debug</option>';
+    echo '</select>';
 }
 
 function hic_measurement_id_render() {

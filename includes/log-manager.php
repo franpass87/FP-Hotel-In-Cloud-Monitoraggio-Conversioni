@@ -12,6 +12,7 @@ class HIC_Log_Manager {
     private $log_file;
     private $max_size;
     private $retention_days;
+    private $log_level;
     
     public function __construct() {
         // Ensure WordPress functions are available
@@ -19,9 +20,10 @@ class HIC_Log_Manager {
             return;
         }
         
-        $this->log_file = Helpers\hic_get_log_file();
+        $this->log_file = hic_get_log_file();
         $this->max_size = HIC_LOG_MAX_SIZE;
         $this->retention_days = apply_filters( 'hic_log_retention_days', HIC_LOG_RETENTION_DAYS );
+        $this->log_level = function_exists('hic_get_option') ? hic_get_option('log_level', HIC_LOG_LEVEL_INFO) : HIC_LOG_LEVEL_INFO;
         
         // Hook into WordPress shutdown to clean up logs (only if add_action exists)
         if (function_exists('add_action')) {
@@ -38,6 +40,11 @@ class HIC_Log_Manager {
             return false;
         }
         
+        // Skip if below configured level
+        if (!$this->should_log($level)) {
+            return false;
+        }
+
         // Rotate log if needed
         $this->rotate_if_needed();
         
@@ -46,6 +53,18 @@ class HIC_Log_Manager {
         
         // Write to log file
         return $this->write_to_log($formatted_message);
+    }
+
+    private function should_log($level) {
+        $levels = [
+            HIC_LOG_LEVEL_ERROR   => 0,
+            HIC_LOG_LEVEL_WARNING => 1,
+            HIC_LOG_LEVEL_INFO    => 2,
+            HIC_LOG_LEVEL_DEBUG   => 3,
+        ];
+
+        $current = $levels[$this->log_level] ?? $levels[HIC_LOG_LEVEL_INFO];
+        return ($levels[$level] ?? $levels[HIC_LOG_LEVEL_INFO]) <= $current;
     }
     
     /**
