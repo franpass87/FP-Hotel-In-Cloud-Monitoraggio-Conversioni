@@ -277,11 +277,11 @@ class HIC_Booking_Poller {
                     $recent_timestamp = hic_validate_api_timestamp($recent_timestamp, 'Recovery polling timestamp reset');
                 }
                 
-                update_option('hic_last_updates_since', $safe_timestamp);
-                update_option('hic_last_update_check', $safe_timestamp);
-                update_option('hic_last_continuous_check', $safe_timestamp);
-                update_option('hic_last_continuous_poll', $recent_timestamp);
-                update_option('hic_last_deep_check', $recent_timestamp);
+                update_option('hic_last_updates_since', $safe_timestamp, false);
+                update_option('hic_last_update_check', $safe_timestamp, false);
+                update_option('hic_last_continuous_check', $safe_timestamp, false);
+                update_option('hic_last_continuous_poll', $recent_timestamp, false);
+                update_option('hic_last_deep_check', $recent_timestamp, false);
                 
                 // Also restart the scheduler to ensure clean state
                 $this->clear_all_scheduled_events();
@@ -458,7 +458,7 @@ class HIC_Booking_Poller {
         Helpers\hic_log("Scheduler: Executing continuous polling (1-minute interval)");
         
         // Update timestamp first to prevent overlapping executions
-        update_option('hic_last_continuous_poll', current_time('timestamp'));
+        update_option('hic_last_continuous_poll', current_time('timestamp'), false);
         
         if (function_exists('hic_api_poll_bookings_continuous')) {
             hic_api_poll_bookings_continuous();
@@ -476,7 +476,7 @@ class HIC_Booking_Poller {
         Helpers\hic_log("Scheduler: Executing deep check (10-minute interval, " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback)");
         
         // Update timestamp first to prevent overlapping executions
-        update_option('hic_last_deep_check', current_time('timestamp'));
+        update_option('hic_last_deep_check', current_time('timestamp'), false);
         
         if (function_exists('hic_api_poll_bookings_deep_check')) {
             hic_api_poll_bookings_deep_check();
