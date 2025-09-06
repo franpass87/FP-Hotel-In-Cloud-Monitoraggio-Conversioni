@@ -741,10 +741,10 @@ function hic_ajax_backfill_reservations() {
     }
 
     // Get and validate input parameters
-    $from_date = sanitize_text_field($_POST['from_date'] ?? '');
-    $to_date = sanitize_text_field($_POST['to_date'] ?? '');
-    $date_type = sanitize_text_field($_POST['date_type'] ?? 'checkin');
-    $limit = isset($_POST['limit']) ? intval($_POST['limit']) : null;
+    $from_date = sanitize_text_field( wp_unslash( $_POST['from_date'] ?? '' ) );
+    $to_date = sanitize_text_field( wp_unslash( $_POST['to_date'] ?? '' ) );
+    $date_type = sanitize_text_field( wp_unslash( $_POST['date_type'] ?? 'checkin' ) );
+    $limit = isset($_POST['limit']) ? intval( wp_unslash( $_POST['limit'] ) ) : null;
 
     // Validate date type (based on API documentation: only checkin, checkout, presence are valid for /reservations endpoint)
     if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
@@ -922,7 +922,7 @@ function hic_ajax_force_polling() {
 
     try {
         // Get force flag from request
-        $force = isset($_POST['force']) && $_POST['force'] === 'true';
+        $force = isset($_POST['force']) && wp_unslash( $_POST['force'] ) === 'true';
 
         // Check if poller class exists
         if (!class_exists('HIC_Booking_Poller')) {
