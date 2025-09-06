@@ -68,10 +68,13 @@ function hic_send_to_fb($data, $gclid, $fbclid){
         'order_id'     => $event_id,
         'bucket'       => $bucket,           // per creare custom conversions per fbads/organic/gads
         'content_name' => sanitize_text_field($data['room'] ?? $data['accommodation_name'] ?? 'Prenotazione'),
-        'vertical'     => 'hotel'
-      ]
-    ]]
-  ];
+      'vertical'     => 'hotel'
+    ]
+  ]]
+];
+
+  // Allow payload customization before encoding
+  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
@@ -213,6 +216,9 @@ function hic_dispatch_pixel_reservation($data) {
       'custom_data' => $custom_data
     ]]
   ];
+
+  // Allow payload customization before encoding
+  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
