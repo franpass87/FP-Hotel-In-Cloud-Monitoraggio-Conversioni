@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 namespace FpHic;
 /**
  * API Polling Handler - Core API Functions Only
