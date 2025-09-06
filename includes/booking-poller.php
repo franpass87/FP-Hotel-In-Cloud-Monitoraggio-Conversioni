@@ -7,11 +7,6 @@ if (!defined('ABSPATH')) exit;
 
 class HIC_Booking_Poller {
     
-    const CONTINUOUS_POLLING_INTERVAL = 60; // 1 minute for continuous polling
-    const DEEP_CHECK_INTERVAL = 600; // 10 minutes for deep check
-    const DEEP_CHECK_LOOKBACK_DAYS = 5; // Look back 5 days in deep check
-    const WATCHDOG_THRESHOLD = 300; // 5 minutes threshold
-    
     public function __construct() {
         // Only initialize if WordPress functions are available
         if (!function_exists('add_filter') || !function_exists('add_action')) {
@@ -97,11 +92,11 @@ class HIC_Booking_Poller {
      */
     public function add_custom_cron_intervals($schedules) {
         $schedules['hic_every_minute'] = array(
-            'interval' => 60,
+            'interval' => HIC_CONTINUOUS_POLLING_INTERVAL,
             'display' => 'Every Minute (HIC Continuous Polling)'
         );
         $schedules['hic_every_ten_minutes'] = array(
-            'interval' => 600,
+            'interval' => HIC_DEEP_CHECK_INTERVAL,
             'display' => 'Every 10 Minutes (HIC Deep Check)'
         );
         return $schedules;
@@ -186,14 +181,14 @@ class HIC_Booking_Poller {
         
         // Check for continuous polling lag (should run every minute)
         $continuous_lag = $current_time - $last_continuous;
-        if ($continuous_lag > 300) { // 5 minutes lag
+        if ($continuous_lag > HIC_WATCHDOG_THRESHOLD) {
             hic_log("Watchdog: Continuous polling lag detected ({$continuous_lag}s), attempting recovery");
             $this->recover_from_failure('continuous');
         }
         
         // Check for deep check lag (should run every 10 minutes)  
         $deep_lag = $current_time - $last_deep;
-        if ($deep_lag > 1200) { // 20 minutes lag
+        if ($deep_lag > (HIC_DEEP_CHECK_INTERVAL * 2)) {
             hic_log("Watchdog: Deep check lag detected ({$deep_lag}s), attempting recovery");
             $this->recover_from_failure('deep');
         }
@@ -257,7 +252,7 @@ class HIC_Booking_Poller {
                 // Handle stuck polling due to timestamp errors
                 hic_log("Recovery: Resetting all timestamps due to timestamp errors");
                 $safe_timestamp = time() - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
-                $recent_timestamp = time() - 300; // 5 minutes ago for polling timestamps
+                $recent_timestamp = time() - HIC_WATCHDOG_THRESHOLD; // 5 minutes ago for polling timestamps
                 
                 // Validate timestamps before using them (if hic_validate_api_timestamp is available)
                 if (function_exists('hic_validate_api_timestamp')) {
@@ -302,7 +297,7 @@ class HIC_Booking_Poller {
     public function heartbeat_settings($settings) {
         // Only modify heartbeat if we're responsible for polling
         if ($this->should_poll()) {
-            $settings['interval'] = 60; // Run every minute for watchdog
+            $settings['interval'] = HIC_CONTINUOUS_POLLING_INTERVAL; // Run every minute for watchdog
         }
         return $settings;
     }
@@ -345,7 +340,7 @@ class HIC_Booking_Poller {
             $last_continuous = get_option('hic_last_continuous_poll', 0);
             
             // If polling hasn't run in more than 5 minutes, trigger recovery
-            if ($current_time - $last_continuous > 300) {
+            if ($current_time - $last_continuous > HIC_WATCHDOG_THRESHOLD) {
                 hic_log("Admin Watchdog: Detected polling failure during admin page load (lag: " . ($current_time - $last_continuous) . "s), triggering recovery");
                 $this->run_watchdog_check();
             }
@@ -377,7 +372,7 @@ class HIC_Booking_Poller {
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         
         // If WP-Cron is not working and polling is severely delayed (>10 minutes), run fallback
-        if ($current_time - $last_continuous > 600) {
+        if ($current_time - $last_continuous > HIC_DEEP_CHECK_INTERVAL) {
             hic_log("Fallback: WP-Cron not working and polling severely delayed, running fallback polling");
             
             // Use a transient to prevent multiple simultaneous executions
@@ -458,10 +453,10 @@ class HIC_Booking_Poller {
     
     /**
      * Execute deep check (every 10 minutes)
-     * Looks back 5 days to catch any missed reservations
+     * Looks back HIC_DEEP_CHECK_LOOKBACK_DAYS days to catch any missed reservations
      */
     public function execute_deep_check() {
-        hic_log("Scheduler: Executing deep check (10-minute interval, 5-day lookback)");
+        hic_log("Scheduler: Executing deep check (10-minute interval, " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback)");
         
         // Update timestamp first to prevent overlapping executions
         update_option('hic_last_deep_check', time());
@@ -484,7 +479,7 @@ class HIC_Booking_Poller {
             return;
         }
         
-        $lookback_seconds = self::DEEP_CHECK_LOOKBACK_DAYS * DAY_IN_SECONDS;
+        $lookback_seconds = HIC_DEEP_CHECK_LOOKBACK_DAYS * DAY_IN_SECONDS;
         $from_date = date('Y-m-d', time() - $lookback_seconds);
         $to_date = date('Y-m-d', time());
         
@@ -495,7 +490,7 @@ class HIC_Booking_Poller {
             $reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, 200);
             if (!is_wp_error($reservations) && is_array($reservations)) {
                 $count = count($reservations);
-                hic_log("Deep check: Found $count reservations in 5-day lookback period");
+                hic_log("Deep check: Found $count reservations in " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback period");
             }
         }
     }
@@ -513,7 +508,7 @@ class HIC_Booking_Poller {
      * Get polling interval in seconds (simplified - always 1 minute for continuous)
      */
     private function get_polling_interval_seconds() {
-        return self::CONTINUOUS_POLLING_INTERVAL;
+        return HIC_CONTINUOUS_POLLING_INTERVAL;
     }
     
     /**
@@ -522,8 +517,8 @@ class HIC_Booking_Poller {
     private function watchdog_check($last_poll, $current_time) {
         $lag = $current_time - $last_poll;
         
-        if ($lag > self::WATCHDOG_THRESHOLD) {
-            hic_log("Heartbeat Scheduler Watchdog: Polling lag detected - {$lag}s since last poll (threshold: " . self::WATCHDOG_THRESHOLD . "s)");
+        if ($lag > HIC_WATCHDOG_THRESHOLD) {
+            hic_log("Heartbeat Scheduler Watchdog: Polling lag detected - {$lag}s since last poll (threshold: " . HIC_WATCHDOG_THRESHOLD . "s)");
         }
     }
     
@@ -677,8 +672,8 @@ class HIC_Booking_Poller {
             'continuous_lag' => $last_continuous > 0 ? time() - $last_continuous : 0,
             'deep_lag' => $last_deep > 0 ? time() - $last_deep : 0,
             'polling_active' => $should_poll,
-            'polling_interval' => self::CONTINUOUS_POLLING_INTERVAL,
-            'deep_check_interval' => self::DEEP_CHECK_INTERVAL
+            'polling_interval' => HIC_CONTINUOUS_POLLING_INTERVAL,
+            'deep_check_interval' => HIC_DEEP_CHECK_INTERVAL
         );
         
         // Add WP-Cron specific info (always show for debugging)

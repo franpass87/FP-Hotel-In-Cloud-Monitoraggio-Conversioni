@@ -6,10 +6,6 @@
 
 if (!defined('ABSPATH')) exit;
 
-// Define constants for better maintainability
-define('HIC_POLL_INTERVAL_SECONDS', 300);  // 5 minutes
-define('HIC_RETRY_INTERVAL_SECONDS', 900); // 15 minutes
-
 /**
  * Validate and sanitize timestamp for API requests
  * Ensures timestamp is within acceptable range for HIC API
