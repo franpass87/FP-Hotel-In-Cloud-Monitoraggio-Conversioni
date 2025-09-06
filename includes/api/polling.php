@@ -394,7 +394,7 @@ function hic_transform_reservation($reservation) {
         'guest_first_name' => $first,
         'guest_last_name' => $last,
         'email' => $email,
-        'phone' => isset($reservation['phone']) ? $reservation['phone'] : '',
+        'phone' => $reservation['phone'] ?? $reservation['whatsapp'] ?? '',
         'language' => $language,
         'original_price' => $price
     );
@@ -495,6 +495,7 @@ function hic_dispatch_reservation($transformed, $original) {
                 'first_name'    => isset($transformed['guest_first_name']) ? $transformed['guest_first_name'] : '',
                 'last_name'     => isset($transformed['guest_last_name']) ? $transformed['guest_last_name'] : '',
                 'email'         => isset($transformed['email']) ? $transformed['email'] : '',
+                'phone'         => isset($transformed['phone']) ? $transformed['phone'] : '',
                 'lingua'        => isset($transformed['language']) ? $transformed['language'] : '',
                 'room'          => isset($transformed['accommodation_name']) ? $transformed['accommodation_name'] : (isset($transformed['room_name']) ? $transformed['room_name'] : ''),
                 'checkin'       => isset($transformed['from_date']) ? $transformed['from_date'] : '',
