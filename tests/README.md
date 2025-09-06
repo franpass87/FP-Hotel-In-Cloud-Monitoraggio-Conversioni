@@ -15,6 +15,13 @@ This will run tests for:
 - OTA email detection
 - Configuration helpers
 
+### GTM Integration Validation
+```bash
+php tests/validate-gtm.php
+```
+
+This script validates the GTM integration logic and ensures the DataLayer events are structured correctly.
+
 ## Test Structure
 
 - `bootstrap.php` - Test environment setup and WordPress function mocks
