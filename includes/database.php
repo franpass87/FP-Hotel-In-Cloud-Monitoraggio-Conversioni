@@ -280,7 +280,11 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
   }
 
   if (!$existing) {
-    $insert_result = $wpdb->insert($table, [$type => $value, 'sid' => $sid_to_use]);
+    $insert_result = $wpdb->insert(
+      $table,
+      [$type => $value, 'sid' => $sid_to_use],
+      ['%s', '%s']
+    );
     if ($insert_result === false) {
       Helpers\hic_log('hic_store_tracking_id: Failed to insert ' . $type . ': ' . ($wpdb->last_error ?: 'Unknown error'));
       return new \WP_Error('db_insert_error', 'Failed to insert tracking id');
@@ -372,10 +376,12 @@ function hic_capture_tracking_params(){
     }
 
     if ($existing_row) {
-      $wpdb->update($table, $utm_params, ['sid' => $sid_for_utm]);
+      $formats = array_fill(0, count($utm_params), '%s');
+      $wpdb->update($table, $utm_params, ['sid' => $sid_for_utm], $formats, ['%s']);
     } else {
       $data = array_merge(['sid' => $sid_for_utm], $utm_params);
-      $wpdb->insert($table, $data);
+      $insert_formats = array_fill(0, count($data), '%s');
+      $wpdb->insert($table, $data, $insert_formats);
     }
 
     if ($wpdb->last_error) {
