@@ -516,3 +516,8 @@ Per validare l'integrazione Google Tag Manager:
 php tests/validate-gtm.php
 ```
 
+Per analizzare lo stile del codice:
+```bash
+composer lint
+```
+
