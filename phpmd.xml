@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<ruleset name="PHPMD Rules for WordPress Plugin">
+    <description>PHP Mess Detector rules for WordPress plugin</description>
+
+    <!-- Code Size Rules -->
+    <rule ref="rulesets/codesize.xml">
+        <!-- Exclude overly restrictive rules for WordPress -->
+        <exclude name="ExcessiveMethodLength"/>
+        <exclude name="ExcessiveClassLength"/>
+        <exclude name="ExcessiveParameterList"/>
+    </rule>
+
+    <!-- Clean Code Rules -->
+    <rule ref="rulesets/cleancode.xml">
+        <!-- WordPress often uses underscores in function names -->
+        <exclude name="UndefinedVariable"/>
+    </rule>
+
+    <!-- Design Rules -->
+    <rule ref="rulesets/design.xml">
+        <!-- WordPress globals are acceptable -->
+        <exclude name="Superglobals"/>
+        <exclude name="ExitExpression"/>
+    </rule>
+
+    <!-- Naming Rules -->
+    <rule ref="rulesets/naming.xml">
+        <!-- WordPress uses underscores in function names -->
+        <exclude name="ShortVariable"/>
+        <exclude name="LongVariable"/>
+    </rule>
+
+    <!-- Unused Code Rules -->
+    <rule ref="rulesets/unusedcode.xml"/>
+
+    <!-- Controversial Rules -->
+    <rule ref="rulesets/controversial.xml">
+        <!-- WordPress often uses globals -->
+        <exclude name="Superglobals"/>
+    </rule>
+</ruleset>

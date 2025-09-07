@@ -23,11 +23,30 @@
     "require-dev": {
         "phpunit/phpunit": "^11",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.1",
-        "wp-coding-standards/wpcs": "^3.2"
+        "wp-coding-standards/wpcs": "^3.2",
+        "phpstan/phpstan": "*",
+        "szepeviktor/phpstan-wordpress": "^1.3",
+        "phpmd/phpmd": "^2.15",
+        "php-parallel-lint/php-parallel-lint": "^1.4"
     },
     "scripts": {
         "test": "php -d auto_prepend_file=tests/preload.php vendor/bin/phpunit",
-        "lint": "vendor/bin/phpcs"
+        "lint": "vendor/bin/phpcs",
+        "lint:fix": "vendor/bin/phpcbf",
+        "lint:syntax": "vendor/bin/parallel-lint includes/ FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php",
+        "analyse": "vendor/bin/phpstan analyse",
+        "analyse:baseline": "vendor/bin/phpstan analyse --generate-baseline",
+        "mess": "vendor/bin/phpmd includes/,FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php text phpmd.xml",
+        "quality": [
+            "@lint:syntax",
+            "@lint",
+            "@analyse",
+            "@mess",
+            "@test"
+        ],
+        "quality:fix": [
+            "@lint:fix"
+        ]
     },
     "archive": {
         "exclude": [
