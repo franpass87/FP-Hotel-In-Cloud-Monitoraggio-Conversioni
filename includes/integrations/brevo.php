@@ -596,22 +596,29 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid) {
     return false;
   }
   
-  // Send event only if real-time sync is enabled and this is a new reservation
+  // Send event for new reservations, allowing override via filter
   $reservation_id = Helpers\hic_extract_reservation_id($data);
-  if (Helpers\hic_realtime_brevo_sync_enabled() && !empty($reservation_id)) {
+  if (!empty($reservation_id)) {
     $is_new = hic_is_reservation_new_for_realtime($reservation_id);
     if ($is_new) {
+      $send_event = apply_filters('hic_brevo_send_event', true, $data);
       hic_mark_reservation_new_for_realtime($reservation_id);
-      $event_result = hic_send_brevo_reservation_created_event($transformed_data, $gclid, $fbclid);
-      if ($event_result['success']) {
-        hic_mark_reservation_notified_to_brevo($reservation_id);
-      } else {
-        if ($event_result['retryable']) {
-          hic_mark_reservation_notification_failed($reservation_id, 'Failed to send reservation_created event: ' . $event_result['error']);
+      if ($send_event) {
+        $event_result = hic_send_brevo_reservation_created_event($transformed_data, $gclid, $fbclid);
+        if ($event_result['success']) {
+          hic_mark_reservation_notified_to_brevo($reservation_id);
+        } else {
+          if ($event_result['retryable']) {
+            hic_mark_reservation_notification_failed($reservation_id, 'Failed to send reservation_created event: ' . $event_result['error']);
+          }
+          // Non-retryable errors are already handled in hic_send_brevo_reservation_created_event
         }
-        // Non-retryable errors are already handled in hic_send_brevo_reservation_created_event
+        return $event_result['success'];
+      } else {
+        // Event sending disabled via filter, mark as notified to avoid retries
+        hic_mark_reservation_notified_to_brevo($reservation_id);
+        return true;
       }
-      return $event_result['success'];
     } else {
       Helpers\hic_log("Unified Brevo: reservation $reservation_id already processed for real-time sync");
     }
