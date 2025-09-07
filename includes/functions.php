@@ -384,15 +384,20 @@ add_filter('wp_privacy_personal_data_erasers', __NAMESPACE__ . '\\hic_register_e
  * @return array{gclid:?string, fbclid:?string}
  */
 function hic_get_tracking_ids_by_sid($sid) {
+    static $cache = [];
     $sid = sanitize_text_field($sid);
     if (empty($sid)) {
         return ['gclid' => null, 'fbclid' => null];
     }
 
+    if (array_key_exists($sid, $cache)) {
+        return $cache[$sid];
+    }
+
     global $wpdb;
     if (!$wpdb) {
         hic_log('hic_get_tracking_ids_by_sid: wpdb is not available');
-        return ['gclid' => null, 'fbclid' => null];
+        return $cache[$sid] = ['gclid' => null, 'fbclid' => null];
     }
 
     $table = $wpdb->prefix . 'hic_gclids';
@@ -401,24 +406,24 @@ function hic_get_tracking_ids_by_sid($sid) {
     $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if (!$table_exists) {
         hic_log('hic_get_tracking_ids_by_sid: Table does not exist: ' . $table);
-        return ['gclid' => null, 'fbclid' => null];
+        return $cache[$sid] = ['gclid' => null, 'fbclid' => null];
     }
 
     $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
 
     if ($wpdb->last_error) {
         hic_log('hic_get_tracking_ids_by_sid: Database error retrieving gclid/fbclid: ' . $wpdb->last_error);
-        return ['gclid' => null, 'fbclid' => null];
+        return $cache[$sid] = ['gclid' => null, 'fbclid' => null];
     }
 
     if ($row) {
-        return [
+        return $cache[$sid] = [
             'gclid' => $row->gclid,
             'fbclid' => $row->fbclid,
         ];
     }
 
-    return ['gclid' => null, 'fbclid' => null];
+    return $cache[$sid] = ['gclid' => null, 'fbclid' => null];
 }
 
 /**
@@ -428,15 +433,20 @@ function hic_get_tracking_ids_by_sid($sid) {
  * @return array{utm_source:?string, utm_medium:?string, utm_campaign:?string}
  */
 function hic_get_utm_params_by_sid($sid) {
+    static $cache = [];
     $sid = sanitize_text_field($sid);
     if (empty($sid)) {
         return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
     }
 
+    if (array_key_exists($sid, $cache)) {
+        return $cache[$sid];
+    }
+
     global $wpdb;
     if (!$wpdb) {
         hic_log('hic_get_utm_params_by_sid: wpdb is not available');
-        return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
     }
 
     $table = $wpdb->prefix . 'hic_gclids';
@@ -445,25 +455,25 @@ function hic_get_utm_params_by_sid($sid) {
     $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if (!$table_exists) {
         hic_log('hic_get_utm_params_by_sid: Table does not exist: ' . $table);
-        return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
     }
 
     $row = $wpdb->get_row($wpdb->prepare("SELECT utm_source, utm_medium, utm_campaign FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
 
     if ($wpdb->last_error) {
         hic_log('hic_get_utm_params_by_sid: Database error retrieving UTM params: ' . $wpdb->last_error);
-        return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
     }
 
     if ($row) {
-        return [
+        return $cache[$sid] = [
             'utm_source' => $row->utm_source,
             'utm_medium' => $row->utm_medium,
             'utm_campaign' => $row->utm_campaign,
         ];
     }
 
-    return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+    return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
 }
 
 function hic_normalize_price($value) {
