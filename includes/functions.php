@@ -583,8 +583,11 @@ function hic_http_request($url, $args = []) {
         return new WP_Error('invalid_url', 'URL non valido');
     }
     if ('https' !== parse_url($validated_url, PHP_URL_SCHEME)) {
-        hic_log('HTTP request rifiutata: solo HTTPS consentito ' . $url, HIC_LOG_LEVEL_ERROR);
-        return new WP_Error('invalid_url', 'Solo HTTPS consentito');
+        $allow_insecure = apply_filters('hic_allow_insecure_http', false, $validated_url, $args);
+        if (!$allow_insecure) {
+            hic_log('HTTP request rifiutata: solo HTTPS consentito ' . $url, HIC_LOG_LEVEL_ERROR);
+            return new WP_Error('invalid_url', 'Solo HTTPS consentito');
+        }
     }
     $url = $validated_url;
 

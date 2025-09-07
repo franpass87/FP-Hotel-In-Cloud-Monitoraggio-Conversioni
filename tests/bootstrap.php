@@ -163,6 +163,8 @@ if (!function_exists('wp_remote_post')) {
 
 if (!function_exists('wp_safe_remote_request')) {
     function wp_safe_remote_request($url, $args = array()) {
+        global $hic_last_request;
+        $hic_last_request = ['url' => $url, 'args' => $args];
         return array('body' => '{}', 'response' => array('code' => 200));
     }
 }
