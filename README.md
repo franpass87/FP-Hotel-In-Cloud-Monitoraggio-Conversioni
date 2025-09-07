@@ -167,6 +167,15 @@ Il token deve corrispondere al valore salvato nell'opzione `hic_health_token`.
 
 Se viene passato un valore non valido, il plugin esegue automaticamente il livello base.
 
+### Site Health Tests
+
+Nel menu **Strumenti → Salute del sito** il plugin aggiunge due verifiche dedicate:
+
+- **Configurazione GA4** (test diretto): controlla che Measurement ID e API Secret siano impostati. Se mancano uno o entrambi i parametri, lo stato risulta *critico*.
+- **Ping Webhook** (test asincrono): invia una richiesta all'endpoint `/wp-json/hic/v1/health` utilizzando il token configurato. Se la risposta non è valida, lo stato viene segnato come *critico*.
+
+Queste verifiche aiutano a individuare rapidamente problemi di configurazione o connettività.
+
 ## Esportazione o cancellazione dei dati
 
 Il plugin supporta gli strumenti di privacy nativi di WordPress. Gli utenti possono richiedere l'esportazione o la cancellazione dei dati di tracciamento associati al proprio indirizzo email tramite:

@@ -136,5 +136,6 @@ if (\is_admin()) {
     \add_action('admin_init', function () {
         require_once __DIR__ . '/includes/admin/admin-settings.php';
         require_once __DIR__ . '/includes/admin/diagnostics.php';
+        require_once __DIR__ . '/includes/site-health.php';
     });
 }
