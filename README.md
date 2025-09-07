@@ -40,18 +40,19 @@ Il plugin utilizza un cookie denominato `hic_sid` per collegare le prenotazioni 
 
 ### Permessi
 
-Durante l'attivazione il plugin assegna automaticamente la capability `hic_manage` agli amministratori.  
-Per concedere l'accesso ad altri ruoli è possibile utilizzare un plugin di gestione ruoli oppure aggiungere una semplice funzione personalizzata:
+Durante l'attivazione il plugin assegna automaticamente le capability `hic_manage` e `hic_view_logs` agli amministratori.
+Per concedere queste capability ad altri ruoli è possibile utilizzare un plugin di gestione ruoli oppure aggiungere una semplice funzione personalizzata:
 
 ```php
 add_action('init', function () {
     if ($role = get_role('editor')) {
         $role->add_cap('hic_manage');
+        $role->add_cap('hic_view_logs');
     }
 });
 ```
 
-Il ruolo scelto otterrà così i permessi per configurare il plugin e visualizzare le pagine di amministrazione.
+Il ruolo scelto otterrà così i permessi per configurare il plugin e visualizzare le pagine di amministrazione e i log diagnostici.
 
 ## Configurazione API
 

@@ -44,16 +44,26 @@ function hic_activate($network_wide)
             \switch_to_blog($site->blog_id);
             \hic_maybe_upgrade_db();
             $role = \get_role('administrator');
-            if ($role && !$role->has_cap('hic_manage')) {
-                $role->add_cap('hic_manage');
+            if ($role) {
+                if (!$role->has_cap('hic_manage')) {
+                    $role->add_cap('hic_manage');
+                }
+                if (!$role->has_cap('hic_view_logs')) {
+                    $role->add_cap('hic_view_logs');
+                }
             }
             \restore_current_blog();
         }
     } else {
         \hic_maybe_upgrade_db();
         $role = \get_role('administrator');
-        if ($role && !$role->has_cap('hic_manage')) {
-            $role->add_cap('hic_manage');
+        if ($role) {
+            if (!$role->has_cap('hic_manage')) {
+                $role->add_cap('hic_manage');
+            }
+            if (!$role->has_cap('hic_view_logs')) {
+                $role->add_cap('hic_view_logs');
+            }
         }
     }
 
