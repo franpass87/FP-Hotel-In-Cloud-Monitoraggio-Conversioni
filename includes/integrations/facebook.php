@@ -59,7 +59,7 @@ function hic_send_to_fb($data, $gclid, $fbclid){
     $user_data['fbc'] = [$fbc];
   }
   if (!empty($_COOKIE['_fbp'])) {
-    $user_data['fbp'] = [sanitize_text_field($_COOKIE['_fbp'])];
+    $user_data['fbp'] = [sanitize_text_field( wp_unslash( $_COOKIE['_fbp'] ) )];
   }
 
   $custom_data = [
@@ -208,7 +208,7 @@ function hic_dispatch_pixel_reservation($data) {
     $user_data['fbc'] = [$fbc];
   }
   if (!empty($_COOKIE['_fbp'])) {
-    $user_data['fbp'] = [sanitize_text_field($_COOKIE['_fbp'])];
+    $user_data['fbp'] = [sanitize_text_field( wp_unslash( $_COOKIE['_fbp'] ) )];
   }
   
   $custom_data = [
