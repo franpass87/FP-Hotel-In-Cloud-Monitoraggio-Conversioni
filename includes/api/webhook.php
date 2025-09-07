@@ -35,6 +35,12 @@ function hic_webhook_handler(WP_REST_Request $request) {
     return new WP_Error('invalid_token','Token non valido',['status'=>403]);
   }
 
+  // Validate Content-Type header
+  $content_type = $request->get_header('content-type');
+  if ( stripos($content_type, 'application/json') === false ) {
+    return new WP_Error('invalid_content_type', 'Content-Type non supportato', ['status' => 415]);
+  }
+
   // Get raw body and validate size
   $raw = file_get_contents('php://input');
   if (strlen($raw) > HIC_WEBHOOK_MAX_PAYLOAD_SIZE) {
