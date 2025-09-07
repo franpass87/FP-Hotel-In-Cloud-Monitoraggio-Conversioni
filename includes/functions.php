@@ -66,10 +66,13 @@ function hic_reliable_polling_enabled() { return hic_get_option('reliable_pollin
 
 // Admin and General Settings
 function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
-function hic_get_log_file() { return hic_get_option('log_file', WP_CONTENT_DIR . '/hic-log.txt'); }
+function hic_get_log_file() {
+    return hic_get_option('log_file', WP_CONTENT_DIR . '/uploads/hic-logs/hic-log.txt');
+}
 
 function hic_validate_log_path($path) {
-    $default = WP_CONTENT_DIR . '/hic-log.txt';
+    $base_dir = WP_CONTENT_DIR . '/uploads/hic-logs/';
+    $default = $base_dir . 'hic-log.txt';
 
     $path = sanitize_text_field($path);
     if (empty($path)) {
@@ -77,9 +80,9 @@ function hic_validate_log_path($path) {
     }
 
     $normalized_path = str_replace('\\', '/', $path);
-    $base_path = rtrim(str_replace('\\', '/', WP_CONTENT_DIR), '/') . '/';
+    $normalized_base = rtrim(str_replace('\\', '/', $base_dir), '/') . '/';
 
-    if (strpos($normalized_path, '..') !== false || strpos($normalized_path, $base_path) !== 0) {
+    if (strpos($normalized_path, '..') !== false || strpos($normalized_path, $normalized_base) !== 0) {
         return $default;
     }
 

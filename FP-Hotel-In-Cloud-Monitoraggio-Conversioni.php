@@ -56,6 +56,20 @@ function hic_activate($network_wide)
             $role->add_cap('hic_manage');
         }
     }
+
+    $log_dir = WP_CONTENT_DIR . '/uploads/hic-logs';
+    if (!file_exists($log_dir)) {
+        if (function_exists('wp_mkdir_p')) {
+            wp_mkdir_p($log_dir);
+        } else {
+            @mkdir($log_dir, 0755, true);
+        }
+    }
+
+    $htaccess = $log_dir . '/.htaccess';
+    if (!file_exists($htaccess)) {
+        file_put_contents($htaccess, "Order allow,deny\nDeny from all\n");
+    }
 }
 
 // Plugin activation hook
