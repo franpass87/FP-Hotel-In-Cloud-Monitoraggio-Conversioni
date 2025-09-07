@@ -35,11 +35,18 @@ function hic_webhook_handler(WP_REST_Request $request) {
     return new WP_Error('invalid_token','Token non valido',['status'=>403]);
   }
 
-  // Get and validate JSON data
-  $data = $request->get_json_params();
+  // Get raw body and validate size
+  $raw = file_get_contents('php://input');
+  if (strlen($raw) > HIC_WEBHOOK_MAX_PAYLOAD_SIZE) {
+    Helpers\hic_log('Webhook payload troppo grande');
+    return new WP_Error('payload_too_large', 'Payload troppo grande', ['status' => 413]);
+  }
+
+  // Decode JSON data
+  $data = json_decode($raw, true);
   if (!$data || !is_array($data)) {
     Helpers\hic_log('Webhook senza payload valido');
-    return new WP_REST_Response(['error'=>'no valid data'], 400);
+    return new WP_REST_Response(['error' => 'no valid data'], 400);
   }
   
   // Log received data (be careful with sensitive information)
