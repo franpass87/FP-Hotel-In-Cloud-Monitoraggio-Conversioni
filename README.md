@@ -9,6 +9,7 @@ Plugin WordPress per il tracciamento delle conversioni da Hotel in Cloud verso G
 2. 📊 **La invia a GA4** (evento purchase per analytics)
 3. 📧 **La invia a Brevo** (contatto + evento per email marketing)
 4. 📱 **La invia a Meta** (evento Purchase per Facebook Ads)
+5. ♻️ **Traccia eventuali rimborsi** (evento refund con valore negativo, attivabile dalle impostazioni)
 
 Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling** indipendente da WordPress cron.
 

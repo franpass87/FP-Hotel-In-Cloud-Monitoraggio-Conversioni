@@ -139,6 +139,7 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_ga4_use_net_value', array('sanitize_callback' => 'rest_sanitize_boolean'));
     register_setting('hic_settings', 'hic_process_invalid', array('sanitize_callback' => 'rest_sanitize_boolean'));
     register_setting('hic_settings', 'hic_allow_status_updates', array('sanitize_callback' => 'rest_sanitize_boolean'));
+    register_setting('hic_settings', 'hic_refund_tracking', array('sanitize_callback' => 'rest_sanitize_boolean'));
     register_setting('hic_settings', 'hic_brevo_list_default', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_brevo_optin_default', array('sanitize_callback' => 'rest_sanitize_boolean'));
     register_setting('hic_settings', 'hic_debug_verbose', array('sanitize_callback' => 'rest_sanitize_boolean'));
@@ -202,6 +203,7 @@ function hic_settings_init() {
     add_settings_field('hic_ga4_use_net_value', 'Usa valore netto per GA4/Pixel', 'hic_ga4_use_net_value_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_process_invalid', 'Processa prenotazioni non valide', 'hic_process_invalid_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_allow_status_updates', 'Gestisci aggiornamenti stato', 'hic_allow_status_updates_render', 'hic_settings', 'hic_hic_section');
+    add_settings_field('hic_refund_tracking', 'Traccia rimborsi', 'hic_refund_tracking_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_brevo_list_default', 'Lista Brevo Default', 'hic_brevo_list_default_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_optin_default', 'Opt-in marketing di default', 'hic_brevo_optin_default_render', 'hic_settings', 'hic_brevo_section');
     
@@ -528,6 +530,11 @@ function hic_process_invalid_render() {
 function hic_allow_status_updates_render() {
     $checked = Helpers\hic_allow_status_updates() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_allow_status_updates" value="1" ' . esc_attr($checked) . ' /> Permetti aggiornamenti quando cambia presence';
+}
+
+function hic_refund_tracking_render() {
+    $checked = Helpers\hic_refund_tracking_enabled() ? 'checked' : '';
+    echo '<input type="checkbox" name="hic_refund_tracking" value="1" ' . esc_attr($checked) . ' /> Abilita tracciamento rimborsi';
 }
 
 function hic_brevo_list_it_render() {

@@ -176,6 +176,7 @@ function hic_get_currency() { return hic_get_option('currency', 'EUR'); }
 function hic_use_net_value() { return hic_get_option('ga4_use_net_value', '0') === '1'; }
 function hic_process_invalid() { return hic_get_option('process_invalid', '0') === '1'; }
 function hic_allow_status_updates() { return hic_get_option('allow_status_updates', '0') === '1'; }
+function hic_refund_tracking_enabled() { return hic_get_option('refund_tracking', '0') === '1'; }
 function hic_get_polling_range_extension_days() { return intval(hic_get_option('polling_range_extension_days', '7')); }
 
 /**
@@ -1266,6 +1267,7 @@ namespace {
     function hic_use_net_value() { return \FpHic\Helpers\hic_use_net_value(); }
     function hic_process_invalid() { return \FpHic\Helpers\hic_process_invalid(); }
     function hic_allow_status_updates() { return \FpHic\Helpers\hic_allow_status_updates(); }
+    function hic_refund_tracking_enabled() { return \FpHic\Helpers\hic_refund_tracking_enabled(); }
     function hic_get_polling_range_extension_days() { return \FpHic\Helpers\hic_get_polling_range_extension_days(); }
     function hic_get_polling_interval() { return \FpHic\Helpers\hic_get_polling_interval(); }
     function hic_acquire_polling_lock($timeout = 300) { return \FpHic\Helpers\hic_acquire_polling_lock($timeout); }

@@ -152,6 +152,143 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
 }
 
 /**
+ * Send refund event to Meta with negative value
+ */
+function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
+  if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
+    Helpers\hic_log('FB refund: Pixel ID o Access Token mancanti.');
+    return false;
+  }
+
+  if (!is_array($data)) {
+    Helpers\hic_log('FB refund: data is not an array');
+    return false;
+  }
+
+  if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
+    Helpers\hic_log('FB refund: email mancante o non valida, evento non inviato');
+    return false;
+  }
+
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+
+  $event_id = Helpers\hic_extract_reservation_id($data);
+  if (empty($event_id)) {
+    $event_id = uniqid('fb_refund_');
+  }
+
+  $amount = 0;
+  if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
+    $amount = -abs(Helpers\hic_normalize_price($data['amount']));
+  }
+
+  $user_data = [
+    'em' => [ hash('sha256', strtolower(trim($data['email']))) ]
+  ];
+
+  if (!empty($data['first_name']) && is_string($data['first_name'])) {
+    $user_data['fn'] = [ hash('sha256', strtolower(trim($data['first_name']))) ];
+  }
+  if (!empty($data['last_name']) && is_string($data['last_name'])) {
+    $user_data['ln'] = [ hash('sha256', strtolower(trim($data['last_name']))) ];
+  }
+  $phone = $data['whatsapp'] ?? $data['phone'] ?? '';
+  if (!empty($phone) && is_string($phone)) {
+    $user_data['ph'] = [ hash('sha256', preg_replace('/\D/','', $phone)) ];
+  }
+
+  if ($fbclid) {
+    $fbc = 'fb.1.' . current_time('timestamp') . '.' . $fbclid;
+    $user_data['fbc'] = [$fbc];
+  }
+  if (!empty($_COOKIE['_fbp'])) {
+    $user_data['fbp'] = [sanitize_text_field( wp_unslash( $_COOKIE['_fbp'] ) )];
+  }
+
+  $custom_data = [
+    'currency'     => sanitize_text_field($data['currency'] ?? 'EUR'),
+    'value'        => $amount,
+    'order_id'     => $event_id,
+    'bucket'       => $bucket,
+    'content_name' => sanitize_text_field($data['room'] ?? $data['accommodation_name'] ?? 'Prenotazione'),
+    'vertical'     => 'hotel'
+  ];
+
+  if (!empty($gclid))   { $custom_data['gclid']   = sanitize_text_field($gclid); }
+  if (!empty($fbclid))  { $custom_data['fbclid']  = sanitize_text_field($fbclid); }
+  if (!empty($msclkid)) { $custom_data['msclkid'] = sanitize_text_field($msclkid); }
+  if (!empty($ttclid))  { $custom_data['ttclid']  = sanitize_text_field($ttclid); }
+
+  if (!empty($data['sid'])) {
+    $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+    if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
+    if (!empty($utm['utm_medium']))   { $custom_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
+    if (!empty($utm['utm_campaign'])) { $custom_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+    if (!empty($utm['utm_content']))  { $custom_data['utm_content']  = sanitize_text_field($utm['utm_content']); }
+    if (!empty($utm['utm_term']))     { $custom_data['utm_term']     = sanitize_text_field($utm['utm_term']); }
+  }
+
+  $payload = [
+    'data' => [[
+      'event_name'       => 'Refund',
+      'event_time'       => current_time('timestamp'),
+      'event_id'         => $event_id,
+      'action_source'    => 'website',
+      'event_source_url' => home_url(),
+      'client_ip_address'  => $_SERVER['REMOTE_ADDR'] ?? '',
+      'client_user_agent'  => $_SERVER['HTTP_USER_AGENT'] ?? '',
+      'user_data'        => $user_data,
+      'custom_data'      => $custom_data
+    ]]
+  ];
+
+  $payload = apply_filters('hic_fb_refund_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid);
+
+  $json_payload = wp_json_encode($payload);
+  if ($json_payload === false) {
+    Helpers\hic_log('FB refund: Failed to encode JSON payload');
+    return false;
+  }
+
+  $url = 'https://graph.facebook.com/v19.0/' . Helpers\hic_get_fb_pixel_id() . '/events?access_token=' . Helpers\hic_get_fb_access_token();
+  $res = Helpers\hic_http_request($url, [
+    'method'  => 'POST',
+    'headers' => ['Content-Type'=>'application/json'],
+    'body'    => $json_payload,
+  ]);
+
+  $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
+  $log_msg = "FB dispatch: Refund (bucket=$bucket) event_id=$event_id value=$amount HTTP=$code";
+
+  if (is_wp_error($res)) {
+    $log_msg .= " ERROR: " . $res->get_error_message();
+    Helpers\hic_log($log_msg);
+    return false;
+  }
+
+  if ($code !== 200) {
+    $response_body = wp_remote_retrieve_body($res);
+    $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
+    Helpers\hic_log($log_msg);
+    return false;
+  }
+
+  $response_body = wp_remote_retrieve_body($res);
+  $response_data = json_decode($response_body, true);
+  if (json_last_error() !== JSON_ERROR_NONE) {
+    Helpers\hic_log('FB refund: Invalid JSON response: ' . json_last_error_msg());
+    return false;
+  }
+  if (isset($response_data['error'])) {
+    Helpers\hic_log('FB refund: API Error: ' . json_encode($response_data['error']));
+    return false;
+  }
+
+  Helpers\hic_log($log_msg);
+  return true;
+}
+
+/**
  * Meta Pixel dispatcher for HIC reservation schema
  */
 function hic_dispatch_pixel_reservation($data) {
