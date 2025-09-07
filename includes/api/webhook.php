@@ -16,6 +16,18 @@ add_action('rest_api_init', function () {
       'methods'             => 'POST',
       'callback'            => 'hic_webhook_handler',
       'permission_callback' => '__return_true',
+      'args'                => [
+        'token' => [
+          'required'          => true,
+          'sanitize_callback' => 'sanitize_text_field',
+          'description'       => 'Token di sicurezza per autenticare la richiesta',
+        ],
+        'email' => [
+          'required'          => true,
+          'sanitize_callback' => 'sanitize_email',
+          'description'       => 'Email del cliente associata alla prenotazione',
+        ],
+      ],
     ]);
   }
 });
@@ -53,6 +65,15 @@ function hic_webhook_handler(WP_REST_Request $request) {
   if (!$data || !is_array($data)) {
     Helpers\hic_log('Webhook senza payload valido');
     return new WP_REST_Response(['error' => 'no valid data'], 400);
+  }
+
+  // Use sanitized email from request params
+  $data['email'] = $request->get_param('email');
+
+  // Validate payload structure and required fields
+  $payload_validation = hic_validate_webhook_payload($data);
+  if (is_wp_error($payload_validation)) {
+    return $payload_validation;
   }
   
   // Log received data (be careful with sensitive information)
@@ -99,4 +120,26 @@ function hic_webhook_handler(WP_REST_Request $request) {
       Helpers\hic_release_reservation_lock($reservation_id);
     }
   }
+}
+
+/**
+ * Validate webhook payload structure
+ *
+ * Ensures required fields are present and correctly formatted.
+ *
+ * @param array|null $payload Decoded JSON payload
+ * @return true|WP_Error
+ */
+function hic_validate_webhook_payload($payload) {
+  if (!is_array($payload)) {
+    return new WP_Error('invalid_payload', 'Payload non valido', ['status' => 400]);
+  }
+
+  // Required field: email
+  if (empty($payload['email']) || !Helpers\hic_is_valid_email($payload['email'])) {
+    Helpers\hic_log('Webhook payload: email mancante o non valida');
+    return new WP_Error('invalid_email', 'Campo email mancante o non valido', ['status' => 400]);
+  }
+
+  return true;
 }
