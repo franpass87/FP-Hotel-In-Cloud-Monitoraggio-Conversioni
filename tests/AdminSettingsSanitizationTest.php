@@ -1,6 +1,7 @@
 <?php
 use PHPUnit\Framework\TestCase;
 require_once __DIR__ . '/bootstrap.php';
+require_once dirname(__DIR__) . '/includes/admin/admin-settings.php';
 
 if (!function_exists('register_setting')) {
     $GLOBALS['hic_registered_settings'] = [];
