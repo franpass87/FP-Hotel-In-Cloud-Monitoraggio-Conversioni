@@ -285,6 +285,7 @@ function hic_admin_enqueue_scripts($hook) {
 function hic_options_page() {
     ?>
     <div class="wrap">
+        <?php settings_errors(); ?>
         <h1>Hotel in Cloud - Monitoraggio Conversioni</h1>
         <form action='options.php' method='post'>
             <?php
