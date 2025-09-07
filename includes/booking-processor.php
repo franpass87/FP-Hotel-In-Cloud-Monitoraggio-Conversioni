@@ -51,6 +51,11 @@ function hic_process_booking_data($data) {
   $status = strtolower($data['status'] ?? ($data['presence'] ?? ''));
   $is_refund = in_array($status, ['cancelled', 'canceled', 'refunded'], true);
 
+  // Allow developers to conditionally skip tracking
+  if (!apply_filters('hic_should_track_reservation', true, $data)) {
+    return false;
+  }
+
   // Invii with error handling
   $success_count = 0;
   $error_count = 0;
