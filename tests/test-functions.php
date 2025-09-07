@@ -155,21 +155,24 @@ class HICFunctionsTest {
 
         global $hic_last_request;
 
-        // GA4 room name
+        // GA4 room name + SID usage
         $data = ['room' => 'Camera Deluxe', 'currency' => 'EUR', 'amount' => 100];
-        \FpHic\hic_send_to_ga4($data, null, null);
+        $sid = 'sid123';
+        \FpHic\hic_send_to_ga4($data, null, null, $sid);
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Camera Deluxe', 'GA4 should use room name');
+        assert($payload['client_id'] === $sid, 'GA4 should use SID as client_id');
+        assert($payload['events'][0]['params']['transaction_id'] === $sid, 'GA4 should use SID as transaction_id');
 
         // GA4 accommodation_name fallback
         $data = ['accommodation_name' => 'Suite', 'currency' => 'EUR', 'amount' => 100];
-        \FpHic\hic_send_to_ga4($data, null, null);
+        \FpHic\hic_send_to_ga4($data, null, null, $sid);
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Suite', 'GA4 should use accommodation name');
 
         // GA4 default
         $data = ['currency' => 'EUR', 'amount' => 100];
-        \FpHic\hic_send_to_ga4($data, null, null);
+        \FpHic\hic_send_to_ga4($data, null, null, $sid);
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Prenotazione', 'GA4 should default to Prenotazione');
 

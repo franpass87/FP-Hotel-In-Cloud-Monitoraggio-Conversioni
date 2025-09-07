@@ -7,7 +7,7 @@ namespace FpHic;
 if (!defined('ABSPATH')) exit;
 
 /* ============ GA4 (purchase + bucket) ============ */
-function hic_send_to_ga4($data, $gclid, $fbclid) {
+function hic_send_to_ga4($data, $gclid, $fbclid, $sid = null) {
   // Validate configuration
   $measurement_id = Helpers\hic_get_measurement_id();
   $api_secret = Helpers\hic_get_api_secret();
@@ -25,6 +25,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
 
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
   $client_id = $gclid ?: ($fbclid ?: (string) wp_generate_uuid4());
+  $sid = !empty($sid) ? sanitize_text_field($sid) : '';
 
   // Validate and normalize amount
   $amount = 0;
@@ -36,6 +37,10 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
   $transaction_id = Helpers\hic_extract_reservation_id($data);
   if (empty($transaction_id)) {
     $transaction_id = uniqid('hic_ga4_');
+  }
+  if ($sid !== '') {
+    $client_id = $sid;
+    $transaction_id = $sid;
   }
 
   $params = [
@@ -56,8 +61,8 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
   if (!empty($fbclid)) { $params['fbclid'] = sanitize_text_field($fbclid); }
 
   // Append UTM parameters if available
-  if (!empty($data['sid'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+  if ($sid !== '') {
+    $utm = Helpers\hic_get_utm_params_by_sid($sid);
     if (!empty($utm['utm_source']))   { $params['utm_source']   = sanitize_text_field($utm['utm_source']); }
     if (!empty($utm['utm_medium']))   { $params['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
     if (!empty($utm['utm_campaign'])) { $params['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
@@ -72,7 +77,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
   ];
 
   // Allow external modification of the GA4 payload
-  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid);
+  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid, $sid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);

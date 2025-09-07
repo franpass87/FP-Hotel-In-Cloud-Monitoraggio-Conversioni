@@ -55,7 +55,7 @@ function hic_process_booking_data($data) {
     // GA4 Integration (server-side)
     if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') && 
         Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
-      if (hic_send_to_ga4($data, $gclid, $fbclid)) {
+      if (hic_send_to_ga4($data, $gclid, $fbclid, $sid)) {
         $success_count++;
       } else {
         $error_count++;
@@ -66,7 +66,7 @@ function hic_process_booking_data($data) {
     
     // GTM Integration (client-side via dataLayer)
     if (($tracking_mode === 'gtm_only' || $tracking_mode === 'hybrid') && Helpers\hic_is_gtm_enabled()) {
-      if (hic_send_to_gtm_datalayer($data, $gclid, $fbclid)) {
+      if (hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid)) {
         $success_count++;
       } else {
         $error_count++;

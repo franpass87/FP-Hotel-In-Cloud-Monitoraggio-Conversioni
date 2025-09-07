@@ -21,6 +21,10 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 
 Il file JavaScript che aggiunge il parametro SID ai link di prenotazione viene caricato solo quando la modalità di tracciamento è impostata su `gtm_only`. Per disabilitarlo è sufficiente selezionare una modalità differente nelle impostazioni del plugin; per riattivarlo ripristinare `gtm_only`.
 
+### Identificatore utente `hic_sid`
+
+Il plugin utilizza un cookie denominato `hic_sid` per collegare le prenotazioni agli utenti. Se presente, questo valore viene inviato come `client_id` e `transaction_id` a GA4 e come `transaction_id` nel dataLayer di GTM, consentendo un tracciamento coerente dell'utente tra le piattaforme.
+
 📖 **Documentazione Completa**:
 - [Come Funziona il Plugin](PLUGIN_FUNZIONAMENTO.md) - Spiegazione dettagliata
 - [Architettura Tecnica](ARCHITETTURA_TECNICA.md) - Diagrammi e flussi
