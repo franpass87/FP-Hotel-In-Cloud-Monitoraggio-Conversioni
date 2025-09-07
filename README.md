@@ -15,7 +15,7 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 ### Modalità di Funzionamento
 
 - **API Polling (Raccomandato)**: WordPress controlla HIC ogni 1-5 minuti per nuove prenotazioni
-- **Webhook**: HIC invia immediatamente le prenotazioni a WordPress (richiede configurazione su HIC)
+- **Webhook**: HIC invia immediatamente le prenotazioni a WordPress (richiede configurazione su HIC). Il payload è limitato a 1 MB (valore predefinito modificabile tramite la costante `HIC_WEBHOOK_MAX_PAYLOAD_SIZE`).
 
 ### Caricamento dello script frontend
 
