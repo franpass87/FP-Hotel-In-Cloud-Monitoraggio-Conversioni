@@ -229,6 +229,64 @@ if (defined('WP_CLI') && WP_CLI) {
         }
 
         /**
+         * Resend tracking for a specific reservation
+         *
+         * ## OPTIONS
+         *
+         * <reservation_id>
+         * : ID della prenotazione da reinviare
+         *
+         * [--sid=<sid>]
+         * : SID opzionale salvato nei cookie per recuperare i tracciamenti
+         *
+         * ## EXAMPLES
+         *
+         *     wp hic resend 12345
+         *     wp hic resend 12345 --sid=abc123
+         *
+         * @param array $args
+         * @param array $assoc_args
+         */
+        public function resend($args, $assoc_args) {
+            if (empty($args[0])) {
+                WP_CLI::error('Reservation ID required');
+                return;
+            }
+
+            if (!function_exists('hic_process_booking_data')) {
+                WP_CLI::error('hic_process_booking_data function not found');
+                return;
+            }
+
+            $reservation_id = sanitize_text_field($args[0]);
+            $sid = isset($assoc_args['sid']) ? sanitize_text_field($assoc_args['sid']) : null;
+
+            $email = function_exists('hic_get_reservation_email') ? hic_get_reservation_email($reservation_id) : null;
+            if (empty($email)) {
+                WP_CLI::error('Email not found for reservation ' . $reservation_id);
+                return;
+            }
+
+            $data = array(
+                'reservation_id' => $reservation_id,
+                'email' => $email,
+            );
+
+            if ($sid) {
+                $data['sid'] = $sid;
+            }
+
+            WP_CLI::log('Resending reservation ' . $reservation_id . '...');
+            $result = hic_process_booking_data($data);
+
+            if ($result !== false) {
+                WP_CLI::success('Reservation resent successfully');
+            } else {
+                WP_CLI::error('Failed to resend reservation');
+            }
+        }
+
+        /**
          * Validate plugin configuration
          *
          * ## EXAMPLES
