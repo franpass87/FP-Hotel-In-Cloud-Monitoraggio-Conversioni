@@ -220,6 +220,22 @@ wp hic cleanup --logs --gclids --booking-events
 
 # Valida la configurazione del plugin
 wp hic validate-config
+
+# Reinvia una prenotazione specifica
+wp hic resend 12345
+
+# Reinvia una prenotazione con un SID salvato
+wp hic resend 12345 --sid=abc123
+```
+
+### Reinvio manuale di una prenotazione
+
+Il comando `wp hic resend` consente di reinviare una singola prenotazione attraverso la normale pipeline di integrazione.
+È sufficiente specificare l'ID della prenotazione e, se necessario, il SID salvato nei cookie:
+
+```bash
+wp hic resend 12345
+wp hic resend 12345 --sid=abc123
 ```
 
 ### Gestione manuale degli eventi
