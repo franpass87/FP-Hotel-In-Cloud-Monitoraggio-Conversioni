@@ -17,9 +17,7 @@
             "includes/integrations/brevo.php",
             "includes/api/webhook.php",
             "includes/api/polling.php",
-            "includes/cli.php",
-            "includes/admin/admin-settings.php",
-            "includes/admin/diagnostics.php"
+            "includes/cli.php"
         ]
     },
     "require-dev": {

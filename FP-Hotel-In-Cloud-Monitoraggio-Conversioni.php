@@ -128,3 +128,11 @@ function hic_activate($network_wide)
         );
     }
 });
+
+// Load admin functionality only in dashboard
+if (\is_admin()) {
+    \add_action('admin_init', function () {
+        require_once __DIR__ . '/includes/admin/admin-settings.php';
+        require_once __DIR__ . '/includes/admin/diagnostics.php';
+    });
+}
