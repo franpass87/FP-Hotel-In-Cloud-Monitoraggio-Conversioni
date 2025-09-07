@@ -193,6 +193,9 @@ wp hic queue --limit=10 --status=pending
 
 # Esegui le routine di pulizia
 wp hic cleanup --logs --gclids --booking-events
+
+# Valida la configurazione del plugin
+wp hic validate-config
 ```
 
 ### Gestione manuale degli eventi
