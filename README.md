@@ -153,6 +153,16 @@ Per monitorare lo stato del plugin dall'esterno è disponibile un endpoint pubbl
 
 Il token deve corrispondere al valore salvato nell'opzione `hic_health_token`.
 
+#### Livelli diagnostici
+
+È possibile specificare il livello di diagnostica tramite il parametro opzionale `level`:
+
+- `basic` (`HIC_DIAGNOSTIC_BASIC`, predefinito)
+- `detailed` (`HIC_DIAGNOSTIC_DETAILED`)
+- `full` (`HIC_DIAGNOSTIC_FULL`)
+
+Se viene passato un valore non valido, il plugin esegue automaticamente il livello base.
+
 ## Esportazione o cancellazione dei dati
 
 Il plugin supporta gli strumenti di privacy nativi di WordPress. Gli utenti possono richiedere l'esportazione o la cancellazione dei dati di tracciamento associati al proprio indirizzo email tramite:

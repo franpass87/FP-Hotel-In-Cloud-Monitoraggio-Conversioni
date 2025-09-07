@@ -471,6 +471,16 @@ class HIC_Health_Monitor {
         }
 
         $level = sanitize_text_field( wp_unslash( $_GET['level'] ?? HIC_DIAGNOSTIC_BASIC ) );
+        $allowed_levels = [
+            HIC_DIAGNOSTIC_BASIC,
+            HIC_DIAGNOSTIC_DETAILED,
+            HIC_DIAGNOSTIC_FULL,
+        ];
+
+        if ( ! in_array( $level, $allowed_levels, true ) ) {
+            $level = HIC_DIAGNOSTIC_BASIC;
+        }
+
         $health_data = $this->check_health($level);
 
         wp_send_json($health_data);
@@ -498,13 +508,22 @@ class HIC_Health_Monitor {
      * REST API health check
      */
     public function rest_health_check($request) {
-        $level = $request->get_param('level') ?: HIC_DIAGNOSTIC_BASIC;
-        
+        $level = sanitize_text_field( $request->get_param('level') ?? HIC_DIAGNOSTIC_BASIC );
+        $allowed_levels = [
+            HIC_DIAGNOSTIC_BASIC,
+            HIC_DIAGNOSTIC_DETAILED,
+            HIC_DIAGNOSTIC_FULL,
+        ];
+
+        if ( ! in_array( $level, $allowed_levels, true ) ) {
+            $level = HIC_DIAGNOSTIC_BASIC;
+        }
+
         // Public endpoint only returns basic info
         if (!current_user_can('hic_manage')) {
             $level = HIC_DIAGNOSTIC_BASIC;
         }
-        
+
         return $this->check_health($level);
     }
     
