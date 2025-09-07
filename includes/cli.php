@@ -227,7 +227,45 @@ if (defined('WP_CLI') && WP_CLI) {
                 'id', 'booking_id', 'processed', 'poll_timestamp', 'processed_at', 'process_attempts', 'last_error'
             ));
         }
-        
+
+        /**
+         * Validate plugin configuration
+         *
+         * ## EXAMPLES
+         *
+         *     wp hic validate-config
+         *
+         * @param array $args
+         * @param array $assoc_args
+         */
+        public function validate_config($args, $assoc_args) {
+            $validator = function_exists('hic_get_config_validator') ? hic_get_config_validator() : null;
+            if (!$validator) {
+                WP_CLI::error('Config validator not available');
+                return;
+            }
+
+            $result = $validator->validate_all_config();
+
+            foreach ($result['warnings'] as $warning) {
+                WP_CLI::warning($warning);
+            }
+
+            foreach ($result['errors'] as $error) {
+                WP_CLI::error($error, false);
+            }
+
+            if (!empty($result['errors'])) {
+                WP_CLI::halt(1);
+            }
+
+            if (!empty($result['warnings'])) {
+                WP_CLI::success('Configuration valid with warnings');
+            } else {
+                WP_CLI::success('Configuration valid');
+            }
+        }
+
         /**
          * Force poll execution bypassing lock using public poller methods
          */
