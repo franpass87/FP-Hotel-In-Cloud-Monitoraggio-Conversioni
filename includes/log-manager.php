@@ -149,6 +149,22 @@ class HIC_Log_Manager {
         if (empty($this->log_file)) {
             return false;
         }
+
+        // Rotate log based on file age
+        if (function_exists('get_option') && function_exists('update_option')) {
+            $created = (int) get_option('hic_log_created', 0);
+            $rotation_days = apply_filters('hic_log_rotation_days', 7);
+            $day_in_seconds = defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400;
+            $max_age = $rotation_days * $day_in_seconds;
+
+            if (!file_exists($this->log_file)) {
+                update_option('hic_log_created', time());
+            } elseif ($created > 0 && (time() - $created) >= $max_age) {
+                $this->rotate_log();
+            } elseif ($created === 0) {
+                update_option('hic_log_created', time());
+            }
+        }
         
         // Ensure directory exists
         $log_dir = dirname($this->log_file);
@@ -210,8 +226,12 @@ class HIC_Log_Manager {
         
         // Move current log to rotated file
         if (rename($this->log_file, $rotated_file)) {
+            if (function_exists('update_option')) {
+                update_option('hic_log_created', time());
+            }
+
             $this->log("Log rotated to: {$rotated_file}", HIC_LOG_LEVEL_INFO);
-            
+
             // Compress rotated file if gzip is available
             if (function_exists('gzopen')) {
                 $this->compress_log($rotated_file);
