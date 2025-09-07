@@ -66,6 +66,23 @@ Il plugin utilizza un cookie denominato `hic_sid` per collegare le prenotazioni 
 
 Quando un visitatore arriva sul sito con parametri UTM nella URL, il plugin salva `utm_source`, `utm_medium`, `utm_campaign`, `utm_content` e `utm_term` nella tabella `hic_gclids`, collegandoli al cookie `hic_sid`. Questi valori vengono poi inclusi automaticamente negli eventi inviati a GA4, Facebook/Meta, Google Tag Manager e Brevo per permettere un'analisi completa delle campagne di marketing.
 
+## Filtri
+
+### `hic_should_track_reservation`
+
+Permette di bloccare l'invio degli eventi per una specifica prenotazione prima che raggiunga le integrazioni esterne.
+
+```php
+add_filter('hic_should_track_reservation', function ($should_track, $reservation) {
+    if (isset($reservation['email']) && strpos($reservation['email'], 'test@') !== false) {
+        return false; // salta la prenotazione
+    }
+    return $should_track;
+}, 10, 2);
+```
+
+Nell'esempio sopra vengono escluse dal tracciamento le prenotazioni che contengono `test@` nell'indirizzo email.
+
 📖 **Documentazione Completa**:
 - [Come Funziona il Plugin](PLUGIN_FUNZIONAMENTO.md) - Spiegazione dettagliata
 - [Architettura Tecnica](ARCHITETTURA_TECNICA.md) - Diagrammi e flussi
