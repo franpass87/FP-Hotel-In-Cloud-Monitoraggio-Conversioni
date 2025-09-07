@@ -1,0 +1,107 @@
+name: Code Quality Assurance
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quality-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['8.1', '8.2', '8.3']
+
+    name: Quality Checks (PHP ${{ matrix.php-version }})
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        extensions: mbstring, intl, curl, json, openssl
+        tools: composer:v2
+        coverage: none
+
+    - name: Validate composer.json and composer.lock
+      run: composer validate --strict
+
+    - name: Cache Composer packages
+      id: composer-cache
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php-${{ matrix.php-version }}-
+
+    - name: Install dependencies
+      run: composer install --prefer-dist --no-progress --no-suggest
+
+    - name: Run PHP Syntax Check
+      run: find includes/ FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php -name "*.php" -exec php -l {} \;
+
+    - name: Run WordPress Coding Standards
+      run: vendor/bin/phpcs --standard=phpcs.xml includes/ FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php
+
+    - name: Run Parallel Lint
+      if: success() || failure()
+      run: vendor/bin/parallel-lint includes/ FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php
+
+    - name: Run PHPStan Static Analysis
+      if: success() || failure()
+      run: vendor/bin/phpstan analyse --configuration=phpstan.neon --no-progress
+
+    - name: Run PHP Mess Detector
+      if: success() || failure()
+      run: vendor/bin/phpmd includes/,FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php text phpmd.xml
+
+    - name: Run PHPUnit Tests
+      if: success() || failure()
+      run: php -d auto_prepend_file=tests/preload.php vendor/bin/phpunit --no-coverage
+
+    - name: Run Quality Assurance Runner
+      if: success() || failure()
+      run: php qa-runner.php
+
+  security-checks:
+    runs-on: ubuntu-latest
+    name: Security Analysis
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        extensions: mbstring, intl, curl, json, openssl
+        tools: composer:v2
+
+    - name: Install dependencies
+      run: composer install --prefer-dist --no-progress
+
+    - name: Run security check for composer dependencies
+      run: |
+        if command -v local-php-security-checker > /dev/null; then
+          local-php-security-checker --path=composer.lock
+        else
+          echo "Security checker not available, skipping..."
+        fi
+
+    - name: Check for hardcoded secrets
+      run: |
+        # Basic secret detection
+        if grep -r -E "(password|secret|key|token)\s*=\s*['\"][^'\"]{10,}" includes/ || \
+           grep -r -E "sk_live_|pk_live_|sk_test_|pk_test_" includes/ || \
+           grep -r -E "['\"]([A-Za-z0-9+/]{40,})['\"]" includes/; then
+          echo "⚠️ Potential secrets detected in code"
+          exit 1
+        else
+          echo "✅ No obvious secrets detected"
+        fi

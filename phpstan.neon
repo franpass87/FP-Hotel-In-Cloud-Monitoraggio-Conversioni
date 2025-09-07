@@ -1,0 +1,66 @@
+parameters:
+    level: 5
+    paths:
+        - includes
+        - FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php
+    excludePaths:
+        - vendor
+        - tests
+    bootstrapFiles:
+        - includes/constants.php
+    stubFiles:
+        - phpstan-stubs/wordpress.stub
+    ignoreErrors:
+        # WordPress function stubs - common patterns
+        - '#Function add_action not found\.#'
+        - '#Function add_filter not found\.#'
+        - '#Function wp_enqueue_script not found\.#'
+        - '#Function wp_enqueue_style not found\.#'
+        - '#Function wp_nonce_field not found\.#'
+        - '#Function sanitize_text_field not found\.#'
+        - '#Function esc_html not found\.#'
+        - '#Function esc_attr not found\.#'
+        - '#Function esc_url not found\.#'
+        - '#Function get_option not found\.#'
+        - '#Function update_option not found\.#'
+        - '#Function plugin_dir_path not found\.#'
+        - '#Function plugin_dir_url not found\.#'
+        - '#Function wp_die not found\.#'
+        - '#Function wp_redirect not found\.#'
+        - '#Function is_admin not found\.#'
+        - '#Function current_user_can not found\.#'
+        - '#Function wp_verify_nonce not found\.#'
+        - '#Function register_setting not found\.#'
+        - '#Function add_settings_section not found\.#'
+        - '#Function add_settings_field not found\.#'
+        - '#Function wp_remote_get not found\.#'
+        - '#Function wp_remote_post not found\.#'
+        - '#Function wp_remote_retrieve_body not found\.#'
+        - '#Function wp_remote_retrieve_response_code not found\.#'
+        - '#Function is_wp_error not found\.#'
+        - '#Function wp_schedule_event not found\.#'
+        - '#Function wp_next_scheduled not found\.#'
+        - '#Function wp_unschedule_event not found\.#'
+        - '#Function wp_clear_scheduled_hook not found\.#'
+        
+        # WordPress globals
+        - '#Undefined variable: \$wpdb#'
+        - '#Access to an undefined property wpdb::\$.*#'
+        - '#Undefined variable: \$wp_version#'
+        
+        # WordPress constants
+        - '#Constant ABSPATH not found\.#'
+        - '#Constant WP_CONTENT_DIR not found\.#'
+        - '#Constant WPINC not found\.#'
+        
+        # HIC Plugin specific ignores
+        - '#Call to function hic_.* not found\.#'
+        - '#Function hic_.* not found\.#'
+        
+    universalObjectCratesClasses:
+        - stdClass
+        - WP_Error
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+    reportUnmatchedIgnoredErrors: false
+    treatPhpDocTypesAsCertain: false
