@@ -391,10 +391,16 @@ function hic_http_request($url, $args = []) {
     if (!isset($args['timeout'])) {
         $args['timeout'] = defined('HIC_API_TIMEOUT') ? HIC_API_TIMEOUT : 15;
     }
+
+    $version = defined('HIC_PLUGIN_VERSION') ? HIC_PLUGIN_VERSION : '1.0';
     if (!isset($args['user-agent'])) {
-        $version = defined('HIC_PLUGIN_VERSION') ? HIC_PLUGIN_VERSION : '1.0';
-        $args['user-agent'] = 'HIC/' . $version;
+        $args['user-agent'] = 'HIC-Plugin/' . $version;
     }
+
+    if (!isset($args['headers']) || !is_array($args['headers'])) {
+        $args['headers'] = [];
+    }
+    $args['headers']['User-Agent'] = 'HIC-Plugin/' . $version;
 
     $response = wp_safe_remote_request($url, $args);
 
