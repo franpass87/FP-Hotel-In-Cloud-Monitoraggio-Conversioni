@@ -11,7 +11,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
   // Validate configuration
   $measurement_id = Helpers\hic_get_measurement_id();
   $api_secret = Helpers\hic_get_api_secret();
-  
+
   if (empty($measurement_id) || empty($api_secret)) {
     Helpers\hic_log('GA4: measurement ID o API secret mancanti');
     return false;
@@ -51,7 +51,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
     'method'         => 'HotelInCloud',
     'vertical'       => 'hotel',
   ];
-  
+
   if (!empty($gclid))  { $params['gclid']  = sanitize_text_field($gclid); }
   if (!empty($fbclid)) { $params['fbclid'] = sanitize_text_field($fbclid); }
 
@@ -82,23 +82,23 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
     'headers' => ['Content-Type'=>'application/json'],
     'body'    => $json_payload,
   ]);
-  
+
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
   $log_msg = "GA4 dispatch: purchase (bucket=$bucket) transaction_id=$transaction_id HTTP=$code";
-  
+
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
     Helpers\hic_log($log_msg);
     return false;
   }
-  
+
   if ($code !== 204 && $code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
     Helpers\hic_log($log_msg);
     return false;
   }
-  
+
   Helpers\hic_log($log_msg);
   return true;
 }
@@ -110,7 +110,7 @@ function hic_dispatch_ga4_reservation($data) {
   // Validate configuration
   $measurement_id = Helpers\hic_get_measurement_id();
   $api_secret = Helpers\hic_get_api_secret();
-  
+
   if (empty($measurement_id) || empty($api_secret)) {
     Helpers\hic_log('GA4 HIC dispatch SKIPPED: measurement ID o API secret mancanti');
     return false;
@@ -203,23 +203,23 @@ function hic_dispatch_ga4_reservation($data) {
     'headers' => ['Content-Type' => 'application/json'],
     'body'    => $json_payload,
   ]);
-  
+
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
   $log_msg = "GA4 HIC dispatch: bucket=$bucket vertical=hotel transaction_id=$transaction_id value=$value $currency price_in_items={$params['items'][0]['price']} HTTP=$code";
-  
+
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
     Helpers\hic_log($log_msg);
     return false;
   }
-  
+
   if ($code !== 204 && $code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
     Helpers\hic_log($log_msg);
     return false;
   }
-  
+
   Helpers\hic_log($log_msg);
   return true;
 }

@@ -6,38 +6,38 @@
 if (!defined('ABSPATH')) exit;
 
 class HIC_Booking_Poller {
-    
+
     public function __construct() {
         // Only initialize if WordPress functions are available
         if (!function_exists('add_filter') || !function_exists('add_action')) {
             return;
         }
-        
+
         // Register custom cron intervals first - always available for cron managers
         add_filter('cron_schedules', array($this, 'add_custom_cron_intervals'));
-        
+
         // WP-Cron system for reliable 24/7 operation
         add_action('hic_continuous_poll_event', array($this, 'execute_continuous_polling'));
         add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
         add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
         add_action('hic_cleanup_event', 'hic_cleanup_old_gclids');
         add_action('hic_booking_events_cleanup', 'hic_cleanup_booking_events');
-        
+
         // Initialize scheduler on activation
         add_action('init', array($this, 'ensure_scheduler_is_active'), 20);
-        
+
         // Add immediate check when admin page is loaded
         add_action('admin_init', array($this, 'admin_watchdog_check'));
-        
+
         // Add watchdog check using WordPress heartbeat
         add_action('heartbeat_received', array($this, 'heartbeat_watchdog'), 10, 2);
         add_filter('heartbeat_settings', array($this, 'heartbeat_settings'));
-        
+
         // Add fallback mechanism for when WP-Cron completely fails
         add_action('wp_loaded', array($this, 'fallback_polling_check'));
         add_action('shutdown', array($this, 'shutdown_polling_check'));
     }
-    
+
     /**
      * Ensure the scheduler is active - uses WP-Cron system
      */
@@ -48,7 +48,7 @@ class HIC_Booking_Poller {
             $this->clear_all_scheduled_events();
             return;
         }
-        
+
         // Check and schedule continuous polling event
         $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         if (!$continuous_next) {
@@ -66,7 +66,7 @@ class HIC_Booking_Poller {
                 Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             }
         }
-        
+
         // Check and schedule deep check event
         $deep_next = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         if (!$deep_next) {
@@ -106,11 +106,11 @@ class HIC_Booking_Poller {
                 Helpers\hic_log('WP-Cron Scheduler: FAILED to schedule booking events cleanup event');
             }
         }
-        
+
         // Log current scheduling status
         $this->log_scheduler_status();
     }
-    
+
     /**
      * Add custom WP-Cron intervals
      */
@@ -125,7 +125,7 @@ class HIC_Booking_Poller {
         );
         return $schedules;
     }
-    
+
     /**
      * Clear all scheduled WP-Cron events
      */
@@ -136,7 +136,7 @@ class HIC_Booking_Poller {
         Helpers\hic_safe_wp_clear_scheduled_hook('hic_booking_events_cleanup');
         Helpers\hic_log('WP-Cron Scheduler: Cleared all scheduled events');
     }
-    
+
     /**
      * Check if WP-Cron is working
      */
@@ -146,7 +146,7 @@ class HIC_Booking_Poller {
             Helpers\hic_log('WP-Cron is disabled via DISABLE_WP_CRON constant');
             return false;
         }
-        
+
         // Check if events are scheduled
         $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         $deep_next = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
@@ -168,7 +168,7 @@ class HIC_Booking_Poller {
 
         return $is_working;
     }
-    
+
     /**
      * Log current scheduler status for debugging
      */
@@ -201,7 +201,7 @@ class HIC_Booking_Poller {
 
         Helpers\hic_log($status_msg);
     }
-    
+
     /**
      * Watchdog to detect and recover from polling failures
      */
@@ -210,54 +210,54 @@ class HIC_Booking_Poller {
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         $last_deep = get_option('hic_last_deep_check', 0);
         $last_successful = get_option('hic_last_successful_poll', 0);
-        
+
         Helpers\hic_log("Watchdog: Running check - continuous lag: " . ($current_time - $last_continuous) . "s, deep lag: " . ($current_time - $last_deep) . "s");
-        
+
         // Check for continuous polling lag (should run every minute)
         $continuous_lag = $current_time - $last_continuous;
         if ($continuous_lag > HIC_WATCHDOG_THRESHOLD) {
             Helpers\hic_log("Watchdog: Continuous polling lag detected ({$continuous_lag}s), attempting recovery");
             $this->recover_from_failure('continuous');
         }
-        
-        // Check for deep check lag (should run every 10 minutes)  
+
+        // Check for deep check lag (should run every 10 minutes)
         $deep_lag = $current_time - $last_deep;
         if ($deep_lag > (HIC_DEEP_CHECK_INTERVAL * 2)) {
             Helpers\hic_log("Watchdog: Deep check lag detected ({$deep_lag}s), attempting recovery");
             $this->recover_from_failure('deep');
         }
-        
+
         // Check for completely stuck polling - no successful polls for 1+ hours
         $success_lag = $current_time - $last_successful;
         if ($last_successful > 0 && $success_lag > 3600) { // 1 hour without success
             Helpers\hic_log("Watchdog: No successful polling for {$success_lag}s - likely timestamp error, triggering timestamp recovery");
             $this->recover_from_failure('timestamp_error');
         }
-        
+
         // Check if WP-Cron events are properly scheduled
         if (!$this->is_wp_cron_working()) {
             Helpers\hic_log("Watchdog: WP-Cron events not properly scheduled, attempting recovery");
             $this->recover_from_failure('scheduling');
         }
-        
+
         // Additional check: if polling should be active but no events are scheduled
         if ($this->should_poll()) {
             $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
             $deep_next = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
-            
+
             if (!$continuous_next || !$deep_next) {
                 Helpers\hic_log("Watchdog: Polling should be active but events not scheduled, forcing restart");
                 $this->recover_from_failure('scheduling');
             }
         }
     }
-    
+
     /**
      * Recover from various types of polling failures
      */
     private function recover_from_failure($failure_type) {
         Helpers\hic_log("Recovery: Attempting recovery for failure type: $failure_type");
-        
+
         switch ($failure_type) {
             case 'continuous':
                 // Force reschedule continuous polling
@@ -266,7 +266,7 @@ class HIC_Booking_Poller {
                 // Trigger immediate execution
                 $this->execute_continuous_polling();
                 break;
-                
+
             case 'deep':
                 // Force reschedule deep check
                 Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
@@ -274,26 +274,26 @@ class HIC_Booking_Poller {
                 // Trigger immediate execution
                 $this->execute_deep_check();
                 break;
-                
+
             case 'scheduling':
                 // Full scheduler restart
                 $this->clear_all_scheduled_events();
                 sleep(1);
                 $this->ensure_scheduler_is_active();
                 break;
-                
+
             case 'timestamp_error':
                 // Handle stuck polling due to timestamp errors
                 Helpers\hic_log("Recovery: Resetting all timestamps due to timestamp errors");
                 $safe_timestamp = current_time('timestamp') - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
                 $recent_timestamp = current_time('timestamp') - HIC_WATCHDOG_THRESHOLD; // 5 minutes ago for polling timestamps
-                
+
                 // Validate timestamps before using them (if hic_validate_api_timestamp is available)
                 if (function_exists('hic_validate_api_timestamp')) {
                     $safe_timestamp = hic_validate_api_timestamp($safe_timestamp, 'Recovery data timestamp reset');
                     $recent_timestamp = hic_validate_api_timestamp($recent_timestamp, 'Recovery polling timestamp reset');
                 }
-                
+
                 update_option('hic_last_updates_since', $safe_timestamp, false);
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_updates_since');
                 update_option('hic_last_update_check', $safe_timestamp, false);
@@ -304,19 +304,19 @@ class HIC_Booking_Poller {
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
                 update_option('hic_last_deep_check', $recent_timestamp, false);
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
-                
+
                 // Also restart the scheduler to ensure clean state
                 $this->clear_all_scheduled_events();
                 sleep(1);
                 $this->ensure_scheduler_is_active();
-                
+
                 Helpers\hic_log("Recovery: All timestamps reset - data timestamps to " . date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restarted");
                 break;
         }
-        
+
         Helpers\hic_log("Recovery: Completed recovery attempt for $failure_type");
     }
-    
+
     /**
      * Public method to trigger timestamp recovery
      * Can be called from diagnostics interface or manual intervention
@@ -329,7 +329,7 @@ class HIC_Booking_Poller {
             'message' => 'Timestamp recovery completed - all timestamps reset and scheduler restarted'
         );
     }
-    
+
     /**
      * Configure WordPress heartbeat for watchdog monitoring
      */
@@ -340,7 +340,7 @@ class HIC_Booking_Poller {
         }
         return $settings;
     }
-    
+
     /**
      * Use WordPress heartbeat for watchdog functionality
      */
@@ -349,10 +349,10 @@ class HIC_Booking_Poller {
         if (!$this->should_poll()) {
             return $response;
         }
-        
+
         // Run watchdog check every heartbeat
         $this->run_watchdog_check();
-        
+
         // Add polling status to heartbeat response for debugging
         $response['hic_polling_status'] = array(
             'last_continuous' => get_option('hic_last_continuous_poll', 0),
@@ -360,10 +360,10 @@ class HIC_Booking_Poller {
             'wp_cron_working' => $this->is_wp_cron_working(),
             'time' => current_time('timestamp')
         );
-        
+
         return $response;
     }
-    
+
     /**
      * Admin watchdog check - runs when admin pages are loaded
      */
@@ -372,18 +372,18 @@ class HIC_Booking_Poller {
         if (!isset($_GET['page']) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), 'hic' ) === false) {
             return;
         }
-        
+
         // Run a lightweight watchdog check
         if ($this->should_poll()) {
             $current_time = current_time('timestamp');
             $last_continuous = get_option('hic_last_continuous_poll', 0);
-            
+
             // If polling hasn't run in more than 5 minutes, trigger recovery
             if ($current_time - $last_continuous > HIC_WATCHDOG_THRESHOLD) {
                 Helpers\hic_log("Admin Watchdog: Detected polling failure during admin page load (lag: " . ($current_time - $last_continuous) . "s), triggering recovery");
                 $this->run_watchdog_check();
             }
-            
+
             // Also check if events are scheduled at all
             $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
             if (!$continuous_next) {
@@ -392,7 +392,7 @@ class HIC_Booking_Poller {
             }
         }
     }
-    
+
     /**
      * Fallback polling check - triggers on every page load as last resort
      */
@@ -401,33 +401,33 @@ class HIC_Booking_Poller {
         if (!$this->should_poll()) {
             return;
         }
-        
+
         // Check if WP-Cron is working - if so, don't interfere
         if ($this->is_wp_cron_working()) {
             return;
         }
-        
+
         $current_time = current_time('timestamp');
         $last_continuous = get_option('hic_last_continuous_poll', 0);
-        
+
         // If WP-Cron is not working and polling is severely delayed (>10 minutes), run fallback
         if ($current_time - $last_continuous > HIC_DEEP_CHECK_INTERVAL) {
             Helpers\hic_log("Fallback: WP-Cron not working and polling severely delayed, running fallback polling");
-            
+
             // Use a transient to prevent multiple simultaneous executions
             $fallback_lock = get_transient('hic_fallback_polling_lock');
             if (!$fallback_lock) {
                 set_transient('hic_fallback_polling_lock', current_time('timestamp'), 120); // 2-minute lock
-                
+
                 // Run polling in background (don't block page load)
                 wp_schedule_single_event(time() + 5, 'hic_fallback_poll_event');
                 add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
-                
+
                 Helpers\hic_log("Fallback: Scheduled fallback polling event");
             }
         }
     }
-    
+
     /**
      * Shutdown polling check - very lightweight check on page end
      */
@@ -436,53 +436,53 @@ class HIC_Booking_Poller {
         if (!$this->should_poll() || is_admin()) {
             return;
         }
-        
+
         // Very quick check - just log if polling seems to be failing
         $current_time = current_time('timestamp');
         $last_continuous = get_option('hic_last_continuous_poll', 0);
-        
+
         if ($current_time - $last_continuous > 1800) { // 30 minutes lag
             Helpers\hic_log("Shutdown Check: Severe polling lag detected ({$current_time} - {$last_continuous} = " . ($current_time - $last_continuous) . "s)");
         }
     }
-    
+
     /**
      * Execute fallback polling when WP-Cron completely fails
      */
     public function execute_fallback_polling() {
         Helpers\hic_log("Fallback: Executing fallback polling due to WP-Cron failure");
-        
+
         try {
             // Try to restart the scheduler first
             $this->ensure_scheduler_is_active();
-            
+
             // Execute continuous polling
             $this->execute_continuous_polling();
-            
+
             // Also run deep check if it's been a while
             $current_time = current_time('timestamp');
             $last_deep = get_option('hic_last_deep_check', 0);
             if ($current_time - $last_deep > 1800) { // 30 minutes
                 $this->execute_deep_check();
             }
-            
+
             Helpers\hic_log("Fallback: Fallback polling completed successfully");
         } catch (Exception $e) {
             Helpers\hic_log("Fallback: Error during fallback polling: " . $e->getMessage());
         }
     }
-    
+
     /**
      * Execute continuous polling (every minute)
      * Checks for recent reservations and manual bookings
      */
     public function execute_continuous_polling() {
         Helpers\hic_log("Scheduler: Executing continuous polling (1-minute interval)");
-        
+
         // Update timestamp first to prevent overlapping executions
         update_option('hic_last_continuous_poll', current_time('timestamp'), false);
         \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
-        
+
         if (function_exists('hic_api_poll_bookings_continuous')) {
             hic_api_poll_bookings_continuous();
         } elseif (function_exists('hic_api_poll_bookings')) {
@@ -490,18 +490,18 @@ class HIC_Booking_Poller {
             hic_api_poll_bookings();
         }
     }
-    
+
     /**
      * Execute deep check (every 10 minutes)
      * Looks back HIC_DEEP_CHECK_LOOKBACK_DAYS days to catch any missed reservations
      */
     public function execute_deep_check() {
         Helpers\hic_log("Scheduler: Executing deep check (10-minute interval, " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback)");
-        
+
         // Update timestamp first to prevent overlapping executions
         update_option('hic_last_deep_check', current_time('timestamp'), false);
         \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
-        
+
         if (function_exists('hic_api_poll_bookings_deep_check')) {
             hic_api_poll_bookings_deep_check();
         } else {
@@ -509,7 +509,7 @@ class HIC_Booking_Poller {
             $this->fallback_deep_check();
         }
     }
-    
+
     /**
      * Fallback deep check implementation
      */
@@ -519,13 +519,13 @@ class HIC_Booking_Poller {
             Helpers\hic_log("Deep check: No property ID configured");
             return;
         }
-        
+
         $lookback_seconds = HIC_DEEP_CHECK_LOOKBACK_DAYS * DAY_IN_SECONDS;
         $from_date = date('Y-m-d', current_time('timestamp') - $lookback_seconds);
         $to_date = date('Y-m-d', current_time('timestamp'));
-        
+
         Helpers\hic_log("Deep check: Searching for reservations from $from_date to $to_date (property: $prop_id)");
-        
+
         // Check by check-in date to catch manual bookings and any missed ones
         if (function_exists('hic_fetch_reservations_raw')) {
             $reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, 200);
@@ -539,30 +539,30 @@ class HIC_Booking_Poller {
      * Check if polling should be active based on configuration
      */
     private function should_poll() {
-        return Helpers\hic_reliable_polling_enabled() && 
-               Helpers\hic_get_connection_type() === 'api' && 
-               Helpers\hic_get_api_url() && 
+        return Helpers\hic_reliable_polling_enabled() &&
+               Helpers\hic_get_connection_type() === 'api' &&
+               Helpers\hic_get_api_url() &&
                Helpers\hic_has_basic_auth_credentials();
     }
-    
+
     /**
      * Get polling interval in seconds (simplified - always 1 minute for continuous)
      */
     private function get_polling_interval_seconds() {
         return HIC_CONTINUOUS_POLLING_INTERVAL;
     }
-    
+
     /**
      * Watchdog check for debugging and monitoring
      */
     private function watchdog_check($last_poll, $current_time) {
         $lag = $current_time - $last_poll;
-        
+
         if ($lag > HIC_WATCHDOG_THRESHOLD) {
             Helpers\hic_log("Heartbeat Scheduler Watchdog: Polling lag detected - {$lag}s since last poll (threshold: " . HIC_WATCHDOG_THRESHOLD . "s)");
         }
     }
-    
+
     /**
      * Execute polling manually - for CLI and admin interface
      * Uses the new continuous polling method
@@ -570,23 +570,23 @@ class HIC_Booking_Poller {
     public function execute_poll() {
         $start_time = microtime(true);
         Helpers\hic_log('Manual polling execution started');
-        
+
         if (!$this->should_poll()) {
             $error = 'Polling conditions not met. Check credentials and connection type.';
             Helpers\hic_log('Manual polling failed: ' . $error);
             return array('success' => false, 'message' => $error);
         }
-        
+
         try {
             // Execute continuous polling
             $this->execute_continuous_polling();
-            
+
             $execution_time = round(microtime(true) - $start_time, 2);
             $message = "Manual polling completed in {$execution_time}s";
             Helpers\hic_log($message);
-            
+
             return array(
-                'success' => true, 
+                'success' => true,
                 'message' => $message,
                 'execution_time' => $execution_time
             );
@@ -596,20 +596,20 @@ class HIC_Booking_Poller {
             return array('success' => false, 'message' => $error);
         }
     }
-    
+
     /**
      * Force execute polling (bypassing locks for manual execution)
      */
     public function force_execute_poll() {
         $start_time = microtime(true);
         Helpers\hic_log('Force manual polling execution started');
-        
+
         if (!$this->should_poll()) {
             $error = 'Polling conditions not met. Check credentials and connection type.';
             Helpers\hic_log('Force manual polling failed: ' . $error);
             return array('success' => false, 'message' => $error);
         }
-        
+
         try {
             // Temporarily clear the lock to allow forced execution
             $lock_cleared = false;
@@ -618,19 +618,19 @@ class HIC_Booking_Poller {
                 $lock_cleared = true;
                 Helpers\hic_log('Cleared existing polling lock for force execution');
             }
-            
+
             // Execute continuous polling
             $this->execute_continuous_polling();
-            
+
             $execution_time = round(microtime(true) - $start_time, 2);
             $message = "Force manual polling completed in {$execution_time}s";
             if ($lock_cleared) {
                 $message .= " (lock was cleared)";
             }
             Helpers\hic_log($message);
-            
+
             return array(
-                'success' => true, 
+                'success' => true,
                 'message' => $message,
                 'execution_time' => $execution_time,
                 'lock_cleared' => $lock_cleared
@@ -678,13 +678,13 @@ class HIC_Booking_Poller {
     public function log_structured($event, $data = array()) {
         Helpers\hic_log($event, HIC_LOG_LEVEL_INFO, is_array($data) ? $data : array());
     }
-    
+
     /**
      * Get detailed diagnostics including polling conditions
      */
     public function get_detailed_diagnostics() {
         $base_stats = $this->get_stats();
-        
+
         // Add detailed condition checks
         $diagnostics = array_merge($base_stats, array(
             'conditions' => array(
@@ -707,10 +707,10 @@ class HIC_Booking_Poller {
                 'timestamp' => get_transient('hic_reliable_polling_lock') ?: null
             )
         ));
-        
+
         return $diagnostics;
     }
-    
+
     /**
      * Get polling statistics for diagnostics
      */
@@ -718,18 +718,18 @@ class HIC_Booking_Poller {
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         $last_deep = get_option('hic_last_deep_check', 0);
         $last_general = get_option('hic_last_api_poll', 0);
-        
+
         // Check scheduler type - WP-Cron only now
         $is_wp_cron_working = $this->is_wp_cron_working();
         $scheduler_type = $is_wp_cron_working ? 'WP-Cron' : 'Non attivo';
-        
+
         // Get detailed polling conditions
         $should_poll = $this->should_poll();
         $reliable_polling = Helpers\hic_reliable_polling_enabled();
         $connection_type = Helpers\hic_get_connection_type();
         $api_url = Helpers\hic_get_api_url();
         $has_auth = Helpers\hic_has_basic_auth_credentials();
-        
+
         $stats = array(
             'scheduler_type' => $scheduler_type,
             'wp_cron_working' => $is_wp_cron_working,
@@ -753,12 +753,12 @@ class HIC_Booking_Poller {
             'polling_interval' => HIC_CONTINUOUS_POLLING_INTERVAL,
             'deep_check_interval' => HIC_DEEP_CHECK_INTERVAL
         );
-        
+
         // Add WP-Cron specific info (always show for debugging)
         $stats['next_continuous_scheduled'] = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         $stats['next_deep_scheduled'] = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         $stats['wp_cron_disabled'] = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
-        
+
         return $stats;
     }
 }

@@ -26,7 +26,7 @@ add_action(
  */
 function hic_get_internal_scheduler_status() {
     global $wpdb;
-    
+
     $status = array(
         'internal_scheduler' => array(
             'enabled' => Helpers\hic_reliable_polling_enabled(),
@@ -45,19 +45,19 @@ function hic_get_internal_scheduler_status() {
             'new' => 0
         )
     );
-    
+
     // Check if internal scheduler conditions are met
-    $status['internal_scheduler']['conditions_met'] = 
-        Helpers\hic_reliable_polling_enabled() && 
-        Helpers\hic_get_connection_type() === 'api' && 
-        Helpers\hic_get_api_url() && 
+    $status['internal_scheduler']['conditions_met'] =
+        Helpers\hic_reliable_polling_enabled() &&
+        Helpers\hic_get_connection_type() === 'api' &&
+        Helpers\hic_get_api_url() &&
         Helpers\hic_has_basic_auth_credentials();
-    
+
     // Get stats from WP-Cron scheduler if available
     if (class_exists('HIC_Booking_Poller')) {
         $poller = new HIC_Booking_Poller();
         $poller_stats = $poller->get_stats();
-        
+
         if (!isset($poller_stats['error'])) {
             $status['internal_scheduler'] = array_merge($status['internal_scheduler'], array(
                 'last_poll' => $poller_stats['last_poll'] ?? 0,
@@ -76,12 +76,12 @@ function hic_get_internal_scheduler_status() {
                 'should_poll' => $poller_stats['should_poll'] ?? false,
                 'polling_conditions' => $poller_stats['polling_conditions'] ?? array()
             ));
-            
+
             // Add detailed WP-Cron diagnostics
             $continuous_next = $poller_stats['next_continuous_scheduled'] ?? Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
             $deep_next = $poller_stats['next_deep_scheduled'] ?? Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
             $wp_cron_disabled = $poller_stats['wp_cron_disabled'] ?? (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON);
-            
+
             $status['internal_scheduler']['cron_diagnostics'] = array(
                 'continuous_scheduled' => $continuous_next,
                 'continuous_scheduled_human' => $continuous_next ? date('Y-m-d H:i:s', $continuous_next) : 'Non programmato',
@@ -92,21 +92,21 @@ function hic_get_internal_scheduler_status() {
                 'continuous_overdue' => $continuous_next && $continuous_next < (time() - 120),
                 'deep_overdue' => $deep_next && $deep_next < (time() - 720)
             );
-            
+
             // Calculate next run estimates for both continuous and deep check
             $scheduler_type = $poller_stats['scheduler_type'] ?? 'Unknown';
-            
+
             if ($poller_stats['wp_cron_working'] ?? false) {
                 // WP-Cron is working - show actual scheduled times
                 $next_continuous = $poller_stats['next_continuous_scheduled'] ?? 0;
                 $next_deep = $poller_stats['next_deep_scheduled'] ?? 0;
-                
+
                 if ($next_continuous > time()) {
                     $status['internal_scheduler']['next_continuous_human'] = 'Tra ' . human_time_diff(time(), $next_continuous);
                 } else {
                     $status['internal_scheduler']['next_continuous_human'] = 'In ritardo o ora (WP-Cron)';
                 }
-                
+
                 if ($next_deep > time()) {
                     $status['internal_scheduler']['next_deep_human'] = 'Tra ' . human_time_diff(time(), $next_deep);
                 } else {
@@ -119,8 +119,8 @@ function hic_get_internal_scheduler_status() {
             }
         }
     }
-    
-    // Real-time sync stats (keep existing functionality)  
+
+    // Real-time sync stats (keep existing functionality)
     $realtime_table = $wpdb->prefix . 'hic_realtime_sync';
     if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $realtime_table)) === $realtime_table) {
         $status['realtime_sync']['total_tracked'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table)));
@@ -131,7 +131,7 @@ function hic_get_internal_scheduler_status() {
     } else {
         $status['realtime_sync']['table_exists'] = false;
     }
-    
+
     return $status;
 }
 
@@ -142,11 +142,11 @@ function hic_should_schedule_poll_event() {
     if (Helpers\hic_get_connection_type() !== 'api') {
         return false;
     }
-    
+
     if (!Helpers\hic_get_api_url()) {
         return false;
     }
-    
+
     // Check if we have Basic Auth credentials
     return Helpers\hic_has_basic_auth_credentials();
 }
@@ -158,15 +158,15 @@ function hic_should_schedule_updates_event() {
     if (Helpers\hic_get_connection_type() !== 'api') {
         return false;
     }
-    
+
     if (!Helpers\hic_get_api_url()) {
         return false;
     }
-    
+
     if (!Helpers\hic_updates_enrich_contacts()) {
         return false;
     }
-    
+
     // Updates polling requires Basic Auth
     return Helpers\hic_has_basic_auth_credentials();
 }
@@ -196,10 +196,10 @@ function hic_get_execution_stats() {
     $last_api_poll = get_option('hic_last_api_poll', 0);
     $last_continuous_poll = get_option('hic_last_continuous_poll', 0);
     $last_successful_poll = get_option('hic_last_successful_poll', 0);
-    
+
     // Use the most recent timestamp as the "last poll time"
     $last_poll_time = max($last_api_poll, $last_continuous_poll, $last_successful_poll);
-    
+
     return array(
         'last_poll_time' => $last_poll_time,
         'last_successful_poll' => $last_successful_poll,
@@ -235,14 +235,14 @@ function hic_test_dispatch_functions() {
         'checkin' => date('Y-m-d', strtotime('+7 days')),
         'checkout' => date('Y-m-d', strtotime('+10 days'))
     );
-    
+
     $results = array();
-    
+
     try {
         // Test with organic traffic (no tracking IDs)
         $gclid = null;
         $fbclid = null;
-        
+
         // Test GA4
         if (!empty(Helpers\hic_get_measurement_id()) && !empty(Helpers\hic_get_api_secret())) {
             hic_send_to_ga4($test_data, $gclid, $fbclid);
@@ -250,7 +250,7 @@ function hic_test_dispatch_functions() {
         } else {
             $results['ga4'] = 'GA4 not configured';
         }
-        
+
         // Test GTM
         if (Helpers\hic_is_gtm_enabled() && !empty(Helpers\hic_get_gtm_container_id())) {
             hic_send_to_gtm_datalayer($test_data, $gclid, $fbclid);
@@ -258,7 +258,7 @@ function hic_test_dispatch_functions() {
         } else {
             $results['gtm'] = 'GTM not configured or disabled';
         }
-        
+
         // Test Facebook
         if (!empty(Helpers\hic_get_fb_pixel_id()) && !empty(Helpers\hic_get_fb_access_token())) {
             hic_send_to_fb($test_data, $gclid, $fbclid);
@@ -266,7 +266,7 @@ function hic_test_dispatch_functions() {
         } else {
             $results['facebook'] = 'Facebook not configured';
         }
-        
+
         // Test Brevo
         if (Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key())) {
             hic_send_brevo_contact($test_data, $gclid, $fbclid);
@@ -275,7 +275,7 @@ function hic_test_dispatch_functions() {
         } else {
             $results['brevo'] = 'Brevo not configured or disabled';
         }
-        
+
         // Test Admin Email
         $admin_email = Helpers\hic_get_admin_email();
         if (!empty($admin_email)) {
@@ -284,9 +284,9 @@ function hic_test_dispatch_functions() {
         } else {
             $results['admin_email'] = 'Admin email not configured';
         }
-        
+
         return array('success' => true, 'results' => $results);
-        
+
     } catch (Exception $e) {
         return array('success' => false, 'message' => sprintf( __( 'Errore: %s', 'hotel-in-cloud' ), $e->getMessage() ) );
     }
@@ -299,22 +299,22 @@ function hic_test_dispatch_functions() {
  */
 function hic_force_restart_internal_scheduler() {
     Helpers\hic_log('Force restart: Starting internal scheduler restart process');
-    
+
     $results = array();
-    
+
     // Clear any existing WP-Cron events (cleanup legacy events)
     $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event', 'hic_reliable_poll_event');
     foreach ($legacy_events as $event) {
         Helpers\hic_safe_wp_clear_scheduled_hook($event);
         $results['legacy_' . $event . '_cleared'] = 'Cleared all legacy cron events';
     }
-    
+
     // Check if internal scheduler should be active
-    $should_activate = Helpers\hic_reliable_polling_enabled() && 
-                      Helpers\hic_get_connection_type() === 'api' && 
-                      Helpers\hic_get_api_url() && 
+    $should_activate = Helpers\hic_reliable_polling_enabled() &&
+                      Helpers\hic_get_connection_type() === 'api' &&
+                      Helpers\hic_get_api_url() &&
                       Helpers\hic_has_basic_auth_credentials();
-    
+
     if ($should_activate) {
         // Reset polling timestamps to trigger immediate execution
         delete_option('hic_last_api_poll');
@@ -322,32 +322,32 @@ function hic_force_restart_internal_scheduler() {
         delete_option('hic_last_continuous_poll');
         delete_option('hic_last_deep_check');
         $results['polling_timestamps_reset'] = 'Timestamps reset for immediate execution';
-        
+
         // Clear and reschedule WP-Cron events for fresh start
         if (class_exists('HIC_Booking_Poller')) {
             $poller = new HIC_Booking_Poller();
             $poller->clear_all_scheduled_events();
-            
+
             // Wait a moment then reschedule
             sleep(1);
             $poller->ensure_scheduler_is_active();
             $results['scheduler_restarted'] = 'WP-Cron events cleared and rescheduled';
         }
-        
+
         // Trigger an immediate poll if the poller is available
         if (function_exists('hic_api_poll_bookings')) {
             Helpers\hic_log('Force restart: Triggering immediate polling');
             hic_api_poll_bookings();
             $results['immediate_poll_triggered'] = 'Polling executed immediately';
         }
-        
+
         $results['internal_scheduler'] = 'Restarted and ready';
         Helpers\hic_log('Force restart: Internal scheduler restart completed successfully');
     } else {
         $results['internal_scheduler'] = 'Conditions not met for activation';
         Helpers\hic_log('Force restart: Conditions not met for internal scheduler');
     }
-    
+
     return $results;
 }
 
@@ -356,9 +356,9 @@ function hic_force_restart_internal_scheduler() {
  */
 function hic_trigger_watchdog_check() {
     Helpers\hic_log('Manual watchdog: Starting manual watchdog check');
-    
+
     $results = array();
-    
+
     if (class_exists('HIC_Booking_Poller')) {
         $poller = new HIC_Booking_Poller();
         $poller->run_watchdog_check();
@@ -368,7 +368,7 @@ function hic_trigger_watchdog_check() {
         $results['watchdog_error'] = 'HIC_Booking_Poller class not available';
         Helpers\hic_log('Manual watchdog: HIC_Booking_Poller class not available');
     }
-    
+
     return $results;
 }
 
@@ -379,22 +379,22 @@ function hic_trigger_watchdog_check() {
  */
 function hic_get_error_stats() {
     $log_lines_to_check = 1000; // Configurable number of recent log lines to analyze
-    
+
     $log_file = Helpers\hic_get_log_file();
     if (!file_exists($log_file)) {
         return array('error_count' => 0, 'last_error' => null);
     }
-    
+
     $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     if (!$lines) {
         return array('error_count' => 0, 'last_error' => null);
     }
-    
+
     // Count errors in recent lines
     $recent_lines = array_slice($lines, -$log_lines_to_check);
     $error_count = 0;
     $last_error = null;
-    
+
     foreach (array_reverse($recent_lines) as $line) {
         if (preg_match('/(error|errore|fallita|failed|HTTP [45]\d\d)/i', $line)) {
             $error_count++;
@@ -403,7 +403,7 @@ function hic_get_error_stats() {
             }
         }
     }
-    
+
     return array(
         'error_count' => $error_count,
         'last_error' => $last_error
@@ -424,21 +424,21 @@ function hic_get_downloaded_booking_ids() {
  */
 function hic_mark_bookings_as_downloaded($booking_ids) {
     $downloaded_ids = hic_get_downloaded_booking_ids();
-    
+
     foreach ($booking_ids as $id) {
         if (!in_array($id, $downloaded_ids)) {
             $downloaded_ids[] = $id;
         }
     }
-    
+
     // Keep only the last 100 downloaded IDs to prevent the list from growing indefinitely
     if (count($downloaded_ids) > 100) {
         $downloaded_ids = array_slice($downloaded_ids, -100);
     }
-    
+
     update_option('hic_downloaded_booking_ids', $downloaded_ids, false);
     Helpers\hic_clear_option_cache('hic_downloaded_booking_ids');
-    
+
     Helpers\hic_log("Marked " . count($booking_ids) . " bookings as downloaded. Total tracked: " . count($downloaded_ids));
 }
 
@@ -455,65 +455,65 @@ function hic_reset_downloaded_bookings() {
  */
 function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     $prop_id = Helpers\hic_get_property_id();
-    
+
     if (!$prop_id) {
         return new WP_Error('missing_prop_id', 'Property ID non configurato');
     }
-    
+
     // Check API connection type
     if (Helpers\hic_get_connection_type() !== 'api') {
         return new WP_Error('wrong_connection', 'Sistema configurato per webhook, non API');
     }
-    
+
     // Validate credentials
     if (!Helpers\hic_has_basic_auth_credentials()) {
         return new WP_Error('missing_credentials', 'Credenziali Basic Auth non configurate');
     }
-    
+
     // Get downloaded booking IDs for filtering
     $downloaded_ids = $skip_downloaded ? hic_get_downloaded_booking_ids() : array();
-    
+
     // Get bookings from the last 30 days to ensure we get recent ones
     $to_date = date('Y-m-d');
     $from_date = date('Y-m-d', strtotime('-30 days'));
-    
-    Helpers\hic_log("Fetching latest $limit bookings for property $prop_id from $from_date to $to_date" . 
+
+    Helpers\hic_log("Fetching latest $limit bookings for property $prop_id from $from_date to $to_date" .
             ($skip_downloaded ? " (skipping " . count($downloaded_ids) . " already downloaded)" : ""));
-    
+
     // Get more bookings to account for filtering out downloaded ones
     $fetch_limit = $skip_downloaded ? $limit * 3 : $limit * 2;
-    
+
     // Use the existing fetch function but without processing
     $result = hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, $fetch_limit);
-    
+
     if (is_wp_error($result)) {
         return $result;
     }
-    
+
     if (!is_array($result)) {
         return new WP_Error('invalid_response', 'Risposta API non valida');
     }
-    
+
     // Sort by creation date (newest first)
     usort($result, function($a, $b) {
         $date_a = isset($a['created_at']) ? $a['created_at'] : $a['from_date'];
         $date_b = isset($b['created_at']) ? $b['created_at'] : $b['from_date'];
         return strtotime($date_b) - strtotime($date_a);
     });
-    
+
     // Filter out already downloaded bookings if skip_downloaded is true
     if ($skip_downloaded && !empty($downloaded_ids)) {
         $result = array_filter($result, function($booking) use ($downloaded_ids) {
             $booking_id = $booking['id'] ?? '';
             return !in_array($booking_id, $downloaded_ids);
         });
-        
+
         // Re-index the array after filtering
         $result = array_values($result);
-        
+
         Helpers\hic_log("After filtering downloaded bookings: " . count($result) . " bookings remain");
     }
-    
+
     // Return only the requested number
     return array_slice($result, 0, $limit);
 }
@@ -525,12 +525,12 @@ function hic_format_bookings_as_csv($bookings) {
     if (empty($bookings)) {
         return '';
     }
-    
+
     // CSV headers
     $headers = array(
         'ID Prenotazione',
         'Nome',
-        'Cognome', 
+        'Cognome',
         'Email',
         'Telefono',
         'Camera/Alloggio',
@@ -542,10 +542,10 @@ function hic_format_bookings_as_csv($bookings) {
         'Presenza',
         'Note'
     );
-    
+
     $csv_lines = array();
     $csv_lines[] = '"' . implode('","', $headers) . '"';
-    
+
     foreach ($bookings as $booking) {
         $row = array(
             $booking['id'] ?? '',
@@ -562,15 +562,15 @@ function hic_format_bookings_as_csv($bookings) {
             $booking['presence'] ?? '',
             $booking['notes'] ?? $booking['description'] ?? ''
         );
-        
+
         // Escape and quote each field
         $escaped_row = array_map(function($field) {
             return '"' . str_replace('"', '""', $field) . '"';
         }, $row);
-        
+
         $csv_lines[] = implode(',', $escaped_row);
     }
-    
+
     return implode("\n", $csv_lines);
 }
 
@@ -1065,7 +1065,7 @@ function hic_diagnostics_page() {
     if (!current_user_can('hic_manage')) {
         wp_die( __( 'Non hai i permessi necessari per accedere a questa pagina.', 'hotel-in-cloud' ) );
     }
-    
+
     // Get initial data
     $scheduler_status = hic_get_internal_scheduler_status();
     $credentials_status = hic_get_credentials_status();
@@ -1073,21 +1073,21 @@ function hic_diagnostics_page() {
     $recent_logs = hic_get_log_manager()->get_recent_logs(20);
     $schedules = wp_get_schedules();
     $error_stats = hic_get_error_stats();
-    
+
     // Note: Updates polling and all cron dependencies removed - system uses internal scheduler only
-    
+
     ?>
     <div class="wrap">
         <h1>🏨 HIC Plugin Diagnostica</h1>
-        
+
         <div class="hic-diagnostics-container">
-            
+
             <!-- System Overview Section -->
             <div class="card hic-overview-card" id="system-overview">
                 <h2>📊 Panoramica Sistema
                     <span class="hic-refresh-indicator" id="refresh-indicator"></span>
                 </h2>
-                
+
                 <div class="hic-overview-grid">
                     <div class="hic-overview-section">
                         <h3>🔗 Connessione</h3>
@@ -1119,11 +1119,11 @@ function hic_diagnostics_page() {
                             </tr>
                         </table>
                     </div>
-                    
+
                     <div class="hic-overview-section">
                         <h3>⚡ Stato Polling</h3>
                         <table class="hic-status-table">
-                            <?php 
+                            <?php
                             $polling_active = $scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met'];
                             $last_poll = $execution_stats['last_successful_poll'];
                             ?>
@@ -1142,7 +1142,7 @@ function hic_diagnostics_page() {
                                 <td>Ultimo Successo</td>
                                 <td>
                                     <?php if ($last_poll > 0): ?>
-                                        <?php 
+                                        <?php
                                         $time_diff = current_time('timestamp') - $last_poll;
                                         if ($time_diff < 900): // Less than 15 minutes
                                         ?>
@@ -1167,11 +1167,11 @@ function hic_diagnostics_page() {
                     </div>
                 </div>
             </div>
-            
+
             <!-- Quick Diagnostics Section -->
             <div class="card hic-quick-card">
                 <h2>🔧 Diagnostica Rapida</h2>
-                
+
                 <div class="hic-quick-actions">
                     <div class="hic-action-group">
                         <h3>Test Sistema</h3>
@@ -1184,7 +1184,7 @@ function hic_diagnostics_page() {
                             Test Connessione
                         </button>
                     </div>
-                    
+
                     <div class="hic-action-group">
                         <h3>Risoluzione Problemi</h3>
                         <button class="button button-secondary" id="trigger-watchdog">
@@ -1196,7 +1196,7 @@ function hic_diagnostics_page() {
                             Reset Emergenza
                         </button>
                     </div>
-                    
+
                     <div class="hic-action-group">
                         <h3>Logs & Export</h3>
                         <button class="button button-secondary" id="download-error-logs">
@@ -1205,18 +1205,18 @@ function hic_diagnostics_page() {
                         </button>
                     </div>
                 </div>
-                
+
                 <div id="quick-results" class="hic-results-container" style="display: none;">
                     <div id="quick-results-content"></div>
                 </div>
-                
+
                 <div id="quick-status" class="hic-status-message"></div>
             </div>
-            
+
             <!-- Integration Status Section -->
             <div class="card hic-integrations-card">
                 <h2>🔌 Stato Integrazioni</h2>
-                
+
                 <div class="hic-integrations-grid">
                     <div class="hic-integration-item">
                         <div class="hic-integration-header">
@@ -1235,7 +1235,7 @@ function hic_diagnostics_page() {
                             <?php endif; ?>
                         </div>
                     </div>
-                    
+
                     <div class="hic-integration-item">
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">📧</span>
@@ -1258,7 +1258,7 @@ function hic_diagnostics_page() {
                         </div>
                         <?php endif; ?>
                     </div>
-                    
+
                     <div class="hic-integration-item">
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">📱</span>
@@ -1276,12 +1276,12 @@ function hic_diagnostics_page() {
                             <?php endif; ?>
                         </div>
                     </div>
-                    
+
                     <div class="hic-integration-item">
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">🎯</span>
                             <h3>Google Ads</h3>
-                            <?php 
+                            <?php
                             // Google Ads tracking is handled via GTM and GA4
                             $gtm_enabled = !empty(Helpers\hic_get_gtm_container_id());
                             $ga4_enabled = !empty(Helpers\hic_get_measurement_id());
@@ -1303,12 +1303,12 @@ function hic_diagnostics_page() {
                         </div>
                     </div>
                 </div>
-                
-                <?php 
+
+                <?php
                 $downloaded_ids = hic_get_downloaded_booking_ids();
                 $downloaded_count = count($downloaded_ids);
                 ?>
-                
+
                 <div class="hic-integration-actions-section">
                     <h3>🚀 Azioni Rapide</h3>
                     <div class="hic-quick-actions">
@@ -1323,19 +1323,19 @@ function hic_diagnostics_page() {
                             </button>
                         <?php endif; ?>
                     </div>
-                    
+
                     <div id="download-results" class="hic-results-container" style="display: none;">
                         <div id="download-results-content"></div>
                     </div>
-                    
+
                     <div id="download-status" class="hic-status-message"></div>
                 </div>
             </div>
-            
+
             <!-- Activity Monitor Section -->
             <div class="card hic-activity-card">
                 <h2>📈 Monitor Attività</h2>
-                
+
                 <div class="hic-activity-grid">
                     <div class="hic-activity-section">
                         <h3>🔄 Statistiche Esecuzione</h3>
@@ -1351,7 +1351,7 @@ function hic_diagnostics_page() {
                             <tr>
                                 <td>Ultimo Polling - Trovate</td>
                                 <td>
-                                    <?php 
+                                    <?php
                                     $last_count = $execution_stats['last_poll_reservations_found'];
                                     if ($last_count > 0) {
                                         echo '<span class="status ok">' . esc_html(number_format($last_count)) . '</span>';
@@ -1364,7 +1364,7 @@ function hic_diagnostics_page() {
                             <tr>
                                 <td>Durata Ultimo Polling</td>
                                 <td>
-                                    <?php 
+                                    <?php
                                     $duration = $execution_stats['last_poll_duration'];
                                     if ($duration > 0) {
                                         echo '<span class="status ' . esc_attr($duration > 10000 ? 'warning' : 'ok') . '">' . esc_html($duration) . ' ms</span>';
@@ -1382,7 +1382,7 @@ function hic_diagnostics_page() {
                             </tr>
                         </table>
                     </div>
-                    
+
                     <div class="hic-activity-section">
                         <h3>📝 Log Recenti</h3>
                         <div class="hic-logs-container">
@@ -1400,11 +1400,11 @@ function hic_diagnostics_page() {
                     </div>
                 </div>
             </div>
-            
+
             <!-- Advanced Tools Section -->
             <div class="card hic-advanced-card">
                 <h2>🛠️ Strumenti Avanzati</h2>
-                
+
                 <details class="hic-advanced-details">
                     <summary>
                         <span class="hic-advanced-summary">
@@ -1412,30 +1412,30 @@ function hic_diagnostics_page() {
                             Mostra Strumenti Avanzati
                         </span>
                     </summary>
-                    
+
                     <div class="hic-advanced-content">
                         <div class="hic-advanced-section">
                             <h3>📦 Backfill Storico</h3>
                             <p>Recupera prenotazioni da un intervallo temporale specifico.</p>
-                            
+
                             <div class="hic-backfill-form">
                                 <div class="hic-form-row">
                                     <label for="backfill-from-date">Da:</label>
                                     <input type="date" id="backfill-from-date" value="<?php echo esc_attr(date('Y-m-d', strtotime('-7 days'))); ?>" />
-                                    
+
                                     <label for="backfill-to-date">A:</label>
                                     <input type="date" id="backfill-to-date" value="<?php echo esc_attr(date('Y-m-d')); ?>" />
-                                    
+
                                     <label for="backfill-date-type">Tipo:</label>
                                     <select id="backfill-date-type">
                                         <option value="checkin">Check-in</option>
                                         <option value="checkout">Check-out</option>
                                         <option value="presence">Presenza</option>
                                     </select>
-                                    
+
                                     <input type="number" id="backfill-limit" placeholder="Limite (opz.)" min="1" max="1000" />
                                 </div>
-                                
+
                                 <div class="hic-form-actions">
                                     <button class="button button-primary" id="start-backfill">
                                         <span class="dashicons dashicons-download"></span>
@@ -1443,26 +1443,26 @@ function hic_diagnostics_page() {
                                     </button>
                                     <span id="backfill-status" class="hic-status-message"></span>
                                 </div>
-                                
+
                                 <div id="backfill-results" class="hic-results-container" style="display: none;">
                                     <div id="backfill-results-content"></div>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="hic-advanced-section">
                             <h3>⚠️ Strumenti di Emergenza</h3>
                             <p class="hic-warning-text">
                                 <span class="dashicons dashicons-warning"></span>
                                 Usa solo in caso di problemi gravi del sistema.
                             </p>
-                            
+
                             <div class="hic-emergency-tools">
                                 <button class="button button-secondary" id="reset-timestamps-advanced">
                                     <span class="dashicons dashicons-update"></span>
                                     Reset Timestamp
                                 </button>
-                                
+
                                 <div class="hic-brevo-test" <?php echo (Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key())) ? '' : 'style="display:none;"'; ?>>
                                     <button class="button button-secondary" id="test-brevo-connectivity">
                                         <span class="dashicons dashicons-cloud"></span>
@@ -1475,9 +1475,9 @@ function hic_diagnostics_page() {
                     </div>
                 </details>
             </div>
-            
+
         </div>
-        
+
         <!-- Test Results -->
         <div id="hic-test-results" style="margin-top: 20px;"></div>
     </div>
@@ -1502,7 +1502,7 @@ function hic_ajax_download_error_logs() {
     if (!file_exists($log_file) || !is_readable($log_file)) {
         wp_die( __( 'File di log non trovato o non leggibile', 'hotel-in-cloud' ) );
     }
-    
+
     // Set headers for file download
     $filename = 'hic-error-log-' . date('Y-m-d-H-i-s') . '.txt';
 
@@ -1512,7 +1512,7 @@ function hic_ajax_download_error_logs() {
     header('Content-Length: ' . filesize($log_file));
     header('Pragma: no-cache');
     header('Expires: 0');
-    
+
     // Output the file content
     readfile($log_file);
 

@@ -57,8 +57,8 @@ function hic_brevo_double_optin_on_enrich() { return hic_get_option('brevo_doubl
 
 // Real-time sync settings
 function hic_realtime_brevo_sync_enabled() { return hic_get_option('realtime_brevo_sync', '1') === '1'; }
-function hic_get_brevo_event_endpoint() { 
-    return hic_get_option('brevo_event_endpoint', 'https://in-automate.brevo.com/api/v2/trackEvent'); 
+function hic_get_brevo_event_endpoint() {
+    return hic_get_option('brevo_event_endpoint', 'https://in-automate.brevo.com/api/v2/trackEvent');
 }
 
 // Reliable polling settings
@@ -101,28 +101,28 @@ function hic_get_webhook_token() { return hic_get_option('webhook_token', ''); }
 function hic_get_api_url() { return hic_get_option('api_url', ''); }
 function hic_get_api_key() { return hic_get_option('api_key', ''); }
 
-function hic_get_api_email() { 
+function hic_get_api_email() {
     // Check for wp-config.php constant first, then fall back to option
     if (defined('HIC_API_EMAIL') && !empty(HIC_API_EMAIL)) {
         return HIC_API_EMAIL;
     }
-    return hic_get_option('api_email', ''); 
+    return hic_get_option('api_email', '');
 }
 
-function hic_get_api_password() { 
+function hic_get_api_password() {
     // Check for wp-config.php constant first, then fall back to option
     if (defined('HIC_API_PASSWORD') && !empty(HIC_API_PASSWORD)) {
         return HIC_API_PASSWORD;
     }
-    return hic_get_option('api_password', ''); 
+    return hic_get_option('api_password', '');
 }
 
-function hic_get_property_id() { 
+function hic_get_property_id() {
     // Check for wp-config.php constant first, then fall back to option
     if (defined('HIC_PROPERTY_ID') && !empty(HIC_PROPERTY_ID)) {
         return HIC_PROPERTY_ID;
     }
-    return hic_get_option('property_id', ''); 
+    return hic_get_option('property_id', '');
 }
 
 /**
@@ -142,8 +142,8 @@ function hic_get_polling_range_extension_days() { return intval(hic_get_option('
 /**
  * Get configured polling interval for quasi-realtime polling
  */
-function hic_get_polling_interval() { 
-    $interval = hic_get_option('polling_interval', 'every_two_minutes'); 
+function hic_get_polling_interval() {
+    $interval = hic_get_option('polling_interval', 'every_two_minutes');
     $valid_intervals = array('every_minute', 'every_two_minutes', 'hic_poll_interval', 'hic_reliable_interval');
     return in_array($interval, $valid_intervals) ? $interval : 'every_two_minutes';
 }
@@ -154,13 +154,13 @@ function hic_get_polling_interval() {
 function hic_acquire_polling_lock($timeout = 300) {
     $lock_key = 'hic_polling_lock';
     $lock_value = current_time('timestamp');
-    
+
     // Check if lock exists and is still valid
     $existing_lock = get_transient($lock_key);
     if ($existing_lock && ($lock_value - $existing_lock) < $timeout) {
         return false; // Lock is held by another process
     }
-    
+
     // Acquire lock
     return set_transient($lock_key, $lock_value, $timeout);
 }
@@ -176,11 +176,11 @@ function hic_should_schedule_retry_event() {
     if (!hic_realtime_brevo_sync_enabled()) {
         return false;
     }
-    
+
     if (!hic_get_brevo_api_key()) {
         return false;
     }
-    
+
     $schedules = wp_get_schedules();
     return isset($schedules['hic_retry_interval']);
 }
@@ -267,27 +267,27 @@ function hic_normalize_price($value) {
     }
 
     $result = floatval($normalized);
-    
+
     // Validate reasonable price range
     if ($result < 0) {
         hic_log('hic_normalize_price: Negative price detected: ' . $result . ' (original: ' . $value . ')');
         return 0.0;
     }
-    
+
     if ($result > 999999.99) {
         hic_log('hic_normalize_price: Unusually high price detected: ' . $result . ' (original: ' . $value . ')');
     }
-    
+
     return $result;
 }
 
 function hic_is_valid_email($email) {
     if (empty($email) || !is_string($email)) return false;
-    
+
     // Sanitize email first
     $email = sanitize_email($email);
     if (empty($email)) return false;
-    
+
     // Use WordPress built-in email validation and return boolean
     return is_email($email) !== false;
 }
@@ -295,16 +295,16 @@ function hic_is_valid_email($email) {
 function hic_is_ota_alias_email($e){
     if (empty($e) || !is_string($e)) return false;
     $e = strtolower(trim($e));
-    
+
     // Validate email format first
     if (!filter_var($e, FILTER_VALIDATE_EMAIL)) return false;
-    
+
     $domains = array(
       'guest.booking.com', 'message.booking.com',
       'guest.airbnb.com','airbnb.com',
       'expedia.com','stay.expedia.com','guest.expediapartnercentral.com'
     );
-    
+
     foreach ($domains as $d) {
         if (substr($e, -strlen('@'.$d)) === '@'.$d) return true;
     }
@@ -316,16 +316,16 @@ function hic_booking_uid($reservation) {
         hic_log('hic_booking_uid: reservation is not an array');
         return '';
     }
-    
+
     // Try multiple possible ID fields in order of preference
     $id_fields = ['id', 'reservation_id', 'booking_id', 'transaction_id'];
-    
+
     foreach ($id_fields as $field) {
         if (!empty($reservation[$field]) && is_scalar($reservation[$field])) {
             return (string) $reservation[$field];
         }
     }
-    
+
     hic_log('hic_booking_uid: No valid ID found in reservation data');
     return '';
 }
@@ -376,7 +376,7 @@ function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
 
 /**
  * Normalize bucket attribution according to priority: gclid > fbclid > organic
- * 
+ *
  * @param string|null $gclid Google Click ID from Google Ads
  * @param string|null $fbclid Facebook Click ID from Meta Ads
  * @return string One of: 'gads', 'fbads', 'organic'
@@ -402,27 +402,27 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
     hic_log('hic_send_admin_email: data is not an array');
     return false;
   }
-  
+
   $bucket = fp_normalize_bucket($gclid, $fbclid);
   $to = hic_get_admin_email();
-  
+
   // Enhanced email validation with detailed logging
   if (empty($to)) {
     hic_log('hic_send_admin_email: admin email is empty');
     return false;
   }
-  
+
   if (!hic_is_valid_email($to)) {
     hic_log('hic_send_admin_email: invalid admin email format: ' . $to);
     return false;
   }
-  
+
   // Check WordPress email configuration
   if (!function_exists('wp_mail')) {
     hic_log('hic_send_admin_email: wp_mail function not available');
     return false;
   }
-  
+
   // Log which admin email is being used for transparency
   $custom_email = hic_get_option('admin_email', '');
   if (!empty($custom_email)) {
@@ -430,11 +430,11 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   } else {
     hic_log('hic_send_admin_email: using WordPress default admin email: ' . $to);
   }
-  
+
   // Log WordPress mail configuration for debugging
   $phpmailer_init_triggered = false;
   $phpmailer_error = '';
-  
+
   // Add temporary hook to capture PHPMailer errors
   $phpmailer_hook = function($phpmailer) use (&$phpmailer_init_triggered, &$phpmailer_error) {
     $phpmailer_init_triggered = true;
@@ -443,12 +443,12 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
     }
   };
   add_action('phpmailer_init', $phpmailer_hook);
-  
+
   $site_name = get_bloginfo('name');
   if (empty($site_name)) {
     $site_name = 'Hotel in Cloud';
   }
-  
+
   $subject = "Nuova prenotazione da " . $site_name;
 
   $body  = "Hai ricevuto una nuova prenotazione da $site_name:\n\n";
@@ -472,12 +472,12 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
 
   $content_type_filter = function(){ return 'text/plain; charset=UTF-8'; };
   add_filter('wp_mail_content_type', $content_type_filter);
-  
+
   // Enhanced email sending with detailed error reporting
   hic_log('hic_send_admin_email: attempting to send email to ' . $to . ' with subject: ' . $subject);
-  
+
   $sent = wp_mail($to, $subject, $body);
-  
+
   // Remove filters and capture additional debugging info
   remove_filter('wp_mail_content_type', $content_type_filter);
   remove_action('phpmailer_init', $phpmailer_hook);
@@ -491,27 +491,27 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
     return true;
   } else {
     $error_details = 'wp_mail returned false';
-    
+
     // Capture PHPMailer specific errors
     if (!empty($phpmailer_error)) {
       $error_details .= ' - PHPMailer Error: ' . $phpmailer_error;
     }
-    
+
     // Check for common WordPress mail issues
     if (!$phpmailer_init_triggered) {
       $error_details .= ' - PHPMailer was not initialized (possible mail function disabled)';
     }
-    
+
     // Log detailed error information
     hic_log('ERRORE invio email admin a '.$to.' - '.$error_details);
-    
+
     // Log server mail configuration for debugging
     if (function_exists('ini_get')) {
       $smtp_config = ini_get('SMTP');
       $sendmail_path = ini_get('sendmail_path');
       hic_log('Server mail config - SMTP: ' . ($smtp_config ?: 'not set') . ', Sendmail: ' . ($sendmail_path ?: 'not set'));
     }
-    
+
     return false;
   }
 }
@@ -523,24 +523,24 @@ function hic_test_email_configuration($recipient_email = null) {
         'message' => '',
         'details' => array()
     );
-    
+
     // Use admin email if no recipient specified
     if (empty($recipient_email)) {
         $recipient_email = hic_get_admin_email();
     }
-    
+
     // Validate recipient email
     if (empty($recipient_email) || !hic_is_valid_email($recipient_email)) {
         $result['message'] = 'Invalid recipient email: ' . $recipient_email;
         return $result;
     }
-    
+
     // Check WordPress mail function availability
     if (!function_exists('wp_mail')) {
         $result['message'] = 'wp_mail function not available';
         return $result;
     }
-    
+
     // Capture PHPMailer configuration
     $phpmailer_info = array();
     $phpmailer_hook = function($phpmailer) use (&$phpmailer_info) {
@@ -553,9 +553,9 @@ function hic_test_email_configuration($recipient_email = null) {
         $phpmailer_info['from'] = $phpmailer->From;
         $phpmailer_info['from_name'] = $phpmailer->FromName;
     };
-    
+
     add_action('phpmailer_init', $phpmailer_hook);
-    
+
     // Prepare test email
     $subject = 'HIC Email Configuration Test - ' . date('Y-m-d H:i:s');
     $body = "Questo è un test di configurazione email per il plugin Hotel in Cloud.\n\n";
@@ -564,12 +564,12 @@ function hic_test_email_configuration($recipient_email = null) {
     $body .= "Sito: " . get_bloginfo('name') . "\n";
     $body .= "URL: " . get_bloginfo('url') . "\n\n";
     $body .= "Se ricevi questa email, la configurazione email funziona correttamente.";
-    
+
     // Send test email
     $sent = wp_mail($recipient_email, $subject, $body);
-    
+
     remove_action('phpmailer_init', $phpmailer_hook);
-    
+
     // Collect server mail configuration
     $server_config = array();
     if (function_exists('ini_get')) {
@@ -578,14 +578,14 @@ function hic_test_email_configuration($recipient_email = null) {
         $server_config['sendmail_path'] = ini_get('sendmail_path') ?: 'not set';
         $server_config['mail_function'] = function_exists('mail') ? 'available' : 'not available';
     }
-    
+
     // Build result
     $result['details']['phpmailer'] = $phpmailer_info;
     $result['details']['server_config'] = $server_config;
     $result['details']['wp_admin_email'] = get_option('admin_email');
     $result['details']['hic_admin_email'] = hic_get_option('admin_email', '');
     $result['details']['effective_admin_email'] = hic_get_admin_email();
-    
+
     if ($sent) {
         $result['success'] = true;
         $result['message'] = 'Email di test inviata con successo a ' . $recipient_email;
@@ -594,7 +594,7 @@ function hic_test_email_configuration($recipient_email = null) {
         $result['message'] = 'Errore nell\'invio dell\'email di test a ' . $recipient_email;
         hic_log('Email test configuration failed for ' . $recipient_email . ' - Check server mail configuration');
     }
-    
+
     return $result;
 }
 
@@ -602,7 +602,7 @@ function hic_test_email_configuration($recipient_email = null) {
 function hic_diagnose_email_issues() {
     $issues = array();
     $suggestions = array();
-    
+
     // Check 1: Admin email configuration
     $admin_email = hic_get_admin_email();
     if (empty($admin_email)) {
@@ -612,30 +612,30 @@ function hic_diagnose_email_issues() {
         $issues[] = 'Email amministratore non valido: ' . $admin_email;
         $suggestions[] = 'Correggi l\'indirizzo email nelle impostazioni';
     }
-    
+
     // Check 2: WordPress mail function
     if (!function_exists('wp_mail')) {
         $issues[] = 'Funzione wp_mail non disponibile';
         $suggestions[] = 'Problema critico di WordPress - contatta lo sviluppatore';
     }
-    
+
     // Check 3: PHP mail function
     if (!function_exists('mail')) {
         $issues[] = 'Funzione mail() PHP non disponibile sul server';
         $suggestions[] = 'Contatta il provider hosting per abilitare la funzione mail()';
     }
-    
+
     // Check 4: Server configuration
     if (function_exists('ini_get')) {
         $smtp_config = ini_get('SMTP');
         $sendmail_path = ini_get('sendmail_path');
-        
+
         if (empty($smtp_config) && empty($sendmail_path)) {
             $issues[] = 'Configurazione email server non trovata';
             $suggestions[] = 'Installa un plugin SMTP (WP Mail SMTP, Easy WP SMTP) o contatta l\'hosting';
         }
     }
-    
+
     // Check 5: Recent email sending attempts (if function exists)
     $email_errors = 0;
     $log_manager = function_exists('FpHic\\hic_get_log_manager') ? \FpHic\hic_get_log_manager() : null;
@@ -651,12 +651,12 @@ function hic_diagnose_email_issues() {
             $email_errors++;
         }
     }
-    
+
     if ($email_errors > 0) {
         $issues[] = "$email_errors errori email negli ultimi log";
         $suggestions[] = 'Controlla i log dettagliati nella sezione Diagnostics';
     }
-    
+
     return array(
         'issues' => $issues,
         'suggestions' => $suggestions,
@@ -670,24 +670,24 @@ function hic_mark_email_enriched($reservation_id, $real_email) {
         hic_log('hic_mark_email_enriched: reservation_id is empty or not scalar');
         return false;
     }
-    
+
     if (empty($real_email) || !is_string($real_email) || !hic_is_valid_email($real_email)) {
         hic_log('hic_mark_email_enriched: real_email is empty, not string, or invalid email format');
         return false;
     }
-    
+
     $email_map = get_option('hic_res_email_map', array());
     if (!is_array($email_map)) {
         $email_map = array(); // Reset if corrupted
     }
-    
+
     $email_map[$reservation_id] = $real_email;
-    
+
     // Keep only last 5k entries (FIFO) to prevent bloat
     if (count($email_map) > 5000) {
         $email_map = array_slice($email_map, -5000, null, true);
     }
-    
+
     $result = update_option('hic_res_email_map', $email_map, false); // autoload=false
     hic_clear_option_cache('hic_res_email_map');
     return $result;
@@ -697,12 +697,12 @@ function hic_get_reservation_email($reservation_id) {
     if (empty($reservation_id) || !is_scalar($reservation_id)) {
         return null;
     }
-    
+
     $email_map = get_option('hic_res_email_map', array());
     if (!is_array($email_map)) {
         return null; // Corrupted data
     }
-    
+
     return isset($email_map[$reservation_id]) ? $email_map[$reservation_id] : null;
 }
 
@@ -715,16 +715,16 @@ function hic_extract_reservation_id($data) {
     if (!is_array($data)) {
         return null;
     }
-    
+
     // Try different field names in order of preference
     $id_fields = ['transaction_id', 'reservation_id', 'id', 'booking_id'];
-    
+
     foreach ($id_fields as $field) {
         if (!empty($data[$field]) && is_scalar($data[$field])) {
             return (string) $data[$field];
         }
     }
-    
+
     return null;
 }
 
@@ -733,26 +733,26 @@ function hic_extract_reservation_id($data) {
  */
 function hic_mark_reservation_processed_by_id($reservation_id) {
     if (empty($reservation_id)) return false;
-    
+
     $synced = get_option('hic_synced_res_ids', array());
     if (!is_array($synced)) {
         $synced = array();
     }
-    
+
     if (!in_array($reservation_id, $synced)) {
         $synced[] = $reservation_id;
-        
+
         // Keep only last 10k entries (FIFO)
         if (count($synced) > 10000) {
             $synced = array_slice($synced, -10000);
         }
-        
+
         update_option('hic_synced_res_ids', $synced, false); // autoload=false
         hic_clear_option_cache('hic_synced_res_ids');
         hic_log("Marked reservation $reservation_id as processed for deduplication");
         return true;
     }
-    
+
     return false;
 }
 
@@ -763,10 +763,10 @@ function hic_mark_reservation_processed_by_id($reservation_id) {
  */
 function hic_acquire_reservation_lock($reservation_id, $timeout = 30) {
   if (empty($reservation_id)) return false;
-  
+
   $lock_key = 'hic_processing_lock_' . md5($reservation_id);
   $lock_time = current_time('timestamp');
-  
+
   // Check if there's already a recent lock
   $existing_lock = get_transient($lock_key);
   if ($existing_lock !== false) {
@@ -778,7 +778,7 @@ function hic_acquire_reservation_lock($reservation_id, $timeout = 30) {
       hic_log("Reservation $reservation_id: expired lock found (age: {$time_diff}s), acquiring new lock");
     }
   }
-  
+
   // Set the lock with timeout
   set_transient($lock_key, $lock_time, $timeout);
   hic_log("Reservation $reservation_id: processing lock acquired");
@@ -790,7 +790,7 @@ function hic_acquire_reservation_lock($reservation_id, $timeout = 30) {
  */
 function hic_release_reservation_lock($reservation_id) {
   if (empty($reservation_id)) return false;
-  
+
   $lock_key = 'hic_processing_lock_' . md5($reservation_id);
   delete_transient($lock_key);
   hic_log("Reservation $reservation_id: processing lock released");
@@ -802,12 +802,12 @@ function hic_release_reservation_lock($reservation_id) {
  */
 function hic_is_reservation_already_processed($reservation_id) {
     if (empty($reservation_id)) return false;
-    
+
     $synced = get_option('hic_synced_res_ids', array());
     if (!is_array($synced)) {
         return false;
     }
-    
+
     return in_array($reservation_id, $synced);
 }
 
@@ -819,12 +819,12 @@ function hic_is_reservation_already_processed($reservation_id) {
 function hic_get_processing_statistics() {
     $synced = get_option('hic_synced_res_ids', array());
     $current_locks = array();
-    
+
     // Check for active locks (this is just for diagnostics)
     // In production, locks are short-lived (30 seconds max)
     $lock_prefix = 'hic_processing_lock_';
     global $wpdb;
-    
+
     $statistics = array(
         'total_processed_reservations' => is_array($synced) ? count($synced) : 0,
         'last_webhook_processing' => get_option('hic_last_webhook_processing', 'never'),
@@ -833,7 +833,7 @@ function hic_get_processing_statistics() {
         'deduplication_enabled' => true,
         'transaction_locking_enabled' => true
     );
-    
+
     return $statistics;
 }
 

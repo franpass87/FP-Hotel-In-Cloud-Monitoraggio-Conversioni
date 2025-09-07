@@ -1,54 +1,54 @@
 <?php declare(strict_types=1);
 /**
  * Configuration Validation System for HIC Plugin
- * 
+ *
  * Provides comprehensive validation for all plugin settings and configurations.
  */
 
 if (!defined('ABSPATH')) exit;
 
 class HIC_Config_Validator {
-    
+
     private $errors = [];
     private $warnings = [];
-    
+
     /**
      * Validate all plugin configurations
      */
     public function validate_all_config() {
         $this->errors = [];
         $this->warnings = [];
-        
+
         // Validate core settings
         $this->validate_api_settings();
         $this->validate_integration_settings();
         $this->validate_system_settings();
         $this->validate_security_settings();
-        
+
         return [
             'valid' => empty($this->errors),
             'errors' => $this->errors,
             'warnings' => $this->warnings
         ];
     }
-    
+
     /**
      * Validate API settings
      */
     private function validate_api_settings() {
         $connection_type = Helpers\hic_get_connection_type();
-        
+
         if (!in_array($connection_type, ['webhook', 'polling'])) {
             $this->errors[] = 'Invalid connection type: ' . $connection_type;
         }
-        
+
         if ($connection_type === 'polling') {
             $this->validate_polling_config();
         } elseif ($connection_type === 'webhook') {
             $this->validate_webhook_config();
         }
     }
-    
+
     /**
      * Validate polling configuration
      */
@@ -57,23 +57,23 @@ class HIC_Config_Validator {
         $email = Helpers\hic_get_api_email();
         $password = Helpers\hic_get_api_password();
         $api_url = Helpers\hic_get_api_url();
-        
+
         if (empty($prop_id) || !is_numeric($prop_id)) {
             $this->errors[] = 'Property ID is required and must be numeric for API polling';
         }
-        
+
         if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $this->errors[] = 'Valid API email is required for API polling';
         }
-        
+
         if (empty($password)) {
             $this->errors[] = 'API password is required for API polling';
         }
-        
+
         if (!empty($api_url) && !filter_var($api_url, FILTER_VALIDATE_URL)) {
             $this->errors[] = 'API URL must be a valid URL';
         }
-        
+
         // Validate polling interval
         $interval = Helpers\hic_get_option('polling_interval', 'two_minutes');
         $valid_intervals = ['one_minute', 'two_minutes', 'five_minutes'];
@@ -81,20 +81,20 @@ class HIC_Config_Validator {
             $this->warnings[] = 'Invalid polling interval, using default';
         }
     }
-    
+
     /**
      * Validate webhook configuration
      */
     private function validate_webhook_config() {
         $token = Helpers\hic_get_webhook_token();
-        
+
         if (empty($token)) {
             $this->errors[] = 'Webhook token is required for webhook mode';
         } elseif (strlen($token) < 20) {
             $this->warnings[] = 'Webhook token should be at least 20 characters for security';
         }
     }
-    
+
     /**
      * Validate integration settings
      */
@@ -103,57 +103,57 @@ class HIC_Config_Validator {
         $this->validate_meta_config();
         $this->validate_brevo_config();
     }
-    
+
     /**
      * Validate GA4 configuration
      */
     private function validate_ga4_config() {
         $measurement_id = Helpers\hic_get_measurement_id();
         $api_secret = Helpers\hic_get_api_secret();
-        
+
         if (!empty($measurement_id)) {
             if (!preg_match('/^G-[A-Z0-9]+$/', $measurement_id)) {
                 $this->errors[] = 'GA4 Measurement ID format is invalid (should be G-XXXXXXXXXX)';
             }
-            
+
             if (empty($api_secret)) {
                 $this->errors[] = 'GA4 API Secret is required when Measurement ID is set';
             }
         }
-        
+
         if (!empty($api_secret) && empty($measurement_id)) {
             $this->warnings[] = 'GA4 API Secret is set but Measurement ID is missing';
         }
     }
-    
+
     /**
      * Validate Meta/Facebook configuration
      */
     private function validate_meta_config() {
         $pixel_id = Helpers\hic_get_fb_pixel_id();
         $access_token = Helpers\hic_get_fb_access_token();
-        
+
         if (!empty($pixel_id)) {
             if (!is_numeric($pixel_id)) {
                 $this->errors[] = 'Facebook Pixel ID must be numeric';
             }
-            
+
             if (empty($access_token)) {
                 $this->errors[] = 'Facebook Access Token is required when Pixel ID is set';
             }
         }
-        
+
         if (!empty($access_token)) {
             if (strlen($access_token) < 50) {
                 $this->warnings[] = 'Facebook Access Token seems too short';
             }
-            
+
             if (empty($pixel_id)) {
                 $this->warnings[] = 'Facebook Access Token is set but Pixel ID is missing';
             }
         }
     }
-    
+
     /**
      * Validate Brevo configuration
      */
@@ -161,41 +161,41 @@ class HIC_Config_Validator {
         if (!Helpers\hic_is_brevo_enabled()) {
             return;
         }
-        
+
         $api_key = Helpers\hic_get_brevo_api_key();
         $list_it = Helpers\hic_get_brevo_list_it();
         $list_en = Helpers\hic_get_brevo_list_en();
         $list_default = Helpers\hic_get_brevo_list_default();
-        
+
         if (empty($api_key)) {
             $this->errors[] = 'Brevo API Key is required when Brevo is enabled';
         }
-        
+
         if (!is_numeric($list_it) || $list_it <= 0) {
             $this->warnings[] = 'Brevo Italian list ID should be a positive number';
         }
-        
+
         if (!is_numeric($list_en) || $list_en <= 0) {
             $this->warnings[] = 'Brevo English list ID should be a positive number';
         }
-        
+
         if (!is_numeric($list_default) || $list_default <= 0) {
             $this->warnings[] = 'Brevo default list ID should be a positive number';
         }
-        
+
         // Validate event endpoint
         $event_endpoint = Helpers\hic_get_brevo_event_endpoint();
         if (!filter_var($event_endpoint, FILTER_VALIDATE_URL)) {
             $this->errors[] = 'Brevo event endpoint must be a valid URL';
         }
-        
+
         // Validate alias list if configured
         $alias_list = Helpers\hic_get_brevo_list_alias();
         if (!empty($alias_list) && (!is_numeric($alias_list) || $alias_list <= 0)) {
             $this->warnings[] = 'Brevo alias list ID should be a positive number';
         }
     }
-    
+
     /**
      * Validate system settings
      */
@@ -210,13 +210,13 @@ class HIC_Config_Validator {
                 $this->errors[] = 'Log directory is not writable: ' . $log_dir;
             }
         }
-        
+
         // Validate admin email
         $admin_email = Helpers\hic_get_admin_email();
         if (!empty($admin_email) && !filter_var($admin_email, FILTER_VALIDATE_EMAIL)) {
             $this->errors[] = 'Admin email address is not valid';
         }
-        
+
         // Check PHP requirements
         if (version_compare(PHP_VERSION, HIC_MIN_PHP_VERSION, '<')) {
             $this->errors[] = sprintf(
@@ -225,7 +225,7 @@ class HIC_Config_Validator {
                 PHP_VERSION
             );
         }
-        
+
         // Check required PHP extensions
         $required_extensions = ['curl', 'json', 'openssl'];
         foreach ($required_extensions as $ext) {
@@ -234,7 +234,7 @@ class HIC_Config_Validator {
             }
         }
     }
-    
+
     /**
      * Validate security settings
      */
@@ -243,7 +243,7 @@ class HIC_Config_Validator {
         if (!is_ssl() && !$this->is_local_environment()) {
             $this->warnings[] = 'HTTPS is recommended for production environments';
         }
-        
+
         // Check WordPress version
         $wp_version = get_bloginfo('version');
         if (version_compare($wp_version, HIC_MIN_WP_VERSION, '<')) {
@@ -253,83 +253,83 @@ class HIC_Config_Validator {
                 $wp_version
             );
         }
-        
+
         // Check file permissions
         $plugin_dir = plugin_dir_path(__DIR__);
         if (is_writable($plugin_dir)) {
             $this->warnings[] = 'Plugin directory is writable, consider restricting permissions';
         }
     }
-    
+
     /**
      * Check if running in local environment
      */
     private function is_local_environment() {
         $host = $_SERVER['HTTP_HOST'] ?? '';
         $local_hosts = ['localhost', '127.0.0.1', '::1'];
-        
+
         foreach ($local_hosts as $local_host) {
             if (strpos($host, $local_host) !== false) {
                 return true;
             }
         }
-        
+
         return false;
     }
-    
+
     /**
      * Validate specific setting
      */
     public function validate_setting($setting, $value) {
         $errors = [];
-        
+
         switch ($setting) {
             case 'measurement_id':
                 if (!empty($value) && !preg_match('/^G-[A-Z0-9]+$/', $value)) {
                     $errors[] = 'GA4 Measurement ID format is invalid';
                 }
                 break;
-                
+
             case 'api_secret':
                 if (!empty($value) && strlen($value) < 20) {
                     $errors[] = 'GA4 API Secret seems too short';
                 }
                 break;
-                
+
             case 'fb_pixel_id':
                 if (!empty($value) && !is_numeric($value)) {
                     $errors[] = 'Facebook Pixel ID must be numeric';
                 }
                 break;
-                
+
             case 'brevo_api_key':
                 if (!empty($value) && strlen($value) < 30) {
                     $errors[] = 'Brevo API Key seems too short';
                 }
                 break;
-                
+
             case 'admin_email':
                 if (!empty($value) && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
                     $errors[] = 'Admin email is not valid';
                 }
                 break;
-                
+
             case 'property_id':
                 if (!empty($value) && (!is_numeric($value) || $value <= 0)) {
                     $errors[] = 'Property ID must be a positive number';
                 }
                 break;
-                
+
             case 'api_email':
                 if (!empty($value) && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
                     $errors[] = 'API email is not valid';
                 }
                 break;
         }
-        
+
         return $errors;
     }
-    
+
     /**
      * Get configuration summary
      */
@@ -354,7 +354,7 @@ class HIC_Config_Validator {
                 'ssl_enabled' => is_ssl()
             ]
         ];
-        
+
         return $summary;
     }
 }

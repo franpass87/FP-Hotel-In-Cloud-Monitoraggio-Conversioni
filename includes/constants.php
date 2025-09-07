@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 /**
  * Constants and Configuration for HIC Plugin
- * 
+ *
  * This file centralizes all magic numbers and configuration values
  * used throughout the plugin to improve maintainability.
  */
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) exit;
 
 // === POLLING INTERVALS ===
 define('HIC_CONTINUOUS_POLLING_INTERVAL', 60);    // 1 minute for continuous polling
-define('HIC_DEEP_CHECK_INTERVAL', 600);           // 10 minutes for deep check  
+define('HIC_DEEP_CHECK_INTERVAL', 600);           // 10 minutes for deep check
 define('HIC_DEEP_CHECK_LOOKBACK_DAYS', 5);        // Look back 5 days in deep check
 define('HIC_WATCHDOG_THRESHOLD', 300);            // 5 minutes threshold
 define('HIC_FALLBACK_POLLING_INTERVAL', 120);     // 2 minutes fallback
@@ -48,7 +48,7 @@ define('HIC_SID_MAX_LENGTH', 256);                // Maximum SID length
 // === OTA DOMAINS ===
 define('HIC_OTA_DOMAINS', [
     'guest.booking.com',
-    'guest.airbnb.com', 
+    'guest.airbnb.com',
     'expedia.com',
     'hotels.com',
     'agoda.com',

@@ -32,7 +32,7 @@ require_once __DIR__ . '/includes/log-manager.php';
 require_once __DIR__ . '/includes/booking-poller.php';
 
 // Plugin activation handler
-function hic_activate($network_wide)
+function hic_activate(bool $network_wide): void
 {
     if (\version_compare(PHP_VERSION, HIC_MIN_PHP_VERSION, '<') || \version_compare(\get_bloginfo('version'), HIC_MIN_WP_VERSION, '<')) {
         \deactivate_plugins(\plugin_basename(__FILE__));

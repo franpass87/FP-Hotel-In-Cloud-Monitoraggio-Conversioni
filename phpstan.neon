@@ -1,0 +1,17 @@
+parameters:
+    level: 4
+    paths:
+        - includes/
+        - FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php
+    excludePaths:
+        - tests/
+    ignoreErrors:
+        # Ignore WordPress specific function calls that may not be available during analysis
+        - '#Function .* not found#'
+        - '#Constant .* not found#'
+        - '#has no return type specified#'
+        - '#has parameter .* with no type specified#'
+        - '#Property .* has no type specified#'
+        - '#Method .* has no return type specified#'
+        - '#Right side of && is always true#'
+    reportUnmatchedIgnoredErrors: false

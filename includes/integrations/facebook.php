@@ -12,20 +12,20 @@ function hic_send_to_fb($data, $gclid, $fbclid){
     Helpers\hic_log('FB Pixel non configurato.');
     return false;
   }
-  
+
   // Validate required data
   if (!is_array($data)) {
     Helpers\hic_log('FB: data is not an array');
     return false;
   }
-  
+
   if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
     Helpers\hic_log('FB: email mancante o non valida, evento non inviato');
     return false;
   }
-  
+
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
-  
+
   // Generate event ID using consistent extraction
   $event_id = Helpers\hic_extract_reservation_id($data);
   if (empty($event_id)) {
@@ -41,7 +41,7 @@ function hic_send_to_fb($data, $gclid, $fbclid){
   $user_data = [
     'em' => [ hash('sha256', strtolower(trim($data['email']))) ]
   ];
-  
+
   // Add optional user data if available and not empty
   if (!empty($data['first_name']) && is_string($data['first_name'])) {
     $user_data['fn'] = [ hash('sha256', strtolower(trim($data['first_name']))) ];
@@ -89,37 +89,37 @@ function hic_send_to_fb($data, $gclid, $fbclid){
     'headers' => ['Content-Type'=>'application/json'],
     'body'    => $json_payload,
   ]);
-  
+
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
   $log_msg = "FB dispatch: Purchase (bucket=$bucket) event_id=$event_id value=$amount HTTP=$code";
-  
+
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
     Helpers\hic_log($log_msg);
     return false;
   }
-  
+
   if ($code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
     Helpers\hic_log($log_msg);
     return false;
   }
-  
+
   // Parse response to check for errors
   $response_body = wp_remote_retrieve_body($res);
   $response_data = json_decode($response_body, true);
-  
+
   if (json_last_error() !== JSON_ERROR_NONE) {
     Helpers\hic_log('FB: Invalid JSON response: ' . json_last_error_msg());
     return false;
   }
-  
+
   if (isset($response_data['error'])) {
     Helpers\hic_log('FB: API Error: ' . json_encode($response_data['error']));
     return false;
   }
-  
+
   Helpers\hic_log($log_msg);
   return true;
 }
@@ -132,19 +132,19 @@ function hic_dispatch_pixel_reservation($data) {
     Helpers\hic_log('FB HIC dispatch SKIPPED: Pixel ID o Access Token mancanti');
     return false;
   }
-  
+
   // Validate input data
   if (!is_array($data)) {
     Helpers\hic_log('FB HIC dispatch: data is not an array');
     return false;
   }
-  
+
   // Validate required data
   if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
     Helpers\hic_log('FB HIC dispatch: email mancante o non valida, evento non inviato');
     return false;
   }
-  
+
   // Validate required fields
   $required_fields = ['transaction_id', 'value', 'currency'];
   foreach ($required_fields as $field) {
@@ -153,7 +153,7 @@ function hic_dispatch_pixel_reservation($data) {
       return false;
     }
   }
-  
+
   $transaction_id = sanitize_text_field($data['transaction_id']);
   $value = Helpers\hic_normalize_price($data['value']);
   $currency = sanitize_text_field($data['currency']);
@@ -172,7 +172,7 @@ function hic_dispatch_pixel_reservation($data) {
   $user_data = [
     'em' => [hash('sha256', strtolower(trim($data['email'])))]
   ];
-  
+
   // Add optional user data if available and not empty
   if (!empty($data['guest_first_name']) && is_string($data['guest_first_name'])) {
     $user_data['fn'] = [hash('sha256', strtolower(trim($data['guest_first_name'])))];
@@ -233,37 +233,37 @@ function hic_dispatch_pixel_reservation($data) {
     'headers' => ['Content-Type' => 'application/json'],
     'body'    => $json_payload,
   ]);
-  
+
   $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
   $log_msg = "FB HIC dispatch: bucket=$bucket transaction_id=$transaction_id value=$value $currency HTTP=$code";
-  
+
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
     Helpers\hic_log($log_msg);
     return false;
   }
-  
+
   if ($code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
     Helpers\hic_log($log_msg);
     return false;
   }
-  
+
   // Parse response to check for errors
   $response_body = wp_remote_retrieve_body($res);
   $response_data = json_decode($response_body, true);
-  
+
   if (json_last_error() !== JSON_ERROR_NONE) {
     Helpers\hic_log('FB HIC dispatch: Invalid JSON response: ' . json_last_error_msg());
     return false;
   }
-  
+
   if (isset($response_data['error'])) {
     Helpers\hic_log('FB HIC dispatch: API Error: ' . json_encode($response_data['error']));
     return false;
   }
-  
+
   Helpers\hic_log($log_msg);
   return true;
 }

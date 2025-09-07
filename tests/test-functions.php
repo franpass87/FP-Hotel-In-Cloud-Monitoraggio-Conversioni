@@ -158,38 +158,38 @@ class HICFunctionsTest {
         // GA4 room name
         $data = ['room' => 'Camera Deluxe', 'currency' => 'EUR', 'amount' => 100];
         \FpHic\hic_send_to_ga4($data, null, null);
-        $payload = json_decode($hic_last_request['args']['body'], true);
-        assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Camera Deluxe', 'GA4 should use room name');
+        $payload = json_decode($hic_last_request['args']['body'] ?? '{}', true);
+        assert(isset($payload['events'][0]['params']['items'][0]['item_name']) && $payload['events'][0]['params']['items'][0]['item_name'] === 'Camera Deluxe', 'GA4 should use room name');
 
         // GA4 accommodation_name fallback
         $data = ['accommodation_name' => 'Suite', 'currency' => 'EUR', 'amount' => 100];
         \FpHic\hic_send_to_ga4($data, null, null);
-        $payload = json_decode($hic_last_request['args']['body'], true);
-        assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Suite', 'GA4 should use accommodation name');
+        $payload = json_decode($hic_last_request['args']['body'] ?? '{}', true);
+        assert(isset($payload['events'][0]['params']['items'][0]['item_name']) && $payload['events'][0]['params']['items'][0]['item_name'] === 'Suite', 'GA4 should use accommodation name');
 
         // GA4 default
         $data = ['currency' => 'EUR', 'amount' => 100];
         \FpHic\hic_send_to_ga4($data, null, null);
-        $payload = json_decode($hic_last_request['args']['body'], true);
-        assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Prenotazione', 'GA4 should default to Prenotazione');
+        $payload = json_decode($hic_last_request['args']['body'] ?? '{}', true);
+        assert(isset($payload['events'][0]['params']['items'][0]['item_name']) && $payload['events'][0]['params']['items'][0]['item_name'] === 'Prenotazione', 'GA4 should default to Prenotazione');
 
         // FB room name
         $data = ['email' => 'user@example.com', 'room' => 'Camera Deluxe', 'currency' => 'EUR', 'amount' => 100];
         \FpHic\hic_send_to_fb($data, null, null);
-        $payload = json_decode($hic_last_request['args']['body'], true);
-        assert($payload['data'][0]['custom_data']['content_name'] === 'Camera Deluxe', 'FB should use room name');
+        $payload = json_decode($hic_last_request['args']['body'] ?? '{}', true);
+        assert(isset($payload['data'][0]['custom_data']['content_name']) && $payload['data'][0]['custom_data']['content_name'] === 'Camera Deluxe', 'FB should use room name');
 
         // FB accommodation_name fallback
         $data = ['email' => 'user@example.com', 'accommodation_name' => 'Suite', 'currency' => 'EUR', 'amount' => 100];
         \FpHic\hic_send_to_fb($data, null, null);
-        $payload = json_decode($hic_last_request['args']['body'], true);
-        assert($payload['data'][0]['custom_data']['content_name'] === 'Suite', 'FB should use accommodation name');
+        $payload = json_decode($hic_last_request['args']['body'] ?? '{}', true);
+        assert(isset($payload['data'][0]['custom_data']['content_name']) && $payload['data'][0]['custom_data']['content_name'] === 'Suite', 'FB should use accommodation name');
 
         // FB default
         $data = ['email' => 'user@example.com', 'currency' => 'EUR', 'amount' => 100];
         \FpHic\hic_send_to_fb($data, null, null);
-        $payload = json_decode($hic_last_request['args']['body'], true);
-        assert($payload['data'][0]['custom_data']['content_name'] === 'Prenotazione', 'FB should default to Prenotazione');
+        $payload = json_decode($hic_last_request['args']['body'] ?? '{}', true);
+        assert(isset($payload['data'][0]['custom_data']['content_name']) && $payload['data'][0]['custom_data']['content_name'] === 'Prenotazione', 'FB should default to Prenotazione');
 
         echo "✅ Event room name fallback tests passed\n";
     }

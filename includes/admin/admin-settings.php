@@ -23,23 +23,23 @@ function hic_ajax_test_email() {
             'message' => 'Nonce di sicurezza non valido.'
         ));
     }
-    
+
     // Check user permissions
     if (!current_user_can('hic_manage')) {
         wp_send_json_error(array(
             'message' => 'Permessi insufficienti.'
         ));
     }
-    
+
     // Get email from request
     $test_email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
-    
+
     if (empty($test_email) || !is_email($test_email)) {
         wp_send_json_error(array(
             'message' => 'Indirizzo email non valido.'
         ));
     }
-    
+
     // Run email configuration test
     $test_result = Helpers\hic_test_email_configuration($test_email);
 
@@ -60,19 +60,19 @@ function hic_ajax_test_api_connection() {
             'message' => 'Nonce di sicurezza non valido.'
         ));
     }
-    
+
     // Check user permissions
     if (!current_user_can('hic_manage')) {
         wp_send_json_error(array(
             'message' => 'Permessi insufficienti.'
         ));
     }
-    
+
     // Get credentials from AJAX request or settings
     $prop_id = sanitize_text_field( wp_unslash( $_POST['prop_id'] ?? '' ) );
     $email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
     $password = sanitize_text_field( wp_unslash( $_POST['password'] ?? '' ) );
-    
+
     // Test the API connection
     $result = hic_test_api_connection($prop_id, $email, $password);
 
@@ -166,26 +166,26 @@ function hic_settings_init() {
     add_settings_field('hic_admin_email', 'Email Amministratore', 'hic_admin_email_render', 'hic_settings', 'hic_main_section');
     add_settings_field('hic_log_file', 'File di Log', 'hic_log_file_render', 'hic_settings', 'hic_main_section');
     add_settings_field('hic_log_level', 'Log Level', 'hic_log_level_render', 'hic_settings', 'hic_main_section');
-    
+
     // GA4 settings
     add_settings_field('hic_measurement_id', 'Measurement ID', 'hic_measurement_id_render', 'hic_settings', 'hic_ga4_section');
     add_settings_field('hic_api_secret', 'API Secret', 'hic_api_secret_render', 'hic_settings', 'hic_ga4_section');
-    
+
     // GTM settings
     add_settings_field('hic_gtm_enabled', 'Abilita GTM', 'hic_gtm_enabled_render', 'hic_settings', 'hic_gtm_section');
     add_settings_field('hic_gtm_container_id', 'GTM Container ID', 'hic_gtm_container_id_render', 'hic_settings', 'hic_gtm_section');
     add_settings_field('hic_tracking_mode', 'Modalità Tracciamento', 'hic_tracking_mode_render', 'hic_settings', 'hic_gtm_section');
-    
+
     // Brevo settings
     add_settings_field('hic_brevo_enabled', 'Abilita Brevo', 'hic_brevo_enabled_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_api_key', 'API Key', 'hic_brevo_api_key_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_list_it', 'Lista Italiana', 'hic_brevo_list_it_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_list_en', 'Lista Inglese', 'hic_brevo_list_en_render', 'hic_settings', 'hic_brevo_section');
-    
+
     // Facebook settings
     add_settings_field('hic_fb_pixel_id', 'Pixel ID', 'hic_fb_pixel_id_render', 'hic_settings', 'hic_fb_section');
     add_settings_field('hic_fb_access_token', 'Access Token', 'hic_fb_access_token_render', 'hic_settings', 'hic_fb_section');
-    
+
     // Hotel in Cloud settings
     add_settings_field('hic_connection_type', 'Tipo Connessione', 'hic_connection_type_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_webhook_token', 'Webhook Token', 'hic_webhook_token_render', 'hic_settings', 'hic_hic_section');
@@ -196,7 +196,7 @@ function hic_settings_init() {
     add_settings_field('hic_property_id', 'ID Struttura (propId)', 'hic_property_id_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_polling_interval', 'Intervallo Polling', 'hic_polling_interval_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_reliable_polling_enabled', 'Polling Affidabile', 'hic_reliable_polling_enabled_render', 'hic_settings', 'hic_hic_section');
-    
+
     // Extended HIC Integration settings
     add_settings_field('hic_currency', 'Valuta (Currency)', 'hic_currency_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_ga4_use_net_value', 'Usa valore netto per GA4/Pixel', 'hic_ga4_use_net_value_render', 'hic_settings', 'hic_hic_section');
@@ -204,14 +204,14 @@ function hic_settings_init() {
     add_settings_field('hic_allow_status_updates', 'Gestisci aggiornamenti stato', 'hic_allow_status_updates_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_brevo_list_default', 'Lista Brevo Default', 'hic_brevo_list_default_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_optin_default', 'Opt-in marketing di default', 'hic_brevo_optin_default_render', 'hic_settings', 'hic_brevo_section');
-    
+
     // Email enrichment settings
     add_settings_field('hic_updates_enrich_contacts', 'Aggiorna contatti da updates', 'hic_updates_enrich_contacts_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_realtime_brevo_sync', 'Sync real-time a Brevo', 'hic_realtime_brevo_sync_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_list_alias', 'Lista alias Brevo', 'hic_brevo_list_alias_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_double_optin_on_enrich', 'Double opt-in quando arriva email reale', 'hic_brevo_double_optin_on_enrich_render', 'hic_settings', 'hic_brevo_section');
     add_settings_field('hic_brevo_event_endpoint', 'Endpoint API Eventi Brevo', 'hic_brevo_event_endpoint_render', 'hic_settings', 'hic_brevo_section');
-    
+
     add_settings_field('hic_debug_verbose', 'Log debug verboso', 'hic_debug_verbose_render', 'hic_settings', 'hic_main_section');
 }
 
@@ -293,20 +293,20 @@ function hic_options_page() {
             submit_button();
             ?>
         </form>
-        
+
         <!-- API Connection Test Section -->
         <?php if (Helpers\hic_get_connection_type() === 'api'): ?>
         <div class="hic-api-test-section" style="margin-top: 30px; padding: 20px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
             <h2>Test Connessione API</h2>
             <p>Testa la connessione alle API Hotel in Cloud con le credenziali Basic Auth configurate.</p>
-            
+
             <button type="button" id="hic-test-api-btn" class="button button-secondary">
                 <span class="dashicons dashicons-admin-tools" style="margin-top: 3px;"></span>
                 Testa Connessione API
             </button>
-            
+
             <div id="hic-test-result" style="margin-top: 15px; display: none;"></div>
-            
+
             <div id="hic-test-loading" style="margin-top: 15px; display: none;">
                 <span class="spinner is-active" style="float: left; margin: 0 10px 0 0;"></span>
                 <span>Test in corso... attendere...</span>
@@ -322,11 +322,11 @@ function hic_admin_email_render() {
     $current_email = Helpers\hic_get_admin_email();
     $custom_email = Helpers\hic_get_option('admin_email', '');
     $wp_admin_email = get_option('admin_email');
-    
+
     echo '<input type="email" name="hic_admin_email" value="' . esc_attr($current_email) . '" class="regular-text" id="hic_admin_email_field" />';
     echo '<button type="button" class="button" id="hic-test-email-btn" style="margin-left: 10px;">Test Email</button>';
     echo '<div id="hic_email_test_result" style="margin-top: 10px;"></div>';
-    
+
     echo '<p class="description">';
     echo 'Email per ricevere notifiche di nuove prenotazioni. ';
     if (empty($custom_email)) {
@@ -335,7 +335,7 @@ function hic_admin_email_render() {
         echo '<strong>Email personalizzata configurata:</strong> ' . esc_html($custom_email);
     }
     echo '</p>';
-    
+
     // Add troubleshooting guide
     echo '<div class="hic-email-troubleshooting" style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9;">';
     echo '<h4 style="margin-top: 0;">🔧 Risoluzione Problemi Email</h4>';
@@ -449,7 +449,7 @@ function hic_api_url_render() {
 function hic_api_email_render() {
     $value = Helpers\hic_get_api_email();
     $is_constant = defined('HIC_API_EMAIL') && !empty(HIC_API_EMAIL);
-    
+
     if ($is_constant) {
         echo '<input type="email" value="' . esc_attr($value) . '" class="regular-text" disabled />';
         echo '<p class="description"><strong>Configurato tramite costante PHP HIC_API_EMAIL in wp-config.php</strong></p>';
@@ -463,7 +463,7 @@ function hic_api_email_render() {
 function hic_api_password_render() {
     $value = Helpers\hic_get_api_password();
     $is_constant = defined('HIC_API_PASSWORD') && !empty(HIC_API_PASSWORD);
-    
+
     if ($is_constant) {
         echo '<input type="password" value="********" class="regular-text" disabled />';
         echo '<p class="description"><strong>Configurato tramite costante PHP HIC_API_PASSWORD in wp-config.php</strong></p>';
@@ -477,7 +477,7 @@ function hic_api_password_render() {
 function hic_property_id_render() {
     $value = Helpers\hic_get_property_id();
     $is_constant = defined('HIC_PROPERTY_ID') && !empty(HIC_PROPERTY_ID);
-    
+
     if ($is_constant) {
         echo '<input type="number" value="' . esc_attr($value) . '" class="regular-text" disabled />';
         echo '<p class="description"><strong>Configurato tramite costante PHP HIC_PROPERTY_ID in wp-config.php</strong></p>';
@@ -589,10 +589,10 @@ function hic_validate_admin_email($input) {
     if (empty($input)) {
         return '';
     }
-    
+
     // Sanitize the email
     $sanitized_email = sanitize_email($input);
-    
+
     // Validate email format
     if (!is_email($sanitized_email)) {
         add_settings_error(
@@ -604,12 +604,12 @@ function hic_validate_admin_email($input) {
         // Return the original value from database
         return Helpers\hic_get_option('admin_email', '');
     }
-    
+
     // Log the email change for transparency
     $old_email = Helpers\hic_get_option('admin_email', '');
     if ($old_email !== $sanitized_email) {
         Helpers\hic_log('Admin email changed from "' . $old_email . '" to "' . $sanitized_email . '"');
-        
+
         // Show success message
         add_settings_error(
             'hic_admin_email',
@@ -618,6 +618,6 @@ function hic_validate_admin_email($input) {
             'updated'
         );
     }
-    
+
     return $sanitized_email;
 }

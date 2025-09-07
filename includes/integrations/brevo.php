@@ -8,9 +8,9 @@ if (!defined('ABSPATH')) exit;
 
 /* ============ Brevo: aggiorna contatto ============ */
 function hic_send_brevo_contact($data, $gclid, $fbclid){
-  if (!Helpers\hic_get_brevo_api_key()) { 
-    Helpers\hic_log('Brevo dispatch SKIPPED: API key mancante'); 
-    return; 
+  if (!Helpers\hic_get_brevo_api_key()) {
+    Helpers\hic_log('Brevo dispatch SKIPPED: API key mancante');
+    return;
   }
 
   $email = isset($data['email']) ? $data['email'] : null;
@@ -48,12 +48,12 @@ function hic_send_brevo_contact($data, $gclid, $fbclid){
     ),
     'body'    => wp_json_encode($body),
   ));
-  
+
   $result = hic_handle_brevo_response($res, 'contact_legacy', array(
-    'email' => $email, 
+    'email' => $email,
     'lists' => implode(',', $list_ids)
   ));
-  
+
   if (!$result['success']) {
     Helpers\hic_log('Brevo contact dispatch FAILED: ' . $result['error']);
   }
@@ -98,7 +98,7 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid){
     'bucket' => $bucket,
     'email' => $event_data['email']
   ));
-  
+
   if (!$result['success']) {
     Helpers\hic_log('Brevo event dispatch FAILED: ' . $result['error']);
   }
@@ -124,7 +124,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   // Determine list based on language and alias status
   $language = isset($data['language']) ? $data['language'] : '';
   $list_ids = array();
-  
+
   if ($is_alias) {
     // Handle alias emails - only add to alias list if configured
     $alias_list_id = intval(Helpers\hic_get_brevo_list_alias());
@@ -160,7 +160,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'LASTNAME' => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
     'PHONE' => isset($data['phone']) ? $data['phone'] : '',
     'LANGUAGE' => $language,
-    
+
     // Modern HIC attributes
     'HIC_RES_ID' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
     'HIC_RES_CODE' => isset($data['reservation_code']) ? $data['reservation_code'] : '',
@@ -169,7 +169,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'HIC_GUESTS' => isset($data['guests']) ? $data['guests'] : '',
     'HIC_ROOM' => isset($data['accommodation_name']) ? $data['accommodation_name'] : '',
     'HIC_PRICE' => isset($data['original_price']) ? $data['original_price'] : '',
-    
+
     // Legacy webhook attributes (for backward compatibility)
     'RESVID' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
     'GCLID' => $gclid,
@@ -213,7 +213,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     ),
     'body' => wp_json_encode($body),
   ));
-  
+
   $result = hic_handle_brevo_response($res, 'contact', array(
     'email' => $email,
     'res_id' => $data['transaction_id'],
@@ -328,7 +328,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   // Debug log the exact payload structure being sent
   Helpers\hic_log(array('Brevo trackEvent payload debug' => array(
     'email' => $email,
-    'event' => 'reservation_created',  
+    'event' => 'reservation_created',
     'properties_structure' => 'properties',
     'auth_header' => 'api-key',
     'amount' => $body['properties']['amount'],
@@ -347,7 +347,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     ),
     'body' => wp_json_encode($body),
   ));
-  
+
   $result = hic_handle_brevo_response($res, 'event', array(
     'event' => 'reservation_created',
     'email' => $email,
@@ -357,10 +357,10 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     'vertical' => $body['properties']['vertical'],
     'endpoint' => Helpers\hic_get_brevo_event_endpoint()
   ));
-  
+
   if (!$result['success']) {
     Helpers\hic_log('Brevo reservation_created event FAILED: ' . $result['error']);
-    
+
     // Check if it's a retryable error or permanent failure
     $is_retryable = hic_is_brevo_error_retryable($result);
     if (!$is_retryable) {
@@ -371,7 +371,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
         hic_mark_reservation_notification_permanent_failure($reservation_id, $result['error']);
       }
     }
-    
+
     // Return additional info about retryability
     return array(
       'success' => false,
@@ -403,33 +403,33 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
       'log_data' => array_merge($log_context, array('error_type' => 'wp_error', 'HTTP' => 0))
     );
   }
-  
+
   $http_code = wp_remote_retrieve_response_code($response);
   $response_body = wp_remote_retrieve_body($response);
-  
+
   // Parse response body for additional error information
   $parsed_body = json_decode($response_body, true);
   $brevo_error_code = null;
   $brevo_error_message = null;
-  
+
   if (is_array($parsed_body)) {
     $brevo_error_code = isset($parsed_body['code']) ? $parsed_body['code'] : null;
     $brevo_error_message = isset($parsed_body['message']) ? $parsed_body['message'] : null;
   }
-  
+
   $log_data = array_merge($log_context, array(
     'HTTP' => $http_code,
     'request_type' => $request_type,
     'API_header' => 'api-key'
   ));
-  
+
   if ($brevo_error_code) {
     $log_data['brevo_error_code'] = $brevo_error_code;
   }
   if ($brevo_error_message) {
     $log_data['brevo_error_message'] = $brevo_error_message;
   }
-  
+
   // Handle HTTP response codes according to Brevo API specification
   switch ($http_code) {
     case 200: // OK
@@ -442,7 +442,7 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
         'http_code' => $http_code,
         'log_data' => $log_data
       );
-      
+
     case 400: // Bad request
       $error_msg = 'Bad request - Invalid parameters';
       if ($brevo_error_message) {
@@ -453,49 +453,49 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
         'error' => $error_msg,
         'log_data' => $log_data
       );
-      
+
     case 401: // Unauthorized
       return array(
         'success' => false,
         'error' => 'Unauthorized - Invalid API key or expired credentials',
         'log_data' => $log_data
       );
-      
+
     case 402: // Payment Required
       return array(
         'success' => false,
         'error' => 'Payment required - Account not activated or insufficient credits',
         'log_data' => $log_data
       );
-      
+
     case 403: // Forbidden
       return array(
         'success' => false,
         'error' => 'Forbidden - No permission to access this resource',
         'log_data' => $log_data
       );
-      
+
     case 404: // Not Found
       return array(
         'success' => false,
         'error' => 'Not found - Endpoint or resource does not exist',
         'log_data' => $log_data
       );
-      
+
     case 405: // Method Not Allowed
       return array(
         'success' => false,
         'error' => 'Method not allowed - Check HTTP method (GET/POST/PUT/DELETE)',
         'log_data' => $log_data
       );
-      
+
     case 406: // Not Acceptable
       return array(
         'success' => false,
         'error' => 'Not acceptable - Content-Type must be application/json',
         'log_data' => $log_data
       );
-      
+
     case 429: // Too Many Requests
       return array(
         'success' => false,
@@ -503,7 +503,7 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
         'log_data' => $log_data,
         'retry_after' => wp_remote_retrieve_header($response, 'retry-after')
       );
-      
+
     case 500:
     case 502:
     case 503:
@@ -512,7 +512,7 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
         'error' => "Server error (HTTP $http_code) - Brevo service temporarily unavailable",
         'log_data' => $log_data
       );
-      
+
     default:
       return array(
         'success' => false,
@@ -529,12 +529,12 @@ function hic_is_brevo_error_retryable($result) {
   if (!is_array($result) || !isset($result['log_data']['HTTP'])) {
     return false;
   }
-  
+
   $http_code = $result['log_data']['HTTP'];
-  
+
   // Retryable errors: rate limiting, server errors
   $retryable_codes = [429, 500, 502, 503];
-  
+
   return in_array($http_code, $retryable_codes);
 }
 
@@ -543,27 +543,27 @@ function hic_is_brevo_error_retryable($result) {
  * Replaces separate hic_send_brevo_contact() + hic_send_brevo_event() calls
  */
 function hic_send_unified_brevo_events($data, $gclid, $fbclid) {
-  if (!Helpers\hic_get_brevo_api_key()) { 
-    Helpers\hic_log('Unified Brevo dispatch SKIPPED: API key mancante'); 
-    return false; 
+  if (!Helpers\hic_get_brevo_api_key()) {
+    Helpers\hic_log('Unified Brevo dispatch SKIPPED: API key mancante');
+    return false;
   }
 
   // Validate essential data
   $email = isset($data['email']) ? $data['email'] : null;
-  if (!Helpers\hic_is_valid_email($email)) { 
-    Helpers\hic_log('Unified Brevo dispatch SKIPPED: email mancante o non valida'); 
-    return false; 
+  if (!Helpers\hic_is_valid_email($email)) {
+    Helpers\hic_log('Unified Brevo dispatch SKIPPED: email mancante o non valida');
+    return false;
   }
 
   // Transform webhook data to modern format for consistency
   $transformed_data = hic_transform_webhook_data_for_brevo($data);
-  
+
   // Use the modern dispatcher for contact management and capture result
   $contact_updated = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid);
   if (!$contact_updated) {
     return false;
   }
-  
+
   // Send event only if real-time sync is enabled and this is a new reservation
   $reservation_id = Helpers\hic_extract_reservation_id($data);
   if (Helpers\hic_realtime_brevo_sync_enabled() && !empty($reservation_id)) {
@@ -596,7 +596,7 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
   if (!is_array($webhook_data)) {
     return array();
   }
-  
+
   // Map webhook field names to modern field names
   $transformed = array(
     'transaction_id' => Helpers\hic_extract_reservation_id($webhook_data),
@@ -613,7 +613,7 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
     'guests' => isset($webhook_data['guests']) ? $webhook_data['guests'] : 1,
     'language' => isset($webhook_data['lingua']) ? $webhook_data['lingua'] : (isset($webhook_data['lang']) ? $webhook_data['lang'] : '')
   );
-  
+
   // Remove empty values but keep numeric zeros
   foreach ($transformed as $key => $value) {
     if ($value === null || $value === '') {
@@ -622,7 +622,7 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
       }
     }
   }
-  
+
   return $transformed;
 }
 
@@ -631,7 +631,7 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
  */
 function hic_test_brevo_contact_api() {
   $test_email = 'test-' . current_time('timestamp') . '@example.com';
-  
+
   $body = array(
     'email' => $test_email,
     'attributes' => array(
@@ -641,7 +641,7 @@ function hic_test_brevo_contact_api() {
     'listIds' => array(), // Empty list to avoid adding test contact to real lists
     'updateEnabled' => false // Don't update if exists
   );
-  
+
   $res = Helpers\hic_http_request('https://api.brevo.com/v3/contacts', array(
     'method'  => 'POST',
     'headers' => array(
@@ -651,12 +651,12 @@ function hic_test_brevo_contact_api() {
     ),
     'body' => wp_json_encode($body),
   ));
-  
+
   $result = hic_handle_brevo_response($res, 'contact_test', array(
     'test_email' => $test_email,
     'endpoint' => 'https://api.brevo.com/v3/contacts'
   ));
-  
+
   return array(
     'success' => $result['success'],
     'message' => $result['success'] ? 'Contact API test successful' : $result['error'],
@@ -671,7 +671,7 @@ function hic_test_brevo_contact_api() {
 function hic_test_brevo_event_api() {
   $endpoint = Helpers\hic_get_brevo_event_endpoint();
   $test_email = 'test-' . current_time('timestamp') . '@example.com';
-  
+
   $body = array(
     'event' => 'test_connectivity',
     'email' => $test_email,
@@ -681,13 +681,13 @@ function hic_test_brevo_event_api() {
       'vertical' => 'hotel'
     )
   );
-  
+
   Helpers\hic_log(array('Brevo Event API Test' => array(
     'endpoint' => $endpoint,
     'test_email' => $test_email,
     'payload' => $body
   )));
-  
+
   $res = Helpers\hic_http_request($endpoint, array(
     'method'  => 'POST',
     'headers' => array(
@@ -697,29 +697,29 @@ function hic_test_brevo_event_api() {
     ),
     'body' => wp_json_encode($body),
   ));
-  
+
   $result = hic_handle_brevo_response($res, 'event_test', array(
     'test_email' => $test_email,
     'endpoint' => $endpoint,
     'event' => 'test_connectivity'
   ));
-  
+
   $response_data = array(
     'success' => $result['success'],
     'message' => $result['success'] ? 'Event API test successful' : $result['error'],
     'endpoint' => $endpoint,
     'http_code' => isset($result['log_data']['HTTP']) ? $result['log_data']['HTTP'] : 'N/A'
   );
-  
+
   // If primary endpoint fails, try alternative endpoint
   if (!$result['success'] && $endpoint !== 'https://in-automate.brevo.com/api/v2/trackEvent') {
     $alt_endpoint = 'https://in-automate.brevo.com/api/v2/trackEvent';
-    
+
     Helpers\hic_log(array('Brevo Event API Alternative Test' => array(
       'alt_endpoint' => $alt_endpoint,
       'reason' => 'Primary endpoint failed'
     )));
-    
+
     $alt_res = Helpers\hic_http_request($alt_endpoint, array(
       'method'  => 'POST',
       'headers' => array(
@@ -729,24 +729,24 @@ function hic_test_brevo_event_api() {
       ),
       'body' => wp_json_encode($body),
     ));
-    
+
     $alt_result = hic_handle_brevo_response($alt_res, 'event_test_alt', array(
       'test_email' => $test_email,
       'endpoint' => $alt_endpoint,
       'event' => 'test_connectivity'
     ));
-    
+
     $response_data['alternative_test'] = array(
       'success' => $alt_result['success'],
       'message' => $alt_result['success'] ? 'Alternative endpoint successful' : $alt_result['error'],
       'endpoint' => $alt_endpoint,
       'http_code' => isset($alt_result['log_data']['HTTP']) ? $alt_result['log_data']['HTTP'] : 'N/A'
     );
-    
+
     if ($alt_result['success']) {
       $response_data['recommendation'] = 'Consider using alternative endpoint: ' . $alt_endpoint;
     }
   }
-  
+
   return $response_data;
 }

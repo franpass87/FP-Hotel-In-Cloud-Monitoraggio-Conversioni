@@ -8,16 +8,16 @@ if (!defined('ABSPATH')) exit;
 /* ============ DB: tabella sid↔gclid/fbclid ============ */
 function hic_create_database_table(){
   global $wpdb;
-  
+
   // Check if wpdb is available
   if (!$wpdb) {
     Helpers\hic_log('hic_create_database_table: wpdb is not available');
     return false;
   }
-  
+
   $table = $wpdb->prefix . 'hic_gclids';
   $charset = $wpdb->get_charset_collate();
-  
+
   $sql = "CREATE TABLE IF NOT EXISTS $table (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     gclid  VARCHAR(255),
@@ -28,25 +28,25 @@ function hic_create_database_table(){
     KEY fbclid (fbclid(100)),
     KEY sid (sid(100))
   ) $charset;";
-  
+
   require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-  
+
   $result = dbDelta($sql);
-  
+
   if ($result === false) {
     Helpers\hic_log('hic_create_database_table: Failed to create table ' . $table);
     return false;
   }
-  
+
   // Verify table was created
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     Helpers\hic_log('hic_create_database_table: Table creation verification failed for ' . $table);
     return false;
   }
-  
+
   Helpers\hic_log('DB ready: '.$table);
-  
+
   // Create real-time sync state table
   return hic_create_realtime_sync_table();
 }
@@ -54,16 +54,16 @@ function hic_create_database_table(){
 /* ============ DB: tabella stati sync real-time per Brevo ============ */
 function hic_create_realtime_sync_table(){
   global $wpdb;
-  
+
   // Check if wpdb is available
   if (!$wpdb) {
     Helpers\hic_log('hic_create_realtime_sync_table: wpdb is not available');
     return false;
   }
-  
+
   $table = $wpdb->prefix . 'hic_realtime_sync';
   $charset = $wpdb->get_charset_collate();
-  
+
   $sql = "CREATE TABLE IF NOT EXISTS $table (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     reservation_id VARCHAR(255) NOT NULL,
@@ -77,25 +77,25 @@ function hic_create_realtime_sync_table(){
     KEY status_idx (sync_status),
     KEY first_seen_idx (first_seen)
   ) $charset;";
-  
+
   require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-  
+
   $result = dbDelta($sql);
-  
+
   if ($result === false) {
     Helpers\hic_log('hic_create_realtime_sync_table: Failed to create table ' . $table);
     return false;
   }
-  
+
   // Verify table was created
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     Helpers\hic_log('hic_create_realtime_sync_table: Table creation verification failed for ' . $table);
     return false;
   }
-  
+
   Helpers\hic_log('DB ready: '.$table.' (realtime sync states)');
-  
+
   // Create booking events queue table
   return hic_create_booking_events_table();
 }
@@ -103,16 +103,16 @@ function hic_create_realtime_sync_table(){
 /* ============ DB: tabella queue eventi prenotazioni ============ */
 function hic_create_booking_events_table(){
   global $wpdb;
-  
+
   // Check if wpdb is available
   if (!$wpdb) {
     Helpers\hic_log('hic_create_booking_events_table: wpdb is not available');
     return false;
   }
-  
+
   $table = $wpdb->prefix . 'hic_booking_events';
   $charset = $wpdb->get_charset_collate();
-  
+
   $sql = "CREATE TABLE IF NOT EXISTS $table (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     booking_id VARCHAR(255) NOT NULL,
@@ -128,23 +128,23 @@ function hic_create_booking_events_table(){
     KEY poll_timestamp_idx (poll_timestamp),
     KEY processed_idx (processed)
   ) $charset;";
-  
+
   require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-  
+
   $result = dbDelta($sql);
-  
+
   if ($result === false) {
     Helpers\hic_log('hic_create_booking_events_table: Failed to create table ' . $table);
     return false;
   }
-  
+
   // Verify table was created
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     Helpers\hic_log('hic_create_booking_events_table: Table creation verification failed for ' . $table);
     return false;
   }
-  
+
   Helpers\hic_log('DB ready: '.$table.' (booking events queue)');
   return true;
 }
@@ -279,7 +279,7 @@ function hic_capture_tracking_params(){
     Helpers\hic_log('hic_capture_tracking_params: wpdb is not available', HIC_LOG_LEVEL_ERROR);
     return false;
   }
-  
+
   $table = $wpdb->prefix . 'hic_gclids';
 
   // Check if table exists
@@ -329,34 +329,34 @@ function hic_is_reservation_new_for_realtime($reservation_id) {
     Helpers\hic_log('hic_is_reservation_new_for_realtime: Invalid reservation_id');
     return false;
   }
-  
+
   global $wpdb;
-  
+
   // Check if wpdb is available
   if (!$wpdb) {
     Helpers\hic_log('hic_is_reservation_new_for_realtime: wpdb is not available');
     return false;
   }
-  
+
   $table = $wpdb->prefix . 'hic_realtime_sync';
-  
+
   // Check if table exists
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     Helpers\hic_log('hic_is_reservation_new_for_realtime: Table does not exist: ' . $table);
     return true; // Assume new if table doesn't exist
   }
-  
+
   $existing = $wpdb->get_var($wpdb->prepare(
     "SELECT id FROM $table WHERE reservation_id = %s LIMIT 1",
     $reservation_id
   ));
-  
+
   if ($wpdb->last_error) {
     Helpers\hic_log('hic_is_reservation_new_for_realtime: Database error: ' . $wpdb->last_error);
     return true; // Assume new on error
   }
-  
+
   return !$existing;
 }
 
@@ -368,17 +368,17 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
     Helpers\hic_log('hic_mark_reservation_new_for_realtime: Invalid reservation_id');
     return false;
   }
-  
+
   global $wpdb;
-  
+
   // Check if wpdb is available
   if (!$wpdb) {
     Helpers\hic_log('hic_mark_reservation_new_for_realtime: wpdb is not available');
     return false;
   }
-  
+
   $table = $wpdb->prefix . 'hic_realtime_sync';
-  
+
   // Check if table exists
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
@@ -387,18 +387,18 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
       return false;
     }
   }
-  
+
   // Insert if not exists
   $result = $wpdb->query($wpdb->prepare(
     "INSERT IGNORE INTO $table (reservation_id, sync_status) VALUES (%s, 'new')",
     $reservation_id
   ));
-  
+
   if ($result === false) {
     Helpers\hic_log('hic_mark_reservation_new_for_realtime: Database error: ' . ($wpdb->last_error ?: 'Unknown error'));
     return false;
   }
-  
+
   return $result !== false;
 }
 
@@ -407,10 +407,10 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
  */
 function hic_mark_reservation_notified_to_brevo($reservation_id) {
   if (empty($reservation_id)) return false;
-  
+
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
-  
+
   $result = $wpdb->update(
     $table,
     array(
@@ -423,7 +423,7 @@ function hic_mark_reservation_notified_to_brevo($reservation_id) {
     array('%s', '%d', '%s', '%s'),
     array('%s')
   );
-  
+
   return $result !== false;
 }
 
@@ -432,18 +432,18 @@ function hic_mark_reservation_notified_to_brevo($reservation_id) {
  */
 function hic_mark_reservation_notification_failed($reservation_id, $error_message = null) {
   if (empty($reservation_id)) return false;
-  
+
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
-  
+
   // Get current attempt count
   $current = $wpdb->get_row($wpdb->prepare(
     "SELECT attempt_count FROM $table WHERE reservation_id = %s",
     $reservation_id
   ));
-  
+
   $attempt_count = $current ? ($current->attempt_count + 1) : 1;
-  
+
   $result = $wpdb->update(
     $table,
     array(
@@ -456,7 +456,7 @@ function hic_mark_reservation_notification_failed($reservation_id, $error_messag
     array('%s', '%s', '%d', '%s'),
     array('%s')
   );
-  
+
   return $result !== false;
 }
 
@@ -465,10 +465,10 @@ function hic_mark_reservation_notification_failed($reservation_id, $error_messag
  */
 function hic_mark_reservation_notification_permanent_failure($reservation_id, $error_message = null) {
   if (empty($reservation_id)) return false;
-  
+
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
-  
+
   $result = $wpdb->update(
     $table,
     array(
@@ -480,7 +480,7 @@ function hic_mark_reservation_notification_permanent_failure($reservation_id, $e
     array('%s', '%s', '%s'),
     array('%s')
   );
-  
+
   return $result !== false;
 }
 
@@ -490,21 +490,21 @@ function hic_mark_reservation_notification_permanent_failure($reservation_id, $e
 function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_minutes = 30) {
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
-  
+
   $retry_time = date('Y-m-d H:i:s', strtotime("-{$retry_delay_minutes} minutes"));
-  
+
   $results = $wpdb->get_results($wpdb->prepare(
-    "SELECT reservation_id, attempt_count, last_error 
-     FROM $table 
-     WHERE sync_status = 'failed' 
-     AND attempt_count < %d 
+    "SELECT reservation_id, attempt_count, last_error
+     FROM $table
+     WHERE sync_status = 'failed'
+     AND attempt_count < %d
      AND (last_attempt IS NULL OR last_attempt < %s)
      ORDER BY first_seen ASC
      LIMIT 10",
     $max_attempts,
     $retry_time
   ));
-  
+
   return $results ? $results : array();
 }
 

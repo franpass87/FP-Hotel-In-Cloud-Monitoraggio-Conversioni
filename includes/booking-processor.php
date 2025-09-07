@@ -47,13 +47,13 @@ function hic_process_booking_data($data) {
   // Invii with error handling
   $success_count = 0;
   $error_count = 0;
-  
+
   try {
     // Tracking integration based on selected mode
     $tracking_mode = Helpers\hic_get_tracking_mode();
-    
+
     // GA4 Integration (server-side)
-    if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') && 
+    if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') &&
         Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
       if (hic_send_to_ga4($data, $gclid, $fbclid)) {
         $success_count++;
@@ -63,7 +63,7 @@ function hic_process_booking_data($data) {
     } else if ($tracking_mode === 'ga4_only') {
       Helpers\hic_log('hic_process_booking_data: GA4 credentials missing for ga4_only mode, skipping');
     }
-    
+
     // GTM Integration (client-side via dataLayer)
     if (($tracking_mode === 'gtm_only' || $tracking_mode === 'hybrid') && Helpers\hic_is_gtm_enabled()) {
       if (hic_send_to_gtm_datalayer($data, $gclid, $fbclid)) {
@@ -74,7 +74,7 @@ function hic_process_booking_data($data) {
     } else if ($tracking_mode === 'gtm_only') {
       Helpers\hic_log('hic_process_booking_data: GTM not enabled for gtm_only mode, skipping');
     }
-    
+
     // Facebook Integration
     if (Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token()) {
       if (hic_send_to_fb($data, $gclid, $fbclid)) {
@@ -85,7 +85,7 @@ function hic_process_booking_data($data) {
     } else {
       Helpers\hic_log('hic_process_booking_data: Facebook credentials missing, skipping');
     }
-    
+
     // Brevo Integration - Unified approach to prevent duplicate events
     if (Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key()) {
       $brevo_success = hic_send_unified_brevo_events($data, $gclid, $fbclid);
@@ -97,7 +97,7 @@ function hic_process_booking_data($data) {
     } else {
       Helpers\hic_log('hic_process_booking_data: Brevo disabled or credentials missing, skipping');
     }
-    
+
     // Admin email - only attempt if valid email is configured
     $admin_email = Helpers\hic_get_admin_email();
     if (!empty($admin_email) && Helpers\hic_is_valid_email($admin_email)) {
@@ -109,11 +109,11 @@ function hic_process_booking_data($data) {
     } else {
       Helpers\hic_log('hic_process_booking_data: Admin email not configured or invalid, skipping');
     }
-    
+
     Helpers\hic_log("Prenotazione processata (SID: " . ($sid ?? 'N/A') . ") - Successi: $success_count, Errori: $error_count");
-    
+
     return $error_count === 0;
-    
+
   } catch (Exception $e) {
     Helpers\hic_log('Errore critico processando prenotazione: ' . $e->getMessage());
     return false;

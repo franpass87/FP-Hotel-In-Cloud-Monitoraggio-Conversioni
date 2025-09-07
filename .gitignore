@@ -26,3 +26,7 @@ hic-log*.txt
 
 # Composer
 vendor/
+
+# Quality tools (downloaded)
+phpstan.phar
+phpcs.phar

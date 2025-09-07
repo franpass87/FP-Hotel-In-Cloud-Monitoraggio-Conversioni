@@ -79,17 +79,17 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
  */
 function hic_queue_gtm_event($event_data) {
     $queued_events = get_option('hic_gtm_queued_events', []);
-    
+
     // Add timestamp to avoid conflicts
     $event_data['event_timestamp'] = current_time('timestamp');
-    
+
     $queued_events[] = $event_data;
-    
+
     // Keep only last 10 events to avoid database bloat
     if (count($queued_events) > 10) {
         $queued_events = array_slice($queued_events, -10);
     }
-    
+
     update_option('hic_gtm_queued_events', $queued_events);
     Helpers\hic_clear_option_cache('hic_gtm_queued_events');
 }
@@ -110,18 +110,18 @@ function hic_output_gtm_head_code() {
     if (!Helpers\hic_is_gtm_enabled()) {
         return;
     }
-    
+
     $container_id = Helpers\hic_get_gtm_container_id();
     if (empty($container_id)) {
         return;
     }
-    
+
     // Validate GTM container ID format
     if (!preg_match('/^GTM-[A-Z0-9]+$/', $container_id)) {
         Helpers\hic_log("GTM: Invalid container ID format: $container_id");
         return;
     }
-    
+
     ?>
     <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -140,12 +140,12 @@ function hic_output_gtm_body_code() {
     if (!Helpers\hic_is_gtm_enabled()) {
         return;
     }
-    
+
     $container_id = Helpers\hic_get_gtm_container_id();
     if (empty($container_id) || !preg_match('/^GTM-[A-Z0-9]+$/', $container_id)) {
         return;
     }
-    
+
     ?>
     <!-- Google Tag Manager (noscript) -->
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<?php echo esc_attr($container_id); ?>"
@@ -161,12 +161,12 @@ function hic_output_gtm_events() {
     if (!Helpers\hic_is_gtm_enabled()) {
         return;
     }
-    
+
     $events = hic_get_and_clear_gtm_events();
     if (empty($events)) {
         return;
     }
-    
+
     ?>
     <script>
     window.dataLayer = window.dataLayer || [];
@@ -184,20 +184,20 @@ function hic_init_gtm_hooks() {
     if (!Helpers\hic_is_gtm_enabled()) {
         return;
     }
-    
+
     // Add GTM head code
     add_action('wp_head', 'hic_output_gtm_head_code', 1);
-    
+
     // Add GTM body code (early in body)
     add_action('wp_body_open', 'hic_output_gtm_body_code', 1);
-    
+
     // Fallback for themes that don't support wp_body_open
     add_action('wp_footer', function() {
         if (!did_action('wp_body_open')) {
             hic_output_gtm_body_code();
         }
     }, 1);
-    
+
     // Output queued events
     add_action('wp_footer', 'hic_output_gtm_events', 20);
 }
