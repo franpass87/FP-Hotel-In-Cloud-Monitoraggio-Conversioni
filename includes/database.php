@@ -28,6 +28,8 @@ function hic_create_database_table(){
     utm_source   VARCHAR(255),
     utm_medium   VARCHAR(255),
     utm_campaign VARCHAR(255),
+    utm_content  VARCHAR(255),
+    utm_term     VARCHAR(255),
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     KEY gclid (gclid(100)),
     KEY fbclid (fbclid(100)),
@@ -36,7 +38,9 @@ function hic_create_database_table(){
     KEY sid (sid(100)),
     KEY utm_source (utm_source(100)),
     KEY utm_medium (utm_medium(100)),
-    KEY utm_campaign (utm_campaign(100))
+    KEY utm_campaign (utm_campaign(100)),
+    KEY utm_content (utm_content(100)),
+    KEY utm_term (utm_term(100))
   ) $charset;";
   
   require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
@@ -228,6 +232,21 @@ function hic_maybe_upgrade_db() {
     $installed_version = '1.3';
   }
 
+  // Migration to version 1.4 - add UTM content and term columns
+  if (version_compare($installed_version, '1.4', '<')) {
+    $table = $wpdb->prefix . 'hic_gclids';
+    $columns = ['utm_content', 'utm_term'];
+    foreach ($columns as $col) {
+      $exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", $col));
+      if (empty($exists)) {
+        $wpdb->query("ALTER TABLE $table ADD COLUMN $col VARCHAR(255)");
+      }
+    }
+    update_option('hic_db_version', '1.4');
+    Helpers\hic_clear_option_cache('hic_db_version');
+    $installed_version = '1.4';
+  }
+
   // Set final version
   update_option('hic_db_version', HIC_DB_VERSION);
   Helpers\hic_clear_option_cache('hic_db_version');
@@ -381,7 +400,7 @@ function hic_capture_tracking_params(){
   // Capture UTM parameters if present
   $sid_for_utm = isset($_COOKIE['hic_sid']) ? sanitize_text_field( wp_unslash( $_COOKIE['hic_sid'] ) ) : $existing_sid;
   $utm_params = [];
-  foreach (['utm_source', 'utm_medium', 'utm_campaign'] as $utm_key) {
+  foreach (['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'] as $utm_key) {
     if (!empty($_GET[$utm_key])) {
       $utm_params[$utm_key] = sanitize_text_field( wp_unslash( $_GET[$utm_key] ) );
     }

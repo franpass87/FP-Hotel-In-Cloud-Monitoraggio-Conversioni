@@ -47,6 +47,8 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
     if (!empty($utm['utm_source']))   { $body['attributes']['UTM_SOURCE']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $body['attributes']['UTM_MEDIUM']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $body['attributes']['UTM_CAMPAIGN'] = $utm['utm_campaign']; }
+    if (!empty($utm['utm_content']))  { $body['attributes']['UTM_CONTENT']  = $utm['utm_content']; }
+    if (!empty($utm['utm_term']))     { $body['attributes']['UTM_TERM']     = $utm['utm_term']; }
   }
 
   $res = Helpers\hic_http_request('https://api.brevo.com/v3/contacts', array(
@@ -99,6 +101,8 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
     if (!empty($utm['utm_source']))   { $event_data['properties']['utm_source']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $event_data['properties']['utm_medium']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $event_data['properties']['utm_campaign'] = $utm['utm_campaign']; }
+    if (!empty($utm['utm_content']))  { $event_data['properties']['utm_content']  = $utm['utm_content']; }
+    if (!empty($utm['utm_term']))     { $event_data['properties']['utm_term']     = $utm['utm_term']; }
   }
 
   $event_data = apply_filters('hic_brevo_event', $event_data, $reservation);
@@ -211,6 +215,8 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     if (!empty($utm['utm_source']))   { $attributes['UTM_SOURCE']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $attributes['UTM_MEDIUM']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $attributes['UTM_CAMPAIGN'] = $utm['utm_campaign']; }
+    if (!empty($utm['utm_content']))  { $attributes['UTM_CONTENT']  = $utm['utm_content']; }
+    if (!empty($utm['utm_term']))     { $attributes['UTM_TERM']     = $utm['utm_term']; }
   }
 
   // Remove empty values but keep valid zeros for numeric fields
@@ -367,6 +373,8 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     if (!empty($utm['utm_source']))   { $body['properties']['utm_source']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $body['properties']['utm_medium']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $body['properties']['utm_campaign'] = $utm['utm_campaign']; }
+    if (!empty($utm['utm_content']))  { $body['properties']['utm_content']  = $utm['utm_content']; }
+    if (!empty($utm['utm_term']))     { $body['properties']['utm_term']     = $utm['utm_term']; }
   }
 
   // Debug log the exact payload structure being sent

@@ -272,7 +272,7 @@ function hic_export_tracking_data($email_address, $page = 1) {
     $offset = ($page - 1) * $number;
     $rows = $wpdb->get_results(
         $wpdb->prepare(
-            "SELECT id, gclid, fbclid, sid, utm_source, utm_medium, utm_campaign, created_at FROM $table WHERE email = %s ORDER BY id ASC LIMIT %d OFFSET %d",
+            "SELECT id, gclid, fbclid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at FROM $table WHERE email = %s ORDER BY id ASC LIMIT %d OFFSET %d",
             $email,
             $number,
             $offset
@@ -299,6 +299,12 @@ function hic_export_tracking_data($email_address, $page = 1) {
         }
         if ($row->utm_campaign !== null) {
             $item[] = ['name' => 'utm_campaign', 'value' => $row->utm_campaign];
+        }
+        if ($row->utm_content !== null) {
+            $item[] = ['name' => 'utm_content', 'value' => $row->utm_content];
+        }
+        if ($row->utm_term !== null) {
+            $item[] = ['name' => 'utm_term', 'value' => $row->utm_term];
         }
         if ($row->created_at !== null) {
             $item[] = ['name' => 'created_at', 'value' => $row->created_at];
@@ -431,13 +437,13 @@ function hic_get_tracking_ids_by_sid($sid) {
  * Retrieve UTM parameters for a given SID from database.
  *
  * @param string $sid Session identifier
- * @return array{utm_source:?string, utm_medium:?string, utm_campaign:?string}
- */
+ * @return array{utm_source:?string, utm_medium:?string, utm_campaign:?string, utm_content:?string, utm_term:?string}
+*/
 function hic_get_utm_params_by_sid($sid) {
     static $cache = [];
     $sid = sanitize_text_field($sid);
     if (empty($sid)) {
-        return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+        return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
     }
 
     if (array_key_exists($sid, $cache)) {
@@ -447,7 +453,7 @@ function hic_get_utm_params_by_sid($sid) {
     global $wpdb;
     if (!$wpdb) {
         hic_log('hic_get_utm_params_by_sid: wpdb is not available');
-        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
     }
 
     $table = $wpdb->prefix . 'hic_gclids';
@@ -456,25 +462,27 @@ function hic_get_utm_params_by_sid($sid) {
     $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if (!$table_exists) {
         hic_log('hic_get_utm_params_by_sid: Table does not exist: ' . $table);
-        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
     }
 
-    $row = $wpdb->get_row($wpdb->prepare("SELECT utm_source, utm_medium, utm_campaign FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
+    $row = $wpdb->get_row($wpdb->prepare("SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
 
     if ($wpdb->last_error) {
         hic_log('hic_get_utm_params_by_sid: Database error retrieving UTM params: ' . $wpdb->last_error);
-        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
     }
 
     if ($row) {
         return $cache[$sid] = [
-            'utm_source' => $row->utm_source,
-            'utm_medium' => $row->utm_medium,
+            'utm_source'   => $row->utm_source,
+            'utm_medium'   => $row->utm_medium,
             'utm_campaign' => $row->utm_campaign,
+            'utm_content'  => $row->utm_content,
+            'utm_term'     => $row->utm_term,
         ];
     }
 
-    return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+    return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
 }
 
 function hic_normalize_price($value) {
