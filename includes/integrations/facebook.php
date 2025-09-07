@@ -54,6 +54,14 @@ function hic_send_to_fb($data, $gclid, $fbclid){
     $user_data['ph'] = [ hash('sha256', preg_replace('/\D/','', $phone)) ];
   }
 
+  if ($fbclid) {
+    $fbc = 'fb.1.' . current_time('timestamp') . '.' . $fbclid;
+    $user_data['fbc'] = [$fbc];
+  }
+  if (!empty($_COOKIE['_fbp'])) {
+    $user_data['fbp'] = [sanitize_text_field($_COOKIE['_fbp'])];
+  }
+
   $custom_data = [
     'currency'     => sanitize_text_field($data['currency'] ?? 'EUR'),
     'value'        => $amount,
@@ -78,6 +86,8 @@ function hic_send_to_fb($data, $gclid, $fbclid){
       'event_id'         => $event_id,
       'action_source'    => 'website',
       'event_source_url' => home_url(),
+      'client_ip_address'  => $_SERVER['REMOTE_ADDR'] ?? '',
+      'client_user_agent'  => $_SERVER['HTTP_USER_AGENT'] ?? '',
       'user_data'        => $user_data,
       'custom_data'      => $custom_data
     ]]
@@ -193,7 +203,14 @@ function hic_dispatch_pixel_reservation($data) {
   if (!empty($data['phone']) && is_string($data['phone'])) {
     $user_data['ph'] = [hash('sha256', preg_replace('/\D/', '', $data['phone']))];
   }
-
+  if ($fbclid) {
+    $fbc = 'fb.1.' . current_time('timestamp') . '.' . $fbclid;
+    $user_data['fbc'] = [$fbc];
+  }
+  if (!empty($_COOKIE['_fbp'])) {
+    $user_data['fbp'] = [sanitize_text_field($_COOKIE['_fbp'])];
+  }
+  
   $custom_data = [
     'currency' => $currency,
     'value' => $value,
@@ -228,6 +245,8 @@ function hic_dispatch_pixel_reservation($data) {
       'event_id' => $transaction_id,
       'action_source' => 'website',
       'event_source_url' => home_url(),
+      'client_ip_address'  => $_SERVER['REMOTE_ADDR'] ?? '',
+      'client_user_agent'  => $_SERVER['HTTP_USER_AGENT'] ?? '',
       'user_data' => $user_data,
       'custom_data' => $custom_data
     ]]
