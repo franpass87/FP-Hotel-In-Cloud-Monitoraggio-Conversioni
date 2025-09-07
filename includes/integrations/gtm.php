@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) exit;
  * Send conversion data to GTM Data Layer
  * This pushes data to the client-side dataLayer for GTM to process
  */
-function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
+function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
     // Only proceed if GTM is enabled
     if (!Helpers\hic_is_gtm_enabled()) {
         return false;
@@ -23,6 +23,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
     }
 
     $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+    $sid = !empty($sid) ? sanitize_text_field($sid) : '';
 
     // Validate and normalize amount
     $amount = 0;
@@ -32,7 +33,9 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
 
     // Generate transaction ID using consistent extraction
     $transaction_id = Helpers\hic_extract_reservation_id($data);
-    if (empty($transaction_id)) {
+    if ($sid !== '') {
+        $transaction_id = $sid;
+    } elseif (empty($transaction_id)) {
         $transaction_id = uniqid('hic_gtm_');
     }
 
@@ -58,6 +61,10 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
         'method' => 'HotelInCloud'
     ];
 
+    if ($sid !== '') {
+        $gtm_data['client_id'] = $sid;
+    }
+
     // Add tracking IDs if available for enhanced attribution
     if (!empty($gclid)) {
         $gtm_data['gclid'] = sanitize_text_field($gclid);
@@ -67,8 +74,8 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
     }
 
     // Include UTM parameters if available
-    if (!empty($data['sid'])) {
-        $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+    if ($sid !== '') {
+        $utm = Helpers\hic_get_utm_params_by_sid($sid);
         if (!empty($utm['utm_source']))   { $gtm_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
         if (!empty($utm['utm_medium']))   { $gtm_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
         if (!empty($utm['utm_campaign'])) { $gtm_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }

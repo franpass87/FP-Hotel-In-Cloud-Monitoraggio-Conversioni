@@ -245,7 +245,8 @@ function hic_test_dispatch_functions() {
         
         // Test GA4
         if (!empty(Helpers\hic_get_measurement_id()) && !empty(Helpers\hic_get_api_secret())) {
-            hic_send_to_ga4($test_data, $gclid, $fbclid);
+            $sid = $test_data['sid'] ?? null;
+            hic_send_to_ga4($test_data, $gclid, $fbclid, $sid);
             $results['ga4'] = 'Test event sent to GA4';
         } else {
             $results['ga4'] = 'GA4 not configured';
@@ -253,7 +254,8 @@ function hic_test_dispatch_functions() {
         
         // Test GTM
         if (Helpers\hic_is_gtm_enabled() && !empty(Helpers\hic_get_gtm_container_id())) {
-            hic_send_to_gtm_datalayer($test_data, $gclid, $fbclid);
+            $sid = $test_data['sid'] ?? null;
+            hic_send_to_gtm_datalayer($test_data, $gclid, $fbclid, $sid);
             $results['gtm'] = 'Test event queued for GTM DataLayer';
         } else {
             $results['gtm'] = 'GTM not configured or disabled';
