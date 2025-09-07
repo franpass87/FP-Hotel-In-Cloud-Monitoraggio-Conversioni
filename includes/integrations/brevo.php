@@ -39,6 +39,14 @@ function hic_send_brevo_contact($data, $gclid, $fbclid){
     'updateEnabled' => true
   );
 
+  // Populate UTM attributes if SID available
+  if (!empty($data['sid'])) {
+    $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+    if (!empty($utm['utm_source']))   { $body['attributes']['UTM_SOURCE']   = $utm['utm_source']; }
+    if (!empty($utm['utm_medium']))   { $body['attributes']['UTM_MEDIUM']   = $utm['utm_medium']; }
+    if (!empty($utm['utm_campaign'])) { $body['attributes']['UTM_CAMPAIGN'] = $utm['utm_campaign']; }
+  }
+
   $res = Helpers\hic_http_request('https://api.brevo.com/v3/contacts', array(
     'method'  => 'POST',
     'headers' => array(
@@ -80,6 +88,14 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid){
       'vertical'       => 'hotel'
     )
   );
+
+  // Attach UTM parameters if SID available
+  if (!empty($reservation['sid'])) {
+    $utm = Helpers\hic_get_utm_params_by_sid($reservation['sid']);
+    if (!empty($utm['utm_source']))   { $event_data['properties']['utm_source']   = $utm['utm_source']; }
+    if (!empty($utm['utm_medium']))   { $event_data['properties']['utm_medium']   = $utm['utm_medium']; }
+    if (!empty($utm['utm_campaign'])) { $event_data['properties']['utm_campaign'] = $utm['utm_campaign']; }
+  }
 
   $event_data = apply_filters('hic_brevo_event', $event_data, $reservation);
 
@@ -180,6 +196,14 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'WHATSAPP' => isset($data['phone']) ? $data['phone'] : '',
     'LINGUA' => $language
   );
+
+  // Populate UTM attributes if available
+  if (!empty($data['transaction_id'])) {
+    $utm = Helpers\hic_get_utm_params_by_sid($data['transaction_id']);
+    if (!empty($utm['utm_source']))   { $attributes['UTM_SOURCE']   = $utm['utm_source']; }
+    if (!empty($utm['utm_medium']))   { $attributes['UTM_MEDIUM']   = $utm['utm_medium']; }
+    if (!empty($utm['utm_campaign'])) { $attributes['UTM_CAMPAIGN'] = $utm['utm_campaign']; }
+  }
 
   // Remove empty values but keep valid zeros for numeric fields
   $attributes = array_filter($attributes, function($value, $key) {
@@ -324,6 +348,14 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'created_at' => current_time('mysql')
     )
   );
+
+  // Add UTM parameters if available
+  if (!empty($data['transaction_id'])) {
+    $utm = Helpers\hic_get_utm_params_by_sid($data['transaction_id']);
+    if (!empty($utm['utm_source']))   { $body['properties']['utm_source']   = $utm['utm_source']; }
+    if (!empty($utm['utm_medium']))   { $body['properties']['utm_medium']   = $utm['utm_medium']; }
+    if (!empty($utm['utm_campaign'])) { $body['properties']['utm_campaign'] = $utm['utm_campaign']; }
+  }
 
   // Debug log the exact payload structure being sent
   Helpers\hic_log(array('Brevo trackEvent payload debug' => array(

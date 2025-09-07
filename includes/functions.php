@@ -231,6 +231,51 @@ function hic_get_tracking_ids_by_sid($sid) {
     return ['gclid' => null, 'fbclid' => null];
 }
 
+/**
+ * Retrieve UTM parameters for a given SID from database.
+ *
+ * @param string $sid Session identifier
+ * @return array{utm_source:?string, utm_medium:?string, utm_campaign:?string}
+ */
+function hic_get_utm_params_by_sid($sid) {
+    $sid = sanitize_text_field($sid);
+    if (empty($sid)) {
+        return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+    }
+
+    global $wpdb;
+    if (!$wpdb) {
+        hic_log('hic_get_utm_params_by_sid: wpdb is not available');
+        return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+    }
+
+    $table = $wpdb->prefix . 'hic_gclids';
+
+    // Ensure table exists before querying
+    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+    if (!$table_exists) {
+        hic_log('hic_get_utm_params_by_sid: Table does not exist: ' . $table);
+        return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+    }
+
+    $row = $wpdb->get_row($wpdb->prepare("SELECT utm_source, utm_medium, utm_campaign FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
+
+    if ($wpdb->last_error) {
+        hic_log('hic_get_utm_params_by_sid: Database error retrieving UTM params: ' . $wpdb->last_error);
+        return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+    }
+
+    if ($row) {
+        return [
+            'utm_source' => $row->utm_source,
+            'utm_medium' => $row->utm_medium,
+            'utm_campaign' => $row->utm_campaign,
+        ];
+    }
+
+    return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null];
+}
+
 function hic_normalize_price($value) {
     if (empty($value) || (!is_numeric($value) && !is_string($value))) return 0.0;
 
@@ -915,6 +960,7 @@ namespace {
     function hic_release_polling_lock() { return \FpHic\Helpers\hic_release_polling_lock(); }
     function hic_should_schedule_retry_event() { return \FpHic\Helpers\hic_should_schedule_retry_event(); }
     function hic_get_tracking_ids_by_sid($sid) { return \FpHic\Helpers\hic_get_tracking_ids_by_sid($sid); }
+    function hic_get_utm_params_by_sid($sid) { return \FpHic\Helpers\hic_get_utm_params_by_sid($sid); }
     function hic_normalize_price($value) { return \FpHic\Helpers\hic_normalize_price($value); }
     function hic_is_valid_email($email) { return \FpHic\Helpers\hic_is_valid_email($email); }
     function hic_is_ota_alias_email($e) { return \FpHic\Helpers\hic_is_ota_alias_email($e); }

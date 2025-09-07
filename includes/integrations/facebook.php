@@ -54,6 +54,23 @@ function hic_send_to_fb($data, $gclid, $fbclid){
     $user_data['ph'] = [ hash('sha256', preg_replace('/\D/','', $phone)) ];
   }
 
+  $custom_data = [
+    'currency'     => sanitize_text_field($data['currency'] ?? 'EUR'),
+    'value'        => $amount,
+    'order_id'     => $event_id,
+    'bucket'       => $bucket,           // per creare custom conversions per fbads/organic/gads
+    'content_name' => sanitize_text_field($data['room'] ?? $data['accommodation_name'] ?? 'Prenotazione'),
+    'vertical'     => 'hotel'
+  ];
+
+  // Attach UTM parameters if available
+  if (!empty($data['sid'])) {
+    $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+    if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
+    if (!empty($utm['utm_medium']))   { $custom_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
+    if (!empty($utm['utm_campaign'])) { $custom_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+  }
+
   $payload = [
     'data' => [[
       'event_name'       => 'Purchase',      // evento standard Meta
@@ -61,17 +78,10 @@ function hic_send_to_fb($data, $gclid, $fbclid){
       'event_id'         => $event_id,
       'action_source'    => 'website',
       'event_source_url' => home_url(),
-      'user_data' => $user_data,
-      'custom_data' => [
-        'currency'     => sanitize_text_field($data['currency'] ?? 'EUR'),
-        'value'        => $amount,
-        'order_id'     => $event_id,
-        'bucket'       => $bucket,           // per creare custom conversions per fbads/organic/gads
-        'content_name' => sanitize_text_field($data['room'] ?? $data['accommodation_name'] ?? 'Prenotazione'),
-      'vertical'     => 'hotel'
-    ]
-  ]]
-];
+      'user_data'        => $user_data,
+      'custom_data'      => $custom_data
+    ]]
+  ];
 
   // Allow payload customization before encoding
   $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid);
@@ -193,6 +203,12 @@ function hic_dispatch_pixel_reservation($data) {
     'bucket' => $bucket,             // Bucket attribution for custom conversions
     'vertical' => 'hotel'
   ];
+
+  // Add UTM parameters if available
+  $utm = Helpers\hic_get_utm_params_by_sid($transaction_id);
+  if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
+  if (!empty($utm['utm_medium']))   { $custom_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
+  if (!empty($utm['utm_campaign'])) { $custom_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
 
   // Add contents array if value > 0
   if ($value > 0) {

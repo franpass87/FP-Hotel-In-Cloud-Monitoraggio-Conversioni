@@ -20,13 +20,19 @@ function hic_create_database_table(){
   
   $sql = "CREATE TABLE IF NOT EXISTS $table (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    gclid  VARCHAR(255),
-    fbclid VARCHAR(255),
-    sid    VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    gclid        VARCHAR(255),
+    fbclid       VARCHAR(255),
+    sid          VARCHAR(255),
+    utm_source   VARCHAR(255),
+    utm_medium   VARCHAR(255),
+    utm_campaign VARCHAR(255),
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     KEY gclid (gclid(100)),
     KEY fbclid (fbclid(100)),
-    KEY sid (sid(100))
+    KEY sid (sid(100)),
+    KEY utm_source (utm_source(100)),
+    KEY utm_medium (utm_medium(100)),
+    KEY utm_campaign (utm_campaign(100))
   ) $charset;";
   
   require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
@@ -188,6 +194,21 @@ function hic_maybe_upgrade_db() {
     $installed_version = '1.1';
   }
 
+  // Migration to version 1.2 - add UTM columns
+  if (version_compare($installed_version, '1.2', '<')) {
+    $table = $wpdb->prefix . 'hic_gclids';
+    $columns = ['utm_source', 'utm_medium', 'utm_campaign'];
+    foreach ($columns as $col) {
+      $exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", $col));
+      if (empty($exists)) {
+        $wpdb->query("ALTER TABLE $table ADD COLUMN $col VARCHAR(255)");
+      }
+    }
+    update_option('hic_db_version', '1.2');
+    Helpers\hic_clear_option_cache('hic_db_version');
+    $installed_version = '1.2';
+  }
+
   // Set final version
   update_option('hic_db_version', HIC_DB_VERSION);
   Helpers\hic_clear_option_cache('hic_db_version');
@@ -312,6 +333,53 @@ function hic_capture_tracking_params(){
     $result = hic_store_tracking_id('fbclid', $fbclid, $existing_sid);
     if (is_wp_error($result)) {
       Helpers\hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
+      return false;
+    }
+  }
+
+  // Capture UTM parameters if present
+  $sid_for_utm = isset($_COOKIE['hic_sid']) ? sanitize_text_field( wp_unslash( $_COOKIE['hic_sid'] ) ) : $existing_sid;
+  $utm_params = [];
+  foreach (['utm_source', 'utm_medium', 'utm_campaign'] as $utm_key) {
+    if (!empty($_GET[$utm_key])) {
+      $utm_params[$utm_key] = sanitize_text_field( wp_unslash( $_GET[$utm_key] ) );
+    }
+  }
+
+  if (!empty($utm_params)) {
+    if (!$sid_for_utm) {
+      $sid_for_utm = (string) wp_generate_uuid4();
+      $cookie_args = apply_filters('hic_sid_cookie_args', [
+        'expires'  => time() + 60*60*24*90,
+        'path'     => '/',
+        'secure'   => is_ssl(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+      ], $sid_for_utm);
+      if (setcookie('hic_sid', $sid_for_utm, $cookie_args)) {
+        $_COOKIE['hic_sid'] = $sid_for_utm;
+      }
+    }
+
+    $existing_row = $wpdb->get_var($wpdb->prepare(
+      "SELECT id FROM $table WHERE sid = %s LIMIT 1",
+      $sid_for_utm
+    ));
+
+    if ($wpdb->last_error) {
+      Helpers\hic_log('hic_capture_tracking_params: Database error checking existing sid for UTM: ' . $wpdb->last_error);
+      return false;
+    }
+
+    if ($existing_row) {
+      $wpdb->update($table, $utm_params, ['sid' => $sid_for_utm]);
+    } else {
+      $data = array_merge(['sid' => $sid_for_utm], $utm_params);
+      $wpdb->insert($table, $data);
+    }
+
+    if ($wpdb->last_error) {
+      Helpers\hic_log('hic_capture_tracking_params: Database error storing UTM params: ' . $wpdb->last_error);
       return false;
     }
   }
