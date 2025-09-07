@@ -384,6 +384,22 @@ Il parametro `vertical` consente di:
 }
 ```
 
+### Filtro `hic_ga4_payload`
+
+Il plugin espone il filtro WordPress `hic_ga4_payload` che permette di modificare il payload inviato a Google Analytics 4 prima che venga codificato in JSON.
+
+**Esempio di utilizzo**
+
+```php
+add_filter('hic_ga4_payload', function ($payload, $data, $gclid, $fbclid) {
+    // Aggiunge un parametro personalizzato all'evento GA4
+    $payload['events'][0]['params']['coupon'] = 'OFFERTA123';
+    return $payload;
+}, 10, 4);
+```
+
+Questo consente di adattare il payload GA4 a esigenze specifiche, come l'aggiunta di campi personalizzati o la modifica dei parametri inviati.
+
 ## Bucket Attribution Normalization
 
 Il plugin implementa un sistema di normalizzazione uniforme per il parametro `bucket` che identifica la fonte di attribuzione della conversione. Questa normalizzazione è applicata coerentemente in tutte le integrazioni (GA4, Meta CAPI, Brevo).

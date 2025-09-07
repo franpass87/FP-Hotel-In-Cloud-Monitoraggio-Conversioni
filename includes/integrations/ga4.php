@@ -63,6 +63,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
     ]]
   ];
 
+  // Allow external modification of the GA4 payload
   $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid);
 
   // Validate JSON encoding
@@ -184,6 +185,7 @@ function hic_dispatch_ga4_reservation($data) {
     ]]
   ];
 
+  // Allow external modification of the GA4 payload
   $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid);
 
   // Validate JSON encoding
