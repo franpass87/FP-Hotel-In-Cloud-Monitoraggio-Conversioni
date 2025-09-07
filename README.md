@@ -17,6 +17,42 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 - **API Polling (Raccomandato)**: WordPress controlla HIC ogni 1-5 minuti per nuove prenotazioni
 - **Webhook**: HIC invia immediatamente le prenotazioni a WordPress (richiede configurazione su HIC). Il payload è limitato a 1 MB (valore predefinito modificabile tramite la costante `HIC_WEBHOOK_MAX_PAYLOAD_SIZE`).
 
+#### Esempio payload Webhook
+
+Il webhook `POST /wp-json/hic/v1/conversion?token=IL_TUO_TOKEN` accetta un corpo JSON con i seguenti campi:
+
+```json
+{
+  "email": "mario.rossi@example.com",
+  "reservation_id": "ABC123",
+  "first_name": "Mario",
+  "last_name": "Rossi",
+  "amount": 199.99,
+  "currency": "EUR",
+  "checkin": "2025-06-01",
+  "checkout": "2025-06-07",
+  "room": "Camera Deluxe",
+  "guests": 2,
+  "language": "it",
+  "sid": "tracking123"
+}
+```
+
+Schema campi principali:
+
+- `email` *(stringa, obbligatorio)* – indirizzo email del cliente
+- `reservation_id` *(stringa)* – identificativo della prenotazione
+- `first_name` *(stringa)* – nome dell'ospite
+- `last_name` *(stringa)* – cognome dell'ospite
+- `amount` *(numero)* – totale della prenotazione
+- `currency` *(stringa)* – valuta dell'importo (es. `EUR`)
+- `checkin` *(data Y-m-d)* – data di arrivo
+- `checkout` *(data Y-m-d)* – data di partenza
+- `room` *(stringa)* – nome della sistemazione
+- `guests` *(intero)* – numero di ospiti
+- `language` *(stringa)* – lingua dell'utente
+- `sid` *(stringa)* – identificatore utente opzionale per il tracciamento
+
 ### Caricamento dello script frontend
 
 Il file JavaScript che aggiunge il parametro SID ai link di prenotazione viene caricato solo quando la modalità di tracciamento è impostata su `gtm_only`. Per disabilitarlo è sufficiente selezionare una modalità differente nelle impostazioni del plugin; per riattivarlo ripristinare `gtm_only`.
