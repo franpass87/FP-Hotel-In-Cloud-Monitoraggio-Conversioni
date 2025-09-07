@@ -49,6 +49,15 @@ Il plugin invia automaticamente eventi "purchase" con queste proprietà:
 
 Questi eventi possono essere usati per automazioni in Brevo.
 
+Ad ogni prenotazione il contatto viene aggiornato e l'evento viene sempre inviato. È possibile disattivare l'invio dell'evento utilizzando il filtro **`hic_brevo_send_event`**:
+
+```php
+add_filter('hic_brevo_send_event', function( $send, $data ) {
+    // Ritorna false per evitare l'invio dell'evento per questa prenotazione
+    return false;
+}, 10, 2);
+```
+
 ### Personalizzare l'evento
 
 Prima dell'invio della richiesta HTTP il plugin applica il filtro **`hic_brevo_event`** che consente di modificare il payload:
