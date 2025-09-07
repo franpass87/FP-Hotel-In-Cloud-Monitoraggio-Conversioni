@@ -122,6 +122,116 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
 }
 
 /**
+ * Send refund event to GA4 with negative value
+ */
+function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $sid = null) {
+  $measurement_id = Helpers\hic_get_measurement_id();
+  $api_secret = Helpers\hic_get_api_secret();
+
+  if (empty($measurement_id) || empty($api_secret)) {
+    Helpers\hic_log('GA4 refund: measurement ID o API secret mancanti');
+    return false;
+  }
+
+  if (!is_array($data)) {
+    Helpers\hic_log('GA4 refund: data is not an array');
+    return false;
+  }
+
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $client_id = $gclid ?: ($fbclid ?: (string) wp_generate_uuid4());
+  $sid = !empty($sid) ? sanitize_text_field($sid) : '';
+
+  $amount = 0;
+  if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
+    $amount = -abs(Helpers\hic_normalize_price($data['amount']));
+  }
+
+  $transaction_id = Helpers\hic_extract_reservation_id($data);
+  if (empty($transaction_id)) {
+    $transaction_id = uniqid('hic_ga4_refund_');
+  }
+  if ($sid !== '') {
+    $client_id = $sid;
+    $transaction_id = $sid;
+  }
+
+  $params = [
+    'transaction_id' => $transaction_id,
+    'currency'       => sanitize_text_field($data['currency'] ?? 'EUR'),
+    'value'          => $amount,
+    'items'          => [[
+      'item_name' => sanitize_text_field($data['room'] ?? $data['accommodation_name'] ?? 'Prenotazione'),
+      'quantity'  => 1,
+      'price'     => $amount
+    ]],
+    'bucket'         => $bucket,
+    'method'         => 'HotelInCloud',
+    'vertical'       => 'hotel',
+  ];
+
+  if (!empty($gclid))   { $params['gclid']   = sanitize_text_field($gclid); }
+  if (!empty($fbclid))  { $params['fbclid']  = sanitize_text_field($fbclid); }
+  if (!empty($msclkid)) { $params['msclkid'] = sanitize_text_field($msclkid); }
+  if (!empty($ttclid))  { $params['ttclid']  = sanitize_text_field($ttclid); }
+
+  if ($sid !== '') {
+    $utm = Helpers\hic_get_utm_params_by_sid($sid);
+    if (!empty($utm['utm_source']))   { $params['utm_source']   = sanitize_text_field($utm['utm_source']); }
+    if (!empty($utm['utm_medium']))   { $params['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
+    if (!empty($utm['utm_campaign'])) { $params['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+    if (!empty($utm['utm_content']))  { $params['utm_content']  = sanitize_text_field($utm['utm_content']); }
+    if (!empty($utm['utm_term']))     { $params['utm_term']     = sanitize_text_field($utm['utm_term']); }
+  }
+
+  $payload = [
+    'client_id' => $client_id,
+    'events'    => [[
+      'name'   => 'refund',
+      'params' => $params
+    ]]
+  ];
+
+  $payload = apply_filters('hic_ga4_refund_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $sid);
+
+  $json_payload = wp_json_encode($payload);
+  if ($json_payload === false) {
+    Helpers\hic_log('GA4 refund: Failed to encode JSON payload');
+    return false;
+  }
+
+  $url = 'https://www.google-analytics.com/mp/collect?measurement_id='
+       . rawurlencode($measurement_id)
+       . '&api_secret='
+       . rawurlencode($api_secret);
+
+  $res = Helpers\hic_http_request($url, [
+    'method'  => 'POST',
+    'headers' => ['Content-Type'=>'application/json'],
+    'body'    => $json_payload,
+  ]);
+
+  $code = is_wp_error($res) ? 0 : wp_remote_retrieve_response_code($res);
+  $log_msg = "GA4 dispatch: refund (bucket=$bucket) transaction_id=$transaction_id HTTP=$code";
+
+  if (is_wp_error($res)) {
+    $log_msg .= " ERROR: " . $res->get_error_message();
+    Helpers\hic_log($log_msg);
+    return false;
+  }
+
+  if ($code !== 204 && $code !== 200) {
+    $response_body = wp_remote_retrieve_body($res);
+    $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
+    Helpers\hic_log($log_msg);
+    return false;
+  }
+
+  Helpers\hic_log($log_msg);
+  return true;
+}
+
+/**
  * GA4 dispatcher for HIC reservation schema
  */
 function hic_dispatch_ga4_reservation($data) {

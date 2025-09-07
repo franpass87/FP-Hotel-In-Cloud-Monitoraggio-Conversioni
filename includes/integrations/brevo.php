@@ -129,6 +129,66 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
 }
 
 /**
+ * Brevo refund event
+ */
+function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
+  if (!Helpers\hic_get_brevo_api_key()) { return false; }
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+
+  $event_data = array(
+    'event' => 'refund',
+    'email' => isset($reservation['email']) ? $reservation['email'] : '',
+    'properties' => array(
+      'reservation_id' => isset($reservation['reservation_id']) ? $reservation['reservation_id'] : (isset($reservation['id']) ? $reservation['id'] : ''),
+      'amount'         => isset($reservation['amount']) ? -abs(Helpers\hic_normalize_price($reservation['amount'])) : 0,
+      'currency'       => isset($reservation['currency']) ? $reservation['currency'] : 'EUR',
+      'date'           => isset($reservation['date']) ? $reservation['date'] : wp_date('Y-m-d'),
+      'whatsapp'       => isset($reservation['whatsapp']) ? $reservation['whatsapp'] : '',
+      'lingua'         => isset($reservation['lingua']) ? $reservation['lingua'] : (isset($reservation['lang']) ? $reservation['lang'] : ''),
+      'firstname'      => isset($reservation['first_name']) ? $reservation['first_name'] : '',
+      'lastname'       => isset($reservation['last_name']) ? $reservation['last_name'] : '',
+      'bucket'         => $bucket,
+      'vertical'       => 'hotel',
+      'msclkid'        => $msclkid,
+      'ttclid'         => $ttclid
+    )
+  );
+
+  if (!empty($reservation['sid'])) {
+    $utm = Helpers\hic_get_utm_params_by_sid($reservation['sid']);
+    if (!empty($utm['utm_source']))   { $event_data['properties']['utm_source']   = $utm['utm_source']; }
+    if (!empty($utm['utm_medium']))   { $event_data['properties']['utm_medium']   = $utm['utm_medium']; }
+    if (!empty($utm['utm_campaign'])) { $event_data['properties']['utm_campaign'] = $utm['utm_campaign']; }
+    if (!empty($utm['utm_content']))  { $event_data['properties']['utm_content']  = $utm['utm_content']; }
+    if (!empty($utm['utm_term']))     { $event_data['properties']['utm_term']     = $utm['utm_term']; }
+  }
+
+  $event_data = apply_filters('hic_brevo_refund_event', $event_data, $reservation);
+
+  $res = Helpers\hic_http_request(Helpers\hic_get_brevo_event_endpoint(), array(
+    'method'  => 'POST',
+    'headers' => array(
+      'accept'       => 'application/json',
+      'content-type' => 'application/json',
+      'api-key'      => Helpers\hic_get_brevo_api_key()
+    ),
+    'body'    => wp_json_encode($event_data),
+  ));
+
+  $result = hic_handle_brevo_response($res, 'event_refund', array(
+    'event' => 'refund',
+    'bucket' => $bucket,
+    'email' => $event_data['email']
+  ));
+
+  if (!$result['success']) {
+    Helpers\hic_log('Brevo refund event dispatch FAILED: ' . $result['error']);
+  }
+
+  return $result['success'];
+}
+
+/**
  * Brevo dispatcher for HIC reservation schema
  */
 function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '') {
