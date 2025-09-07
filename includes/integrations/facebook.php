@@ -7,7 +7,7 @@ namespace FpHic;
 if (!defined('ABSPATH')) exit;
 
 /* ============ Meta CAPI (Purchase + bucket) ============ */
-function hic_send_to_fb($data, $gclid, $fbclid){
+function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
     Helpers\hic_log('FB Pixel non configurato.');
     return false;
@@ -71,6 +71,11 @@ function hic_send_to_fb($data, $gclid, $fbclid){
     'vertical'     => 'hotel'
   ];
 
+  if (!empty($gclid))   { $custom_data['gclid']   = sanitize_text_field($gclid); }
+  if (!empty($fbclid))  { $custom_data['fbclid']  = sanitize_text_field($fbclid); }
+  if (!empty($msclkid)) { $custom_data['msclkid'] = sanitize_text_field($msclkid); }
+  if (!empty($ttclid))  { $custom_data['ttclid']  = sanitize_text_field($ttclid); }
+
   // Attach UTM parameters if available
   if (!empty($data['sid'])) {
     $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
@@ -94,7 +99,7 @@ function hic_send_to_fb($data, $gclid, $fbclid){
   ];
 
   // Allow payload customization before encoding
-  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid);
+  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
@@ -178,13 +183,17 @@ function hic_dispatch_pixel_reservation($data) {
   $value = Helpers\hic_normalize_price($data['value']);
   $currency = sanitize_text_field($data['currency']);
 
-  // Get gclid/fbclid for bucket normalization if available
+  // Get tracking IDs for bucket normalization if available
   $gclid = '';
   $fbclid = '';
+  $msclkid = '';
+  $ttclid = '';
   if (!empty($data['transaction_id'])) {
     $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
     $gclid = $tracking['gclid'] ?? '';
     $fbclid = $tracking['fbclid'] ?? '';
+    $msclkid = $tracking['msclkid'] ?? '';
+    $ttclid = $tracking['ttclid'] ?? '';
   }
 
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
@@ -221,6 +230,11 @@ function hic_dispatch_pixel_reservation($data) {
     'vertical' => 'hotel'
   ];
 
+  if (!empty($gclid))   { $custom_data['gclid']   = sanitize_text_field($gclid); }
+  if (!empty($fbclid))  { $custom_data['fbclid']  = sanitize_text_field($fbclid); }
+  if (!empty($msclkid)) { $custom_data['msclkid'] = sanitize_text_field($msclkid); }
+  if (!empty($ttclid))  { $custom_data['ttclid']  = sanitize_text_field($ttclid); }
+
   // Add UTM parameters if available
   $utm = Helpers\hic_get_utm_params_by_sid($transaction_id);
   if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
@@ -253,7 +267,7 @@ function hic_dispatch_pixel_reservation($data) {
   ];
 
   // Allow payload customization before encoding
-  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid);
+  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);

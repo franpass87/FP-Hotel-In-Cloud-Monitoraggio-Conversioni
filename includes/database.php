@@ -22,6 +22,8 @@ function hic_create_database_table(){
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     gclid        VARCHAR(255),
     fbclid       VARCHAR(255),
+    msclkid      VARCHAR(255),
+    ttclid       VARCHAR(255),
     sid          VARCHAR(255),
     utm_source   VARCHAR(255),
     utm_medium   VARCHAR(255),
@@ -29,6 +31,8 @@ function hic_create_database_table(){
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     KEY gclid (gclid(100)),
     KEY fbclid (fbclid(100)),
+    KEY msclkid (msclkid(100)),
+    KEY ttclid (ttclid(100)),
     KEY sid (sid(100)),
     KEY utm_source (utm_source(100)),
     KEY utm_medium (utm_medium(100)),
@@ -209,6 +213,21 @@ function hic_maybe_upgrade_db() {
     $installed_version = '1.2';
   }
 
+  // Migration to version 1.3 - add msclkid and ttclid columns
+  if (version_compare($installed_version, '1.3', '<')) {
+    $table = $wpdb->prefix . 'hic_gclids';
+    $columns = ['msclkid', 'ttclid'];
+    foreach ($columns as $col) {
+      $exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", $col));
+      if (empty($exists)) {
+        $wpdb->query("ALTER TABLE $table ADD COLUMN $col VARCHAR(255)");
+      }
+    }
+    update_option('hic_db_version', '1.3');
+    Helpers\hic_clear_option_cache('hic_db_version');
+    $installed_version = '1.3';
+  }
+
   // Set final version
   update_option('hic_db_version', HIC_DB_VERSION);
   Helpers\hic_clear_option_cache('hic_db_version');
@@ -232,7 +251,7 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
   }
 
   // Only allow specific tracking types
-  $allowed_types = ['gclid', 'fbclid'];
+  $allowed_types = ['gclid', 'fbclid', 'msclkid', 'ttclid'];
   if (!in_array($type, $allowed_types, true)) {
     Helpers\hic_log('hic_store_tracking_id: Invalid type: ' . $type);
     return new \WP_Error('invalid_type', 'Invalid tracking type');
@@ -335,6 +354,24 @@ function hic_capture_tracking_params(){
   if (!empty($_GET['fbclid'])) {
     $fbclid = sanitize_text_field( wp_unslash( $_GET['fbclid'] ) );
     $result = hic_store_tracking_id('fbclid', $fbclid, $existing_sid);
+    if (is_wp_error($result)) {
+      Helpers\hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
+      return false;
+    }
+  }
+
+  if (!empty($_GET['msclkid'])) {
+    $msclkid = sanitize_text_field( wp_unslash( $_GET['msclkid'] ) );
+    $result = hic_store_tracking_id('msclkid', $msclkid, $existing_sid);
+    if (is_wp_error($result)) {
+      Helpers\hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
+      return false;
+    }
+  }
+
+  if (!empty($_GET['ttclid'])) {
+    $ttclid = sanitize_text_field( wp_unslash( $_GET['ttclid'] ) );
+    $result = hic_store_tracking_id('ttclid', $ttclid, $existing_sid);
     if (is_wp_error($result)) {
       Helpers\hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
