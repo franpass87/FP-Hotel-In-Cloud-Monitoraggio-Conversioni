@@ -66,6 +66,14 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid) {
         $gtm_data['fbclid'] = sanitize_text_field($fbclid);
     }
 
+    // Include UTM parameters if available
+    if (!empty($data['sid'])) {
+        $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+        if (!empty($utm['utm_source']))   { $gtm_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
+        if (!empty($utm['utm_medium']))   { $gtm_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
+        if (!empty($utm['utm_campaign'])) { $gtm_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+    }
+
     // Store the data to be pushed to dataLayer on next page load
     hic_queue_gtm_event($gtm_data);
 

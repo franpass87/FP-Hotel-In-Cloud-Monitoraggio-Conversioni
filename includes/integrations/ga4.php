@@ -55,6 +55,14 @@ function hic_send_to_ga4($data, $gclid, $fbclid) {
   if (!empty($gclid))  { $params['gclid']  = sanitize_text_field($gclid); }
   if (!empty($fbclid)) { $params['fbclid'] = sanitize_text_field($fbclid); }
 
+  // Append UTM parameters if available
+  if (!empty($data['sid'])) {
+    $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+    if (!empty($utm['utm_source']))   { $params['utm_source']   = sanitize_text_field($utm['utm_source']); }
+    if (!empty($utm['utm_medium']))   { $params['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
+    if (!empty($utm['utm_campaign'])) { $params['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+  }
+
   $payload = [
     'client_id' => $client_id,
     'events'    => [[
@@ -166,6 +174,12 @@ function hic_dispatch_ga4_reservation($data) {
     'bucket' => $bucket,             // Use normalized bucket based on attribution
     'vertical' => 'hotel'
   ];
+
+  // Attach UTM parameters if available
+  $utm = Helpers\hic_get_utm_params_by_sid($transaction_id);
+  if (!empty($utm['utm_source']))   { $params['utm_source']   = sanitize_text_field($utm['utm_source']); }
+  if (!empty($utm['utm_medium']))   { $params['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
+  if (!empty($utm['utm_campaign'])) { $params['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
 
   // Add optional item_category only if room_name is available
   if (!empty($data['room_name'])) {
