@@ -442,6 +442,23 @@ Il parametro `bucket` viene inviato in tutti gli eventi di conversione per:
 3. **Automazioni Brevo**: Trigger diversi in base alla fonte
 4. **Analisi Performance**: Confrontare ROI tra canali di acquisizione
 
+### Filtro `hic_log_message`
+
+Il plugin espone il filtro WordPress `hic_log_message` per permettere la
+personalizzazione dei messaggi di log. Il filtro riceve il messaggio originale
+e il livello di log e deve restituire la stringa che verrà salvata nel file.
+
+Per impostazione predefinita viene applicato l'helper `hic_mask_sensitive_data`
+che offusca email, numeri di telefono e token sensibili.
+
+Esempio di utilizzo:
+
+```php
+add_filter('hic_log_message', function($message, $level) {
+    return strtoupper($message);
+}, 10, 2);
+```
+
 ### Test e Validazione
 
 Il sistema include test completi per tutte le combinazioni:

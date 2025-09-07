@@ -47,7 +47,19 @@ class HIC_Log_Manager {
 
         // Rotate log if needed
         $this->rotate_if_needed();
-        
+
+        /**
+         * Filters the log message before it is formatted and written.
+         *
+         * Developers can use this hook to modify or sanitize log messages.
+         * The default implementation applies the {@see hic_mask_sensitive_data}
+         * helper to hide common sensitive information.
+         *
+         * @param string $message Original log message.
+         * @param string $level   Log level for the message.
+         */
+        $message = apply_filters('hic_log_message', $message, $level);
+
         // Format log entry
         $formatted_message = $this->format_log_entry($message, $level, $context);
         

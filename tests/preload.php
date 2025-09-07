@@ -11,7 +11,33 @@ if (!function_exists('add_action')) {
         $GLOBALS['hic_test_hooks'][$hook][] = $callback;
     }
 }
-if (!function_exists('add_filter')) { function add_filter(...$args) {} }
+// Basic filter system for testing
+if (!function_exists('add_filter')) {
+    function add_filter($hook, $callback, $priority = 10, $accepted_args = 1) {
+        $GLOBALS['hic_test_filters'][$hook][$priority][] = [
+            'function' => $callback,
+            'accepted_args' => $accepted_args
+        ];
+    }
+}
+if (!function_exists('apply_filters')) {
+    function apply_filters($hook, $value, ...$args) {
+        if (empty($GLOBALS['hic_test_filters'][$hook])) {
+            return $value;
+        }
+
+        ksort($GLOBALS['hic_test_filters'][$hook]);
+
+        foreach ($GLOBALS['hic_test_filters'][$hook] as $callbacks) {
+            foreach ($callbacks as $cb) {
+                $params = array_merge([$value], array_slice($args, 0, $cb['accepted_args'] - 1));
+                $value = \call_user_func_array($cb['function'], $params);
+            }
+        }
+
+        return $value;
+    }
+}
 if (!function_exists('register_activation_hook')) { function register_activation_hook(...$args) {} }
 if (!function_exists('register_deactivation_hook')) { function register_deactivation_hook(...$args) {} }
 if (!function_exists('wp_next_scheduled')) { function wp_next_scheduled(...$args) { return false; } }

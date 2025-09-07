@@ -86,6 +86,42 @@ function hic_validate_log_path($path) {
     return $normalized_path;
 }
 
+/**
+ * Mask common sensitive data like emails, phone numbers and tokens.
+ */
+function hic_mask_sensitive_data($message) {
+    if (!is_string($message)) {
+        return $message;
+    }
+
+    // Mask email addresses
+    $message = preg_replace('/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/u', '[masked-email]', $message);
+
+    // Mask phone numbers (sequences of digits, spaces or dashes)
+    $message = preg_replace('/\b(?:\+?\d[\d\s\-]{7,}\d)\b/u', '[masked-phone]', $message);
+
+    // Mask tokens and authorization headers
+    $message = preg_replace('/(token|api[_-]?key|secret|password)\s*[=:]\s*[A-Za-z0-9._-]+/iu', '$1=[masked]', $message);
+    $message = preg_replace('/Authorization:\s*Bearer\s+[A-Za-z0-9._-]+/iu', 'Authorization: Bearer [masked]', $message);
+
+    return $message;
+}
+
+/**
+ * Default filter for hic_log_message that masks sensitive data.
+ *
+ * @param string $message Log message
+ * @param string $level   Log level
+ * @return string
+ */
+function hic_default_log_message_filter($message, $level) {
+    return hic_mask_sensitive_data($message);
+}
+
+if (function_exists('add_filter')) {
+    add_filter('hic_log_message', __NAMESPACE__ . '\\hic_default_log_message_filter', 10, 2);
+}
+
 // GTM Settings
 function hic_is_gtm_enabled() { return hic_get_option('gtm_enabled', '0') === '1'; }
 function hic_get_gtm_container_id() { return hic_get_option('gtm_container_id', ''); }
@@ -1122,6 +1158,8 @@ namespace {
     function hic_is_valid_email($email) { return \FpHic\Helpers\hic_is_valid_email($email); }
     function hic_is_ota_alias_email($e) { return \FpHic\Helpers\hic_is_ota_alias_email($e); }
     function hic_booking_uid($reservation) { return \FpHic\Helpers\hic_booking_uid($reservation); }
+    function hic_mask_sensitive_data($message) { return \FpHic\Helpers\hic_mask_sensitive_data($message); }
+    function hic_default_log_message_filter($message, $level) { return \FpHic\Helpers\hic_default_log_message_filter($message, $level); }
     function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) { return \FpHic\Helpers\hic_log($msg, $level, $context); }
     function fp_normalize_bucket($gclid, $fbclid) { return \FpHic\Helpers\fp_normalize_bucket($gclid, $fbclid); }
     function hic_get_bucket($gclid, $fbclid) { return \FpHic\Helpers\hic_get_bucket($gclid, $fbclid); }
