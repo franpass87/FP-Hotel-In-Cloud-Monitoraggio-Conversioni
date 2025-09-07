@@ -617,15 +617,40 @@ function hic_http_request($url, $args = []) {
     $response = wp_safe_remote_request($url, $args);
 
     if (is_wp_error($response)) {
-        hic_log('HTTP request error: ' . $response->get_error_message(), HIC_LOG_LEVEL_ERROR);
+        $error_message = $response->get_error_message();
+        hic_log('HTTP request error: ' . $error_message, HIC_LOG_LEVEL_ERROR);
+        hic_store_failed_request($url, $args, $error_message);
     } else {
         $code = wp_remote_retrieve_response_code($response);
         if ($code >= 400) {
+            $error_message = 'HTTP ' . $code;
             hic_log('HTTP request to ' . $url . ' failed with status ' . $code, HIC_LOG_LEVEL_ERROR);
+            hic_store_failed_request($url, $args, $error_message);
         }
     }
 
     return $response;
+}
+
+function hic_store_failed_request($url, $args, $error) {
+    global $wpdb;
+    if (!$wpdb) {
+        return;
+    }
+
+    $table = $wpdb->prefix . 'hic_failed_requests';
+
+    $wpdb->insert(
+        $table,
+        [
+            'endpoint'   => $url,
+            'payload'    => wp_json_encode($args),
+            'attempts'   => 1,
+            'last_error' => $error,
+            'last_try'   => current_time('mysql'),
+        ],
+        ['%s', '%s', '%d', '%s', '%s']
+    );
 }
 
 function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
@@ -1131,6 +1156,75 @@ function hic_safe_wp_clear_scheduled_hook($hook, $args = array()) {
     }
     return wp_clear_scheduled_hook($hook, $args);
 }
+
+function hic_add_failed_request_schedule($schedules) {
+    $schedules['hic_every_fifteen_minutes'] = array(
+        'interval' => 15 * 60,
+        'display'  => 'Every 15 Minutes (HIC Failed Requests)'
+    );
+    return $schedules;
+}
+add_filter('cron_schedules', __NAMESPACE__ . '\\hic_add_failed_request_schedule');
+
+function hic_schedule_failed_request_retry() {
+    if (!hic_safe_wp_next_scheduled('hic_retry_failed_requests')) {
+        hic_safe_wp_schedule_event(time(), 'hic_every_fifteen_minutes', 'hic_retry_failed_requests');
+    }
+}
+add_action('init', __NAMESPACE__ . '\\hic_schedule_failed_request_retry');
+
+function hic_retry_failed_requests() {
+    global $wpdb;
+    if (!$wpdb) {
+        return;
+    }
+
+    $table = $wpdb->prefix . 'hic_failed_requests';
+    $rows  = $wpdb->get_results("SELECT * FROM $table");
+
+    if (empty($rows)) {
+        return;
+    }
+
+    foreach ($rows as $row) {
+        if ($row->attempts >= 5) {
+            $wpdb->delete($table, array('id' => $row->id));
+            continue;
+        }
+
+        $delay     = 15 * 60 * pow(2, max(0, $row->attempts - 1));
+        $next_time = strtotime($row->last_try) + $delay;
+        if (time() < $next_time) {
+            continue;
+        }
+
+        $args     = json_decode($row->payload, true);
+        $response = wp_safe_remote_request($row->endpoint, is_array($args) ? $args : array());
+
+        if (is_wp_error($response) || wp_remote_retrieve_response_code($response) >= 400) {
+            $error_message = is_wp_error($response) ? $response->get_error_message() : 'HTTP ' . wp_remote_retrieve_response_code($response);
+            $wpdb->update(
+                $table,
+                array(
+                    'attempts'   => $row->attempts + 1,
+                    'last_error' => $error_message,
+                    'last_try'   => current_time('mysql'),
+                ),
+                array('id' => $row->id),
+                array('%d', '%s', '%s'),
+                array('%d')
+            );
+            hic_log('Retry failed for ' . $row->endpoint . ': ' . $error_message, HIC_LOG_LEVEL_ERROR);
+            if ($row->attempts + 1 >= 5) {
+                $wpdb->delete($table, array('id' => $row->id));
+            }
+        } else {
+            hic_log('Retry succeeded for ' . $row->endpoint);
+            $wpdb->delete($table, array('id' => $row->id));
+        }
+    }
+}
+add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
 
 }
 

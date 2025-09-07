@@ -160,6 +160,49 @@ function hic_create_booking_events_table(){
   }
   
   Helpers\hic_log('DB ready: '.$table.' (booking events queue)');
+  return hic_create_failed_requests_table();
+}
+
+/* ============ DB: tabella richieste HTTP fallite ============ */
+function hic_create_failed_requests_table(){
+  global $wpdb;
+
+  // Check if wpdb is available
+  if (!$wpdb) {
+    Helpers\hic_log('hic_create_failed_requests_table: wpdb is not available');
+    return false;
+  }
+
+  $table = $wpdb->prefix . 'hic_failed_requests';
+  $charset = $wpdb->get_charset_collate();
+
+  $sql = "CREATE TABLE IF NOT EXISTS $table (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    endpoint TEXT NOT NULL,
+    payload LONGTEXT NULL,
+    attempts INT DEFAULT 0,
+    last_error TEXT NULL,
+    last_try TIMESTAMP NULL,
+    KEY endpoint_idx (endpoint(191))
+  ) $charset;";
+
+  require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+
+  $result = dbDelta($sql);
+
+  if ($result === false) {
+    Helpers\hic_log('hic_create_failed_requests_table: Failed to create table ' . $table);
+    return false;
+  }
+
+  // Verify table was created
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+  if (!$table_exists) {
+    Helpers\hic_log('hic_create_failed_requests_table: Table creation verification failed for ' . $table);
+    return false;
+  }
+
+  Helpers\hic_log('DB ready: '.$table.' (failed requests)');
   return true;
 }
 
@@ -245,6 +288,14 @@ function hic_maybe_upgrade_db() {
     update_option('hic_db_version', '1.4');
     Helpers\hic_clear_option_cache('hic_db_version');
     $installed_version = '1.4';
+  }
+
+  // Migration to version 1.5 - add failed requests table
+  if (version_compare($installed_version, '1.5', '<')) {
+    hic_create_failed_requests_table();
+    update_option('hic_db_version', '1.5');
+    Helpers\hic_clear_option_cache('hic_db_version');
+    $installed_version = '1.5';
   }
 
   // Set final version
