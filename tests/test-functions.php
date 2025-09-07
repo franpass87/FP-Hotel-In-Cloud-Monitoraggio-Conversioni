@@ -126,13 +126,6 @@ class HICFunctionsTest {
         if (!function_exists('wp_json_encode')) {
             function wp_json_encode($data) { return json_encode($data); }
         }
-        if (!function_exists('wp_remote_request')) {
-            function wp_remote_request($url, $args) {
-                global $hic_last_request;
-                $hic_last_request = ['url' => $url, 'args' => $args];
-                return ['response' => ['code' => 200], 'body' => '{}'];
-            }
-        }
         if (!function_exists('wp_remote_retrieve_response_code')) {
             function wp_remote_retrieve_response_code($res) { return $res['response']['code'] ?? 0; }
         }
