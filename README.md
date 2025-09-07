@@ -116,6 +116,15 @@ Per monitorare lo stato del plugin dall'esterno è disponibile un endpoint pubbl
 
 Il token deve corrispondere al valore salvato nell'opzione `hic_health_token`.
 
+## Esportazione o cancellazione dei dati
+
+Il plugin supporta gli strumenti di privacy nativi di WordPress. Gli utenti possono richiedere l'esportazione o la cancellazione dei dati di tracciamento associati al proprio indirizzo email tramite:
+
+1. **Strumenti → Esporta dati personali**
+2. **Strumenti → Cancella dati personali**
+
+L'amministratore del sito approverà la richiesta e il sistema includerà i dati presenti nella tabella `hic_gclids`.
+
 ## Cron & CLI
 
 ### Hook Cron principali
