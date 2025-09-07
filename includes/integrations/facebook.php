@@ -82,6 +82,8 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
     if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
     if (!empty($utm['utm_medium']))   { $custom_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
     if (!empty($utm['utm_campaign'])) { $custom_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+    if (!empty($utm['utm_content']))  { $custom_data['utm_content']  = sanitize_text_field($utm['utm_content']); }
+    if (!empty($utm['utm_term']))     { $custom_data['utm_term']     = sanitize_text_field($utm['utm_term']); }
   }
 
   $payload = [
@@ -240,6 +242,8 @@ function hic_dispatch_pixel_reservation($data) {
   if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
   if (!empty($utm['utm_medium']))   { $custom_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
   if (!empty($utm['utm_campaign'])) { $custom_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+  if (!empty($utm['utm_content']))  { $custom_data['utm_content']  = sanitize_text_field($utm['utm_content']); }
+  if (!empty($utm['utm_term']))     { $custom_data['utm_term']     = sanitize_text_field($utm['utm_term']); }
 
   // Add contents array if value > 0
   if ($value > 0) {

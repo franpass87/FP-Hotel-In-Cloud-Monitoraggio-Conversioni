@@ -61,6 +61,10 @@ Il file JavaScript che aggiunge il parametro SID ai link di prenotazione viene c
 
 Il plugin utilizza un cookie denominato `hic_sid` per collegare le prenotazioni agli utenti. Se presente, questo valore viene inviato come `client_id` e `transaction_id` a GA4 e come `transaction_id` nel dataLayer di GTM, consentendo un tracciamento coerente dell'utente tra le piattaforme.
 
+### Parametri UTM
+
+Quando un visitatore arriva sul sito con parametri UTM nella URL, il plugin salva `utm_source`, `utm_medium`, `utm_campaign`, `utm_content` e `utm_term` nella tabella `hic_gclids`, collegandoli al cookie `hic_sid`. Questi valori vengono poi inclusi automaticamente negli eventi inviati a GA4, Facebook/Meta, Google Tag Manager e Brevo per permettere un'analisi completa delle campagne di marketing.
+
 📖 **Documentazione Completa**:
 - [Come Funziona il Plugin](PLUGIN_FUNZIONAMENTO.md) - Spiegazione dettagliata
 - [Architettura Tecnica](ARCHITETTURA_TECNICA.md) - Diagrammi e flussi

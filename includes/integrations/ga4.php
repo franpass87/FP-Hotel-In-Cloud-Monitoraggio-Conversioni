@@ -68,6 +68,8 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
     if (!empty($utm['utm_source']))   { $params['utm_source']   = sanitize_text_field($utm['utm_source']); }
     if (!empty($utm['utm_medium']))   { $params['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
     if (!empty($utm['utm_campaign'])) { $params['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+    if (!empty($utm['utm_content']))  { $params['utm_content']  = sanitize_text_field($utm['utm_content']); }
+    if (!empty($utm['utm_term']))     { $params['utm_term']     = sanitize_text_field($utm['utm_term']); }
   }
 
   $payload = [
@@ -196,6 +198,8 @@ function hic_dispatch_ga4_reservation($data) {
   if (!empty($utm['utm_source']))   { $params['utm_source']   = sanitize_text_field($utm['utm_source']); }
   if (!empty($utm['utm_medium']))   { $params['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
   if (!empty($utm['utm_campaign'])) { $params['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+  if (!empty($utm['utm_content']))  { $params['utm_content']  = sanitize_text_field($utm['utm_content']); }
+  if (!empty($utm['utm_term']))     { $params['utm_term']     = sanitize_text_field($utm['utm_term']); }
 
   // Add optional item_category only if room_name is available
   if (!empty($data['room_name'])) {

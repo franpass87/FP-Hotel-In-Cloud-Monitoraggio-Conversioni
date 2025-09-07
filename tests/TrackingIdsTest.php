@@ -57,8 +57,9 @@ final class TrackingIdsTest extends TestCase
     {
         global $wpdb;
         $wpdb = new MockWpdb();
-        $wpdb->exec("CREATE TABLE wp_hic_gclids (id INTEGER PRIMARY KEY AUTOINCREMENT, gclid TEXT, fbclid TEXT, msclkid TEXT, ttclid TEXT, sid TEXT);");
+        $wpdb->exec("CREATE TABLE wp_hic_gclids (id INTEGER PRIMARY KEY AUTOINCREMENT, gclid TEXT, fbclid TEXT, msclkid TEXT, ttclid TEXT, sid TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, utm_content TEXT, utm_term TEXT);");
         $wpdb->exec("INSERT INTO wp_hic_gclids (gclid, fbclid, msclkid, ttclid, sid) VALUES ('g1', 'f1', 'm1', 't1', 'SID123');");
+        $wpdb->exec("INSERT INTO wp_hic_gclids (sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term) VALUES ('SIDUTM', 'google', 'cpc', 'camp', 'content', 'term');");
     }
 
     public function testRetrievesTrackingIds()
@@ -80,5 +81,17 @@ final class TrackingIdsTest extends TestCase
         $this->assertNull($result['fbclid']);
         $this->assertNull($result['msclkid']);
         $this->assertNull($result['ttclid']);
+    }
+
+    public function testRetrievesUtmParams()
+    {
+        $result = Helpers\hic_get_utm_params_by_sid('SIDUTM');
+        $this->assertSame([
+            'utm_source'   => 'google',
+            'utm_medium'   => 'cpc',
+            'utm_campaign' => 'camp',
+            'utm_content'  => 'content',
+            'utm_term'     => 'term',
+        ], $result);
     }
 }

@@ -79,6 +79,8 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
         if (!empty($utm['utm_source']))   { $gtm_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
         if (!empty($utm['utm_medium']))   { $gtm_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
         if (!empty($utm['utm_campaign'])) { $gtm_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+        if (!empty($utm['utm_content']))  { $gtm_data['utm_content']  = sanitize_text_field($utm['utm_content']); }
+        if (!empty($utm['utm_term']))     { $gtm_data['utm_term']     = sanitize_text_field($utm['utm_term']); }
     }
 
     // Store the data to be pushed to dataLayer on next page load
