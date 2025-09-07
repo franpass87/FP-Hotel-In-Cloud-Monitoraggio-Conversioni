@@ -57,20 +57,20 @@ final class TrackingIdsTest extends TestCase
     {
         global $wpdb;
         $wpdb = new MockWpdb();
-        $wpdb->exec("CREATE TABLE wp_hic_gclids (id INTEGER PRIMARY KEY AUTOINCREMENT, gclid TEXT, fbclid TEXT, sid TEXT);");
-        $wpdb->exec("INSERT INTO wp_hic_gclids (gclid, fbclid, sid) VALUES ('g1', 'f1', 'SID123');");
+        $wpdb->exec("CREATE TABLE wp_hic_gclids (id INTEGER PRIMARY KEY AUTOINCREMENT, gclid TEXT, fbclid TEXT, msclkid TEXT, ttclid TEXT, sid TEXT);");
+        $wpdb->exec("INSERT INTO wp_hic_gclids (gclid, fbclid, msclkid, ttclid, sid) VALUES ('g1', 'f1', 'm1', 't1', 'SID123');");
     }
 
     public function testRetrievesTrackingIds()
     {
         $result = Helpers\hic_get_tracking_ids_by_sid('SID123');
-        $this->assertSame(['gclid' => 'g1', 'fbclid' => 'f1'], $result);
+        $this->assertSame(['gclid' => 'g1', 'fbclid' => 'f1', 'msclkid' => 'm1', 'ttclid' => 't1'], $result);
     }
 
     public function testSanitizesSid()
     {
         $result = Helpers\hic_get_tracking_ids_by_sid('<script>SID123</script>');
-        $this->assertSame(['gclid' => 'g1', 'fbclid' => 'f1'], $result);
+        $this->assertSame(['gclid' => 'g1', 'fbclid' => 'f1', 'msclkid' => 'm1', 'ttclid' => 't1'], $result);
     }
 
     public function testReturnsNullWhenNotFound()
@@ -78,5 +78,7 @@ final class TrackingIdsTest extends TestCase
         $result = Helpers\hic_get_tracking_ids_by_sid('UNKNOWN');
         $this->assertNull($result['gclid']);
         $this->assertNull($result['fbclid']);
+        $this->assertNull($result['msclkid']);
+        $this->assertNull($result['ttclid']);
     }
 }

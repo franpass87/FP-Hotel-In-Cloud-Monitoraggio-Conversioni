@@ -7,7 +7,7 @@ namespace FpHic;
 if (!defined('ABSPATH')) exit;
 
 /* ============ GA4 (purchase + bucket) ============ */
-function hic_send_to_ga4($data, $gclid, $fbclid, $sid = null) {
+function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $sid = null) {
   // Validate configuration
   $measurement_id = Helpers\hic_get_measurement_id();
   $api_secret = Helpers\hic_get_api_secret();
@@ -57,8 +57,10 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $sid = null) {
     'vertical'       => 'hotel',
   ];
   
-  if (!empty($gclid))  { $params['gclid']  = sanitize_text_field($gclid); }
-  if (!empty($fbclid)) { $params['fbclid'] = sanitize_text_field($fbclid); }
+  if (!empty($gclid))   { $params['gclid']   = sanitize_text_field($gclid); }
+  if (!empty($fbclid))  { $params['fbclid']  = sanitize_text_field($fbclid); }
+  if (!empty($msclkid)) { $params['msclkid'] = sanitize_text_field($msclkid); }
+  if (!empty($ttclid))  { $params['ttclid']  = sanitize_text_field($ttclid); }
 
   // Append UTM parameters if available
   if ($sid !== '') {
@@ -77,7 +79,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $sid = null) {
   ];
 
   // Allow external modification of the GA4 payload
-  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid, $sid);
+  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $sid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
@@ -150,13 +152,17 @@ function hic_dispatch_ga4_reservation($data) {
   $value = Helpers\hic_normalize_price($data['value']);
   $currency = sanitize_text_field($data['currency']);
 
-  // Get gclid/fbclid for bucket normalization if available
+  // Get tracking IDs for bucket normalization if available
   $gclid = '';
   $fbclid = '';
+  $msclkid = '';
+  $ttclid = '';
   if (!empty($data['transaction_id'])) {
     $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
     $gclid = $tracking['gclid'] ?? '';
     $fbclid = $tracking['fbclid'] ?? '';
+    $msclkid = $tracking['msclkid'] ?? '';
+    $ttclid = $tracking['ttclid'] ?? '';
   }
 
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
@@ -179,6 +185,11 @@ function hic_dispatch_ga4_reservation($data) {
     'bucket' => $bucket,             // Use normalized bucket based on attribution
     'vertical' => 'hotel'
   ];
+
+  if (!empty($gclid))   { $params['gclid']   = sanitize_text_field($gclid); }
+  if (!empty($fbclid))  { $params['fbclid']  = sanitize_text_field($fbclid); }
+  if (!empty($msclkid)) { $params['msclkid'] = sanitize_text_field($msclkid); }
+  if (!empty($ttclid))  { $params['ttclid']  = sanitize_text_field($ttclid); }
 
   // Attach UTM parameters if available
   $utm = Helpers\hic_get_utm_params_by_sid($transaction_id);
@@ -205,7 +216,7 @@ function hic_dispatch_ga4_reservation($data) {
   ];
 
   // Allow external modification of the GA4 payload
-  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid);
+  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);

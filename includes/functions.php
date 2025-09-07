@@ -381,13 +381,13 @@ add_filter('wp_privacy_personal_data_erasers', __NAMESPACE__ . '\\hic_register_e
  * Retrieve tracking IDs (gclid and fbclid) for a given SID from database.
  *
  * @param string $sid Session identifier
- * @return array{gclid:?string, fbclid:?string}
- */
+ * @return array{gclid:?string, fbclid:?string, msclkid:?string, ttclid:?string}
+*/
 function hic_get_tracking_ids_by_sid($sid) {
     static $cache = [];
     $sid = sanitize_text_field($sid);
     if (empty($sid)) {
-        return ['gclid' => null, 'fbclid' => null];
+        return ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null];
     }
 
     if (array_key_exists($sid, $cache)) {
@@ -397,7 +397,7 @@ function hic_get_tracking_ids_by_sid($sid) {
     global $wpdb;
     if (!$wpdb) {
         hic_log('hic_get_tracking_ids_by_sid: wpdb is not available');
-        return $cache[$sid] = ['gclid' => null, 'fbclid' => null];
+        return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null];
     }
 
     $table = $wpdb->prefix . 'hic_gclids';
@@ -406,24 +406,25 @@ function hic_get_tracking_ids_by_sid($sid) {
     $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if (!$table_exists) {
         hic_log('hic_get_tracking_ids_by_sid: Table does not exist: ' . $table);
-        return $cache[$sid] = ['gclid' => null, 'fbclid' => null];
+        return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null];
     }
-
-    $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
+    $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid, msclkid, ttclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
 
     if ($wpdb->last_error) {
-        hic_log('hic_get_tracking_ids_by_sid: Database error retrieving gclid/fbclid: ' . $wpdb->last_error);
-        return $cache[$sid] = ['gclid' => null, 'fbclid' => null];
+        hic_log('hic_get_tracking_ids_by_sid: Database error retrieving tracking IDs: ' . $wpdb->last_error);
+        return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null];
     }
 
     if ($row) {
         return $cache[$sid] = [
             'gclid' => $row->gclid,
             'fbclid' => $row->fbclid,
+            'msclkid' => $row->msclkid,
+            'ttclid' => $row->ttclid,
         ];
     }
 
-    return $cache[$sid] = ['gclid' => null, 'fbclid' => null];
+    return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null];
 }
 
 /**

@@ -30,13 +30,17 @@ function hic_process_booking_data($data) {
 
   // Sanitize SID input
   $sid = !empty($data['sid']) ? sanitize_text_field($data['sid']) : null;
-  $gclid  = null;
-  $fbclid = null;
+  $gclid   = null;
+  $fbclid  = null;
+  $msclkid = null;
+  $ttclid  = null;
 
   if ($sid) {
     $tracking = Helpers\hic_get_tracking_ids_by_sid($sid);
-    $gclid = $tracking['gclid'];
-    $fbclid = $tracking['fbclid'];
+    $gclid   = $tracking['gclid'];
+    $fbclid  = $tracking['fbclid'];
+    $msclkid = $tracking['msclkid'];
+    $ttclid  = $tracking['ttclid'];
   }
 
   // Validation for amount if present
@@ -55,7 +59,7 @@ function hic_process_booking_data($data) {
     // GA4 Integration (server-side)
     if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') && 
         Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
-      if (hic_send_to_ga4($data, $gclid, $fbclid, $sid)) {
+      if (hic_send_to_ga4($data, $gclid, $fbclid, $msclkid, $ttclid, $sid)) {
         $success_count++;
       } else {
         $error_count++;
@@ -77,7 +81,7 @@ function hic_process_booking_data($data) {
     
     // Facebook Integration
     if (Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token()) {
-      if (hic_send_to_fb($data, $gclid, $fbclid)) {
+      if (hic_send_to_fb($data, $gclid, $fbclid, $msclkid, $ttclid)) {
         $success_count++;
       } else {
         $error_count++;
@@ -88,7 +92,7 @@ function hic_process_booking_data($data) {
     
     // Brevo Integration - Unified approach to prevent duplicate events
     if (Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key()) {
-      $brevo_success = hic_send_unified_brevo_events($data, $gclid, $fbclid);
+      $brevo_success = hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid, $ttclid);
       if ($brevo_success) {
         $success_count++;
       } else {
