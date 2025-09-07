@@ -609,7 +609,7 @@ function hic_ajax_refresh_diagnostics() {
             'scheduler_status' => hic_get_internal_scheduler_status(),
             'credentials_status' => hic_get_credentials_status(),
             'execution_stats' => hic_get_execution_stats(),
-            'recent_logs' => hic_get_log_manager()->get_recent_logs(20),
+            'recent_logs' => current_user_can('hic_view_logs') ? hic_get_log_manager()->get_recent_logs(20) : array(),
             'error_stats' => hic_get_error_stats()
         );
 
@@ -1072,7 +1072,7 @@ function hic_diagnostics_page() {
     $scheduler_status = hic_get_internal_scheduler_status();
     $credentials_status = hic_get_credentials_status();
     $execution_stats = hic_get_execution_stats();
-    $recent_logs = hic_get_log_manager()->get_recent_logs(20);
+    $recent_logs = current_user_can('hic_view_logs') ? hic_get_log_manager()->get_recent_logs(20) : array();
     $schedules = wp_get_schedules();
     $error_stats = hic_get_error_stats();
     
@@ -1199,6 +1199,7 @@ function hic_diagnostics_page() {
                         </button>
                     </div>
                     
+                    <?php if (current_user_can('hic_view_logs')): ?>
                     <div class="hic-action-group">
                         <h3>Logs & Export</h3>
                         <button class="button button-secondary" id="download-error-logs">
@@ -1206,6 +1207,7 @@ function hic_diagnostics_page() {
                             Scarica Log
                         </button>
                     </div>
+                    <?php endif; ?>
                 </div>
                 
                 <div id="quick-results" class="hic-results-container" style="display: none;">
@@ -1385,6 +1387,7 @@ function hic_diagnostics_page() {
                         </table>
                     </div>
                     
+                    <?php if (current_user_can('hic_view_logs')): ?>
                     <div class="hic-activity-section">
                         <h3>📝 Log Recenti</h3>
                         <div class="hic-logs-container">
@@ -1400,6 +1403,7 @@ function hic_diagnostics_page() {
                             <?php endif; ?>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
             
@@ -1491,7 +1495,7 @@ function hic_diagnostics_page() {
  * AJAX handler for downloading error logs
  */
 function hic_ajax_download_error_logs() {
-    if ( ! current_user_can('hic_manage') ) {
+    if ( ! current_user_can('hic_view_logs') ) {
         wp_die( __( 'Permessi insufficienti', 'hotel-in-cloud' ) );
     }
 
