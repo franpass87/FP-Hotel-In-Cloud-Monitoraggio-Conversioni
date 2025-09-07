@@ -798,9 +798,9 @@ function hic_test_email_configuration($recipient_email = null) {
     add_action('phpmailer_init', $phpmailer_hook);
     
     // Prepare test email
-    $subject = 'HIC Email Configuration Test - ' . date('Y-m-d H:i:s');
+    $subject = 'HIC Email Configuration Test - ' . current_time('mysql');
     $body = "Questo è un test di configurazione email per il plugin Hotel in Cloud.\n\n";
-    $body .= "Timestamp: " . date('Y-m-d H:i:s') . "\n";
+    $body .= "Timestamp: " . current_time('mysql') . "\n";
     $body .= "Destinatario: " . $recipient_email . "\n";
     $body .= "Sito: " . get_bloginfo('name') . "\n";
     $body .= "URL: " . get_bloginfo('url') . "\n\n";

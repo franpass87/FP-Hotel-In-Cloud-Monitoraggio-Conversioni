@@ -84,9 +84,9 @@ function hic_get_internal_scheduler_status() {
             
             $status['internal_scheduler']['cron_diagnostics'] = array(
                 'continuous_scheduled' => $continuous_next,
-                'continuous_scheduled_human' => $continuous_next ? date('Y-m-d H:i:s', $continuous_next) : 'Non programmato',
+                'continuous_scheduled_human' => $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'Non programmato',
                 'deep_scheduled' => $deep_next,
-                'deep_scheduled_human' => $deep_next ? date('Y-m-d H:i:s', $deep_next) : 'Non programmato',
+                'deep_scheduled_human' => $deep_next ? wp_date('Y-m-d H:i:s', $deep_next) : 'Non programmato',
                 'wp_cron_disabled' => $wp_cron_disabled,
                 'current_time' => time(),
                 'continuous_overdue' => $continuous_next && $continuous_next < (time() - 120),
@@ -232,8 +232,8 @@ function hic_test_dispatch_functions() {
         'last_name' => 'Doe',
         'lingua' => 'it',
         'room' => 'Standard Room',
-        'checkin' => date('Y-m-d', strtotime('+7 days')),
-        'checkout' => date('Y-m-d', strtotime('+10 days'))
+        'checkin' => wp_date('Y-m-d', strtotime('+7 days', current_time('timestamp'))),
+        'checkout' => wp_date('Y-m-d', strtotime('+10 days', current_time('timestamp')))
     );
     
     $results = array();
@@ -476,8 +476,8 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     $downloaded_ids = $skip_downloaded ? hic_get_downloaded_booking_ids() : array();
     
     // Get bookings from the last 30 days to ensure we get recent ones
-    $to_date = date('Y-m-d');
-    $from_date = date('Y-m-d', strtotime('-30 days'));
+    $to_date = wp_date('Y-m-d');
+    $from_date = wp_date('Y-m-d', strtotime('-30 days', current_time('timestamp')));
     
     Helpers\hic_log("Fetching latest $limit bookings for property $prop_id from $from_date to $to_date" . 
             ($skip_downloaded ? " (skipping " . count($downloaded_ids) . " already downloaded)" : ""));
@@ -1346,7 +1346,7 @@ function hic_diagnostics_page() {
                         <table class="hic-stats-table">
                             <tr>
                                 <td>Ultimo Polling</td>
-                                <td><?php echo esc_html($execution_stats['last_poll_time'] ? date('Y-m-d H:i:s', $execution_stats['last_poll_time']) : 'Mai'); ?></td>
+                                <td><?php echo esc_html($execution_stats['last_poll_time'] ? wp_date('Y-m-d H:i:s', $execution_stats['last_poll_time']) : 'Mai'); ?></td>
                             </tr>
                             <tr>
                                 <td>Prenotazioni Elaborate</td>
@@ -1427,10 +1427,10 @@ function hic_diagnostics_page() {
                             <div class="hic-backfill-form">
                                 <div class="hic-form-row">
                                     <label for="backfill-from-date">Da:</label>
-                                    <input type="date" id="backfill-from-date" value="<?php echo esc_attr(date('Y-m-d', strtotime('-7 days'))); ?>" />
+                                    <input type="date" id="backfill-from-date" value="<?php echo esc_attr(wp_date('Y-m-d', strtotime('-7 days', current_time('timestamp')))); ?>" />
                                     
                                     <label for="backfill-to-date">A:</label>
-                                    <input type="date" id="backfill-to-date" value="<?php echo esc_attr(date('Y-m-d')); ?>" />
+                                    <input type="date" id="backfill-to-date" value="<?php echo esc_attr(wp_date('Y-m-d')); ?>" />
                                     
                                     <label for="backfill-date-type">Tipo:</label>
                                     <select id="backfill-date-type">
@@ -1510,7 +1510,7 @@ function hic_ajax_download_error_logs() {
     }
     
     // Set headers for file download
-    $filename = 'hic-error-log-' . date('Y-m-d-H-i-s') . '.txt';
+    $filename = 'hic-error-log-' . wp_date('Y-m-d-H-i-s') . '.txt';
 
     nocache_headers();
     header('Content-Type: text/plain');

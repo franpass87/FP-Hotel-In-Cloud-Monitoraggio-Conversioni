@@ -221,7 +221,7 @@ class HIC_Log_Manager {
      * Rotate log file
      */
     private function rotate_log() {
-        $timestamp = date('Y-m-d_H-i-s');
+        $timestamp = wp_date('Y-m-d_H-i-s');
         $rotated_file = $this->log_file . '.' . $timestamp;
         
         // Move current log to rotated file
@@ -304,7 +304,7 @@ class HIC_Log_Manager {
             'size' => $size,
             'size_mb' => round($size / 1048576, 2),
             'lines' => $lines,
-            'last_modified' => date('Y-m-d H:i:s', $last_modified),
+            'last_modified' => wp_date('Y-m-d H:i:s', $last_modified),
             'rotated_files' => $this->get_rotated_files()
         ];
     }
@@ -341,7 +341,7 @@ class HIC_Log_Manager {
                 'file' => basename($file),
                 'size' => filesize($file),
                 'size_mb' => round(filesize($file) / 1048576, 2),
-                'modified' => date('Y-m-d H:i:s', filemtime($file))
+                'modified' => wp_date('Y-m-d H:i:s', filemtime($file))
             ];
         }
         
@@ -448,7 +448,7 @@ class HIC_Log_Manager {
             return false;
         }
         
-        $timestamp = date('Y-m-d_H-i-s');
+        $timestamp = wp_date('Y-m-d_H-i-s');
         $archive_file = $this->log_file . '.archive.' . $timestamp;
         
         if (copy($this->log_file, $archive_file)) {

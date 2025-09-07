@@ -158,10 +158,10 @@ class HIC_Booking_Poller {
         if (!$is_working) {
             $debug_info = sprintf(
                 'WP-Cron events check: continuous=%s, deep=%s, cleanup=%s, booking_cleanup=%s',
-                $continuous_next ? date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
-                $deep_next ? date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
-                $cleanup_next ? date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
-                $booking_cleanup_next ? date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED'
+                $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
+                $deep_next ? wp_date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
+                $cleanup_next ? wp_date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
+                $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED'
             );
             Helpers\hic_log('WP-Cron not working: ' . $debug_info);
         }
@@ -187,10 +187,10 @@ class HIC_Booking_Poller {
 
         $status_msg = sprintf(
             'WP-Cron Status: Continuous next=%s, Deep next=%s, Cleanup next=%s, Booking cleanup next=%s, WP-Cron disabled=%s, Should poll=%s (reliable=%s, type=%s, url=%s, auth=%s)',
-            $continuous_next ? date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
-            $deep_next ? date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
-            $cleanup_next ? date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
-            $booking_cleanup_next ? date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED',
+            $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
+            $deep_next ? wp_date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
+            $cleanup_next ? wp_date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
+            $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED',
             (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) ? 'YES' : 'NO',
             $should_poll ? 'YES' : 'NO',
             $reliable_polling ? 'YES' : 'NO',
@@ -310,7 +310,7 @@ class HIC_Booking_Poller {
                 sleep(1);
                 $this->ensure_scheduler_is_active();
                 
-                Helpers\hic_log("Recovery: All timestamps reset - data timestamps to " . date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restarted");
+                Helpers\hic_log("Recovery: All timestamps reset - data timestamps to " . wp_date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . wp_date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restarted");
                 break;
         }
         
@@ -521,8 +521,8 @@ class HIC_Booking_Poller {
         }
         
         $lookback_seconds = HIC_DEEP_CHECK_LOOKBACK_DAYS * DAY_IN_SECONDS;
-        $from_date = date('Y-m-d', current_time('timestamp') - $lookback_seconds);
-        $to_date = date('Y-m-d', current_time('timestamp'));
+        $from_date = wp_date('Y-m-d', current_time('timestamp') - $lookback_seconds);
+        $to_date = wp_date('Y-m-d', current_time('timestamp'));
         
         Helpers\hic_log("Deep check: Searching for reservations from $from_date to $to_date (property: $prop_id)");
         

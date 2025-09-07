@@ -565,7 +565,7 @@ function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_m
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
   
-  $retry_time = date('Y-m-d H:i:s', strtotime("-{$retry_delay_minutes} minutes"));
+  $retry_time = wp_date('Y-m-d H:i:s', strtotime("-{$retry_delay_minutes} minutes", current_time('timestamp')));
   
   $results = $wpdb->get_results($wpdb->prepare(
     "SELECT reservation_id, attempt_count, last_error 

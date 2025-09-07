@@ -60,7 +60,7 @@ class HIC_Performance_Monitor {
             'duration' => $duration,
             'memory_used' => $memory_used,
             'timestamp' => current_time('timestamp'),
-            'date' => date('Y-m-d'),
+            'date' => wp_date('Y-m-d'),
             'additional_data' => $additional_data
         ];
         
@@ -74,7 +74,7 @@ class HIC_Performance_Monitor {
      * Record a performance metric
      */
     public function record_metric($metric) {
-        $today = date('Y-m-d');
+        $today = wp_date('Y-m-d');
         $metrics_key = 'hic_performance_metrics_' . $today;
         
         $today_metrics = get_option($metrics_key, []);
@@ -130,10 +130,10 @@ class HIC_Performance_Monitor {
      */
     public function get_metrics($start_date = null, $end_date = null, $operation = null) {
         if (!$start_date) {
-            $start_date = date('Y-m-d', strtotime('-7 days'));
+            $start_date = wp_date('Y-m-d', strtotime('-7 days', current_time('timestamp')));
         }
         if (!$end_date) {
-            $end_date = date('Y-m-d');
+            $end_date = wp_date('Y-m-d');
         }
         
         $metrics = [];
@@ -150,7 +150,7 @@ class HIC_Performance_Monitor {
             }
             
             $metrics = array_merge($metrics, $day_metrics);
-            $current_date = date('Y-m-d', strtotime($current_date . ' +1 day'));
+            $current_date = wp_date('Y-m-d', strtotime($current_date . ' +1 day'));
         }
         
         return $metrics;
@@ -160,7 +160,7 @@ class HIC_Performance_Monitor {
      * Get performance summary
      */
     public function get_performance_summary($days = 7) {
-        $start_date = date('Y-m-d', strtotime("-{$days} days"));
+        $start_date = wp_date('Y-m-d', strtotime("-{$days} days", current_time('timestamp')));
         $metrics = $this->get_metrics($start_date);
         
         $summary = [
@@ -265,7 +265,7 @@ class HIC_Performance_Monitor {
             'duration' => $duration,
             'memory_used' => 0,
             'timestamp' => current_time('timestamp'),
-            'date' => date('Y-m-d'),
+            'date' => wp_date('Y-m-d'),
             'additional_data' => [
                 'endpoint' => $endpoint,
                 'success' => $success,
@@ -281,7 +281,7 @@ class HIC_Performance_Monitor {
      * Update daily API statistics
      */
     private function update_daily_api_stats($success) {
-        $today = date('Y-m-d');
+        $today = wp_date('Y-m-d');
         $stats_key = 'hic_api_stats_' . $today;
         $stats = get_option($stats_key, ['total' => 0, 'success' => 0, 'failed' => 0]);
         
@@ -302,7 +302,7 @@ class HIC_Performance_Monitor {
         $stats = [];
         
         for ($i = 0; $i < $days; $i++) {
-            $date = date('Y-m-d', strtotime("-{$i} days"));
+            $date = wp_date('Y-m-d', strtotime("-{$i} days", current_time('timestamp')));
             $stats_key = 'hic_api_stats_' . $date;
             $day_stats = get_option($stats_key, ['total' => 0, 'success' => 0, 'failed' => 0]);
             $stats[$date] = $day_stats;
@@ -320,7 +320,7 @@ class HIC_Performance_Monitor {
             'duration' => $duration,
             'memory_used' => 0,
             'timestamp' => current_time('timestamp'),
-            'date' => date('Y-m-d'),
+            'date' => wp_date('Y-m-d'),
             'additional_data' => [
                 'booking_id' => $booking_id,
                 'success' => $success,
@@ -387,7 +387,7 @@ class HIC_Performance_Monitor {
      * Initialize daily metrics
      */
     public function init_daily_metrics() {
-        $today = date('Y-m-d');
+        $today = wp_date('Y-m-d');
         $last_init = get_option('hic_metrics_last_init');
         
         if ($last_init !== $today) {
@@ -416,7 +416,7 @@ class HIC_Performance_Monitor {
      * Clean up old metrics
      */
     public function cleanup_old_metrics() {
-        $cutoff_date = date('Y-m-d', strtotime('-30 days'));
+        $cutoff_date = wp_date('Y-m-d', strtotime('-30 days', current_time('timestamp')));
         
         global $wpdb;
         

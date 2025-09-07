@@ -286,7 +286,7 @@ if (defined('WP_CLI') && WP_CLI) {
             }
             
             if (isset($stats['last_poll']) && $stats['last_poll'] > 0) {
-                WP_CLI::log("Last poll: " . date('Y-m-d H:i:s', $stats['last_poll']) . " ({$stats['last_poll_human']})");
+                WP_CLI::log("Last poll: " . wp_date('Y-m-d H:i:s', $stats['last_poll']) . " ({$stats['last_poll_human']})");
                 WP_CLI::log("Lag: {$stats['lag_seconds']} seconds");
             }
             

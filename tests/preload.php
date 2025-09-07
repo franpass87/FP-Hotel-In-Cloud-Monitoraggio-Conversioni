@@ -64,3 +64,8 @@ if (!function_exists('is_ssl')) { function is_ssl() { return false; } }
 if (!function_exists('wp_unslash')) { function wp_unslash($value) { return $value; } }
 if (!function_exists('is_wp_error')) { function is_wp_error($thing) { return $thing instanceof \WP_Error; } }
 if (!function_exists('sanitize_text_field')) { function sanitize_text_field($str) { return filter_var($str, FILTER_SANITIZE_STRING); } }
+if (!function_exists('wp_date')) {
+    function wp_date($format, $timestamp = null, $timezone = null) {
+        return date($format, $timestamp ?? time());
+    }
+}

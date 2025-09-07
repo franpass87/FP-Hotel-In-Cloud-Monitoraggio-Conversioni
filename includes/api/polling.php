@@ -29,25 +29,25 @@ function hic_validate_api_timestamp($timestamp, $context = 'api_request') {
     if (empty($timestamp) || !is_numeric($timestamp)) {
         $timestamp = $current_time - 7200; // Default to 2 hours ago
         $adjusted = true;
-        Helpers\hic_log("$context: Invalid timestamp, using default: " . date('Y-m-d H:i:s', $timestamp));
+        Helpers\hic_log("$context: Invalid timestamp, using default: " . wp_date('Y-m-d H:i:s', $timestamp));
     }
     // Handle timestamps that are too old
     elseif ($timestamp < $earliest_allowed) {
         $timestamp = $earliest_allowed;
         $adjusted = true;
-        Helpers\hic_log("$context: Timestamp too old (" . date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . date('Y-m-d H:i:s', $timestamp));
+        Helpers\hic_log("$context: Timestamp too old (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
     }
     // Handle timestamps that are too far in the future
     elseif ($timestamp > $latest_allowed) {
         $timestamp = $current_time - 3600; // Set to 1 hour ago
         $adjusted = true;
-        Helpers\hic_log("$context: Timestamp too far in future (" . date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . date('Y-m-d H:i:s', $timestamp));
+        Helpers\hic_log("$context: Timestamp too far in future (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
     }
     // Additional safety check for unreasonable timestamps
     elseif ($timestamp < 0 || $timestamp < ($current_time - (365 * DAY_IN_SECONDS))) {
         $timestamp = $earliest_allowed;
         $adjusted = true;
-        Helpers\hic_log("$context: Unreasonable timestamp (" . date('Y-m-d H:i:s', $original_timestamp) . "), reset to safe value: " . date('Y-m-d H:i:s', $timestamp));
+        Helpers\hic_log("$context: Unreasonable timestamp (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to safe value: " . wp_date('Y-m-d H:i:s', $timestamp));
     }
     
     return $timestamp;
@@ -570,8 +570,8 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $from_time = $current_time - ($window_back_minutes * 60);
     $to_time = $current_time + ($window_forward_minutes * 60);
     
-    $from_date = date('Y-m-d H:i:s', $from_time);
-    $to_date = date('Y-m-d H:i:s', $to_time);
+    $from_date = wp_date('Y-m-d H:i:s', $from_time);
+    $to_date = wp_date('Y-m-d H:i:s', $to_time);
     
     Helpers\hic_log("Internal Scheduler: Moving window polling from $from_date to $to_date (property: $prop_id)");
     
@@ -595,11 +595,11 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
         if ($validated_check !== $last_update_check) {
             update_option('hic_last_update_check', $validated_check, false);
             Helpers\hic_clear_option_cache('hic_last_update_check');
-            Helpers\hic_log("Quasi-realtime Poll: Updated stored timestamp from " . date('Y-m-d H:i:s', $last_update_check) . " to " . date('Y-m-d H:i:s', $validated_check));
+            Helpers\hic_log("Quasi-realtime Poll: Updated stored timestamp from " . wp_date('Y-m-d H:i:s', $last_update_check) . " to " . wp_date('Y-m-d H:i:s', $validated_check));
             $last_update_check = $validated_check;
         }
         
-        Helpers\hic_log("Internal Scheduler: Checking for updates since " . date('Y-m-d H:i:s', $last_update_check));
+        Helpers\hic_log("Internal Scheduler: Checking for updates since " . wp_date('Y-m-d H:i:s', $last_update_check));
         $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_update_check, 100);
         
         if (!is_wp_error($updated_reservations)) {
@@ -630,7 +630,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
                 
                 update_option('hic_last_update_check', $validated_reset, false);
                 Helpers\hic_clear_option_cache('hic_last_update_check');
-                Helpers\hic_log('Quasi-realtime Poll: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
+                Helpers\hic_log('Quasi-realtime Poll: Timestamp error detected, reset timestamp to: ' . wp_date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
                 
                 // Also reset scheduler timestamps to restart polling immediately with safe values
                 $recent_timestamp = $current_time - 300; // 5 minutes ago
@@ -640,13 +640,13 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
                 Helpers\hic_clear_option_cache('hic_last_continuous_poll');
                 update_option('hic_last_deep_check', $validated_recent, false);
                 Helpers\hic_clear_option_cache('hic_last_deep_check');
-                Helpers\hic_log('Quasi-realtime Poll: Reset scheduler timestamps to restart polling: ' . date('Y-m-d H:i:s', $validated_recent));
+                Helpers\hic_log('Quasi-realtime Poll: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
             }
         }
     
     // Also poll by checkin date to catch any updates to existing bookings
-    $checkin_from = date('Y-m-d', $from_time);
-    $checkin_to = date('Y-m-d', $to_time + (7 * DAY_IN_SECONDS)); // Extend checkin window
+    $checkin_from = wp_date('Y-m-d', $from_time);
+    $checkin_to = wp_date('Y-m-d', $to_time + (7 * DAY_IN_SECONDS)); // Extend checkin window
     
     Helpers\hic_log("Internal Scheduler: Polling by checkin date from $checkin_from to $checkin_to");
     $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 100);
@@ -844,15 +844,15 @@ function hic_api_poll_updates(){
     if ($validated_last_since !== $last_since) {
         update_option('hic_last_updates_since', $validated_last_since, false);
         Helpers\hic_clear_option_cache('hic_last_updates_since');
-        Helpers\hic_log("Internal Scheduler: Updated stored timestamp from " . date('Y-m-d H:i:s', $last_since) . " to " . date('Y-m-d H:i:s', $validated_last_since));
+        Helpers\hic_log("Internal Scheduler: Updated stored timestamp from " . wp_date('Y-m-d H:i:s', $last_since) . " to " . wp_date('Y-m-d H:i:s', $validated_last_since));
         $last_since = $validated_last_since;
     }
     
     $since = max(0, $last_since - $overlap_seconds);
     
     Helpers\hic_log("Internal Scheduler: polling updates for property $prop");
-    Helpers\hic_log("Internal Scheduler: last timestamp: " . date('Y-m-d H:i:s', $last_since) . " ($last_since)");
-    Helpers\hic_log("Internal Scheduler: requesting since: " . date('Y-m-d H:i:s', $since) . " ($since) [overlap: {$overlap_seconds}s]");
+    Helpers\hic_log("Internal Scheduler: last timestamp: " . wp_date('Y-m-d H:i:s', $last_since) . " ($last_since)");
+    Helpers\hic_log("Internal Scheduler: requesting since: " . wp_date('Y-m-d H:i:s', $since) . " ($since) [overlap: {$overlap_seconds}s]");
     
     $out = hic_fetch_reservations_updates($prop, $since, 100); // limit opzionale se supportato
     if (!is_wp_error($out)) {
@@ -876,9 +876,9 @@ function hic_api_poll_updates(){
               // Use the max updated_at if found, otherwise use current time
               if ($max_updated_at > 0) {
                   $new_timestamp = $max_updated_at;
-                  Helpers\hic_log("Internal Scheduler: Using max updated_at timestamp: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+                  Helpers\hic_log("Internal Scheduler: Using max updated_at timestamp: " . wp_date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
               } else {
-                  Helpers\hic_log("Internal Scheduler: No updated_at field found, using current time: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+                  Helpers\hic_log("Internal Scheduler: No updated_at field found, using current time: " . wp_date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
               }
         } else {
             // No updates found - advance timestamp only if enough time has passed to prevent infinite polling
@@ -888,7 +888,7 @@ function hic_api_poll_updates(){
             } else {
                 // Keep previous timestamp for retry, but with small increment to avoid exact same request
                 $new_timestamp = $last_since + 60; // Advance by 1 minute to make progress
-                Helpers\hic_log("Internal Scheduler: No updates found, advancing by 1 minute for next retry: " . date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+                Helpers\hic_log("Internal Scheduler: No updates found, advancing by 1 minute for next retry: " . wp_date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
             }
         }
         
@@ -909,7 +909,7 @@ function hic_api_poll_updates(){
             
             update_option('hic_last_updates_since', $validated_reset, false);
             Helpers\hic_clear_option_cache('hic_last_updates_since');
-            Helpers\hic_log('Internal Scheduler: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
+            Helpers\hic_log('Internal Scheduler: Timestamp error detected, reset timestamp to: ' . wp_date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
             
             // Also reset scheduler timestamps to restart polling immediately with safe values
             $recent_timestamp = $current_time - 300; // 5 minutes ago
@@ -919,7 +919,7 @@ function hic_api_poll_updates(){
             Helpers\hic_clear_option_cache('hic_last_continuous_poll');
             update_option('hic_last_deep_check', $validated_recent, false);
             Helpers\hic_clear_option_cache('hic_last_deep_check');
-            Helpers\hic_log('Internal Scheduler: Reset scheduler timestamps to restart polling: ' . date('Y-m-d H:i:s', $validated_recent));
+            Helpers\hic_log('Internal Scheduler: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
         }
     }
 }
@@ -985,7 +985,7 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
     $validated_since = hic_validate_api_timestamp($since, 'HIC updates fetch');
     
     if ($validated_since !== $since) {
-        Helpers\hic_log("HIC updates fetch: Timestamp adjusted from " . date('Y-m-d H:i:s', $since) . " to " . date('Y-m-d H:i:s', $validated_since));
+        Helpers\hic_log("HIC updates fetch: Timestamp adjusted from " . wp_date('Y-m-d H:i:s', $since) . " to " . wp_date('Y-m-d H:i:s', $validated_since));
     }
     
     $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
@@ -1211,8 +1211,8 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
     // Use a small date range to minimize data transfer
     $test_args = array(
         'date_type' => 'checkin',
-        'from_date' => date('Y-m-d', strtotime('-7 days')),
-        'to_date' => date('Y-m-d'),
+        'from_date' => wp_date('Y-m-d', strtotime('-7 days', current_time('timestamp'))),
+        'to_date' => wp_date('Y-m-d'),
         'limit' => 1
     );
     $test_url = add_query_arg($test_args, $endpoint);
@@ -1552,8 +1552,8 @@ function hic_api_poll_bookings_continuous() {
         $from_time = $current_time - ($window_back_minutes * 60);
         $to_time = $current_time + ($window_forward_minutes * 60);
         
-        $from_date = date('Y-m-d H:i:s', $from_time);
-        $to_date = date('Y-m-d H:i:s', $to_time);
+        $from_date = wp_date('Y-m-d H:i:s', $from_time);
+        $to_date = wp_date('Y-m-d H:i:s', $to_time);
         
         Helpers\hic_log("Continuous Polling: Checking window from $from_date to $to_date (property: $prop_id)");
         
@@ -1576,11 +1576,11 @@ function hic_api_poll_bookings_continuous() {
         if ($validated_check !== $last_continuous_check) {
             update_option('hic_last_continuous_check', $validated_check, false);
             Helpers\hic_clear_option_cache('hic_last_continuous_check');
-            Helpers\hic_log("Continuous Polling: Updated stored timestamp from " . date('Y-m-d H:i:s', $last_continuous_check) . " to " . date('Y-m-d H:i:s', $validated_check));
+            Helpers\hic_log("Continuous Polling: Updated stored timestamp from " . wp_date('Y-m-d H:i:s', $last_continuous_check) . " to " . wp_date('Y-m-d H:i:s', $validated_check));
             $last_continuous_check = $validated_check;
         }
         
-        Helpers\hic_log("Continuous Polling: Checking for updates since " . date('Y-m-d H:i:s', $last_continuous_check));
+        Helpers\hic_log("Continuous Polling: Checking for updates since " . wp_date('Y-m-d H:i:s', $last_continuous_check));
         $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_continuous_check, 50);
         
         if (!is_wp_error($updated_reservations)) {
@@ -1611,7 +1611,7 @@ function hic_api_poll_bookings_continuous() {
                 
                 update_option('hic_last_continuous_check', $validated_reset, false);
                 Helpers\hic_clear_option_cache('hic_last_continuous_check');
-                Helpers\hic_log('Continuous Polling: Timestamp error detected, reset timestamp to: ' . date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
+                Helpers\hic_log('Continuous Polling: Timestamp error detected, reset timestamp to: ' . wp_date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
                 
                 // Also reset scheduler timestamps to restart polling immediately with safe values
                 $recent_timestamp = $current_time - 300; // 5 minutes ago
@@ -1621,13 +1621,13 @@ function hic_api_poll_bookings_continuous() {
                 Helpers\hic_clear_option_cache('hic_last_continuous_poll');
                 update_option('hic_last_deep_check', $validated_recent, false);
                 Helpers\hic_clear_option_cache('hic_last_deep_check');
-                Helpers\hic_log('Continuous Polling: Reset scheduler timestamps to restart polling: ' . date('Y-m-d H:i:s', $validated_recent));
+                Helpers\hic_log('Continuous Polling: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
             }
         }
         
         // Also check by check-in date for today and tomorrow (catch modifications)
-        $checkin_from = date('Y-m-d', $current_time);
-        $checkin_to = date('Y-m-d', $current_time + DAY_IN_SECONDS);
+        $checkin_from = wp_date('Y-m-d', $current_time);
+        $checkin_to = wp_date('Y-m-d', $current_time + DAY_IN_SECONDS);
         
         $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 30);
         
@@ -1681,8 +1681,8 @@ function hic_api_poll_bookings_deep_check() {
         $current_time = current_time('timestamp');
         $lookback_seconds = 5 * DAY_IN_SECONDS; // 5 days
         
-        $from_date = date('Y-m-d', $current_time - $lookback_seconds);
-        $to_date = date('Y-m-d', $current_time);
+        $from_date = wp_date('Y-m-d', $current_time - $lookback_seconds);
+        $to_date = wp_date('Y-m-d', $current_time);
         
         Helpers\hic_log("Deep Check: Searching 5-day window from $from_date to $to_date (property: $prop_id)");
         
@@ -1700,7 +1700,7 @@ function hic_api_poll_bookings_deep_check() {
             Helpers\hic_log("Deep Check: Reduced lookback from " . ($lookback_seconds / DAY_IN_SECONDS) . " days to " . ($safe_lookback_seconds / DAY_IN_SECONDS) . " days due to API limits");
         }
         
-        Helpers\hic_log("Deep Check: Checking for updates since " . date('Y-m-d H:i:s', $lookback_timestamp));
+        Helpers\hic_log("Deep Check: Checking for updates since " . wp_date('Y-m-d H:i:s', $lookback_timestamp));
         $updated_reservations = hic_fetch_reservations_updates($prop_id, $lookback_timestamp, 100);
         
         if (!is_wp_error($updated_reservations)) {
@@ -1743,8 +1743,8 @@ function hic_api_poll_bookings_deep_check() {
                 update_option('hic_last_deep_check', $validated_recent, false);
                 Helpers\hic_clear_option_cache('hic_last_deep_check');
                 
-                Helpers\hic_log('Deep Check: Reset all timestamps to: ' . date('Y-m-d H:i:s', $validated_safe) . " for recovery");
-                Helpers\hic_log('Deep Check: Reset scheduler timestamps to restart polling immediately: ' . date('Y-m-d H:i:s', $validated_recent));
+                Helpers\hic_log('Deep Check: Reset all timestamps to: ' . wp_date('Y-m-d H:i:s', $validated_safe) . " for recovery");
+                Helpers\hic_log('Deep Check: Reset scheduler timestamps to restart polling immediately: ' . wp_date('Y-m-d H:i:s', $validated_recent));
                 
                 // Reduce error count since this is a recoverable error that's now handled
                 $total_errors--;
@@ -1752,8 +1752,8 @@ function hic_api_poll_bookings_deep_check() {
         }
         
         // Also check check-in dates for the next 7 days (catch future reservations that might have been missed)
-        $checkin_from = date('Y-m-d', $current_time);
-        $checkin_to = date('Y-m-d', $current_time + (7 * DAY_IN_SECONDS));
+        $checkin_from = wp_date('Y-m-d', $current_time);
+        $checkin_to = wp_date('Y-m-d', $current_time + (7 * DAY_IN_SECONDS));
         
         Helpers\hic_log("Deep Check: Checking by checkin date from $checkin_from to $checkin_to");
         $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 100);
