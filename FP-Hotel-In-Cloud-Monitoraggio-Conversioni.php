@@ -18,20 +18,23 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Load Composer autoloader
+// Load Composer autoloader or fallback to manual loading
+$vendor_available = false;
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require __DIR__ . '/vendor/autoload.php';
-} else {
-    require_once __DIR__ . '/includes/constants.php';
-    require_once __DIR__ . '/includes/functions.php';
-    require_once __DIR__ . '/includes/log-manager.php';
-    Helpers\hic_log('HIC Plugin: vendor/autoload.php non trovato.', HIC_LOG_LEVEL_ERROR);
-    return;
+    $vendor_available = true;
 }
-// Ensure plugin constants are loaded before usage
+
+// Ensure plugin constants and core files are loaded
 require_once __DIR__ . '/includes/constants.php';
+require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/log-manager.php';
 require_once __DIR__ . '/includes/booking-poller.php';
+
+// Log vendor autoloader status after all includes are loaded
+if (!$vendor_available) {
+    Helpers\hic_log('HIC Plugin: vendor/autoload.php non trovato, utilizzando caricamento manuale.', HIC_LOG_LEVEL_WARNING);
+}
 
 // Plugin activation handler
 function hic_activate($network_wide)
