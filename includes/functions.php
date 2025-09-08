@@ -1287,6 +1287,7 @@ function hic_retry_failed_requests() {
 namespace {
     function hic_http_request($url, $args = array()) { return \FpHic\Helpers\hic_http_request($url, $args); }
     function hic_get_option($key, $default = '') { return \FpHic\Helpers\hic_get_option($key, $default); }
+    function hic_clear_option_cache($key = null) { return \FpHic\Helpers\hic_clear_option_cache($key); }
     function hic_get_measurement_id() { return \FpHic\Helpers\hic_get_measurement_id(); }
     function hic_get_api_secret() { return \FpHic\Helpers\hic_get_api_secret(); }
     function hic_get_brevo_api_key() { return \FpHic\Helpers\hic_get_brevo_api_key(); }
