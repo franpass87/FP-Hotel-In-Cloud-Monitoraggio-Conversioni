@@ -449,50 +449,49 @@ jQuery(document).ready(function($) {
                 nonce: hicDiagnostics.diagnostics_nonce
             }, function(response) {
                 updateProgress($progressBar, 80);
-                var result = JSON.parse(response);
-                
-                if (result.success) {
+
+                if (response.success) {
                     updateProgress($progressBar, 100);
                     buttonController.setSuccess('Test completato con successo!');
                     $status.text('✓ Test completato!').css('color', '#00a32a');
-                    
+
                     var html = '<div class="notice notice-success inline"><p><strong>Test Polling Completato:</strong><br>';
-                    html += result.message + '<br>';
-                    if (result.execution_time) {
-                        html += 'Tempo esecuzione: ' + result.execution_time + ' secondi<br>';
+                    html += response.data.message + '<br>';
+                    if (response.data.execution_time) {
+                        html += 'Tempo esecuzione: ' + response.data.execution_time + ' secondi<br>';
                     }
                     html += '</p></div>';
-                    
+
                     $resultsContent.html(html);
                     $results.show();
-                    
+
                     // Refresh page after 3 seconds
                     setTimeout(function() {
                         showToast('Aggiornamento dati...', 'info', 2000);
                         location.reload();
                     }, 3000);
-                    
+
                 } else {
                     updateProgress($progressBar, 100);
-                    buttonController.setError('Test fallito: ' + (result.message || 'Errore sconosciuto'));
+                    buttonController.setError('Test fallito: ' + (response.data.message || 'Errore sconosciuto'));
                     $status.text('✗ Test fallito').css('color', '#d63638');
-                    
+
                     var html = '<div class="notice notice-error inline"><p><strong>Errore Test:</strong><br>';
-                    html += result.message || 'Errore sconosciuto';
+                    html += response.data.message || 'Errore sconosciuto';
                     html += '</p></div>';
-                    
+
                     $resultsContent.html(html);
                     $results.show();
                 }
-                
+
                 // Remove progress bar
                 setTimeout(function() { $progressBar.remove(); }, 1000);
-                
-            }).fail(function() {
+
+            }, 'json').fail(function() {
                 updateProgress($progressBar, 100);
                 buttonController.setError('Errore di comunicazione con il server');
                 $status.text('✗ Errore comunicazione').css('color', '#d63638');
-                
+
                 // Remove progress bar after showing completion
                 setTimeout(function() { $progressBar.remove(); }, 1000);
             });
@@ -518,35 +517,27 @@ jQuery(document).ready(function($) {
                 nonce: hicDiagnostics.diagnostics_nonce
             }, function(response) {
                 console.log('Test connectivity response received:', response); // Debug log
-                try {
-                    var result = JSON.parse(response);
-                    
-                    if (result.success) {
-                        buttonController.setSuccess('Connessione verificata!');
-                        $status.text('✓ Connessione OK').css('color', '#00a32a');
-                        
-                        var html = '<div class="notice notice-success inline"><p><strong>Test Connessione Riuscito:</strong><br>';
-                        html += result.message + '</p></div>';
-                        
-                    } else {
-                        buttonController.setError('Connessione fallita');
-                        $status.text('✗ Connessione fallita').css('color', '#d63638');
-                        
-                        var html = '<div class="notice notice-warning inline"><p><strong>Test Connessione Fallito:</strong><br>';
-                        html += result.message || 'Errore sconosciuto';
-                        html += '</p></div>';
-                    }
-                    
-                    $resultsContent.html(html);
-                    $results.show();
-                    
-                } catch (e) {
-                    console.error('Error parsing test connectivity response:', e, response); // Debug log
-                    buttonController.setError('Errore di parsing risposta');
-                    $status.text('✗ Errore parsing').css('color', '#d63638');
+
+                if (response.success) {
+                    buttonController.setSuccess('Connessione verificata!');
+                    $status.text('✓ Connessione OK').css('color', '#00a32a');
+
+                    var html = '<div class="notice notice-success inline"><p><strong>Test Connessione Riuscito:</strong><br>';
+                    html += response.data.message + '</p></div>';
+
+                } else {
+                    buttonController.setError('Connessione fallita: ' + (response.data.message || 'Errore sconosciuto'));
+                    $status.text('✗ Connessione fallita').css('color', '#d63638');
+
+                    var html = '<div class="notice notice-warning inline"><p><strong>Test Connessione Fallito:</strong><br>';
+                    html += response.data.message || 'Errore sconosciuto';
+                    html += '</p></div>';
                 }
-                
-            }).fail(function(xhr, status, error) {
+
+                $resultsContent.html(html);
+                $results.show();
+
+            }, 'json').fail(function(xhr, status, error) {
                 console.error('Test connectivity AJAX failed:', status, error); // Debug log
                 buttonController.setError('Errore di comunicazione');
                 $status.text('✗ Errore comunicazione').css('color', '#d63638');
