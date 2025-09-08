@@ -104,7 +104,7 @@ class HIC_Log_Manager {
      * Log debug message (only if debug mode enabled)
      */
     public function debug($message, $context = []) {
-        if (Helpers\hic_is_debug_verbose()) {
+        if (hic_is_debug_verbose()) {
             return $this->log($message, HIC_LOG_LEVEL_DEBUG, $context);
         }
         return true;

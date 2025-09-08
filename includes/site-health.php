@@ -28,7 +28,7 @@ function hic_register_site_health_tests(array $tests): array
  */
 function hic_site_health_ga4_config(): array
 {
-    $configured = !empty(Helpers\hic_get_measurement_id()) && !empty(Helpers\hic_get_api_secret());
+    $configured = !empty(hic_get_measurement_id()) && !empty(hic_get_api_secret());
 
     if ($configured) {
         $status = 'good';

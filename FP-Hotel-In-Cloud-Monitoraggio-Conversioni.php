@@ -33,7 +33,7 @@ require_once __DIR__ . '/includes/booking-poller.php';
 
 // Log vendor autoloader status after all includes are loaded
 if (!$vendor_available) {
-    Helpers\hic_log('HIC Plugin: vendor/autoload.php non trovato, utilizzando caricamento manuale.', HIC_LOG_LEVEL_WARNING);
+    hic_log('HIC Plugin: vendor/autoload.php non trovato, utilizzando caricamento manuale.', HIC_LOG_LEVEL_WARNING);
 }
 
 // Plugin activation handler
@@ -121,7 +121,7 @@ function hic_activate($network_wide)
     require_once __DIR__ . '/includes/performance-monitor.php';
 
     // Initialize helper action hooks
-    Helpers\hic_init_helper_hooks();
+    \FpHic\Helpers\hic_init_helper_hooks();
     
     // Initialize log manager
     \hic_get_log_manager();
@@ -138,7 +138,7 @@ function hic_activate($network_wide)
 
 // Enqueue frontend JavaScript
 \add_action('wp_enqueue_scripts', function() {
-    if (Helpers\hic_get_tracking_mode() === 'gtm_only') {
+    if (hic_get_tracking_mode() === 'gtm_only') {
         \wp_enqueue_script(
             'hic-frontend',
             \plugin_dir_url(__FILE__) . 'assets/js/frontend.js',

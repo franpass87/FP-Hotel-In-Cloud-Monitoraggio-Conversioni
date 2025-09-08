@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) exit;
  */
 function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
     // Only proceed if GTM is enabled
-    if (!Helpers\hic_is_gtm_enabled()) {
+    if (!hic_is_gtm_enabled()) {
         return false;
     }
 
@@ -22,17 +22,17 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
         return false;
     }
 
-    $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+    $bucket = fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
     $sid = !empty($sid) ? sanitize_text_field($sid) : '';
 
     // Validate and normalize amount
     $amount = 0;
     if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-        $amount = Helpers\hic_normalize_price($data['amount']);
+        $amount = hic_normalize_price($data['amount']);
     }
 
     // Generate transaction ID using consistent extraction
-    $transaction_id = Helpers\hic_extract_reservation_id($data);
+    $transaction_id = hic_extract_reservation_id($data);
     if ($sid !== '') {
         $transaction_id = $sid;
     } elseif (empty($transaction_id)) {
@@ -75,7 +75,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
 
     // Include UTM parameters if available
     if ($sid !== '') {
-        $utm = Helpers\hic_get_utm_params_by_sid($sid);
+        $utm = hic_get_utm_params_by_sid($sid);
         if (!empty($utm['utm_source']))   { $gtm_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
         if (!empty($utm['utm_medium']))   { $gtm_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
         if (!empty($utm['utm_campaign'])) { $gtm_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
@@ -108,7 +108,7 @@ function hic_queue_gtm_event($event_data) {
     }
     
     update_option('hic_gtm_queued_events', $queued_events);
-    Helpers\hic_clear_option_cache('hic_gtm_queued_events');
+    hic_clear_option_cache('hic_gtm_queued_events');
 }
 
 /**
@@ -124,11 +124,11 @@ function hic_get_and_clear_gtm_events() {
  * Output GTM container code in <head>
  */
 function hic_output_gtm_head_code() {
-    if (!Helpers\hic_is_gtm_enabled()) {
+    if (!hic_is_gtm_enabled()) {
         return;
     }
     
-    $container_id = Helpers\hic_get_gtm_container_id();
+    $container_id = hic_get_gtm_container_id();
     if (empty($container_id)) {
         return;
     }
@@ -154,11 +154,11 @@ function hic_output_gtm_head_code() {
  * Output GTM noscript code in <body>
  */
 function hic_output_gtm_body_code() {
-    if (!Helpers\hic_is_gtm_enabled()) {
+    if (!hic_is_gtm_enabled()) {
         return;
     }
     
-    $container_id = Helpers\hic_get_gtm_container_id();
+    $container_id = hic_get_gtm_container_id();
     if (empty($container_id) || !preg_match('/^GTM-[A-Z0-9]+$/', $container_id)) {
         return;
     }
@@ -175,7 +175,7 @@ function hic_output_gtm_body_code() {
  * Output queued GTM events to dataLayer
  */
 function hic_output_gtm_events() {
-    if (!Helpers\hic_is_gtm_enabled()) {
+    if (!hic_is_gtm_enabled()) {
         return;
     }
     
@@ -198,7 +198,7 @@ function hic_output_gtm_events() {
  * Hook GTM scripts into WordPress
  */
 function hic_init_gtm_hooks() {
-    if (!Helpers\hic_is_gtm_enabled()) {
+    if (!hic_is_gtm_enabled()) {
         return;
     }
     
@@ -228,7 +228,7 @@ function hic_init_gtm_hooks() {
  */
 function hic_dispatch_gtm_reservation($data) {
     // Only proceed if GTM is enabled
-    if (!Helpers\hic_is_gtm_enabled()) {
+    if (!hic_is_gtm_enabled()) {
         return false;
     }
 
@@ -248,19 +248,19 @@ function hic_dispatch_gtm_reservation($data) {
     }
 
     $transaction_id = sanitize_text_field($data['transaction_id']);
-    $value = Helpers\hic_normalize_price($data['value']);
+    $value = hic_normalize_price($data['value']);
     $currency = sanitize_text_field($data['currency']);
 
     // Get gclid/fbclid for bucket normalization if available
     $gclid = '';
     $fbclid = '';
     if (!empty($data['transaction_id'])) {
-        $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
+        $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
         $gclid = $tracking['gclid'] ?? '';
         $fbclid = $tracking['fbclid'] ?? '';
     }
 
-    $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+    $bucket = fp_normalize_bucket($gclid, $fbclid);
 
     // Prepare GTM ecommerce data
     $gtm_data = [
@@ -283,7 +283,7 @@ function hic_dispatch_gtm_reservation($data) {
         'checkout' => sanitize_text_field($data['to_date'] ?? ''),
         'reservation_code' => sanitize_text_field($data['reservation_code'] ?? ''),
         'presence' => sanitize_text_field($data['presence'] ?? ''),
-        'unpaid_balance' => Helpers\hic_normalize_price($data['unpaid_balance'] ?? 0),
+        'unpaid_balance' => hic_normalize_price($data['unpaid_balance'] ?? 0),
         'bucket' => $bucket,
         'vertical' => 'hotel'
     ];

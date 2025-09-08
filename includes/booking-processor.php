@@ -26,7 +26,7 @@ function hic_process_booking_data($data) {
   }
 
   // Validate email format
-  if (!Helpers\hic_is_valid_email($data['email'])) {
+  if (!hic_is_valid_email($data['email'])) {
     hic_log('hic_process_booking_data: email non valida - ' . $data['email']);
     return false;
   }
@@ -39,7 +39,7 @@ function hic_process_booking_data($data) {
   $ttclid  = null;
 
   if ($sid) {
-    $tracking = Helpers\hic_get_tracking_ids_by_sid($sid);
+    $tracking = hic_get_tracking_ids_by_sid($sid);
     $gclid   = $tracking['gclid'];
     $fbclid  = $tracking['fbclid'];
     $msclkid = $tracking['msclkid'];
@@ -48,7 +48,7 @@ function hic_process_booking_data($data) {
 
   // Validation for amount if present
   if (isset($data['amount'])) {
-    $data['amount'] = Helpers\hic_normalize_price($data['amount']);
+    $data['amount'] = hic_normalize_price($data['amount']);
   }
 
   $status = strtolower($data['status'] ?? ($data['presence'] ?? ''));
@@ -65,17 +65,17 @@ function hic_process_booking_data($data) {
 
   try {
     // Tracking integration based on selected mode
-    $tracking_mode = Helpers\hic_get_tracking_mode();
+    $tracking_mode = hic_get_tracking_mode();
 
     if ($is_refund) {
-      if (!Helpers\hic_refund_tracking_enabled()) {
+      if (!hic_refund_tracking_enabled()) {
         hic_log('hic_process_booking_data: refund detected but tracking disabled');
         return false;
       }
 
       // GA4 refund event
       if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') &&
-          Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
+          hic_get_measurement_id() && hic_get_api_secret()) {
         if (hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid, $ttclid, $sid)) {
           $success_count++;
         } else {
@@ -84,7 +84,7 @@ function hic_process_booking_data($data) {
       }
 
       // Facebook refund event
-      if (Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token()) {
+      if (hic_get_fb_pixel_id() && hic_get_fb_access_token()) {
         if (hic_send_fb_refund($data, $gclid, $fbclid, $msclkid, $ttclid)) {
           $success_count++;
         } else {
@@ -93,7 +93,7 @@ function hic_process_booking_data($data) {
       }
 
       // Brevo refund event
-      if (Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key()) {
+      if (hic_is_brevo_enabled() && hic_get_brevo_api_key()) {
         $brevo_success = hic_send_brevo_refund_event($data, $gclid, $fbclid, $msclkid, $ttclid);
         if ($brevo_success) {
           $success_count++;
@@ -104,7 +104,7 @@ function hic_process_booking_data($data) {
     } else {
       // GA4 Integration (server-side)
       if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') &&
-          Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
+          hic_get_measurement_id() && hic_get_api_secret()) {
         if (hic_send_to_ga4($data, $gclid, $fbclid, $msclkid, $ttclid, $sid)) {
           $success_count++;
         } else {
@@ -115,7 +115,7 @@ function hic_process_booking_data($data) {
       }
 
       // GTM Integration (client-side via dataLayer)
-      if (($tracking_mode === 'gtm_only' || $tracking_mode === 'hybrid') && Helpers\hic_is_gtm_enabled()) {
+      if (($tracking_mode === 'gtm_only' || $tracking_mode === 'hybrid') && hic_is_gtm_enabled()) {
         if (hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid)) {
           $success_count++;
         } else {
@@ -126,7 +126,7 @@ function hic_process_booking_data($data) {
       }
 
       // Facebook Integration
-      if (Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token()) {
+      if (hic_get_fb_pixel_id() && hic_get_fb_access_token()) {
         if (hic_send_to_fb($data, $gclid, $fbclid, $msclkid, $ttclid)) {
           $success_count++;
         } else {
@@ -137,7 +137,7 @@ function hic_process_booking_data($data) {
       }
 
       // Brevo Integration - Unified approach to prevent duplicate events
-      if (Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key()) {
+      if (hic_is_brevo_enabled() && hic_get_brevo_api_key()) {
         $brevo_success = hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid, $ttclid);
         if ($brevo_success) {
           $success_count++;
@@ -149,9 +149,9 @@ function hic_process_booking_data($data) {
       }
 
       // Admin email - only attempt if valid email is configured
-      $admin_email = Helpers\hic_get_admin_email();
-      if (!empty($admin_email) && Helpers\hic_is_valid_email($admin_email)) {
-        if (Helpers\hic_send_admin_email($data, $gclid, $fbclid, $sid)) {
+      $admin_email = hic_get_admin_email();
+      if (!empty($admin_email) && hic_is_valid_email($admin_email)) {
+        if (hic_send_admin_email($data, $gclid, $fbclid, $sid)) {
           $success_count++;
         } else {
           $error_count++;

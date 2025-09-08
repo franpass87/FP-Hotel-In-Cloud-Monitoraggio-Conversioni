@@ -36,7 +36,7 @@ class HIC_Config_Validator {
      * Validate API settings
      */
     private function validate_api_settings() {
-        $connection_type = Helpers\hic_get_connection_type();
+        $connection_type = hic_get_connection_type();
         
         if (!in_array($connection_type, ['webhook', 'polling'])) {
             $this->errors[] = 'Invalid connection type: ' . $connection_type;
@@ -53,10 +53,10 @@ class HIC_Config_Validator {
      * Validate polling configuration
      */
     private function validate_polling_config() {
-        $prop_id = Helpers\hic_get_property_id();
-        $email = Helpers\hic_get_api_email();
-        $password = Helpers\hic_get_api_password();
-        $api_url = Helpers\hic_get_api_url();
+        $prop_id = hic_get_property_id();
+        $email = hic_get_api_email();
+        $password = hic_get_api_password();
+        $api_url = hic_get_api_url();
         
         if (empty($prop_id) || !is_numeric($prop_id)) {
             $this->errors[] = 'Property ID is required and must be numeric for API polling';
@@ -75,7 +75,7 @@ class HIC_Config_Validator {
         }
         
         // Validate polling interval
-        $interval = Helpers\hic_get_option('polling_interval', 'two_minutes');
+        $interval = hic_get_option('polling_interval', 'two_minutes');
         $valid_intervals = ['one_minute', 'two_minutes', 'five_minutes'];
         if (!in_array($interval, $valid_intervals)) {
             $this->warnings[] = 'Invalid polling interval, using default';
@@ -86,7 +86,7 @@ class HIC_Config_Validator {
      * Validate webhook configuration
      */
     private function validate_webhook_config() {
-        $token = Helpers\hic_get_webhook_token();
+        $token = hic_get_webhook_token();
         
         if (empty($token)) {
             $this->errors[] = 'Webhook token is required for webhook mode';
@@ -108,8 +108,8 @@ class HIC_Config_Validator {
      * Validate GA4 configuration
      */
     private function validate_ga4_config() {
-        $measurement_id = Helpers\hic_get_measurement_id();
-        $api_secret = Helpers\hic_get_api_secret();
+        $measurement_id = hic_get_measurement_id();
+        $api_secret = hic_get_api_secret();
         
         if (!empty($measurement_id)) {
             if (!preg_match('/^G-[A-Z0-9]+$/', $measurement_id)) {
@@ -130,8 +130,8 @@ class HIC_Config_Validator {
      * Validate Meta/Facebook configuration
      */
     private function validate_meta_config() {
-        $pixel_id = Helpers\hic_get_fb_pixel_id();
-        $access_token = Helpers\hic_get_fb_access_token();
+        $pixel_id = hic_get_fb_pixel_id();
+        $access_token = hic_get_fb_access_token();
         
         if (!empty($pixel_id)) {
             if (!is_numeric($pixel_id)) {
@@ -158,14 +158,14 @@ class HIC_Config_Validator {
      * Validate Brevo configuration
      */
     private function validate_brevo_config() {
-        if (!Helpers\hic_is_brevo_enabled()) {
+        if (!hic_is_brevo_enabled()) {
             return;
         }
         
-        $api_key = Helpers\hic_get_brevo_api_key();
-        $list_it = Helpers\hic_get_brevo_list_it();
-        $list_en = Helpers\hic_get_brevo_list_en();
-        $list_default = Helpers\hic_get_brevo_list_default();
+        $api_key = hic_get_brevo_api_key();
+        $list_it = hic_get_brevo_list_it();
+        $list_en = hic_get_brevo_list_en();
+        $list_default = hic_get_brevo_list_default();
         
         if (empty($api_key)) {
             $this->errors[] = 'Brevo API Key is required when Brevo is enabled';
@@ -184,13 +184,13 @@ class HIC_Config_Validator {
         }
         
         // Validate event endpoint
-        $event_endpoint = Helpers\hic_get_brevo_event_endpoint();
+        $event_endpoint = hic_get_brevo_event_endpoint();
         if (!filter_var($event_endpoint, FILTER_VALIDATE_URL)) {
             $this->errors[] = 'Brevo event endpoint must be a valid URL';
         }
         
         // Validate alias list if configured
-        $alias_list = Helpers\hic_get_brevo_list_alias();
+        $alias_list = hic_get_brevo_list_alias();
         if (!empty($alias_list) && (!is_numeric($alias_list) || $alias_list <= 0)) {
             $this->warnings[] = 'Brevo alias list ID should be a positive number';
         }
@@ -201,7 +201,7 @@ class HIC_Config_Validator {
      */
     private function validate_system_settings() {
         // Validate log file
-        $log_file = Helpers\hic_get_log_file();
+        $log_file = hic_get_log_file();
         if (!empty($log_file)) {
             $log_dir = dirname($log_file);
             if (!is_dir($log_dir) && !wp_mkdir_p($log_dir)) {
@@ -212,7 +212,7 @@ class HIC_Config_Validator {
         }
         
         // Validate admin email
-        $admin_email = Helpers\hic_get_admin_email();
+        $admin_email = hic_get_admin_email();
         if (!empty($admin_email) && !filter_var($admin_email, FILTER_VALIDATE_EMAIL)) {
             $this->errors[] = 'Admin email address is not valid';
         }
@@ -335,17 +335,17 @@ class HIC_Config_Validator {
      */
     public function get_config_summary() {
         $summary = [
-            'connection_type' => Helpers\hic_get_connection_type(),
+            'connection_type' => hic_get_connection_type(),
             'integrations' => [
-                'ga4' => !empty(Helpers\hic_get_measurement_id()) && !empty(Helpers\hic_get_api_secret()),
-                'meta' => !empty(Helpers\hic_get_fb_pixel_id()) && !empty(Helpers\hic_get_fb_access_token()),
-                'brevo' => Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key())
+                'ga4' => !empty(hic_get_measurement_id()) && !empty(hic_get_api_secret()),
+                'meta' => !empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token()),
+                'brevo' => hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())
             ],
             'features' => [
-                'polling' => Helpers\hic_reliable_polling_enabled(),
-                'email_enrichment' => Helpers\hic_updates_enrich_contacts(),
-                'real_time_sync' => Helpers\hic_realtime_brevo_sync_enabled(),
-                'debug_mode' => Helpers\hic_is_debug_verbose()
+                'polling' => hic_reliable_polling_enabled(),
+                'email_enrichment' => hic_updates_enrich_contacts(),
+                'real_time_sync' => hic_realtime_brevo_sync_enabled(),
+                'debug_mode' => hic_is_debug_verbose()
             ],
             'system' => [
                 'php_version' => PHP_VERSION,

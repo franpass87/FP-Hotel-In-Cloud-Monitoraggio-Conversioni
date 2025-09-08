@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) exit;
 
 /* ============ Meta CAPI (Purchase + bucket) ============ */
 function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
-  if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
+  if (!hic_get_fb_pixel_id() || !hic_get_fb_access_token()) {
     hic_log('FB Pixel non configurato.');
     return false;
   }
@@ -19,15 +19,15 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
     return false;
   }
   
-  if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
+  if (empty($data['email']) || !hic_is_valid_email($data['email'])) {
     hic_log('FB: email mancante o non valida, evento non inviato');
     return false;
   }
   
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+  $bucket = fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
   
   // Generate event ID using consistent extraction
-  $event_id = Helpers\hic_extract_reservation_id($data);
+  $event_id = hic_extract_reservation_id($data);
   if (empty($event_id)) {
     $event_id = uniqid('fb_');
   }
@@ -35,7 +35,7 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   // Validate and sanitize amount
   $amount = 0;
   if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-    $amount = Helpers\hic_normalize_price($data['amount']);
+    $amount = hic_normalize_price($data['amount']);
   }
 
   $user_data = [
@@ -78,7 +78,7 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
 
   // Attach UTM parameters if available
   if (!empty($data['sid'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+    $utm = hic_get_utm_params_by_sid($data['sid']);
     if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
     if (!empty($utm['utm_medium']))   { $custom_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
     if (!empty($utm['utm_campaign'])) { $custom_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
@@ -110,8 +110,8 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
     return false;
   }
 
-  $url = 'https://graph.facebook.com/v19.0/' . Helpers\hic_get_fb_pixel_id() . '/events?access_token=' . Helpers\hic_get_fb_access_token();
-  $res = Helpers\hic_http_request($url, [
+  $url = 'https://graph.facebook.com/v19.0/' . hic_get_fb_pixel_id() . '/events?access_token=' . hic_get_fb_access_token();
+  $res = hic_http_request($url, [
     'method'  => 'POST',
     'headers' => ['Content-Type'=>'application/json'],
     'body'    => $json_payload,
@@ -155,7 +155,7 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
  * Send refund event to Meta with negative value
  */
 function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
-  if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
+  if (!hic_get_fb_pixel_id() || !hic_get_fb_access_token()) {
     hic_log('FB refund: Pixel ID o Access Token mancanti.');
     return false;
   }
@@ -165,21 +165,21 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
     return false;
   }
 
-  if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
+  if (empty($data['email']) || !hic_is_valid_email($data['email'])) {
     hic_log('FB refund: email mancante o non valida, evento non inviato');
     return false;
   }
 
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
 
-  $event_id = Helpers\hic_extract_reservation_id($data);
+  $event_id = hic_extract_reservation_id($data);
   if (empty($event_id)) {
     $event_id = uniqid('fb_refund_');
   }
 
   $amount = 0;
   if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-    $amount = -abs(Helpers\hic_normalize_price($data['amount']));
+    $amount = -abs(hic_normalize_price($data['amount']));
   }
 
   $user_data = [
@@ -220,7 +220,7 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
   if (!empty($ttclid))  { $custom_data['ttclid']  = sanitize_text_field($ttclid); }
 
   if (!empty($data['sid'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+    $utm = hic_get_utm_params_by_sid($data['sid']);
     if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
     if (!empty($utm['utm_medium']))   { $custom_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
     if (!empty($utm['utm_campaign'])) { $custom_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
@@ -250,8 +250,8 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
     return false;
   }
 
-  $url = 'https://graph.facebook.com/v19.0/' . Helpers\hic_get_fb_pixel_id() . '/events?access_token=' . Helpers\hic_get_fb_access_token();
-  $res = Helpers\hic_http_request($url, [
+  $url = 'https://graph.facebook.com/v19.0/' . hic_get_fb_pixel_id() . '/events?access_token=' . hic_get_fb_access_token();
+  $res = hic_http_request($url, [
     'method'  => 'POST',
     'headers' => ['Content-Type'=>'application/json'],
     'body'    => $json_payload,
@@ -292,7 +292,7 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
  * Meta Pixel dispatcher for HIC reservation schema
  */
 function hic_dispatch_pixel_reservation($data) {
-  if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
+  if (!hic_get_fb_pixel_id() || !hic_get_fb_access_token()) {
     hic_log('FB HIC dispatch SKIPPED: Pixel ID o Access Token mancanti');
     return false;
   }
@@ -304,7 +304,7 @@ function hic_dispatch_pixel_reservation($data) {
   }
   
   // Validate required data
-  if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
+  if (empty($data['email']) || !hic_is_valid_email($data['email'])) {
     hic_log('FB HIC dispatch: email mancante o non valida, evento non inviato');
     return false;
   }
@@ -319,7 +319,7 @@ function hic_dispatch_pixel_reservation($data) {
   }
   
   $transaction_id = sanitize_text_field($data['transaction_id']);
-  $value = Helpers\hic_normalize_price($data['value']);
+  $value = hic_normalize_price($data['value']);
   $currency = sanitize_text_field($data['currency']);
 
   // Get tracking IDs for bucket normalization if available
@@ -328,14 +328,14 @@ function hic_dispatch_pixel_reservation($data) {
   $msclkid = '';
   $ttclid = '';
   if (!empty($data['transaction_id'])) {
-    $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
+    $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
     $gclid = $tracking['gclid'] ?? '';
     $fbclid = $tracking['fbclid'] ?? '';
     $msclkid = $tracking['msclkid'] ?? '';
     $ttclid = $tracking['ttclid'] ?? '';
   }
 
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
 
   $user_data = [
     'em' => [hash('sha256', strtolower(trim($data['email'])))]
@@ -375,7 +375,7 @@ function hic_dispatch_pixel_reservation($data) {
   if (!empty($ttclid))  { $custom_data['ttclid']  = sanitize_text_field($ttclid); }
 
   // Add UTM parameters if available
-  $utm = Helpers\hic_get_utm_params_by_sid($transaction_id);
+  $utm = hic_get_utm_params_by_sid($transaction_id);
   if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
   if (!empty($utm['utm_medium']))   { $custom_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
   if (!empty($utm['utm_campaign'])) { $custom_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
@@ -417,8 +417,8 @@ function hic_dispatch_pixel_reservation($data) {
     return false;
   }
 
-  $url = 'https://graph.facebook.com/v19.0/' . Helpers\hic_get_fb_pixel_id() . '/events?access_token=' . Helpers\hic_get_fb_access_token();
-  $res = Helpers\hic_http_request($url, [
+  $url = 'https://graph.facebook.com/v19.0/' . hic_get_fb_pixel_id() . '/events?access_token=' . hic_get_fb_access_token();
+  $res = hic_http_request($url, [
     'method'  => 'POST',
     'headers' => ['Content-Type' => 'application/json'],
     'body'    => $json_payload,

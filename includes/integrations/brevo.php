@@ -8,7 +8,7 @@ if (!defined('ABSPATH')) exit;
 
 /* ============ Brevo: aggiorna contatto ============ */
 function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
-  if (!Helpers\hic_get_brevo_api_key()) { 
+  if (!hic_get_brevo_api_key()) { 
     hic_log('Brevo dispatch SKIPPED: API key mancante'); 
     return; 
   }
@@ -19,7 +19,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
   // Lista in base alla lingua (supporta sia 'lingua' sia 'lang')
   $lang = isset($data['lingua']) ? $data['lingua'] : (isset($data['lang']) ? $data['lang'] : '');
   $list_ids = array();
-  if (strtolower($lang) === 'en') { $list_ids[] = intval(Helpers\hic_get_brevo_list_en()); } else { $list_ids[] = intval(Helpers\hic_get_brevo_list_it()); }
+  if (strtolower($lang) === 'en') { $list_ids[] = intval(hic_get_brevo_list_en()); } else { $list_ids[] = intval(hic_get_brevo_list_it()); }
 
   $body = array(
     'email' => $email,
@@ -32,7 +32,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
       'MSCLKID'   => isset($msclkid) ? $msclkid : '',
       'TTCLID'    => isset($ttclid) ? $ttclid : '',
       'DATE'      => isset($data['date']) ? $data['date'] : wp_date('Y-m-d'),
-      'AMOUNT'    => isset($data['amount']) ? Helpers\hic_normalize_price($data['amount']) : 0,
+      'AMOUNT'    => isset($data['amount']) ? hic_normalize_price($data['amount']) : 0,
       'CURRENCY'  => isset($data['currency']) ? $data['currency'] : 'EUR',
       'WHATSAPP'  => isset($data['whatsapp']) ? $data['whatsapp'] : '',
       'LINGUA'    => $lang
@@ -43,7 +43,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
 
   // Populate UTM attributes if SID available
   if (!empty($data['sid'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
+    $utm = hic_get_utm_params_by_sid($data['sid']);
     if (!empty($utm['utm_source']))   { $body['attributes']['UTM_SOURCE']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $body['attributes']['UTM_MEDIUM']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $body['attributes']['UTM_CAMPAIGN'] = $utm['utm_campaign']; }
@@ -51,11 +51,11 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
     if (!empty($utm['utm_term']))     { $body['attributes']['UTM_TERM']     = $utm['utm_term']; }
   }
 
-  $res = Helpers\hic_http_request('https://api.brevo.com/v3/contacts', array(
+  $res = hic_http_request('https://api.brevo.com/v3/contacts', array(
     'method'  => 'POST',
     'headers' => array(
       'accept'       => 'application/json',
-      'api-key'      => Helpers\hic_get_brevo_api_key(),
+      'api-key'      => hic_get_brevo_api_key(),
       'content-type' => 'application/json'
     ),
     'body'    => wp_json_encode($body),
@@ -73,15 +73,15 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
 
 /* ============ Brevo: evento personalizzato (purchase + bucket) ============ */
 function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
-  if (!Helpers\hic_get_brevo_api_key()) { return; }
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  if (!hic_get_brevo_api_key()) { return; }
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
 
   $event_data = array(
     'event' => 'purchase', // puoi rinominare in 'hic_booking' se preferisci
     'email' => isset($reservation['email']) ? $reservation['email'] : '',
     'properties' => array(
       'reservation_id' => isset($reservation['reservation_id']) ? $reservation['reservation_id'] : (isset($reservation['id']) ? $reservation['id'] : ''),
-      'amount'         => isset($reservation['amount']) ? Helpers\hic_normalize_price($reservation['amount']) : 0,
+      'amount'         => isset($reservation['amount']) ? hic_normalize_price($reservation['amount']) : 0,
       'currency'       => isset($reservation['currency']) ? $reservation['currency'] : 'EUR',
       'date'           => isset($reservation['date']) ? $reservation['date'] : wp_date('Y-m-d'),
       'whatsapp'       => isset($reservation['whatsapp']) ? $reservation['whatsapp'] : '',
@@ -97,7 +97,7 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
 
   // Attach UTM parameters if SID available
   if (!empty($reservation['sid'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($reservation['sid']);
+    $utm = hic_get_utm_params_by_sid($reservation['sid']);
     if (!empty($utm['utm_source']))   { $event_data['properties']['utm_source']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $event_data['properties']['utm_medium']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $event_data['properties']['utm_campaign'] = $utm['utm_campaign']; }
@@ -107,12 +107,12 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
 
   $event_data = apply_filters('hic_brevo_event', $event_data, $reservation);
 
-  $res = Helpers\hic_http_request(Helpers\hic_get_brevo_event_endpoint(), array(
+  $res = hic_http_request(hic_get_brevo_event_endpoint(), array(
     'method'  => 'POST',
     'headers' => array(
       'accept'       => 'application/json',
       'content-type' => 'application/json',
-      'api-key'      => Helpers\hic_get_brevo_api_key()
+      'api-key'      => hic_get_brevo_api_key()
     ),
     'body'    => wp_json_encode($event_data),
   ));
@@ -132,15 +132,15 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
  * Brevo refund event
  */
 function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
-  if (!Helpers\hic_get_brevo_api_key()) { return false; }
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  if (!hic_get_brevo_api_key()) { return false; }
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
 
   $event_data = array(
     'event' => 'refund',
     'email' => isset($reservation['email']) ? $reservation['email'] : '',
     'properties' => array(
       'reservation_id' => isset($reservation['reservation_id']) ? $reservation['reservation_id'] : (isset($reservation['id']) ? $reservation['id'] : ''),
-      'amount'         => isset($reservation['amount']) ? -abs(Helpers\hic_normalize_price($reservation['amount'])) : 0,
+      'amount'         => isset($reservation['amount']) ? -abs(hic_normalize_price($reservation['amount'])) : 0,
       'currency'       => isset($reservation['currency']) ? $reservation['currency'] : 'EUR',
       'date'           => isset($reservation['date']) ? $reservation['date'] : wp_date('Y-m-d'),
       'whatsapp'       => isset($reservation['whatsapp']) ? $reservation['whatsapp'] : '',
@@ -155,7 +155,7 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
   );
 
   if (!empty($reservation['sid'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($reservation['sid']);
+    $utm = hic_get_utm_params_by_sid($reservation['sid']);
     if (!empty($utm['utm_source']))   { $event_data['properties']['utm_source']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $event_data['properties']['utm_medium']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $event_data['properties']['utm_campaign'] = $utm['utm_campaign']; }
@@ -165,12 +165,12 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
 
   $event_data = apply_filters('hic_brevo_refund_event', $event_data, $reservation);
 
-  $res = Helpers\hic_http_request(Helpers\hic_get_brevo_event_endpoint(), array(
+  $res = hic_http_request(hic_get_brevo_event_endpoint(), array(
     'method'  => 'POST',
     'headers' => array(
       'accept'       => 'application/json',
       'content-type' => 'application/json',
-      'api-key'      => Helpers\hic_get_brevo_api_key()
+      'api-key'      => hic_get_brevo_api_key()
     ),
     'body'    => wp_json_encode($event_data),
   ));
@@ -192,18 +192,18 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
  * Brevo dispatcher for HIC reservation schema
  */
 function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '') {
-  if (!Helpers\hic_get_brevo_api_key()) {
+  if (!hic_get_brevo_api_key()) {
     hic_log('Brevo disabilitato (API key vuota).');
     return false;
   }
 
   $email = isset($data['email']) ? $data['email'] : '';
-  if (!Helpers\hic_is_valid_email($email)) {
+  if (!hic_is_valid_email($email)) {
     hic_log('Brevo: email mancante o non valida, skip contatto.');
     return false;
   }
 
-  $is_alias = Helpers\hic_is_ota_alias_email($email);
+  $is_alias = hic_is_ota_alias_email($email);
 
   // Determine list based on language and alias status
   $language = isset($data['language']) ? $data['language'] : '';
@@ -211,7 +211,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   
   if ($is_alias) {
     // Handle alias emails - only add to alias list if configured
-    $alias_list_id = intval(Helpers\hic_get_brevo_list_alias());
+    $alias_list_id = intval(hic_get_brevo_list_alias());
     if ($alias_list_id > 0) {
       $list_ids[] = $alias_list_id;
     }
@@ -219,13 +219,13 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   } else {
     // Handle real emails - add to language-specific lists
     if (in_array($language, array('it'))) {
-      $list_id = intval(Helpers\hic_get_brevo_list_it());
+      $list_id = intval(hic_get_brevo_list_it());
       if ($list_id > 0) $list_ids[] = $list_id;
     } elseif (in_array($language, array('en'))) {
-      $list_id = intval(Helpers\hic_get_brevo_list_en());
+      $list_id = intval(hic_get_brevo_list_en());
       if ($list_id > 0) $list_ids[] = $list_id;
     } else {
-      $list_id = intval(Helpers\hic_get_brevo_list_default());
+      $list_id = intval(hic_get_brevo_list_default());
       if ($list_id > 0) $list_ids[] = $list_id;
     }
   }
@@ -233,7 +233,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   // Get tracking IDs for legacy compatibility
   // Use provided values when available before querying the database
   if (!empty($data['transaction_id']) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid))) {
-    $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
+    $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
     if (empty($gclid))   { $gclid   = $tracking['gclid'] ?? ''; }
     if (empty($fbclid))  { $fbclid  = $tracking['fbclid'] ?? ''; }
     if (empty($msclkid)) { $msclkid = $tracking['msclkid'] ?? ''; }
@@ -263,7 +263,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'MSCLKID' => $msclkid,
     'TTCLID'  => $ttclid,
     'DATE' => isset($data['from_date']) ? $data['from_date'] : wp_date('Y-m-d'),
-    'AMOUNT' => isset($data['original_price']) ? Helpers\hic_normalize_price($data['original_price']) : 0,
+    'AMOUNT' => isset($data['original_price']) ? hic_normalize_price($data['original_price']) : 0,
     'CURRENCY' => isset($data['currency']) ? $data['currency'] : 'EUR',
     'WHATSAPP' => isset($data['phone']) ? $data['phone'] : '',
     'LINGUA' => $language
@@ -271,7 +271,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
 
   // Populate UTM attributes if available
   if (!empty($data['transaction_id'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($data['transaction_id']);
+    $utm = hic_get_utm_params_by_sid($data['transaction_id']);
     if (!empty($utm['utm_source']))   { $attributes['UTM_SOURCE']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $attributes['UTM_MEDIUM']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $attributes['UTM_CAMPAIGN'] = $utm['utm_campaign']; }
@@ -297,16 +297,16 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
 
   // Add marketing opt-in only if not alias and default is enabled, or if enrichment is happening and double opt-in is enabled
   if (!$is_alias) {
-    if (Helpers\hic_get_brevo_optin_default() || ($is_enrichment && Helpers\hic_brevo_double_optin_on_enrich())) {
+    if (hic_get_brevo_optin_default() || ($is_enrichment && hic_brevo_double_optin_on_enrich())) {
       $body['emailBlacklisted'] = false;
     }
   }
 
-  $res = Helpers\hic_http_request('https://api.brevo.com/v3/contacts', array(
+  $res = hic_http_request('https://api.brevo.com/v3/contacts', array(
     'method'  => 'POST',
     'headers' => array(
       'accept' => 'application/json',
-      'api-key' => Helpers\hic_get_brevo_api_key(),
+      'api-key' => hic_get_brevo_api_key(),
       'content-type' => 'application/json'
     ),
     'body' => wp_json_encode($body),
@@ -342,7 +342,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
  * }
  */
 function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '') {
-  if (!Helpers\hic_get_brevo_api_key()) {
+  if (!hic_get_brevo_api_key()) {
     hic_log('Brevo reservation_created event SKIPPED: API key mancante');
     return array(
       'success' => false,
@@ -352,7 +352,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     );
   }
 
-  if (!Helpers\hic_realtime_brevo_sync_enabled()) {
+  if (!hic_realtime_brevo_sync_enabled()) {
     hic_log('Brevo reservation_created event SKIPPED: real-time sync disabilitato');
     return array(
       'success' => false,
@@ -363,7 +363,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   }
 
   $email = isset($data['email']) ? $data['email'] : '';
-  if (!Helpers\hic_is_valid_email($email)) {
+  if (!hic_is_valid_email($email)) {
     hic_log('Brevo reservation_created event SKIPPED: email mancante o non valida');
     return array(
       'success' => false,
@@ -394,14 +394,14 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
 
   // Get tracking IDs for bucket normalization if available
   if (!empty($data['transaction_id']) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid))) {
-    $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
+    $tracking = hic_get_tracking_ids_by_sid($data['transaction_id']);
     if (empty($gclid))   { $gclid   = $tracking['gclid'] ?? ''; }
     if (empty($fbclid))  { $fbclid  = $tracking['fbclid'] ?? ''; }
     if (empty($msclkid)) { $msclkid = $tracking['msclkid'] ?? ''; }
     if (empty($ttclid))  { $ttclid  = $tracking['ttclid'] ?? ''; }
   }
 
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = fp_normalize_bucket($gclid, $fbclid);
 
   $body = array(
     'event' => 'reservation_created',
@@ -409,7 +409,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     'properties' => array(
       'reservation_id' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
       'reservation_code' => isset($data['reservation_code']) ? $data['reservation_code'] : '',
-      'amount' => isset($data['original_price']) ? Helpers\hic_normalize_price($data['original_price']) : 0,
+      'amount' => isset($data['original_price']) ? hic_normalize_price($data['original_price']) : 0,
       'currency' => isset($data['currency']) ? $data['currency'] : 'EUR',
       'from_date' => isset($data['from_date']) ? $data['from_date'] : '',
       'to_date' => isset($data['to_date']) ? $data['to_date'] : '',
@@ -429,7 +429,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
 
   // Add UTM parameters if available
   if (!empty($data['transaction_id'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($data['transaction_id']);
+    $utm = hic_get_utm_params_by_sid($data['transaction_id']);
     if (!empty($utm['utm_source']))   { $body['properties']['utm_source']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $body['properties']['utm_medium']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $body['properties']['utm_campaign'] = $utm['utm_campaign']; }
@@ -446,16 +446,16 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     'amount' => $body['properties']['amount'],
     'bucket' => $body['properties']['bucket'],
     'vertical' => $body['properties']['vertical'],
-    'endpoint' => Helpers\hic_get_brevo_event_endpoint(),
+    'endpoint' => hic_get_brevo_event_endpoint(),
     'full_payload' => $body
   )));
 
-  $res = Helpers\hic_http_request(Helpers\hic_get_brevo_event_endpoint(), array(
+  $res = hic_http_request(hic_get_brevo_event_endpoint(), array(
     'method'  => 'POST',
     'headers' => array(
       'accept' => 'application/json',
       'content-type' => 'application/json',
-      'api-key' => Helpers\hic_get_brevo_api_key()
+      'api-key' => hic_get_brevo_api_key()
     ),
     'body' => wp_json_encode($body),
   ));
@@ -467,7 +467,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     'amount' => $body['properties']['amount'],
     'bucket' => $bucket,
     'vertical' => $body['properties']['vertical'],
-    'endpoint' => Helpers\hic_get_brevo_event_endpoint()
+    'endpoint' => hic_get_brevo_event_endpoint()
   ));
   
   if (!$result['success']) {
@@ -655,14 +655,14 @@ function hic_is_brevo_error_retryable($result) {
  * Replaces separate hic_send_brevo_contact() + hic_send_brevo_event() calls
  */
 function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $ttclid = '') {
-  if (!Helpers\hic_get_brevo_api_key()) { 
+  if (!hic_get_brevo_api_key()) { 
     hic_log('Unified Brevo dispatch SKIPPED: API key mancante'); 
     return false; 
   }
 
   // Validate essential data
   $email = isset($data['email']) ? $data['email'] : null;
-  if (!Helpers\hic_is_valid_email($email)) { 
+  if (!hic_is_valid_email($email)) { 
     hic_log('Unified Brevo dispatch SKIPPED: email mancante o non valida'); 
     return false; 
   }
@@ -677,7 +677,7 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
   }
   
   // Send event for new reservations, allowing override via filter
-  $reservation_id = Helpers\hic_extract_reservation_id($data);
+  $reservation_id = hic_extract_reservation_id($data);
   if (!empty($reservation_id)) {
     $is_new = hic_is_reservation_new_for_realtime($reservation_id);
     if ($is_new) {
@@ -718,13 +718,13 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
   
   // Map webhook field names to modern field names
   $transformed = array(
-    'transaction_id' => Helpers\hic_extract_reservation_id($webhook_data),
+    'transaction_id' => hic_extract_reservation_id($webhook_data),
     'reservation_code' => isset($webhook_data['reservation_code']) ? $webhook_data['reservation_code'] : '',
     'email' => isset($webhook_data['email']) ? $webhook_data['email'] : '',
     'guest_first_name' => isset($webhook_data['first_name']) ? $webhook_data['first_name'] : '',
     'guest_last_name' => isset($webhook_data['last_name']) ? $webhook_data['last_name'] : '',
     'phone' => isset($webhook_data['whatsapp']) ? $webhook_data['whatsapp'] : (isset($webhook_data['phone']) ? $webhook_data['phone'] : ''),
-    'original_price' => isset($webhook_data['amount']) ? Helpers\hic_normalize_price($webhook_data['amount']) : 0,
+    'original_price' => isset($webhook_data['amount']) ? hic_normalize_price($webhook_data['amount']) : 0,
     'currency' => isset($webhook_data['currency']) ? $webhook_data['currency'] : 'EUR',
     'from_date' => $webhook_data['date'] ?? $webhook_data['checkin'] ?? '',
     'to_date'   => $webhook_data['to_date'] ?? $webhook_data['checkout'] ?? '',
@@ -761,11 +761,11 @@ function hic_test_brevo_contact_api() {
     'updateEnabled' => false // Don't update if exists
   );
   
-  $res = Helpers\hic_http_request('https://api.brevo.com/v3/contacts', array(
+  $res = hic_http_request('https://api.brevo.com/v3/contacts', array(
     'method'  => 'POST',
     'headers' => array(
       'accept' => 'application/json',
-      'api-key' => Helpers\hic_get_brevo_api_key(),
+      'api-key' => hic_get_brevo_api_key(),
       'content-type' => 'application/json'
     ),
     'body' => wp_json_encode($body),
@@ -788,7 +788,7 @@ function hic_test_brevo_contact_api() {
  * Test Brevo Event API connectivity
  */
 function hic_test_brevo_event_api() {
-  $endpoint = Helpers\hic_get_brevo_event_endpoint();
+  $endpoint = hic_get_brevo_event_endpoint();
   $test_email = 'test-' . current_time('timestamp') . '@example.com';
   
   $body = array(
@@ -807,12 +807,12 @@ function hic_test_brevo_event_api() {
     'payload' => $body
   )));
   
-  $res = Helpers\hic_http_request($endpoint, array(
+  $res = hic_http_request($endpoint, array(
     'method'  => 'POST',
     'headers' => array(
       'accept' => 'application/json',
       'content-type' => 'application/json',
-      'api-key' => Helpers\hic_get_brevo_api_key()
+      'api-key' => hic_get_brevo_api_key()
     ),
     'body' => wp_json_encode($body),
   ));
@@ -839,12 +839,12 @@ function hic_test_brevo_event_api() {
       'reason' => 'Primary endpoint failed'
     )));
     
-    $alt_res = Helpers\hic_http_request($alt_endpoint, array(
+    $alt_res = hic_http_request($alt_endpoint, array(
       'method'  => 'POST',
       'headers' => array(
         'accept' => 'application/json',
         'content-type' => 'application/json',
-        'api-key' => Helpers\hic_get_brevo_api_key()
+        'api-key' => hic_get_brevo_api_key()
       ),
       'body' => wp_json_encode($body),
     ));

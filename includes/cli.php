@@ -100,7 +100,7 @@ if (defined('WP_CLI') && WP_CLI) {
             delete_option('hic_last_reliable_poll');
             
             // Clear scheduled events
-            Helpers\hic_safe_wp_clear_scheduled_hook('hic_reliable_poll_event');
+            hic_safe_wp_clear_scheduled_hook('hic_reliable_poll_event');
             
             WP_CLI::success('Polling state reset successfully');
         }
