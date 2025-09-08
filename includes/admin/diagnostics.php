@@ -301,7 +301,7 @@ function hic_test_dispatch_functions() {
  * Force restart of internal scheduler (replaces WP-Cron rescheduling)
  */
 function hic_force_restart_internal_scheduler() {
-    Helpers\hic_log('Force restart: Starting internal scheduler restart process');
+    hic_log('Force restart: Starting internal scheduler restart process');
     
     $results = array();
     
@@ -339,16 +339,16 @@ function hic_force_restart_internal_scheduler() {
         
         // Trigger an immediate poll if the poller is available
         if (function_exists('hic_api_poll_bookings')) {
-            Helpers\hic_log('Force restart: Triggering immediate polling');
+            hic_log('Force restart: Triggering immediate polling');
             hic_api_poll_bookings();
             $results['immediate_poll_triggered'] = 'Polling executed immediately';
         }
         
         $results['internal_scheduler'] = 'Restarted and ready';
-        Helpers\hic_log('Force restart: Internal scheduler restart completed successfully');
+        hic_log('Force restart: Internal scheduler restart completed successfully');
     } else {
         $results['internal_scheduler'] = 'Conditions not met for activation';
-        Helpers\hic_log('Force restart: Conditions not met for internal scheduler');
+        hic_log('Force restart: Conditions not met for internal scheduler');
     }
     
     return $results;
@@ -358,7 +358,7 @@ function hic_force_restart_internal_scheduler() {
  * Manual watchdog trigger function
  */
 function hic_trigger_watchdog_check() {
-    Helpers\hic_log('Manual watchdog: Starting manual watchdog check');
+    hic_log('Manual watchdog: Starting manual watchdog check');
     
     $results = array();
     
@@ -366,10 +366,10 @@ function hic_trigger_watchdog_check() {
         $poller = new HIC_Booking_Poller();
         $poller->run_watchdog_check();
         $results['watchdog_executed'] = 'Watchdog check completed';
-        Helpers\hic_log('Manual watchdog: Watchdog check completed');
+        hic_log('Manual watchdog: Watchdog check completed');
     } else {
         $results['watchdog_error'] = 'HIC_Booking_Poller class not available';
-        Helpers\hic_log('Manual watchdog: HIC_Booking_Poller class not available');
+        hic_log('Manual watchdog: HIC_Booking_Poller class not available');
     }
     
     return $results;
@@ -442,7 +442,7 @@ function hic_mark_bookings_as_downloaded($booking_ids) {
     update_option('hic_downloaded_booking_ids', $downloaded_ids, false);
     Helpers\hic_clear_option_cache('hic_downloaded_booking_ids');
     
-    Helpers\hic_log("Marked " . count($booking_ids) . " bookings as downloaded. Total tracked: " . count($downloaded_ids));
+    hic_log("Marked " . count($booking_ids) . " bookings as downloaded. Total tracked: " . count($downloaded_ids));
 }
 
 /**
@@ -450,7 +450,7 @@ function hic_mark_bookings_as_downloaded($booking_ids) {
  */
 function hic_reset_downloaded_bookings() {
     delete_option('hic_downloaded_booking_ids');
-    Helpers\hic_log("Reset downloaded bookings tracking");
+    hic_log("Reset downloaded bookings tracking");
 }
 
 /**
@@ -480,7 +480,7 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     $to_date = wp_date('Y-m-d');
     $from_date = wp_date('Y-m-d', strtotime('-30 days', current_time('timestamp')));
     
-    Helpers\hic_log("Fetching latest $limit bookings for property $prop_id from $from_date to $to_date" . 
+    hic_log("Fetching latest $limit bookings for property $prop_id from $from_date to $to_date" . 
             ($skip_downloaded ? " (skipping " . count($downloaded_ids) . " already downloaded)" : ""));
     
     // Get more bookings to account for filtering out downloaded ones
@@ -514,7 +514,7 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
         // Re-index the array after filtering
         $result = array_values($result);
         
-        Helpers\hic_log("After filtering downloaded bookings: " . count($result) . " bookings remain");
+        hic_log("After filtering downloaded bookings: " . count($result) . " bookings remain");
     }
     
     // Return only the requested number
@@ -616,10 +616,10 @@ function hic_ajax_refresh_diagnostics() {
 
         wp_send_json_success($data);
     } catch (Exception $e) {
-        Helpers\hic_log('AJAX Refresh Diagnostics Error: ' . $e->getMessage());
+        hic_log('AJAX Refresh Diagnostics Error: ' . $e->getMessage());
         wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante il caricamento diagnostiche: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     } catch (Error $e) {
-        Helpers\hic_log('AJAX Refresh Diagnostics Fatal Error: ' . $e->getMessage());
+        hic_log('AJAX Refresh Diagnostics Fatal Error: ' . $e->getMessage());
         wp_send_json_error( [ 'message' => sprintf( __( 'Errore fatale durante il caricamento diagnostiche: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
@@ -820,7 +820,7 @@ function hic_ajax_download_latest_bookings() {
             $processed_data = hic_convert_api_booking_to_processor_format($booking);
 
             // Process the booking through normal integration pipeline
-            Helpers\hic_log("Processing downloaded booking ID: " . ($booking['id'] ?? 'N/A') . " for integrations");
+            hic_log("Processing downloaded booking ID: " . ($booking['id'] ?? 'N/A') . " for integrations");
 
             $processing_success = hic_process_booking_data($processed_data);
 
@@ -910,10 +910,10 @@ function hic_ajax_force_polling() {
 
         // Execute polling (force or normal)
         if ($force) {
-            Helpers\hic_log('Admin Force Polling: Starting force execution');
+            hic_log('Admin Force Polling: Starting force execution');
             $result = $poller->force_execute_poll();
         } else {
-            Helpers\hic_log('Admin Manual Polling: Starting normal execution');
+            hic_log('Admin Manual Polling: Starting normal execution');
             $result = $poller->execute_poll();
         }
 
@@ -935,7 +935,7 @@ function hic_ajax_force_polling() {
             wp_send_json_error($response);
         }
     } catch (Exception $e) {
-        Helpers\hic_log('Admin Polling Error: ' . $e->getMessage());
+        hic_log('Admin Polling Error: ' . $e->getMessage());
         wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante l\'esecuzione del polling: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
@@ -953,7 +953,7 @@ function hic_ajax_trigger_watchdog() {
     }
 
     try {
-        Helpers\hic_log('Admin Watchdog: Manual watchdog trigger initiated');
+        hic_log('Admin Watchdog: Manual watchdog trigger initiated');
 
         // Check if required functions exist
         if (!function_exists('hic_trigger_watchdog_check')) {
@@ -976,13 +976,13 @@ function hic_ajax_trigger_watchdog() {
             'scheduler_restart' => $restart_result
         );
 
-        Helpers\hic_log('Admin Watchdog: Manual watchdog trigger completed successfully');
+        hic_log('Admin Watchdog: Manual watchdog trigger completed successfully');
         wp_send_json_success($response);
     } catch (Exception $e) {
-        Helpers\hic_log('Admin Watchdog Error: ' . $e->getMessage());
+        hic_log('Admin Watchdog Error: ' . $e->getMessage());
         wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante l\'esecuzione del watchdog: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     } catch (Error $e) {
-        Helpers\hic_log('Admin Watchdog Fatal Error: ' . $e->getMessage());
+        hic_log('Admin Watchdog Fatal Error: ' . $e->getMessage());
         wp_send_json_error( [ 'message' => sprintf( __( 'Errore fatale durante l\'esecuzione del watchdog: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }
@@ -1000,7 +1000,7 @@ function hic_ajax_reset_timestamps() {
     }
 
     try {
-        Helpers\hic_log('Admin Timestamp Reset: Manual timestamp reset initiated');
+        hic_log('Admin Timestamp Reset: Manual timestamp reset initiated');
 
         // Execute timestamp recovery using the new method
         if (class_exists('HIC_Booking_Poller')) {
@@ -1021,10 +1021,10 @@ function hic_ajax_reset_timestamps() {
             wp_send_json_error( [ 'message' => __( 'Classe HIC_Booking_Poller non disponibile', 'hotel-in-cloud' ) ] );
         }
     } catch (Exception $e) {
-        Helpers\hic_log('Admin Timestamp Reset Error: ' . $e->getMessage());
+        hic_log('Admin Timestamp Reset Error: ' . $e->getMessage());
         wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante il reset dei timestamp: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     } catch (Error $e) {
-        Helpers\hic_log('Admin Timestamp Reset Fatal Error: ' . $e->getMessage());
+        hic_log('Admin Timestamp Reset Fatal Error: ' . $e->getMessage());
         wp_send_json_error( [ 'message' => sprintf( __( 'Errore fatale durante il reset dei timestamp: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
     }
 }

@@ -535,7 +535,7 @@ class HIC_Health_Monitor {
         
         // Log critical issues
         if ($health_data['status'] === 'unhealthy') {
-            Helpers\hic_log('Health check failed: ' . json_encode($health_data));
+            hic_log('Health check failed: ' . json_encode($health_data));
             
             // Send alert if configured
             $this->send_health_alert($health_data);

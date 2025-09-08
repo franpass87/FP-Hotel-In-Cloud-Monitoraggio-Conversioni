@@ -616,7 +616,7 @@ function hic_validate_admin_email($input) {
     // Log the email change for transparency
     $old_email = Helpers\hic_get_option('admin_email', '');
     if ($old_email !== $sanitized_email) {
-        Helpers\hic_log('Admin email changed from "' . $old_email . '" to "' . $sanitized_email . '"');
+        hic_log('Admin email changed from "' . $old_email . '" to "' . $sanitized_email . '"');
         
         // Show success message
         add_settings_error(

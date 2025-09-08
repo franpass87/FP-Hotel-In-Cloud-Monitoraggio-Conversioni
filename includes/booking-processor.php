@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) exit;
 function hic_process_booking_data($data) {
   // Validate input data
   if (!is_array($data)) {
-    Helpers\hic_log('hic_process_booking_data: dati non validi (non array)');
+    hic_log('hic_process_booking_data: dati non validi (non array)');
     return false;
   }
 
@@ -17,14 +17,14 @@ function hic_process_booking_data($data) {
   $required_fields = ['email'];
   foreach ($required_fields as $field) {
     if (empty($data[$field])) {
-      Helpers\hic_log("hic_process_booking_data: campo obbligatorio mancante - $field");
+      hic_log("hic_process_booking_data: campo obbligatorio mancante - $field");
       return false;
     }
   }
 
   // Validate email format
   if (!Helpers\hic_is_valid_email($data['email'])) {
-    Helpers\hic_log('hic_process_booking_data: email non valida - ' . $data['email']);
+    hic_log('hic_process_booking_data: email non valida - ' . $data['email']);
     return false;
   }
 
@@ -66,7 +66,7 @@ function hic_process_booking_data($data) {
 
     if ($is_refund) {
       if (!Helpers\hic_refund_tracking_enabled()) {
-        Helpers\hic_log('hic_process_booking_data: refund detected but tracking disabled');
+        hic_log('hic_process_booking_data: refund detected but tracking disabled');
         return false;
       }
 
@@ -108,7 +108,7 @@ function hic_process_booking_data($data) {
           $error_count++;
         }
       } else if ($tracking_mode === 'ga4_only') {
-        Helpers\hic_log('hic_process_booking_data: GA4 credentials missing for ga4_only mode, skipping');
+        hic_log('hic_process_booking_data: GA4 credentials missing for ga4_only mode, skipping');
       }
 
       // GTM Integration (client-side via dataLayer)
@@ -119,7 +119,7 @@ function hic_process_booking_data($data) {
           $error_count++;
         }
       } else if ($tracking_mode === 'gtm_only') {
-        Helpers\hic_log('hic_process_booking_data: GTM not enabled for gtm_only mode, skipping');
+        hic_log('hic_process_booking_data: GTM not enabled for gtm_only mode, skipping');
       }
 
       // Facebook Integration
@@ -130,7 +130,7 @@ function hic_process_booking_data($data) {
           $error_count++;
         }
       } else {
-        Helpers\hic_log('hic_process_booking_data: Facebook credentials missing, skipping');
+        hic_log('hic_process_booking_data: Facebook credentials missing, skipping');
       }
 
       // Brevo Integration - Unified approach to prevent duplicate events
@@ -142,7 +142,7 @@ function hic_process_booking_data($data) {
           $error_count++;
         }
       } else {
-        Helpers\hic_log('hic_process_booking_data: Brevo disabled or credentials missing, skipping');
+        hic_log('hic_process_booking_data: Brevo disabled or credentials missing, skipping');
       }
 
       // Admin email - only attempt if valid email is configured
@@ -154,19 +154,19 @@ function hic_process_booking_data($data) {
           $error_count++;
         }
       } else {
-        Helpers\hic_log('hic_process_booking_data: Admin email not configured or invalid, skipping');
+        hic_log('hic_process_booking_data: Admin email not configured or invalid, skipping');
       }
     }
 
-    Helpers\hic_log("Prenotazione processata (SID: " . ($sid ?? 'N/A') . ") - Successi: $success_count, Errori: $error_count");
+    hic_log("Prenotazione processata (SID: " . ($sid ?? 'N/A') . ") - Successi: $success_count, Errori: $error_count");
 
     return $error_count === 0;
 
   } catch (Exception $e) {
-    Helpers\hic_log('Errore critico processando prenotazione: ' . $e->getMessage());
+    hic_log('Errore critico processando prenotazione: ' . $e->getMessage());
     return false;
   } catch (Throwable $e) {
-    Helpers\hic_log('Errore fatale processando prenotazione: ' . $e->getMessage());
+    hic_log('Errore fatale processando prenotazione: ' . $e->getMessage());
     return false;
   }
 }
