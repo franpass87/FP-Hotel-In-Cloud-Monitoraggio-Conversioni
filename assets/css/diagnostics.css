@@ -29,6 +29,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.04);
             padding: 24px;
             width: 100%;
+            max-width: none;
             box-sizing: border-box;
             transition: all 0.3s ease;
             position: relative;
