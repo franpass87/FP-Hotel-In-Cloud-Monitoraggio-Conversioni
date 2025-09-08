@@ -22,28 +22,22 @@ jQuery(function($){
             password: $('input[name="hic_api_password"]').val()
         };
 
-        $.post(ajaxurl, data, function(response){
+        $.post(ajaxurl, data, function(response) {
             $loading.hide();
             $btn.prop('disabled', false);
 
-            try {
-                var result = typeof response === 'string' ? JSON.parse(response) : response;
-                var resp = result.data || {};
-                var messageClass = result.success ? 'notice-success' : 'notice-error';
-                var icon = result.success ? 'dashicons-yes-alt' : 'dashicons-dismiss';
-                var html = '<div class="notice ' + messageClass + ' inline">' +
-                           '<p><span class="dashicons ' + icon + '"></span> ' + resp.message;
-                if (result.success && resp.data_count !== undefined) {
-                    html += ' (' + resp.data_count + ' prenotazioni trovate negli ultimi 7 giorni)';
-                }
-                html += '</p></div>';
-                $result.html(html).show();
-            } catch (e) {
-                $result.html('<div class="notice notice-error inline">' +
-                             '<p><span class="dashicons dashicons-dismiss"></span> Errore nel parsing della risposta</p>' +
-                             '</div>').show();
+            var resp = response.data || {};
+            var messageClass = response.success ? 'notice-success' : 'notice-error';
+            var icon = response.success ? 'dashicons-yes-alt' : 'dashicons-dismiss';
+            var html = '<div class="notice ' + messageClass + ' inline">' +
+                       '<p><span class="dashicons ' + icon + '"></span> ' + resp.message;
+
+            if (response.success && resp.data_count !== undefined) {
+                html += ' (' + resp.data_count + ' prenotazioni trovate negli ultimi 7 giorni)';
             }
-        }).fail(function(xhr, status, error){
+            html += '</p></div>';
+            $result.html(html).show();
+        }, 'json').fail(function(xhr, status, error) {
             $loading.hide();
             $btn.prop('disabled', false);
             $result.html('<div class="notice notice-error inline">' +
