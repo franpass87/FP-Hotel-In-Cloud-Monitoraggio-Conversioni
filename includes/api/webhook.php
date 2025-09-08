@@ -1,4 +1,7 @@
 <?php declare(strict_types=1);
+
+use function FpHic\hic_process_booking_data;
+
 /**
  * Webhook API Handler
  */
