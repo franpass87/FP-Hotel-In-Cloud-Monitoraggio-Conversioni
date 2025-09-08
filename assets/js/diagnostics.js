@@ -560,7 +560,7 @@ jQuery(document).ready(function($) {
                 action: 'hic_trigger_watchdog',
                 nonce: hicDiagnostics.admin_nonce
             }).done(function(response) {
-                if (response.data.success) {
+                if (response.success) {
                     buttonController.setSuccess('Watchdog completato con successo!');
                     $status.text('✓ Watchdog completato').css('color', '#00a32a');
 
