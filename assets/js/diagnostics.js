@@ -751,7 +751,7 @@ jQuery(document).ready(function($) {
                     if (response.data.contact_api.success) {
                         html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.data.contact_api.http_code + '</p>';
                     } else {
-                        html += '<p><span class="status error">✗ Errore</span> - ' + response.data.contact_api.error + '</p>';
+                        html += '<p><span class="status error">✗ Errore</span> - ' + response.data.contact_api.message + '</p>';
                     }
 
                     // Event API results
@@ -759,7 +759,7 @@ jQuery(document).ready(function($) {
                     if (response.data.event_api.success) {
                         html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.data.event_api.http_code + '</p>';
                     } else {
-                        html += '<p><span class="status error">✗ Errore</span> - ' + response.data.event_api.error + '</p>';
+                        html += '<p><span class="status error">✗ Errore</span> - ' + response.data.event_api.message + '</p>';
                     }
 
                     html += '</div>';
