@@ -1,0 +1,107 @@
+name: Build WordPress Plugin ZIP
+
+on:
+  # Trigger on releases and tags
+  release:
+    types: [published]
+  push:
+    tags:
+      - 'v*'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Plugin version (leave empty to auto-detect)'
+        required: false
+        default: ''
+
+jobs:
+  build-wordpress-zip:
+    runs-on: ubuntu-latest
+    name: Build WordPress Plugin ZIP
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        extensions: mbstring, intl, curl, json, openssl, zip
+        tools: composer:v2
+        coverage: none
+
+    - name: Validate composer.json and composer.lock
+      run: composer validate --strict
+
+    - name: Install production dependencies
+      run: composer install --no-dev --optimize-autoloader --no-progress
+
+    - name: Build WordPress Plugin ZIP
+      run: composer build
+
+    - name: Get plugin version
+      id: version
+      run: |
+        if [ -n "${{ github.event.inputs.version }}" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION=$(php -r "
+            \$content = file_get_contents('FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php');
+            if (preg_match('/\* Version:\s*(.+)/', \$content, \$matches)) {
+              echo trim(\$matches[1]);
+            } else {
+              echo '1.0.0';
+            }
+          ")
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Plugin version: $VERSION"
+
+    - name: Verify ZIP file was created
+      run: |
+        if [ ! -f "dist/FP-Hotel-In-Cloud-Monitoraggio-Conversioni-${{ steps.version.outputs.version }}.zip" ]; then
+          echo "❌ ZIP file not found!"
+          ls -la dist/
+          exit 1
+        fi
+        echo "✅ ZIP file created successfully:"
+        ls -la dist/FP-Hotel-In-Cloud-Monitoraggio-Conversioni-${{ steps.version.outputs.version }}.zip
+
+    - name: Upload WordPress Plugin ZIP as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wordpress-plugin-zip-v${{ steps.version.outputs.version }}
+        path: dist/FP-Hotel-In-Cloud-Monitoraggio-Conversioni-${{ steps.version.outputs.version }}.zip
+        retention-days: 90
+
+    - name: Upload to release (if triggered by release)
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: dist/FP-Hotel-In-Cloud-Monitoraggio-Conversioni-${{ steps.version.outputs.version }}.zip
+        asset_name: FP-Hotel-In-Cloud-Monitoraggio-Conversioni-${{ steps.version.outputs.version }}.zip
+        asset_content_type: application/zip
+
+    - name: Summary
+      run: |
+        echo "🎉 Build completed successfully!"
+        echo ""
+        echo "📦 **Plugin ZIP Details:**"
+        echo "- Name: FP-Hotel-In-Cloud-Monitoraggio-Conversioni-${{ steps.version.outputs.version }}.zip"
+        echo "- Size: $(du -h dist/FP-Hotel-In-Cloud-Monitoraggio-Conversioni-${{ steps.version.outputs.version }}.zip | cut -f1)"
+        echo "- Location: dist/"
+        echo ""
+        echo "🔧 **Installation Instructions:**"
+        echo "1. Download the ZIP file from the Actions artifacts"
+        echo "2. Go to WordPress Admin > Plugins > Add New > Upload Plugin"
+        echo "3. Select the ZIP file and click 'Install Now'"
+        echo "4. Activate the plugin"
+        echo ""
+        echo "📋 **ZIP Contents:**"
+        unzip -l dist/FP-Hotel-In-Cloud-Monitoraggio-Conversioni-${{ steps.version.outputs.version }}.zip | head -20

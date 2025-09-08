@@ -107,7 +107,21 @@ Nell'esempio sopra vengono escluse dal tracciamento le prenotazioni che contengo
 
 ### Build del Plugin
 
-Per creare un pacchetto ZIP pronto per l'installazione su WordPress:
+#### Opzione 1: GitHub Actions (Automatico)
+
+Il plugin può essere buildato automaticamente tramite GitHub Actions:
+
+- **Su Release**: Crea automaticamente il ZIP quando viene pubblicato un nuovo release
+- **Su Tag**: Attivato quando si pusha un tag versione (es. `v1.4.0`)
+- **Manuale**: Eseguibile dalla tab "Actions" di GitHub
+
+Il ZIP creato è disponibile come artifact e viene automaticamente allegato ai release.
+
+**Istruzioni**: Vedi [docs/GITHUB_ACTIONS.md](docs/GITHUB_ACTIONS.md) per dettagli completi.
+
+#### Opzione 2: Build Locale
+
+Per creare un pacchetto ZIP manualmente:
 
 ```bash
 # Opzione 1: Usando Composer
