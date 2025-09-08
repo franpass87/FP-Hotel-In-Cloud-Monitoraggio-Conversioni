@@ -1,4 +1,5 @@
 <?php declare(strict_types=1);
+use function FpHic\hic_process_booking_data;
 /**
  * WP-CLI commands for HIC Plugin
  */
