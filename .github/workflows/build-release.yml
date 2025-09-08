@@ -1,0 +1,162 @@
+name: Build and Release WordPress Plugin
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.4.0
+  release:
+    types: [published]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build WordPress Plugin
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      zip_name: ${{ steps.create_zip.outputs.zip_name }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: mbstring, intl, curl, json, openssl, zip
+        tools: composer:v2
+        coverage: none
+
+    - name: Get plugin version
+      id: version
+      run: |
+        VERSION=$(grep "Version:" FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php | sed 's/.*Version: *//' | tr -d ' ')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Plugin version: $VERSION"
+
+    - name: Validate composer.json
+      run: composer validate --strict
+
+    - name: Install production dependencies
+      run: composer install --no-dev --optimize-autoloader --prefer-dist --no-progress
+
+    - name: Run quality checks
+      run: |
+        echo "Running quality assurance checks..."
+        php qa-runner.php
+
+    - name: Create build directory
+      run: |
+        BUILD_DIR="fp-hotel-in-cloud-monitoraggio-conversioni"
+        echo "Creating build directory: $BUILD_DIR"
+        mkdir -p build/$BUILD_DIR
+        
+        # Copy plugin files (exclude dev files)
+        rsync -av \
+          --exclude='.git*' \
+          --exclude='.github/' \
+          --exclude='tests/' \
+          --exclude='docs/' \
+          --exclude='phpunit.xml' \
+          --exclude='phpstan.neon' \
+          --exclude='phpcs.xml' \
+          --exclude='phpmd.xml' \
+          --exclude='phpstan-stubs/' \
+          --exclude='composer.json' \
+          --exclude='composer.lock' \
+          --exclude='qa-runner.php' \
+          --exclude='demo-*' \
+          --exclude='*.md' \
+          --exclude='.phpunit.result.cache' \
+          ./ build/$BUILD_DIR/
+          
+        # Create a simple readme for the built plugin
+        cat > build/$BUILD_DIR/README.txt << 'EOF'
+=== HIC GA4 + Brevo + Meta (bucket strategy) ===
+Contributors: Francesco Passeri
+Tags: analytics, conversion tracking, hotel bookings, ga4, brevo, meta
+Requires at least: 5.8
+Tested up to: 6.4
+Requires PHP: 7.4
+Stable tag: ${{ steps.version.outputs.version }}
+License: GPLv2 or later
+
+WordPress plugin for tracking hotel booking conversions across GA4, Meta CAPI, and Brevo with bucket strategy.
+
+== Description ==
+
+This plugin tracks hotel booking conversions from Hotel in Cloud and sends them to:
+- Google Analytics 4 (GA4) as purchase events
+- Meta CAPI (Facebook/Instagram) as Purchase events  
+- Brevo for contact management and events
+
+Features bucket strategy classification (gads/fbads/organic) based on tracking parameters.
+
+== Installation ==
+
+1. Upload the plugin files to `/wp-content/plugins/fp-hotel-in-cloud-monitoraggio-conversioni/`
+2. Activate the plugin through the 'Plugins' screen in WordPress
+3. Configure the plugin through Settings > HIC Monitoring
+
+== Changelog ==
+
+= ${{ steps.version.outputs.version }} =
+* See GitHub repository for detailed changelog
+
+EOF
+
+    - name: Create plugin ZIP
+      run: |
+        cd build
+        PLUGIN_NAME="fp-hotel-in-cloud-monitoraggio-conversioni"
+        ZIP_NAME="${PLUGIN_NAME}-v${{ steps.version.outputs.version }}.zip"
+        
+        echo "Creating ZIP file: $ZIP_NAME"
+        zip -r $ZIP_NAME $PLUGIN_NAME
+        
+        echo "ZIP file created successfully"
+        ls -la *.zip
+        
+        # Store ZIP name for later steps
+        echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
+        echo "zip_path=build/$ZIP_NAME" >> $GITHUB_OUTPUT
+      id: create_zip
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: plugin-zip-v${{ steps.version.outputs.version }}
+        path: ${{ steps.create_zip.outputs.zip_path }}
+        retention-days: 30
+
+    - name: Display build summary
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Plugin version: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "✅ ZIP file: ${{ steps.create_zip.outputs.zip_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Quality checks: PASSED" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Build artifact uploaded" >> $GITHUB_STEP_SUMMARY
+
+  attach-to-release:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'release'
+    name: Attach ZIP to Release
+
+    steps:
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: plugin-zip-v${{ needs.build.outputs.version }}
+        path: ./
+
+    - name: Upload to release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./${{ needs.build.outputs.zip_name }}
+        asset_name: ${{ needs.build.outputs.zip_name }}
+        asset_content_type: application/zip
