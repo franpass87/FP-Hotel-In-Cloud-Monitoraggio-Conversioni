@@ -242,7 +242,7 @@ function hic_maybe_upgrade_db() {
   // Fresh install
   if (!$installed_version) {
     update_option('hic_db_version', HIC_DB_VERSION);
-    Helpers\hic_clear_option_cache('hic_db_version');
+    hic_clear_option_cache('hic_db_version');
     return;
   }
 
@@ -254,7 +254,7 @@ function hic_maybe_upgrade_db() {
       $wpdb->query("ALTER TABLE $table ADD COLUMN brevo_event_sent TINYINT(1) DEFAULT 0");
     }
     update_option('hic_db_version', '1.1');
-    Helpers\hic_clear_option_cache('hic_db_version');
+    hic_clear_option_cache('hic_db_version');
     $installed_version = '1.1';
   }
 
@@ -269,7 +269,7 @@ function hic_maybe_upgrade_db() {
       }
     }
     update_option('hic_db_version', '1.2');
-    Helpers\hic_clear_option_cache('hic_db_version');
+    hic_clear_option_cache('hic_db_version');
     $installed_version = '1.2';
   }
 
@@ -284,7 +284,7 @@ function hic_maybe_upgrade_db() {
       }
     }
     update_option('hic_db_version', '1.3');
-    Helpers\hic_clear_option_cache('hic_db_version');
+    hic_clear_option_cache('hic_db_version');
     $installed_version = '1.3';
   }
 
@@ -299,7 +299,7 @@ function hic_maybe_upgrade_db() {
       }
     }
     update_option('hic_db_version', '1.4');
-    Helpers\hic_clear_option_cache('hic_db_version');
+    hic_clear_option_cache('hic_db_version');
     $installed_version = '1.4';
   }
 
@@ -307,13 +307,13 @@ function hic_maybe_upgrade_db() {
   if (version_compare($installed_version, '1.5', '<')) {
     hic_create_failed_requests_table();
     update_option('hic_db_version', '1.5');
-    Helpers\hic_clear_option_cache('hic_db_version');
+    hic_clear_option_cache('hic_db_version');
     $installed_version = '1.5';
   }
 
   // Set final version
   update_option('hic_db_version', HIC_DB_VERSION);
-  Helpers\hic_clear_option_cache('hic_db_version');
+  hic_clear_option_cache('hic_db_version');
 }
 
 /**
