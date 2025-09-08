@@ -90,7 +90,7 @@ function hic_add_admin_menu() {
     add_menu_page(
         'HIC Monitoring Settings',
         'HIC Monitoring',
-        'hic_manage',
+        'manage_options',
         'hic-monitoring',
         'hic_options_page'
     );
@@ -100,7 +100,7 @@ function hic_add_admin_menu() {
         'hic-monitoring',
         'Diagnostics',
         'Diagnostics',
-        'hic_manage',
+        'manage_options',
         'hic-diagnostics',
         'hic_diagnostics_page'
     );
