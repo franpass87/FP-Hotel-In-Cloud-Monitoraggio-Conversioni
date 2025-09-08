@@ -41,7 +41,7 @@ function hic_ajax_test_email() {
     }
     
     // Run email configuration test
-    $test_result = Helpers\hic_test_email_configuration($test_email);
+    $test_result = \FpHic\Helpers\hic_test_email_configuration($test_email);
 
     $success = !empty($test_result['success']);
     unset($test_result['success']);
@@ -277,9 +277,9 @@ function hic_admin_enqueue_scripts($hook) {
             'diagnostics_nonce' => wp_create_nonce('hic_diagnostics_nonce'),
             'admin_nonce' => wp_create_nonce('hic_admin_action'),
             'monitor_nonce' => wp_create_nonce('hic_monitor_nonce'),
-            'is_api_connection' => (Helpers\hic_get_connection_type() === 'api'),
-            'has_basic_auth' => Helpers\hic_has_basic_auth_credentials(),
-            'has_property_id' => (bool) Helpers\hic_get_property_id(),
+            'is_api_connection' => (\FpHic\Helpers\hic_get_connection_type() === 'api'),
+            'has_basic_auth' => \FpHic\Helpers\hic_has_basic_auth_credentials(),
+            'has_property_id' => (bool) \FpHic\Helpers\hic_get_property_id(),
         ));
     }
 }
@@ -298,7 +298,7 @@ function hic_options_page() {
         </form>
         
         <!-- API Connection Test Section -->
-        <?php if (Helpers\hic_get_connection_type() === 'api'): ?>
+        <?php if (\FpHic\Helpers\hic_get_connection_type() === 'api'): ?>
         <div class="hic-api-test-section" style="margin-top: 30px; padding: 20px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
             <h2>Test Connessione API</h2>
             <p>Testa la connessione alle API Hotel in Cloud con le credenziali Basic Auth configurate.</p>
@@ -322,8 +322,8 @@ function hic_options_page() {
 
 // Render functions for settings fields
 function hic_admin_email_render() {
-    $current_email = Helpers\hic_get_admin_email();
-    $custom_email = Helpers\hic_get_option('admin_email', '');
+    $current_email = \FpHic\Helpers\hic_get_admin_email();
+    $custom_email = \FpHic\Helpers\hic_get_option('admin_email', '');
     $wp_admin_email = get_option('admin_email');
     
     echo '<input type="email" name="hic_admin_email" value="' . esc_attr($current_email) . '" class="regular-text" id="hic_admin_email_field" />';
@@ -380,27 +380,27 @@ function hic_log_level_render() {
 }
 
 function hic_measurement_id_render() {
-    echo '<input type="text" name="hic_measurement_id" value="' . esc_attr(Helpers\hic_get_measurement_id()) . '" class="regular-text" />';
+    echo '<input type="text" name="hic_measurement_id" value="' . esc_attr(\FpHic\Helpers\hic_get_measurement_id()) . '" class="regular-text" />';
 }
 
 function hic_api_secret_render() {
-    echo '<input type="text" name="hic_api_secret" value="' . esc_attr(Helpers\hic_get_api_secret()) . '" class="regular-text" />';
+    echo '<input type="text" name="hic_api_secret" value="' . esc_attr(\FpHic\Helpers\hic_get_api_secret()) . '" class="regular-text" />';
 }
 
 // GTM render functions
 function hic_gtm_enabled_render() {
-    $checked = Helpers\hic_is_gtm_enabled() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_is_gtm_enabled() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_gtm_enabled" value="1" ' . esc_attr($checked) . ' /> Abilita integrazione Google Tag Manager';
     echo '<p class="description">Abilita il tracciamento tramite Google Tag Manager per una gestione più flessibile dei tag.</p>';
 }
 
 function hic_gtm_container_id_render() {
-    echo '<input type="text" name="hic_gtm_container_id" value="' . esc_attr(Helpers\hic_get_gtm_container_id()) . '" class="regular-text" placeholder="GTM-XXXXXXX" />';
+    echo '<input type="text" name="hic_gtm_container_id" value="' . esc_attr(\FpHic\Helpers\hic_get_gtm_container_id()) . '" class="regular-text" placeholder="GTM-XXXXXXX" />';
     echo '<p class="description">ID del container GTM (formato: GTM-XXXXXXX). Disponibile in Google Tag Manager sotto "ID container".</p>';
 }
 
 function hic_tracking_mode_render() {
-    $mode = Helpers\hic_get_tracking_mode();
+    $mode = \FpHic\Helpers\hic_get_tracking_mode();
     echo '<select name="hic_tracking_mode" class="regular-text">';
     echo '<option value="ga4_only"' . selected($mode, 'ga4_only', false) . '>Solo GA4 Measurement Protocol (Server-side)</option>';
     echo '<option value="gtm_only"' . selected($mode, 'gtm_only', false) . '>Solo Google Tag Manager (Client-side)</option>';
@@ -414,24 +414,24 @@ function hic_tracking_mode_render() {
 }
 
 function hic_brevo_enabled_render() {
-    $checked = Helpers\hic_is_brevo_enabled() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_is_brevo_enabled() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_brevo_enabled" value="1" ' . esc_attr($checked) . ' /> Abilita integrazione Brevo';
 }
 
 function hic_brevo_api_key_render() {
-    echo '<input type="password" name="hic_brevo_api_key" value="' . esc_attr(Helpers\hic_get_brevo_api_key()) . '" class="regular-text" />';
+    echo '<input type="password" name="hic_brevo_api_key" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_api_key()) . '" class="regular-text" />';
 }
 
 function hic_fb_pixel_id_render() {
-    echo '<input type="text" name="hic_fb_pixel_id" value="' . esc_attr(Helpers\hic_get_fb_pixel_id()) . '" class="regular-text" />';
+    echo '<input type="text" name="hic_fb_pixel_id" value="' . esc_attr(\FpHic\Helpers\hic_get_fb_pixel_id()) . '" class="regular-text" />';
 }
 
 function hic_fb_access_token_render() {
-    echo '<input type="password" name="hic_fb_access_token" value="' . esc_attr(Helpers\hic_get_fb_access_token()) . '" class="regular-text" />';
+    echo '<input type="password" name="hic_fb_access_token" value="' . esc_attr(\FpHic\Helpers\hic_get_fb_access_token()) . '" class="regular-text" />';
 }
 
 function hic_connection_type_render() {
-    $type = Helpers\hic_get_connection_type();
+    $type = \FpHic\Helpers\hic_get_connection_type();
     echo '<select name="hic_connection_type">';
     echo '<option value="webhook"' . selected($type, 'webhook', false) . '>Webhook</option>';
     echo '<option value="api"' . selected($type, 'api', false) . '>API Polling</option>';
@@ -439,24 +439,24 @@ function hic_connection_type_render() {
 }
 
 function hic_webhook_token_render() {
-    echo '<input type="text" name="hic_webhook_token" value="' . esc_attr(Helpers\hic_get_webhook_token()) . '" class="regular-text" />';
+    echo '<input type="text" name="hic_webhook_token" value="' . esc_attr(\FpHic\Helpers\hic_get_webhook_token()) . '" class="regular-text" />';
     echo '<p class="description">Token per autenticare il webhook</p>';
 }
 
 function hic_api_url_render() {
-    echo '<input type="url" name="hic_api_url" value="' . esc_url(Helpers\hic_get_api_url()) . '" class="regular-text" />';
+    echo '<input type="url" name="hic_api_url" value="' . esc_url(\FpHic\Helpers\hic_get_api_url()) . '" class="regular-text" />';
     echo '<p class="description">URL delle API Hotel in Cloud (solo se si usa API Polling)</p>';
 }
 
 // Basic Auth render functions
 function hic_api_email_render() {
-    $value = Helpers\hic_get_api_email();
+    $value = \FpHic\Helpers\hic_get_api_email();
     $is_constant = defined('HIC_API_EMAIL') && !empty(HIC_API_EMAIL);
     
     if ($is_constant) {
         echo '<input type="email" value="' . esc_attr($value) . '" class="regular-text" disabled />';
         echo '<p class="description"><strong>Configurato tramite costante PHP HIC_API_EMAIL in wp-config.php</strong></p>';
-        echo '<input type="hidden" name="hic_api_email" value="' . esc_attr(Helpers\hic_get_option('api_email', '')) . '" />';
+        echo '<input type="hidden" name="hic_api_email" value="' . esc_attr(\FpHic\Helpers\hic_get_option('api_email', '')) . '" />';
     } else {
         echo '<input type="email" name="hic_api_email" value="' . esc_attr($value) . '" class="regular-text" />';
         echo '<p class="description">Email per autenticazione Basic Auth alle API Hotel in Cloud</p>';
@@ -464,13 +464,13 @@ function hic_api_email_render() {
 }
 
 function hic_api_password_render() {
-    $value = Helpers\hic_get_api_password();
+    $value = \FpHic\Helpers\hic_get_api_password();
     $is_constant = defined('HIC_API_PASSWORD') && !empty(HIC_API_PASSWORD);
     
     if ($is_constant) {
         echo '<input type="password" value="********" class="regular-text" disabled />';
         echo '<p class="description"><strong>Configurato tramite costante PHP HIC_API_PASSWORD in wp-config.php</strong></p>';
-        echo '<input type="hidden" name="hic_api_password" value="' . esc_attr(Helpers\hic_get_option('api_password', '')) . '" />';
+        echo '<input type="hidden" name="hic_api_password" value="' . esc_attr(\FpHic\Helpers\hic_get_option('api_password', '')) . '" />';
     } else {
         echo '<input type="password" name="hic_api_password" value="' . esc_attr($value) . '" class="regular-text" />';
         echo '<p class="description">Password per autenticazione Basic Auth alle API Hotel in Cloud</p>';
@@ -478,13 +478,13 @@ function hic_api_password_render() {
 }
 
 function hic_property_id_render() {
-    $value = Helpers\hic_get_property_id();
+    $value = \FpHic\Helpers\hic_get_property_id();
     $is_constant = defined('HIC_PROPERTY_ID') && !empty(HIC_PROPERTY_ID);
     
     if ($is_constant) {
         echo '<input type="number" value="' . esc_attr($value) . '" class="regular-text" disabled />';
         echo '<p class="description"><strong>Configurato tramite costante PHP HIC_PROPERTY_ID in wp-config.php</strong></p>';
-        echo '<input type="hidden" name="hic_property_id" value="' . esc_attr(Helpers\hic_get_option('property_id', '')) . '" />';
+        echo '<input type="hidden" name="hic_property_id" value="' . esc_attr(\FpHic\Helpers\hic_get_option('property_id', '')) . '" />';
     } else {
         echo '<input type="number" name="hic_property_id" value="' . esc_attr($value) . '" class="regular-text" />';
         echo '<p class="description">ID della struttura (propId) per le chiamate API</p>';
@@ -492,7 +492,7 @@ function hic_property_id_render() {
 }
 
 function hic_polling_interval_render() {
-    $interval = Helpers\hic_get_polling_interval();
+    $interval = \FpHic\Helpers\hic_get_polling_interval();
     echo '<select name="hic_polling_interval">';
     echo '<option value="every_minute"' . selected($interval, 'every_minute', false) . '>Ogni minuto (quasi real-time)</option>';
     echo '<option value="every_two_minutes"' . selected($interval, 'every_two_minutes', false) . '>Ogni 2 minuti (bilanciato)</option>';
@@ -503,7 +503,7 @@ function hic_polling_interval_render() {
 }
 
 function hic_reliable_polling_enabled_render() {
-    $enabled = Helpers\hic_get_option('reliable_polling_enabled', '1') === '1';
+    $enabled = \FpHic\Helpers\hic_get_option('reliable_polling_enabled', '1') === '1';
     echo '<label>';
     echo '<input type="checkbox" name="hic_reliable_polling_enabled" value="1"' . checked($enabled, true, false) . ' />';
     echo ' Attiva sistema polling affidabile';
@@ -513,79 +513,79 @@ function hic_reliable_polling_enabled_render() {
 
 // Extended HIC Integration render functions
 function hic_currency_render() {
-    echo '<input type="text" name="hic_currency" value="' . esc_attr(Helpers\hic_get_currency()) . '" maxlength="3" />';
+    echo '<input type="text" name="hic_currency" value="' . esc_attr(\FpHic\Helpers\hic_get_currency()) . '" maxlength="3" />';
     echo '<p class="description">Valuta per GA4 e Meta Pixel (default: EUR)</p>';
 }
 
 function hic_ga4_use_net_value_render() {
-    $checked = Helpers\hic_use_net_value() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_use_net_value() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_ga4_use_net_value" value="1" ' . esc_attr($checked) . ' /> Usa price - unpaid_balance come valore per GA4/Pixel';
 }
 
 function hic_process_invalid_render() {
-    $checked = Helpers\hic_process_invalid() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_process_invalid() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_process_invalid" value="1" ' . esc_attr($checked) . ' /> Processa anche prenotazioni con valid=0';
 }
 
 function hic_allow_status_updates_render() {
-    $checked = Helpers\hic_allow_status_updates() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_allow_status_updates() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_allow_status_updates" value="1" ' . esc_attr($checked) . ' /> Permetti aggiornamenti quando cambia presence';
 }
 
 function hic_refund_tracking_render() {
-    $checked = Helpers\hic_refund_tracking_enabled() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_refund_tracking_enabled() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_refund_tracking" value="1" ' . esc_attr($checked) . ' /> Abilita tracciamento rimborsi';
 }
 
 function hic_brevo_list_it_render() {
-    echo '<input type="number" name="hic_brevo_list_it" value="' . esc_attr(Helpers\hic_get_brevo_list_it()) . '" />';
+    echo '<input type="number" name="hic_brevo_list_it" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_it()) . '" />';
     echo '<p class="description">ID lista Brevo per contatti italiani</p>';
 }
 
 function hic_brevo_list_en_render() {
-    echo '<input type="number" name="hic_brevo_list_en" value="' . esc_attr(Helpers\hic_get_brevo_list_en()) . '" />';
+    echo '<input type="number" name="hic_brevo_list_en" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_en()) . '" />';
     echo '<p class="description">ID lista Brevo per contatti inglesi</p>';
 }
 
 function hic_brevo_list_default_render() {
-    echo '<input type="number" name="hic_brevo_list_default" value="' . esc_attr(Helpers\hic_get_brevo_list_default()) . '" />';
+    echo '<input type="number" name="hic_brevo_list_default" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_default()) . '" />';
     echo '<p class="description">ID lista Brevo per altre lingue</p>';
 }
 
 function hic_brevo_optin_default_render() {
-    $checked = Helpers\hic_get_brevo_optin_default() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_get_brevo_optin_default() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_brevo_optin_default" value="1" ' . esc_attr($checked) . ' /> Opt-in marketing di default per nuovi contatti';
 }
 
 function hic_debug_verbose_render() {
-    $checked = Helpers\hic_is_debug_verbose() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_is_debug_verbose() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_debug_verbose" value="1" ' . esc_attr($checked) . ' /> Abilita log debug estesi (solo per test)';
 }
 
 // Email enrichment render functions
 function hic_updates_enrich_contacts_render() {
-    $checked = Helpers\hic_updates_enrich_contacts() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_updates_enrich_contacts() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_updates_enrich_contacts" value="1" ' . esc_attr($checked) . ' /> Aggiorna contatti Brevo quando arriva email reale da updates';
 }
 
 function hic_realtime_brevo_sync_render() {
-    $checked = Helpers\hic_realtime_brevo_sync_enabled() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_realtime_brevo_sync_enabled() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_realtime_brevo_sync" value="1" ' . esc_attr($checked) . ' /> Invia eventi "reservation_created" a Brevo in tempo reale per nuove prenotazioni';
     echo '<p class="description">Quando abilitato, le nuove prenotazioni rilevate dal polling updates invieranno automaticamente eventi a Brevo per automazioni e tracciamento.</p>';
 }
 
 function hic_brevo_list_alias_render() {
-    echo '<input type="number" name="hic_brevo_list_alias" value="' . esc_attr(Helpers\hic_get_brevo_list_alias()) . '" />';
+    echo '<input type="number" name="hic_brevo_list_alias" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_alias()) . '" />';
     echo '<p class="description">ID lista Brevo per contatti con email alias (Booking/Airbnb/OTA). Lascia vuoto per non iscriverli a nessuna lista.</p>';
 }
 
 function hic_brevo_double_optin_on_enrich_render() {
-    $checked = Helpers\hic_brevo_double_optin_on_enrich() ? 'checked' : '';
+    $checked = \FpHic\Helpers\hic_brevo_double_optin_on_enrich() ? 'checked' : '';
     echo '<input type="checkbox" name="hic_brevo_double_optin_on_enrich" value="1" ' . esc_attr($checked) . ' /> Invia double opt-in quando arriva email reale';
 }
 
 function hic_brevo_event_endpoint_render() {
-    $endpoint = Helpers\hic_get_brevo_event_endpoint();
+    $endpoint = \FpHic\Helpers\hic_get_brevo_event_endpoint();
     echo '<input type="url" name="hic_brevo_event_endpoint" value="' . esc_url($endpoint) . '" style="width: 100%;" />';
     echo '<p class="description">Endpoint API per eventi Brevo. Default: https://in-automate.brevo.com/api/v2/trackEvent<br>';
     echo 'Modificare solo se Brevo cambia il proprio endpoint per gli eventi o se si utilizza un endpoint personalizzato.</p>';
@@ -610,11 +610,11 @@ function hic_validate_admin_email($input) {
             'error'
         );
         // Return the original value from database
-        return Helpers\hic_get_option('admin_email', '');
+        return \FpHic\Helpers\hic_get_option('admin_email', '');
     }
     
     // Log the email change for transparency
-    $old_email = Helpers\hic_get_option('admin_email', '');
+    $old_email = \FpHic\Helpers\hic_get_option('admin_email', '');
     if ($old_email !== $sanitized_email) {
         hic_log('Admin email changed from "' . $old_email . '" to "' . $sanitized_email . '"');
         
