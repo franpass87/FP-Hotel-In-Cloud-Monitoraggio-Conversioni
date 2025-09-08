@@ -289,9 +289,9 @@ class HIC_Booking_Poller {
                 $recent_timestamp = current_time('timestamp') - HIC_WATCHDOG_THRESHOLD; // 5 minutes ago for polling timestamps
                 
                 // Validate timestamps before using them (if hic_validate_api_timestamp is available)
-                if (function_exists('hic_validate_api_timestamp')) {
-                    $safe_timestamp = hic_validate_api_timestamp($safe_timestamp, 'Recovery data timestamp reset');
-                    $recent_timestamp = hic_validate_api_timestamp($recent_timestamp, 'Recovery polling timestamp reset');
+                if (function_exists('\\FpHic\\hic_validate_api_timestamp')) {
+                    $safe_timestamp = \FpHic\hic_validate_api_timestamp($safe_timestamp, 'Recovery data timestamp reset');
+                    $recent_timestamp = \FpHic\hic_validate_api_timestamp($recent_timestamp, 'Recovery polling timestamp reset');
                 }
                 
                 update_option('hic_last_updates_since', $safe_timestamp, false);
@@ -483,11 +483,11 @@ class HIC_Booking_Poller {
         update_option('hic_last_continuous_poll', current_time('timestamp'), false);
         \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
         
-        if (function_exists('hic_api_poll_bookings_continuous')) {
-            hic_api_poll_bookings_continuous();
-        } elseif (function_exists('hic_api_poll_bookings')) {
+        if (function_exists('\\FpHic\\hic_api_poll_bookings_continuous')) {
+            \FpHic\hic_api_poll_bookings_continuous();
+        } elseif (function_exists('\\FpHic\\hic_api_poll_bookings')) {
             // Fallback to existing function if new one doesn't exist yet
-            hic_api_poll_bookings();
+            \FpHic\hic_api_poll_bookings();
         }
     }
     
@@ -502,8 +502,8 @@ class HIC_Booking_Poller {
         update_option('hic_last_deep_check', current_time('timestamp'), false);
         \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
         
-        if (function_exists('hic_api_poll_bookings_deep_check')) {
-            hic_api_poll_bookings_deep_check();
+        if (function_exists('\\FpHic\\hic_api_poll_bookings_deep_check')) {
+            \FpHic\hic_api_poll_bookings_deep_check();
         } else {
             // Fallback implementation
             $this->fallback_deep_check();
@@ -527,8 +527,8 @@ class HIC_Booking_Poller {
         hic_log("Deep check: Searching for reservations from $from_date to $to_date (property: $prop_id)");
         
         // Check by check-in date to catch manual bookings and any missed ones
-        if (function_exists('hic_fetch_reservations_raw')) {
-            $reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, 200);
+        if (function_exists('\\FpHic\\hic_fetch_reservations_raw')) {
+            $reservations = \FpHic\hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, 200);
             if (!is_wp_error($reservations) && is_array($reservations)) {
                 $count = count($reservations);
                 hic_log("Deep check: Found $count reservations in " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback period");
