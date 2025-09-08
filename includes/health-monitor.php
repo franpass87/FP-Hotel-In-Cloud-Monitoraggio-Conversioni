@@ -171,9 +171,9 @@ class HIC_Health_Monitor {
             ];
         }
         
-        $prop_id = Helpers\hic_get_property_id();
-        $email = Helpers\hic_get_api_email();
-        $password = Helpers\hic_get_api_password();
+        $prop_id = \FpHic\Helpers\hic_get_property_id();
+        $email = \FpHic\Helpers\hic_get_api_email();
+        $password = \FpHic\Helpers\hic_get_api_password();
         
         if (empty($prop_id) || empty($email) || empty($password)) {
             return [
@@ -200,7 +200,7 @@ class HIC_Health_Monitor {
      * Check polling system health
      */
     private function check_polling_system() {
-        if (!Helpers\hic_reliable_polling_enabled()) {
+        if (!\FpHic\Helpers\hic_reliable_polling_enabled()) {
             return [
                 'status' => 'warning',
                 'message' => 'Polling system disabled',
@@ -244,19 +244,19 @@ class HIC_Health_Monitor {
     private function check_integrations() {
         $integrations = [
             'ga4' => [
-                'enabled' => !empty(Helpers\hic_get_measurement_id()) && !empty(Helpers\hic_get_api_secret()),
-                'measurement_id' => !empty(Helpers\hic_get_measurement_id()),
-                'api_secret' => !empty(Helpers\hic_get_api_secret())
+                'enabled' => !empty(\FpHic\Helpers\hic_get_measurement_id()) && !empty(\FpHic\Helpers\hic_get_api_secret()),
+                'measurement_id' => !empty(\FpHic\Helpers\hic_get_measurement_id()),
+                'api_secret' => !empty(\FpHic\Helpers\hic_get_api_secret())
             ],
             'meta' => [
-                'enabled' => !empty(Helpers\hic_get_fb_pixel_id()) && !empty(Helpers\hic_get_fb_access_token()),
-                'pixel_id' => !empty(Helpers\hic_get_fb_pixel_id()),
-                'access_token' => !empty(Helpers\hic_get_fb_access_token())
+                'enabled' => !empty(\FpHic\Helpers\hic_get_fb_pixel_id()) && !empty(\FpHic\Helpers\hic_get_fb_access_token()),
+                'pixel_id' => !empty(\FpHic\Helpers\hic_get_fb_pixel_id()),
+                'access_token' => !empty(\FpHic\Helpers\hic_get_fb_access_token())
             ],
             'brevo' => [
-                'enabled' => Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key()),
-                'api_key' => !empty(Helpers\hic_get_brevo_api_key()),
-                'lists_configured' => !empty(Helpers\hic_get_brevo_list_it()) && !empty(Helpers\hic_get_brevo_list_en())
+                'enabled' => \FpHic\Helpers\hic_is_brevo_enabled() && !empty(\FpHic\Helpers\hic_get_brevo_api_key()),
+                'api_key' => !empty(\FpHic\Helpers\hic_get_brevo_api_key()),
+                'lists_configured' => !empty(\FpHic\Helpers\hic_get_brevo_list_it()) && !empty(\FpHic\Helpers\hic_get_brevo_list_en())
             ]
         ];
         
@@ -276,7 +276,7 @@ class HIC_Health_Monitor {
      * Check log file health
      */
     private function check_log_health() {
-        $log_file = Helpers\hic_get_log_file();
+        $log_file = \FpHic\Helpers\hic_get_log_file();
         
         if (empty($log_file)) {
             return [
@@ -345,7 +345,7 @@ class HIC_Health_Monitor {
         $checks = [
             'wp_content' => is_writable(WP_CONTENT_DIR),
             'plugin_dir' => is_writable(plugin_dir_path(__DIR__)),
-            'log_dir' => is_writable(dirname(Helpers\hic_get_log_file()))
+            'log_dir' => is_writable(dirname(\FpHic\Helpers\hic_get_log_file()))
         ];
         
         $all_ok = array_reduce($checks, function($carry, $item) {
@@ -437,8 +437,8 @@ class HIC_Health_Monitor {
      */
     private function schedule_health_checks() {
         // Use safe WordPress cron functions
-        if (!Helpers\hic_safe_wp_next_scheduled('hic_health_monitor_event')) {
-            Helpers\hic_safe_wp_schedule_event(time(), 'hourly', 'hic_health_monitor_event');
+        if (!\FpHic\Helpers\hic_safe_wp_next_scheduled('hic_health_monitor_event')) {
+            \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hourly', 'hic_health_monitor_event');
         }
     }
 
@@ -546,7 +546,7 @@ class HIC_Health_Monitor {
      * Send health alert
      */
     private function send_health_alert($health_data) {
-        $admin_email = Helpers\hic_get_admin_email();
+        $admin_email = \FpHic\Helpers\hic_get_admin_email();
         
         if (!empty($admin_email)) {
             $subject = 'HIC Plugin Health Alert';
