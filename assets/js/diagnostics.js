@@ -232,13 +232,11 @@ jQuery(document).ready(function($) {
             }
             
             $.post(ajaxurl, postData, function(response) {
-                var result = JSON.parse(response);
-                
-                if (result.success) {
+                if (response.success) {
                     $status.text('Backfill completato!').css('color', '#46b450');
-                    
-                    var stats = result.stats;
-                    var html = '<p><strong>' + result.message + '</strong></p>' +
+
+                    var stats = response.stats;
+                    var html = '<p><strong>' + response.message + '</strong></p>' +
                               '<ul>' +
                               '<li>Prenotazioni trovate: <strong>' + stats.total_found + '</strong></li>' +
                               '<li>Prenotazioni processate: <strong>' + stats.total_processed + '</strong></li>' +
@@ -248,31 +246,31 @@ jQuery(document).ready(function($) {
                               '<li>Intervallo date: <strong>' + stats.date_range + '</strong></li>' +
                               '<li>Tipo data: <strong>' + stats.date_type + '</strong></li>' +
                               '</ul>';
-                    
+
                     $resultsContent.html(html);
                     $results.show();
-                    
+
                 } else {
                     $status.text('Errore durante il backfill').css('color', '#dc3232');
-                    
-                    var html = '<p><strong>Errore:</strong> ' + result.message + '</p>';
-                    if (result.stats && Object.keys(result.stats).length > 0) {
+
+                    var html = '<p><strong>Errore:</strong> ' + response.message + '</p>';
+                    if (response.stats && Object.keys(response.stats).length > 0) {
                         html += '<p><strong>Statistiche parziali:</strong></p><ul>';
-                        Object.keys(result.stats).forEach(function(key) {
-                            if (result.stats[key] !== null && result.stats[key] !== '') {
-                                html += '<li>' + key + ': ' + result.stats[key] + '</li>';
+                        Object.keys(response.stats).forEach(function(key) {
+                            if (response.stats[key] !== null && response.stats[key] !== '') {
+                                html += '<li>' + key + ': ' + response.stats[key] + '</li>';
                             }
                         });
                         html += '</ul>';
                     }
-                    
+
                     $resultsContent.html(html);
                     $results.show();
                 }
-                
+
                 $btn.prop('disabled', false);
-                
-            }).fail(function() {
+
+            }, 'json').fail(function() {
                 $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
                 $btn.prop('disabled', false);
             });
@@ -315,32 +313,31 @@ jQuery(document).ready(function($) {
                 action: 'hic_download_latest_bookings',
                 nonce: hicDiagnostics.diagnostics_nonce
             }, function(response) {
-                var result = JSON.parse(response);
                 
-                if (result.success) {
+                if (response.success) {
                     $status.text('Invio completato!').css('color', '#46b450');
                     
                     // Build results HTML
-                    var html = '<p><strong>' + result.message + '</strong></p>' +
+                    var html = '<p><strong>' + response.message + '</strong></p>' +
                               '<ul>' +
-                              '<li>Prenotazioni elaborate: <strong>' + result.count + '</strong></li>' +
-                              '<li>Invii riusciti: <strong class="status ok">' + result.success_count + '</strong></li>' +
-                              '<li>Invii falliti: <strong class="status ' + (result.error_count > 0 ? 'error' : 'ok') + '">' + result.error_count + '</strong></li>' +
+                              '<li>Prenotazioni elaborate: <strong>' + response.count + '</strong></li>' +
+                              '<li>Invii riusciti: <strong class="status ok">' + response.success_count + '</strong></li>' +
+                              '<li>Invii falliti: <strong class="status ' + (response.error_count > 0 ? 'error' : 'ok') + '">' + response.error_count + '</strong></li>' +
                               '</ul>';
                     
                     // Add integration status
                     html += '<h4>Integrazioni Attive:</h4><ul>';
-                    if (result.integration_status.ga4_configured) {
+                    if (response.integration_status.ga4_configured) {
                         html += '<li><span class="status ok">✓ GA4</span> - Eventi inviati</li>';
                     } else {
                         html += '<li><span class="status error">✗ GA4</span> - Non configurato</li>';
                     }
-                    if (result.integration_status.brevo_configured) {
+                    if (response.integration_status.brevo_configured) {
                         html += '<li><span class="status ok">✓ Brevo</span> - Contatti ed eventi inviati</li>';
                     } else {
                         html += '<li><span class="status error">✗ Brevo</span> - Non configurato</li>';
                     }
-                    if (result.integration_status.facebook_configured) {
+                    if (response.integration_status.facebook_configured) {
                         html += '<li><span class="status ok">✓ Facebook</span> - Eventi inviati</li>';
                     } else {
                         html += '<li><span class="status error">✗ Facebook</span> - Non configurato</li>';
@@ -349,12 +346,12 @@ jQuery(document).ready(function($) {
                     html += '</ul>';
                     
                     // Add booking details if available
-                    if (result.processing_results && result.processing_results.length > 0) {
+                    if (response.processing_results && response.processing_results.length > 0) {
                         html += '<h4>Dettaglio Prenotazioni Elaborate:</h4>';
                         html += '<table style="width: 100%; border-collapse: collapse;">';
                         html += '<tr style="background: #f1f1f1; font-weight: bold;"><th style="padding: 8px; border: 1px solid #ddd;">ID</th><th style="padding: 8px; border: 1px solid #ddd;">Email</th><th style="padding: 8px; border: 1px solid #ddd;">Importo</th><th style="padding: 8px; border: 1px solid #ddd;">Stato</th></tr>';
                         
-                        result.processing_results.forEach(function(booking) {
+                        response.processing_results.forEach(function(booking) {
                             var statusIcon = booking.success ? '<span class="status ok">✓</span>' : '<span class="status error">✗</span>';
                             html += '<tr>' +
                                    '<td style="padding: 8px; border: 1px solid #ddd;">' + booking.booking_id + '</td>' +
@@ -371,17 +368,17 @@ jQuery(document).ready(function($) {
                     
                 } else {
                     $status.text('Errore durante l\'invio').css('color', '#dc3232');
-                    if (result.already_downloaded) {
+                    if (response.already_downloaded) {
                         // Special handling for already downloaded message
-                        alert(result.message);
+                        alert(response.message);
                     } else {
-                        alert('Errore: ' + result.message);
+                        alert('Errore: ' + response.message);
                     }
                 }
                 
                 $btn.prop('disabled', false);
                 
-            }).fail(function() {
+            }, 'json').fail(function() {
                 $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
                 $btn.prop('disabled', false);
             });
@@ -403,9 +400,8 @@ jQuery(document).ready(function($) {
                 action: 'hic_reset_download_tracking',
                 nonce: hicDiagnostics.diagnostics_nonce
             }, function(response) {
-                var result = JSON.parse(response);
                 
-                if (result.success) {
+                if (response.success) {
                     $status.text('Tracking resettato!').css('color', '#46b450');
                     
                     // Refresh the page after 2 seconds to update the UI
@@ -415,12 +411,12 @@ jQuery(document).ready(function($) {
                     
                 } else {
                     $status.text('Errore durante il reset').css('color', '#dc3232');
-                    alert('Errore: ' + result.message);
+                    alert('Errore: ' + response.message);
                 }
                 
                 $btn.prop('disabled', false);
                 
-            }).fail(function() {
+            }, 'json').fail(function() {
                 $status.text('Errore di comunicazione con il server').css('color', '#dc3232');
                 $btn.prop('disabled', false);
             });
