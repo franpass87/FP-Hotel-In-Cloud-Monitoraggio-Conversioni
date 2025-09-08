@@ -72,39 +72,36 @@ jobs:
           ./ build/$BUILD_DIR/
           
         # Create a simple readme for the built plugin
-        cat > build/$BUILD_DIR/README.txt << 'EOF'
-=== HIC GA4 + Brevo + Meta (bucket strategy) ===
-Contributors: Francesco Passeri
-Tags: analytics, conversion tracking, hotel bookings, ga4, brevo, meta
-Requires at least: 5.8
-Tested up to: 6.4
-Requires PHP: 7.4
-Stable tag: ${{ steps.version.outputs.version }}
-License: GPLv2 or later
-
-WordPress plugin for tracking hotel booking conversions across GA4, Meta CAPI, and Brevo with bucket strategy.
-
-== Description ==
-
-This plugin tracks hotel booking conversions from Hotel in Cloud and sends them to:
-- Google Analytics 4 (GA4) as purchase events
-- Meta CAPI (Facebook/Instagram) as Purchase events  
-- Brevo for contact management and events
-
-Features bucket strategy classification (gads/fbads/organic) based on tracking parameters.
-
-== Installation ==
-
-1. Upload the plugin files to `/wp-content/plugins/fp-hotel-in-cloud-monitoraggio-conversioni/`
-2. Activate the plugin through the 'Plugins' screen in WordPress
-3. Configure the plugin through Settings > HIC Monitoring
-
-== Changelog ==
-
-= ${{ steps.version.outputs.version }} =
-* See GitHub repository for detailed changelog
-
-EOF
+        echo "=== HIC GA4 + Brevo + Meta (bucket strategy) ===" > build/$BUILD_DIR/README.txt
+        echo "Contributors: Francesco Passeri" >> build/$BUILD_DIR/README.txt
+        echo "Tags: analytics, conversion tracking, hotel bookings, ga4, brevo, meta" >> build/$BUILD_DIR/README.txt
+        echo "Requires at least: 5.8" >> build/$BUILD_DIR/README.txt
+        echo "Tested up to: 6.4" >> build/$BUILD_DIR/README.txt
+        echo "Requires PHP: 7.4" >> build/$BUILD_DIR/README.txt
+        echo "Stable tag: \${{ steps.version.outputs.version }}" >> build/$BUILD_DIR/README.txt
+        echo "License: GPLv2 or later" >> build/$BUILD_DIR/README.txt
+        echo "" >> build/$BUILD_DIR/README.txt
+        echo "WordPress plugin for tracking hotel booking conversions across GA4, Meta CAPI, and Brevo with bucket strategy." >> build/$BUILD_DIR/README.txt
+        echo "" >> build/$BUILD_DIR/README.txt
+        echo "== Description ==" >> build/$BUILD_DIR/README.txt
+        echo "" >> build/$BUILD_DIR/README.txt
+        echo "This plugin tracks hotel booking conversions from Hotel in Cloud and sends them to:" >> build/$BUILD_DIR/README.txt
+        echo "- Google Analytics 4 (GA4) as purchase events" >> build/$BUILD_DIR/README.txt
+        echo "- Meta CAPI (Facebook/Instagram) as Purchase events" >> build/$BUILD_DIR/README.txt
+        echo "- Brevo for contact management and events" >> build/$BUILD_DIR/README.txt
+        echo "" >> build/$BUILD_DIR/README.txt
+        echo "Features bucket strategy classification (gads/fbads/organic) based on tracking parameters." >> build/$BUILD_DIR/README.txt
+        echo "" >> build/$BUILD_DIR/README.txt
+        echo "== Installation ==" >> build/$BUILD_DIR/README.txt
+        echo "" >> build/$BUILD_DIR/README.txt
+        echo "1. Upload the plugin files to '/wp-content/plugins/fp-hotel-in-cloud-monitoraggio-conversioni/'" >> build/$BUILD_DIR/README.txt
+        echo "2. Activate the plugin through the 'Plugins' screen in WordPress" >> build/$BUILD_DIR/README.txt
+        echo "3. Configure the plugin through Settings > HIC Monitoring" >> build/$BUILD_DIR/README.txt
+        echo "" >> build/$BUILD_DIR/README.txt
+        echo "== Changelog ==" >> build/$BUILD_DIR/README.txt
+        echo "" >> build/$BUILD_DIR/README.txt
+        echo "= \${{ steps.version.outputs.version }} =" >> build/$BUILD_DIR/README.txt
+        echo "* See GitHub repository for detailed changelog" >> build/$BUILD_DIR/README.txt
 
     - name: Create plugin ZIP
       run: |
