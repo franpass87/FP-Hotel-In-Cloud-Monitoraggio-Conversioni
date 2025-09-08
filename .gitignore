@@ -5,6 +5,9 @@ test-*.html
 tests/temp/
 tests/*.temp
 
+# Build artifacts
+/dist/
+
 # IDE files
 .vscode/
 .idea/
