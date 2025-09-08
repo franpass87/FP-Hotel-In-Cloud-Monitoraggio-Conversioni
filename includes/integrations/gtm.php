@@ -219,8 +219,8 @@ function hic_init_gtm_hooks() {
     add_action('wp_footer', 'hic_output_gtm_events', 20);
 }
 
-// Initialize GTM hooks when WordPress is ready
-add_action('init', 'hic_init_gtm_hooks');
+// Initialize GTM hooks when WordPress is ready (safe hook registration)
+\FpHic\Helpers\hic_safe_add_hook('action', 'init', 'hic_init_gtm_hooks');
 
 /**
  * GTM dispatcher for HIC reservation schema

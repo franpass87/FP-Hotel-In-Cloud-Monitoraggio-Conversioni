@@ -10,15 +10,7 @@
         "files": [
             "includes/constants.php",
             "includes/functions.php",
-            "includes/database.php",
-            "includes/booking-processor.php",
-            "includes/integrations/ga4.php",
-            "includes/integrations/gtm.php",
-            "includes/integrations/facebook.php",
-            "includes/integrations/brevo.php",
-            "includes/api/webhook.php",
-            "includes/api/polling.php",
-            "includes/cli.php"
+            "includes/database.php"
         ]
     },
     "require-dev": {

@@ -5,7 +5,8 @@
 
 if (!defined('ABSPATH')) exit;
 
-add_action(
+\FpHic\Helpers\hic_safe_add_hook(
+    'action',
     'admin_enqueue_scripts',
     function ($hook) {
         if ($hook === 'hic-monitoring_page_hic-diagnostics') {
@@ -578,20 +579,20 @@ function hic_format_bookings_as_csv($bookings) {
 
 /* ============ AJAX Handlers ============ */
 
-// Add AJAX handlers
-add_action('wp_ajax_hic_refresh_diagnostics', 'hic_ajax_refresh_diagnostics');
-add_action('wp_ajax_hic_test_dispatch', 'hic_ajax_test_dispatch');
-add_action('wp_ajax_hic_force_reschedule', 'hic_ajax_force_reschedule');
-add_action('wp_ajax_hic_create_tables', 'hic_ajax_create_tables');
-add_action('wp_ajax_hic_backfill_reservations', 'hic_ajax_backfill_reservations');
-add_action('wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_bookings');
-add_action('wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
-add_action('wp_ajax_hic_force_polling', 'hic_ajax_force_polling');
-add_action('wp_ajax_hic_download_error_logs', 'hic_ajax_download_error_logs');
-add_action('wp_ajax_hic_trigger_watchdog', 'hic_ajax_trigger_watchdog');
-add_action('wp_ajax_hic_reset_timestamps', 'hic_ajax_reset_timestamps');
-add_action('wp_ajax_hic_test_brevo_connectivity', 'hic_ajax_test_brevo_connectivity');
-add_action('wp_ajax_hic_get_system_status', 'hic_ajax_get_system_status');
+// Add AJAX handlers (using safe hook registration)
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_refresh_diagnostics', 'hic_ajax_refresh_diagnostics');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_test_dispatch', 'hic_ajax_test_dispatch');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_force_reschedule', 'hic_ajax_force_reschedule');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_create_tables', 'hic_ajax_create_tables');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_backfill_reservations', 'hic_ajax_backfill_reservations');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_bookings');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_force_polling', 'hic_ajax_force_polling');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_download_error_logs', 'hic_ajax_download_error_logs');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_trigger_watchdog', 'hic_ajax_trigger_watchdog');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_reset_timestamps', 'hic_ajax_reset_timestamps');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_test_brevo_connectivity', 'hic_ajax_test_brevo_connectivity');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_get_system_status', 'hic_ajax_get_system_status');
 
 
 

@@ -5,6 +5,19 @@
 
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Safe logging helper that checks if the logging function is available
+ */
+function hic_safe_log($message, $level = null) {
+    if (function_exists('FpHic\\Helpers\\hic_log')) {
+        if ($level !== null) {
+            \FpHic\Helpers\hic_log($message, $level);
+        } else {
+            \FpHic\Helpers\hic_log($message);
+        }
+    }
+}
+
 /* ============ DB: tabella sid↔gclid/fbclid ============ */
 function hic_create_database_table(){
   global $wpdb;
@@ -212,7 +225,7 @@ function hic_maybe_upgrade_db() {
 
   // Ensure wpdb is available
   if (!$wpdb) {
-    Helpers\hic_log('hic_maybe_upgrade_db: wpdb is not available');
+    hic_safe_log('hic_maybe_upgrade_db: wpdb is not available');
     return;
   }
 
