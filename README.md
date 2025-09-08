@@ -92,15 +92,6 @@ Nell'esempio sopra vengono escluse dal tracciamento le prenotazioni che contengo
 
 ## Installazione
 
-### Opzione 1: ZIP Pre-compilato (Raccomandato)
-
-1. Scarica il file ZIP pre-compilato dalla sezione [Releases](https://github.com/franpass87/FP-Hotel-In-Cloud-Monitoraggio-Conversioni/releases)
-2. Vai su **WordPress Admin > Plugin > Aggiungi nuovo > Carica plugin**
-3. Seleziona il file ZIP e clicca "Installa ora"
-4. Attiva il plugin
-
-### Opzione 2: Installazione Manuale
-
 1. Dopo aver scaricato il plugin, entrare nella sua directory ed eseguire `composer install` per installare le dipendenze e generare il loader delle classi.
 2. Caricare il plugin normalmente in WordPress.
 3. In installazioni WordPress Multisite, l'attivazione a livello di rete inizializza le tabelle del database per ogni sito.
