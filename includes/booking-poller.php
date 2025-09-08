@@ -50,9 +50,9 @@ class HIC_Booking_Poller {
         }
         
         // Check and schedule continuous polling event
-        $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         if (!$continuous_next) {
-            $scheduled = Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled continuous polling every minute');
             } else {
@@ -62,15 +62,15 @@ class HIC_Booking_Poller {
             // Check if event is overdue (more than 2 minutes in the past)
             if ($continuous_next < (time() - 120)) {
                 hic_log('WP-Cron Scheduler: Continuous polling event is overdue, rescheduling');
-                Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-                Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             }
         }
         
         // Check and schedule deep check event
-        $deep_next = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         if (!$deep_next) {
-            $scheduled = Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled deep check every 10 minutes');
             } else {
@@ -80,15 +80,15 @@ class HIC_Booking_Poller {
             // Check if event is overdue (more than 12 minutes in the past)
             if ($deep_next < (time() - 720)) {
                 hic_log('WP-Cron Scheduler: Deep check event is overdue, rescheduling');
-                Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
-                Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
+                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
             }
         }
 
         // Schedule daily cleanup event
-        $cleanup_next = Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
+        $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         if (!$cleanup_next) {
-            $scheduled = Helpers\hic_safe_wp_schedule_event(time(), 'daily', 'hic_cleanup_event');
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'daily', 'hic_cleanup_event');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled daily cleanup event');
             } else {
@@ -97,9 +97,9 @@ class HIC_Booking_Poller {
         }
 
         // Schedule booking events cleanup
-        $booking_cleanup_next = Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
+        $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
         if (!$booking_cleanup_next) {
-            $scheduled = Helpers\hic_safe_wp_schedule_event(time(), 'daily', 'hic_booking_events_cleanup');
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'daily', 'hic_booking_events_cleanup');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled booking events cleanup event');
             } else {
@@ -130,10 +130,10 @@ class HIC_Booking_Poller {
      * Clear all scheduled WP-Cron events
      */
     public function clear_all_scheduled_events() {
-        Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-        Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
-        Helpers\hic_safe_wp_clear_scheduled_hook('hic_cleanup_event');
-        Helpers\hic_safe_wp_clear_scheduled_hook('hic_booking_events_cleanup');
+        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_cleanup_event');
+        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_booking_events_cleanup');
         hic_log('WP-Cron Scheduler: Cleared all scheduled events');
     }
     
@@ -148,10 +148,10 @@ class HIC_Booking_Poller {
         }
         
         // Check if events are scheduled
-        $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
-        $deep_next = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
-        $cleanup_next = Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
-        $booking_cleanup_next = Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
+        $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
+        $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
 
         $is_working = ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false);
 
@@ -173,17 +173,17 @@ class HIC_Booking_Poller {
      * Log current scheduler status for debugging
      */
     private function log_scheduler_status() {
-        $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
-        $deep_next = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
-        $cleanup_next = Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
-        $booking_cleanup_next = Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
+        $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
+        $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
 
         // Check polling conditions
         $should_poll = $this->should_poll();
-        $reliable_polling = Helpers\hic_reliable_polling_enabled();
-        $connection_type = Helpers\hic_get_connection_type();
-        $api_url = Helpers\hic_get_api_url();
-        $has_auth = Helpers\hic_has_basic_auth_credentials();
+        $reliable_polling = \FpHic\Helpers\hic_reliable_polling_enabled();
+        $connection_type = \FpHic\Helpers\hic_get_connection_type();
+        $api_url = \FpHic\Helpers\hic_get_api_url();
+        $has_auth = \FpHic\Helpers\hic_has_basic_auth_credentials();
 
         $status_msg = sprintf(
             'WP-Cron Status: Continuous next=%s, Deep next=%s, Cleanup next=%s, Booking cleanup next=%s, WP-Cron disabled=%s, Should poll=%s (reliable=%s, type=%s, url=%s, auth=%s)',
@@ -242,8 +242,8 @@ class HIC_Booking_Poller {
         
         // Additional check: if polling should be active but no events are scheduled
         if ($this->should_poll()) {
-            $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
-            $deep_next = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+            $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+            $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
             
             if (!$continuous_next || !$deep_next) {
                 hic_log("Watchdog: Polling should be active but events not scheduled, forcing restart");
@@ -261,16 +261,16 @@ class HIC_Booking_Poller {
         switch ($failure_type) {
             case 'continuous':
                 // Force reschedule continuous polling
-                Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-                Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
                 // Trigger immediate execution
                 $this->execute_continuous_polling();
                 break;
                 
             case 'deep':
                 // Force reschedule deep check
-                Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
-                Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
+                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
                 // Trigger immediate execution
                 $this->execute_deep_check();
                 break;
@@ -385,7 +385,7 @@ class HIC_Booking_Poller {
             }
             
             // Also check if events are scheduled at all
-            $continuous_next = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+            $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
             if (!$continuous_next) {
                 hic_log("Admin Watchdog: No continuous polling event scheduled, restarting scheduler");
                 $this->ensure_scheduler_is_active();
@@ -514,7 +514,7 @@ class HIC_Booking_Poller {
      * Fallback deep check implementation
      */
     private function fallback_deep_check() {
-        $prop_id = Helpers\hic_get_property_id();
+        $prop_id = \FpHic\Helpers\hic_get_property_id();
         if (empty($prop_id)) {
             hic_log("Deep check: No property ID configured");
             return;
@@ -539,10 +539,10 @@ class HIC_Booking_Poller {
      * Check if polling should be active based on configuration
      */
     private function should_poll() {
-        return Helpers\hic_reliable_polling_enabled() && 
-               Helpers\hic_get_connection_type() === 'api' && 
-               Helpers\hic_get_api_url() && 
-               Helpers\hic_has_basic_auth_credentials();
+        return \FpHic\Helpers\hic_reliable_polling_enabled() && 
+               \FpHic\Helpers\hic_get_connection_type() === 'api' && 
+               \FpHic\Helpers\hic_get_api_url() && 
+               \FpHic\Helpers\hic_has_basic_auth_credentials();
     }
     
     /**
@@ -688,19 +688,19 @@ class HIC_Booking_Poller {
         // Add detailed condition checks
         $diagnostics = array_merge($base_stats, array(
             'conditions' => array(
-                'reliable_polling_enabled' => Helpers\hic_reliable_polling_enabled(),
-                'connection_type_api' => Helpers\hic_get_connection_type() === 'api',
-                'api_url_configured' => !empty(Helpers\hic_get_api_url()),
-                'has_credentials' => Helpers\hic_has_basic_auth_credentials(),
-                'basic_auth_complete' => Helpers\hic_has_basic_auth_credentials(),
-                'credentials_type' => Helpers\hic_has_basic_auth_credentials() ? 'basic_auth' : 'none'
+                'reliable_polling_enabled' => \FpHic\Helpers\hic_reliable_polling_enabled(),
+                'connection_type_api' => \FpHic\Helpers\hic_get_connection_type() === 'api',
+                'api_url_configured' => !empty(\FpHic\Helpers\hic_get_api_url()),
+                'has_credentials' => \FpHic\Helpers\hic_has_basic_auth_credentials(),
+                'basic_auth_complete' => \FpHic\Helpers\hic_has_basic_auth_credentials(),
+                'credentials_type' => \FpHic\Helpers\hic_has_basic_auth_credentials() ? 'basic_auth' : 'none'
             ),
             'configuration' => array(
-                'connection_type' => Helpers\hic_get_connection_type(),
-                'api_url' => !empty(Helpers\hic_get_api_url()) ? 'configured' : 'missing',
-                'property_id' => !empty(Helpers\hic_get_property_id()) ? 'configured' : 'missing',
-                'api_email' => !empty(Helpers\hic_get_api_email()) ? 'configured' : 'missing',
-                'api_password' => !empty(Helpers\hic_get_api_password()) ? 'configured' : 'missing'
+                'connection_type' => \FpHic\Helpers\hic_get_connection_type(),
+                'api_url' => !empty(\FpHic\Helpers\hic_get_api_url()) ? 'configured' : 'missing',
+                'property_id' => !empty(\FpHic\Helpers\hic_get_property_id()) ? 'configured' : 'missing',
+                'api_email' => !empty(\FpHic\Helpers\hic_get_api_email()) ? 'configured' : 'missing',
+                'api_password' => !empty(\FpHic\Helpers\hic_get_api_password()) ? 'configured' : 'missing'
             ),
             'lock_status' => array(
                 'active' => get_transient('hic_reliable_polling_lock') ? true : false,
@@ -725,10 +725,10 @@ class HIC_Booking_Poller {
         
         // Get detailed polling conditions
         $should_poll = $this->should_poll();
-        $reliable_polling = Helpers\hic_reliable_polling_enabled();
-        $connection_type = Helpers\hic_get_connection_type();
-        $api_url = Helpers\hic_get_api_url();
-        $has_auth = Helpers\hic_has_basic_auth_credentials();
+        $reliable_polling = \FpHic\Helpers\hic_reliable_polling_enabled();
+        $connection_type = \FpHic\Helpers\hic_get_connection_type();
+        $api_url = \FpHic\Helpers\hic_get_api_url();
+        $has_auth = \FpHic\Helpers\hic_has_basic_auth_credentials();
         
         $stats = array(
             'scheduler_type' => $scheduler_type,
@@ -755,8 +755,8 @@ class HIC_Booking_Poller {
         );
         
         // Add WP-Cron specific info (always show for debugging)
-        $stats['next_continuous_scheduled'] = Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
-        $stats['next_deep_scheduled'] = Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        $stats['next_continuous_scheduled'] = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $stats['next_deep_scheduled'] = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         $stats['wp_cron_disabled'] = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
         
         return $stats;
