@@ -71,16 +71,7 @@ The workflow will automatically build and attach the plugin ZIP to the release.
 
 ## Manual Testing
 
-You can now test the build process locally with the helper script:
-
-```bash
-./build-plugin.sh
-```
-
-The script installs production dependencies, runs quality checks and
-creates `build/fp-hotel-in-cloud-monitoraggio-conversioni-v{version}.zip`.
-
-If you prefer to perform the steps manually, follow this sequence:
+You can test the build process locally:
 
 ```bash
 # Install production dependencies
