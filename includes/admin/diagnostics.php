@@ -30,7 +30,7 @@ function hic_get_internal_scheduler_status() {
     
     $status = array(
         'internal_scheduler' => array(
-            'enabled' => Helpers\hic_reliable_polling_enabled(),
+            'enabled' => hic_reliable_polling_enabled(),
             'conditions_met' => false,
             'last_poll' => null,
             'last_poll_human' => 'Mai eseguito',
@@ -49,10 +49,10 @@ function hic_get_internal_scheduler_status() {
     
     // Check if internal scheduler conditions are met
     $status['internal_scheduler']['conditions_met'] = 
-        Helpers\hic_reliable_polling_enabled() && 
-        Helpers\hic_get_connection_type() === 'api' && 
-        Helpers\hic_get_api_url() && 
-        Helpers\hic_has_basic_auth_credentials();
+        hic_reliable_polling_enabled() && 
+        hic_get_connection_type() === 'api' && 
+        hic_get_api_url() && 
+        hic_has_basic_auth_credentials();
     
     // Get stats from WP-Cron scheduler if available
     if (class_exists('HIC_Booking_Poller')) {
@@ -79,8 +79,8 @@ function hic_get_internal_scheduler_status() {
             ));
             
             // Add detailed WP-Cron diagnostics
-            $continuous_next = $poller_stats['next_continuous_scheduled'] ?? Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
-            $deep_next = $poller_stats['next_deep_scheduled'] ?? Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+            $continuous_next = $poller_stats['next_continuous_scheduled'] ?? hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+            $deep_next = $poller_stats['next_deep_scheduled'] ?? hic_safe_wp_next_scheduled('hic_deep_check_event');
             $wp_cron_disabled = $poller_stats['wp_cron_disabled'] ?? (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON);
             
             $status['internal_scheduler']['cron_diagnostics'] = array(
@@ -140,36 +140,36 @@ function hic_get_internal_scheduler_status() {
  * Check if main polling should be scheduled based on conditions
  */
 function hic_should_schedule_poll_event() {
-    if (Helpers\hic_get_connection_type() !== 'api') {
+    if (hic_get_connection_type() !== 'api') {
         return false;
     }
     
-    if (!Helpers\hic_get_api_url()) {
+    if (!hic_get_api_url()) {
         return false;
     }
     
     // Check if we have Basic Auth credentials
-    return Helpers\hic_has_basic_auth_credentials();
+    return hic_has_basic_auth_credentials();
 }
 
 /**
  * Check if updates polling should be scheduled based on conditions
  */
 function hic_should_schedule_updates_event() {
-    if (Helpers\hic_get_connection_type() !== 'api') {
+    if (hic_get_connection_type() !== 'api') {
         return false;
     }
     
-    if (!Helpers\hic_get_api_url()) {
+    if (!hic_get_api_url()) {
         return false;
     }
     
-    if (!Helpers\hic_updates_enrich_contacts()) {
+    if (!hic_updates_enrich_contacts()) {
         return false;
     }
     
     // Updates polling requires Basic Auth
-    return Helpers\hic_has_basic_auth_credentials();
+    return hic_has_basic_auth_credentials();
 }
 
 /**
@@ -177,15 +177,15 @@ function hic_should_schedule_updates_event() {
  */
 function hic_get_credentials_status() {
     return array(
-        'connection_type' => Helpers\hic_get_connection_type(),
-        'api_url' => !empty(Helpers\hic_get_api_url()),
-        'property_id' => !empty(Helpers\hic_get_property_id()),
-        'api_email' => !empty(Helpers\hic_get_api_email()),
-        'api_password' => !empty(Helpers\hic_get_api_password()),
-        'updates_enrich_enabled' => Helpers\hic_updates_enrich_contacts(),
-        'ga4_configured' => !empty(Helpers\hic_get_measurement_id()) && !empty(Helpers\hic_get_api_secret()),
-        'brevo_configured' => Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key()),
-        'facebook_configured' => !empty(Helpers\hic_get_fb_pixel_id()) && !empty(Helpers\hic_get_fb_access_token())
+        'connection_type' => hic_get_connection_type(),
+        'api_url' => !empty(hic_get_api_url()),
+        'property_id' => !empty(hic_get_property_id()),
+        'api_email' => !empty(hic_get_api_email()),
+        'api_password' => !empty(hic_get_api_password()),
+        'updates_enrich_enabled' => hic_updates_enrich_contacts(),
+        'ga4_configured' => !empty(hic_get_measurement_id()) && !empty(hic_get_api_secret()),
+        'brevo_configured' => hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key()),
+        'facebook_configured' => !empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())
     );
 }
 
@@ -210,9 +210,9 @@ function hic_get_execution_stats() {
         'last_poll_reservations_found' => get_option('hic_last_poll_count', 0),
         'last_poll_skipped' => get_option('hic_last_poll_skipped', 0),
         'last_poll_duration' => get_option('hic_last_poll_duration', 0),
-        'polling_interval' => Helpers\hic_get_polling_interval(),
-        'log_file_exists' => file_exists(Helpers\hic_get_log_file()),
-        'log_file_size' => file_exists(Helpers\hic_get_log_file()) ? filesize(Helpers\hic_get_log_file()) : 0
+        'polling_interval' => hic_get_polling_interval(),
+        'log_file_exists' => file_exists(hic_get_log_file()),
+        'log_file_size' => file_exists(hic_get_log_file()) ? filesize(hic_get_log_file()) : 0
     );
 }
 
@@ -245,7 +245,7 @@ function hic_test_dispatch_functions() {
         $fbclid = null;
         
         // Test GA4
-        if (!empty(Helpers\hic_get_measurement_id()) && !empty(Helpers\hic_get_api_secret())) {
+        if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
             $sid = $test_data['sid'] ?? null;
             hic_send_to_ga4($test_data, $gclid, $fbclid, '', '', $sid);
             $results['ga4'] = 'Test event sent to GA4';
@@ -254,7 +254,7 @@ function hic_test_dispatch_functions() {
         }
         
         // Test GTM
-        if (Helpers\hic_is_gtm_enabled() && !empty(Helpers\hic_get_gtm_container_id())) {
+        if (hic_is_gtm_enabled() && !empty(hic_get_gtm_container_id())) {
             $sid = $test_data['sid'] ?? null;
             hic_send_to_gtm_datalayer($test_data, $gclid, $fbclid, $sid);
             $results['gtm'] = 'Test event queued for GTM DataLayer';
@@ -263,7 +263,7 @@ function hic_test_dispatch_functions() {
         }
         
         // Test Facebook
-        if (!empty(Helpers\hic_get_fb_pixel_id()) && !empty(Helpers\hic_get_fb_access_token())) {
+        if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
             hic_send_to_fb($test_data, $gclid, $fbclid, '', '');
             $results['facebook'] = 'Test event sent to Facebook';
         } else {
@@ -271,7 +271,7 @@ function hic_test_dispatch_functions() {
         }
         
         // Test Brevo
-        if (Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key())) {
+        if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
             hic_send_brevo_contact($test_data, $gclid, $fbclid, '', '');
             hic_send_brevo_event($test_data, $gclid, $fbclid, '', '');
             $results['brevo'] = 'Test contact and event sent to Brevo';
@@ -280,9 +280,9 @@ function hic_test_dispatch_functions() {
         }
         
         // Test Admin Email
-        $admin_email = Helpers\hic_get_admin_email();
+        $admin_email = hic_get_admin_email();
         if (!empty($admin_email)) {
-            Helpers\hic_send_admin_email($test_data, $gclid, $fbclid, 'test_' . current_time('timestamp'));
+            hic_send_admin_email($test_data, $gclid, $fbclid, 'test_' . current_time('timestamp'));
             $results['admin_email'] = 'Test email sent to admin: ' . $admin_email;
         } else {
             $results['admin_email'] = 'Admin email not configured';
@@ -308,15 +308,15 @@ function hic_force_restart_internal_scheduler() {
     // Clear any existing WP-Cron events (cleanup legacy events)
     $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event', 'hic_reliable_poll_event');
     foreach ($legacy_events as $event) {
-        Helpers\hic_safe_wp_clear_scheduled_hook($event);
+        hic_safe_wp_clear_scheduled_hook($event);
         $results['legacy_' . $event . '_cleared'] = 'Cleared all legacy cron events';
     }
     
     // Check if internal scheduler should be active
-    $should_activate = Helpers\hic_reliable_polling_enabled() && 
-                      Helpers\hic_get_connection_type() === 'api' && 
-                      Helpers\hic_get_api_url() && 
-                      Helpers\hic_has_basic_auth_credentials();
+    $should_activate = hic_reliable_polling_enabled() && 
+                      hic_get_connection_type() === 'api' && 
+                      hic_get_api_url() && 
+                      hic_has_basic_auth_credentials();
     
     if ($should_activate) {
         // Reset polling timestamps to trigger immediate execution
@@ -383,7 +383,7 @@ function hic_trigger_watchdog_check() {
 function hic_get_error_stats() {
     $log_lines_to_check = 1000; // Configurable number of recent log lines to analyze
     
-    $log_file = Helpers\hic_get_log_file();
+    $log_file = hic_get_log_file();
     if (!file_exists($log_file)) {
         return array('error_count' => 0, 'last_error' => null);
     }
@@ -440,7 +440,7 @@ function hic_mark_bookings_as_downloaded($booking_ids) {
     }
     
     update_option('hic_downloaded_booking_ids', $downloaded_ids, false);
-    Helpers\hic_clear_option_cache('hic_downloaded_booking_ids');
+    hic_clear_option_cache('hic_downloaded_booking_ids');
     
     hic_log("Marked " . count($booking_ids) . " bookings as downloaded. Total tracked: " . count($downloaded_ids));
 }
@@ -457,19 +457,19 @@ function hic_reset_downloaded_bookings() {
  * Get the latest bookings from the API (with duplicate prevention)
  */
 function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
-    $prop_id = Helpers\hic_get_property_id();
+    $prop_id = hic_get_property_id();
     
     if (!$prop_id) {
         return new WP_Error('missing_prop_id', 'Property ID non configurato');
     }
     
     // Check API connection type
-    if (Helpers\hic_get_connection_type() !== 'api') {
+    if (hic_get_connection_type() !== 'api') {
         return new WP_Error('wrong_connection', 'Sistema configurato per webhook, non API');
     }
     
     // Validate credentials
-    if (!Helpers\hic_has_basic_auth_credentials()) {
+    if (!hic_has_basic_auth_credentials()) {
         return new WP_Error('missing_credentials', 'Credenziali Basic Auth non configurate');
     }
     
@@ -845,9 +845,9 @@ function hic_ajax_download_latest_bookings() {
 
         // Get integration status for report
         $integration_status = array(
-            'ga4_configured' => !empty(Helpers\hic_get_measurement_id()) && !empty(Helpers\hic_get_api_secret()),
-            'brevo_configured' => Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key()),
-            'facebook_configured' => !empty(Helpers\hic_get_fb_pixel_id()) && !empty(Helpers\hic_get_fb_access_token())
+            'ga4_configured' => !empty(hic_get_measurement_id()) && !empty(hic_get_api_secret()),
+            'brevo_configured' => hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key()),
+            'facebook_configured' => !empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())
         );
 
         wp_send_json_success( array(
@@ -1097,9 +1097,9 @@ function hic_diagnostics_page() {
                         <table class="hic-status-table">
                             <tr>
                                 <td>Modalità</td>
-                                <td><strong><?php echo esc_html(Helpers\hic_get_connection_type()); ?></strong></td>
+                                <td><strong><?php echo esc_html(hic_get_connection_type()); ?></strong></td>
                                 <td>
-                                    <?php if (Helpers\hic_get_connection_type() === 'api'): ?>
+                                    <?php if (hic_get_connection_type() === 'api'): ?>
                                         <span class="status ok">✓ Polling Attivo</span>
                                     <?php else: ?>
                                         <span class="status warning">⚠ Webhook</span>
@@ -1227,7 +1227,7 @@ function hic_diagnostics_page() {
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">📊</span>
                             <h3>Google Analytics 4</h3>
-                            <?php if (!empty(Helpers\hic_get_measurement_id()) && !empty(Helpers\hic_get_api_secret())): ?>
+                            <?php if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())): ?>
                                 <span class="status ok">✓ Attivo</span>
                             <?php else: ?>
                                 <span class="status error">✗ Inattivo</span>
@@ -1235,8 +1235,8 @@ function hic_diagnostics_page() {
                         </div>
                         <div class="hic-integration-details">
                             <p>Tracking conversioni e eventi booking</p>
-                            <?php if (!empty(Helpers\hic_get_measurement_id())): ?>
-                                <small>ID: <?php echo esc_html(substr(Helpers\hic_get_measurement_id(), 0, 8)); ?>...</small>
+                            <?php if (!empty(hic_get_measurement_id())): ?>
+                                <small>ID: <?php echo esc_html(substr(hic_get_measurement_id(), 0, 8)); ?>...</small>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -1245,7 +1245,7 @@ function hic_diagnostics_page() {
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">📧</span>
                             <h3>Brevo</h3>
-                            <?php if (Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key())): ?>
+                            <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
                                 <span class="status ok">✓ Attivo</span>
                             <?php else: ?>
                                 <span class="status error">✗ Inattivo</span>
@@ -1253,11 +1253,11 @@ function hic_diagnostics_page() {
                         </div>
                         <div class="hic-integration-details">
                             <p>Email marketing e automazioni</p>
-                            <?php if (Helpers\hic_realtime_brevo_sync_enabled()): ?>
+                            <?php if (hic_realtime_brevo_sync_enabled()): ?>
                                 <small>Real-time sync: ✓</small>
                             <?php endif; ?>
                         </div>
-                        <?php if (Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key())): ?>
+                        <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
                         <div class="hic-integration-actions">
                             <button class="button button-small" id="test-brevo-connectivity-quick">Test API</button>
                         </div>
@@ -1268,7 +1268,7 @@ function hic_diagnostics_page() {
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">📱</span>
                             <h3>Meta/Facebook</h3>
-                            <?php if (!empty(Helpers\hic_get_fb_pixel_id()) && !empty(Helpers\hic_get_fb_access_token())): ?>
+                            <?php if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())): ?>
                                 <span class="status ok">✓ Attivo</span>
                             <?php else: ?>
                                 <span class="status error">✗ Inattivo</span>
@@ -1276,8 +1276,8 @@ function hic_diagnostics_page() {
                         </div>
                         <div class="hic-integration-details">
                             <p>Facebook Pixel e Conversions API</p>
-                            <?php if (!empty(Helpers\hic_get_fb_pixel_id())): ?>
-                                <small>Pixel: <?php echo esc_html(substr(Helpers\hic_get_fb_pixel_id(), 0, 8)); ?>...</small>
+                            <?php if (!empty(hic_get_fb_pixel_id())): ?>
+                                <small>Pixel: <?php echo esc_html(substr(hic_get_fb_pixel_id(), 0, 8)); ?>...</small>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -1288,8 +1288,8 @@ function hic_diagnostics_page() {
                             <h3>Google Ads</h3>
                             <?php 
                             // Google Ads tracking is handled via GTM and GA4
-                            $gtm_enabled = !empty(Helpers\hic_get_gtm_container_id());
-                            $ga4_enabled = !empty(Helpers\hic_get_measurement_id());
+                            $gtm_enabled = !empty(hic_get_gtm_container_id());
+                            $ga4_enabled = !empty(hic_get_measurement_id());
                             $ads_enabled = $gtm_enabled || $ga4_enabled;
                             ?>
                             <?php if ($ads_enabled): ?>
@@ -1301,7 +1301,7 @@ function hic_diagnostics_page() {
                         <div class="hic-integration-details">
                             <p>Conversion tracking via GA4/GTM</p>
                             <?php if ($gtm_enabled): ?>
-                                <small>GTM: <?php echo esc_html(substr(Helpers\hic_get_gtm_container_id(), 0, 8)); ?>...</small>
+                                <small>GTM: <?php echo esc_html(substr(hic_get_gtm_container_id(), 0, 8)); ?>...</small>
                             <?php elseif ($ga4_enabled): ?>
                                 <small>Via GA4 measurement</small>
                             <?php endif; ?>
@@ -1470,7 +1470,7 @@ function hic_diagnostics_page() {
                                     Reset Timestamp
                                 </button>
                                 
-                                <div class="hic-brevo-test" <?php echo (Helpers\hic_is_brevo_enabled() && !empty(Helpers\hic_get_brevo_api_key())) ? '' : 'style="display:none;"'; ?>>
+                                <div class="hic-brevo-test" <?php echo (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) ? '' : 'style="display:none;"'; ?>>
                                     <button class="button button-secondary" id="test-brevo-connectivity">
                                         <span class="dashicons dashicons-cloud"></span>
                                         Test Brevo API
@@ -1504,7 +1504,7 @@ function hic_ajax_download_error_logs() {
         wp_die( __( 'Nonce non valido', 'hotel-in-cloud' ) );
     }
 
-    $log_file = Helpers\hic_get_log_file();
+    $log_file = hic_get_log_file();
 
     if (!file_exists($log_file) || !is_readable($log_file)) {
         wp_die( __( 'File di log non trovato o non leggibile', 'hotel-in-cloud' ) );
@@ -1538,7 +1538,7 @@ function hic_ajax_test_brevo_connectivity() {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
-    if (!Helpers\hic_get_brevo_api_key()) {
+    if (!hic_get_brevo_api_key()) {
         wp_send_json_error( [
             'message' => __( 'API key Brevo mancante. Configura prima l\'API key nelle impostazioni.', 'hotel-in-cloud' )
         ] );
