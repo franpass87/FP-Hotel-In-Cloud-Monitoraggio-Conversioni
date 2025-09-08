@@ -27,7 +27,7 @@ class HealthMonitorApiConnectionTest extends TestCase
         $result = $method->invoke($monitor);
 
         $this->assertSame(['prop', 'email@example.com', 'pass'], $GLOBALS['hic_api_test_called']);
-        $this->assertSame('pass', $result['status']);
+        $this->assertTrue($result['status'] === 'pass');
         $this->assertSame('API OK', $result['message']);
     }
 }
