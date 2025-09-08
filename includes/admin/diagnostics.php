@@ -3,6 +3,18 @@
  * HIC Plugin Diagnostics and Monitoring
  */
 
+use function FpHic\hic_send_to_ga4;
+use function FpHic\hic_send_to_gtm_datalayer;
+use function FpHic\hic_send_to_fb;
+use function FpHic\hic_send_brevo_contact;
+use function FpHic\hic_send_brevo_event;
+use function FpHic\hic_api_poll_bookings;
+use function FpHic\hic_fetch_reservations_raw;
+use function FpHic\hic_process_booking_data;
+use function FpHic\hic_backfill_reservations;
+use function FpHic\hic_test_brevo_contact_api;
+use function FpHic\hic_test_brevo_event_api;
+
 if (!defined('ABSPATH')) exit;
 
 \FpHic\Helpers\hic_safe_add_hook(
