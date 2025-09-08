@@ -2,6 +2,7 @@
     "name": "fp-hotel-in-cloud/monitoraggio-conversioni",
     "description": "HIC GA4 + Brevo + Meta plugin",
     "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
     "autoload": {
         "psr-4": {
             "FpHic\\": "includes/"
