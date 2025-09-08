@@ -94,7 +94,7 @@ function hic_activate($network_wide)
 
 // Add settings link in plugin list
 \add_filter('plugin_action_links_' . \plugin_basename(__FILE__), function ($links) {
-    $settings_link = '<a href="' . \admin_url('options-general.php?page=hic-monitoring') . '">' . \__('Impostazioni', 'hotel-in-cloud') . '</a>';
+    $settings_link = '<a href="' . \admin_url('admin.php?page=hic-monitoring') . '">' . \__('Impostazioni', 'hotel-in-cloud') . '</a>';
     \array_unshift($links, $settings_link);
     return $links;
 });
