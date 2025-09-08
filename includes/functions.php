@@ -37,7 +37,57 @@ function hic_clear_option_cache($key = null) {
     unset($cache[$key]);
 }
 
-add_action('updated_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
+/**
+ * Safely register a WordPress hook, deferring if WordPress is not ready
+ */
+function hic_safe_add_hook($type, $hook, $function, $priority = 10, $accepted_args = 1) {
+    static $deferred_hooks = [];
+    
+    if (function_exists('add_action') && function_exists('add_filter')) {
+        // WordPress is ready, register the hook
+        if ($type === 'action') {
+            add_action($hook, $function, $priority, $accepted_args);
+        } else {
+            add_filter($hook, $function, $priority, $accepted_args);
+        }
+        
+        // Also register any deferred hooks
+        foreach ($deferred_hooks as $deferred) {
+            if ($deferred['type'] === 'action') {
+                add_action($deferred['hook'], $deferred['function'], $deferred['priority'], $deferred['accepted_args']);
+            } else {
+                add_filter($deferred['hook'], $deferred['function'], $deferred['priority'], $deferred['accepted_args']);
+            }
+        }
+        $deferred_hooks = [];
+    } else {
+        // WordPress not ready, defer the hook registration
+        $deferred_hooks[] = [
+            'type' => $type,
+            'hook' => $hook,
+            'function' => $function,
+            'priority' => $priority,
+            'accepted_args' => $accepted_args
+        ];
+    }
+}
+
+/**
+ * Initialize WordPress action hooks for the plugin helpers
+ * This function should be called when WordPress is ready
+ */
+function hic_init_helper_hooks() {
+    // Trigger any deferred hook registrations
+    hic_safe_add_hook('action', 'updated_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
+    
+    if (function_exists('add_action') && function_exists('add_filter')) {
+        add_filter('wp_privacy_personal_data_exporters', __NAMESPACE__ . '\\hic_register_exporter');
+        add_filter('wp_privacy_personal_data_erasers', __NAMESPACE__ . '\\hic_register_eraser');
+        add_filter('cron_schedules', __NAMESPACE__ . '\\hic_add_failed_request_schedule');
+        add_action('init', __NAMESPACE__ . '\\hic_schedule_failed_request_retry');
+        add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
+    }
+}
 
 // Helper functions to get configuration values
 function hic_get_measurement_id() { return hic_get_option('measurement_id', ''); }
@@ -379,8 +429,9 @@ function hic_erase_tracking_data($email_address, $page = 1) {
     ];
 }
 
-add_filter('wp_privacy_personal_data_exporters', __NAMESPACE__ . '\\hic_register_exporter');
-add_filter('wp_privacy_personal_data_erasers', __NAMESPACE__ . '\\hic_register_eraser');
+// Note: These hooks are now registered in hic_init_helper_hooks() function
+// add_filter('wp_privacy_personal_data_exporters', __NAMESPACE__ . '\\hic_register_exporter');
+// add_filter('wp_privacy_personal_data_erasers', __NAMESPACE__ . '\\hic_register_eraser');
 
 /* ============ New Helper Functions ============ */
 
@@ -1165,14 +1216,16 @@ function hic_add_failed_request_schedule($schedules) {
     );
     return $schedules;
 }
-add_filter('cron_schedules', __NAMESPACE__ . '\\hic_add_failed_request_schedule');
+// Note: This hook is now registered in hic_init_helper_hooks() function
+// add_filter('cron_schedules', __NAMESPACE__ . '\\hic_add_failed_request_schedule');
 
 function hic_schedule_failed_request_retry() {
     if (!hic_safe_wp_next_scheduled('hic_retry_failed_requests')) {
         hic_safe_wp_schedule_event(time(), 'hic_every_fifteen_minutes', 'hic_retry_failed_requests');
     }
 }
-add_action('init', __NAMESPACE__ . '\\hic_schedule_failed_request_retry');
+// Note: This hook is now registered in hic_init_helper_hooks() function
+// add_action('init', __NAMESPACE__ . '\\hic_schedule_failed_request_retry');
 
 function hic_retry_failed_requests() {
     global $wpdb;
@@ -1225,7 +1278,8 @@ function hic_retry_failed_requests() {
         }
     }
 }
-add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
+// Note: This hook is now registered in hic_init_helper_hooks() function
+// add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
 
 }
 

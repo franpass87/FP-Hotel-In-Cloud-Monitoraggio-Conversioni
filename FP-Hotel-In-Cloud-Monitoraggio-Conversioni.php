@@ -108,6 +108,19 @@ function hic_activate($network_wide)
 
 // Initialize enhanced systems when WordPress is ready
 \add_action('init', function() {
+    // Load additional plugin files after WordPress is ready
+    require_once __DIR__ . '/includes/booking-processor.php';
+    require_once __DIR__ . '/includes/integrations/ga4.php';
+    require_once __DIR__ . '/includes/integrations/gtm.php';
+    require_once __DIR__ . '/includes/integrations/facebook.php';
+    require_once __DIR__ . '/includes/integrations/brevo.php';
+    require_once __DIR__ . '/includes/api/webhook.php';
+    require_once __DIR__ . '/includes/api/polling.php';
+    require_once __DIR__ . '/includes/cli.php';
+    
+    // Initialize helper action hooks
+    Helpers\hic_init_helper_hooks();
+    
     // Initialize log manager
     \hic_get_log_manager();
 

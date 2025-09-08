@@ -816,5 +816,5 @@ function hic_deactivate() {
     delete_option('hic_failed_bookings_today');
 }
 
-// Initialize booking poller when WordPress is ready
-add_action('init', 'hic_init_booking_poller');
+// Initialize booking poller when WordPress is ready (safe hook registration)
+\FpHic\Helpers\hic_safe_add_hook('action', 'init', 'hic_init_booking_poller');
