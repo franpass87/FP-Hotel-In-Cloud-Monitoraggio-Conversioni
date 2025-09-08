@@ -163,7 +163,7 @@ class HIC_Health_Monitor {
      * Check API connection health
      */
     private function check_api_connection() {
-        if (!function_exists('hic_test_api_connection')) {
+        if (!function_exists('\\FpHic\\hic_test_api_connection')) {
             return [
                 'status' => 'warning',
                 'message' => 'API test function not available',
@@ -187,7 +187,7 @@ class HIC_Health_Monitor {
             ];
         }
         
-        $test_result = hic_test_api_connection($prop_id, $email, $password);
+        $test_result = \FpHic\hic_test_api_connection($prop_id, $email, $password);
         
         return [
             'status' => $test_result['success'] ? 'pass' : 'fail',
