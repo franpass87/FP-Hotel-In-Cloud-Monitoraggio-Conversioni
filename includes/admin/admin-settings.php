@@ -74,7 +74,7 @@ function hic_ajax_test_api_connection() {
     $password = sanitize_text_field( wp_unslash( $_POST['password'] ?? '' ) );
     
     // Test the API connection
-    $result = hic_test_api_connection($prop_id, $email, $password);
+    $result = \FpHic\hic_test_api_connection($prop_id, $email, $password);
 
     $success = !empty($result['success']);
     unset($result['success']);
