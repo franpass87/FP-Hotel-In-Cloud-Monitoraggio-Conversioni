@@ -11,9 +11,9 @@ if (!defined('ABSPATH')) exit;
 function hic_safe_log($message, $level = null) {
     if (function_exists('FpHic\\Helpers\\hic_log')) {
         if ($level !== null) {
-            \FpHic\hic_log($message, $level);
+            \FpHic\Helpers\hic_log($message, $level);
         } else {
-            \FpHic\hic_log($message);
+            \FpHic\Helpers\hic_log($message);
         }
     }
 }

@@ -13,13 +13,13 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
   $api_secret = Helpers\hic_get_api_secret();
   
   if (empty($measurement_id) || empty($api_secret)) {
-    Helpers\hic_log('GA4: measurement ID o API secret mancanti');
+    hic_log('GA4: measurement ID o API secret mancanti');
     return false;
   }
 
   // Validate input data
   if (!is_array($data)) {
-    Helpers\hic_log('GA4: data is not an array');
+    hic_log('GA4: data is not an array');
     return false;
   }
 
@@ -86,7 +86,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    Helpers\hic_log('GA4: Failed to encode JSON payload');
+    hic_log('GA4: Failed to encode JSON payload');
     return false;
   }
 
@@ -106,18 +106,18 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
   
   if ($code !== 204 && $code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
   
-  Helpers\hic_log($log_msg);
+  hic_log($log_msg);
   return true;
 }
 
@@ -129,12 +129,12 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
   $api_secret = Helpers\hic_get_api_secret();
 
   if (empty($measurement_id) || empty($api_secret)) {
-    Helpers\hic_log('GA4 refund: measurement ID o API secret mancanti');
+    hic_log('GA4 refund: measurement ID o API secret mancanti');
     return false;
   }
 
   if (!is_array($data)) {
-    Helpers\hic_log('GA4 refund: data is not an array');
+    hic_log('GA4 refund: data is not an array');
     return false;
   }
 
@@ -196,7 +196,7 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
 
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    Helpers\hic_log('GA4 refund: Failed to encode JSON payload');
+    hic_log('GA4 refund: Failed to encode JSON payload');
     return false;
   }
 
@@ -216,18 +216,18 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
 
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
 
   if ($code !== 204 && $code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
 
-  Helpers\hic_log($log_msg);
+  hic_log($log_msg);
   return true;
 }
 
@@ -240,13 +240,13 @@ function hic_dispatch_ga4_reservation($data) {
   $api_secret = Helpers\hic_get_api_secret();
   
   if (empty($measurement_id) || empty($api_secret)) {
-    Helpers\hic_log('GA4 HIC dispatch SKIPPED: measurement ID o API secret mancanti');
+    hic_log('GA4 HIC dispatch SKIPPED: measurement ID o API secret mancanti');
     return false;
   }
 
   // Validate input data
   if (!is_array($data)) {
-    Helpers\hic_log('GA4 HIC dispatch: data is not an array');
+    hic_log('GA4 HIC dispatch: data is not an array');
     return false;
   }
 
@@ -254,7 +254,7 @@ function hic_dispatch_ga4_reservation($data) {
   $required_fields = ['transaction_id', 'value', 'currency'];
   foreach ($required_fields as $field) {
     if (!isset($data[$field])) {
-      Helpers\hic_log("GA4 HIC dispatch: Missing required field '$field'");
+      hic_log("GA4 HIC dispatch: Missing required field '$field'");
       return false;
     }
   }
@@ -335,7 +335,7 @@ function hic_dispatch_ga4_reservation($data) {
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    Helpers\hic_log('GA4 HIC dispatch: Failed to encode JSON payload');
+    hic_log('GA4 HIC dispatch: Failed to encode JSON payload');
     return false;
   }
 
@@ -355,17 +355,17 @@ function hic_dispatch_ga4_reservation($data) {
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
   
   if ($code !== 204 && $code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
   
-  Helpers\hic_log($log_msg);
+  hic_log($log_msg);
   return true;
 }

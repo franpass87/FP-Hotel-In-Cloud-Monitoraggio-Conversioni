@@ -9,12 +9,12 @@ if (!defined('ABSPATH')) exit;
 /* ============ Brevo: aggiorna contatto ============ */
 function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   if (!Helpers\hic_get_brevo_api_key()) { 
-    Helpers\hic_log('Brevo dispatch SKIPPED: API key mancante'); 
+    hic_log('Brevo dispatch SKIPPED: API key mancante'); 
     return; 
   }
 
   $email = isset($data['email']) ? $data['email'] : null;
-  if (!$email) { Helpers\hic_log('Nessuna email nel payload → skip Brevo contact.'); return; }
+  if (!$email) { hic_log('Nessuna email nel payload → skip Brevo contact.'); return; }
 
   // Lista in base alla lingua (supporta sia 'lingua' sia 'lang')
   $lang = isset($data['lingua']) ? $data['lingua'] : (isset($data['lang']) ? $data['lang'] : '');
@@ -67,7 +67,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
   ));
   
   if (!$result['success']) {
-    Helpers\hic_log('Brevo contact dispatch FAILED: ' . $result['error']);
+    hic_log('Brevo contact dispatch FAILED: ' . $result['error']);
   }
 }
 
@@ -124,7 +124,7 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
   ));
   
   if (!$result['success']) {
-    Helpers\hic_log('Brevo event dispatch FAILED: ' . $result['error']);
+    hic_log('Brevo event dispatch FAILED: ' . $result['error']);
   }
 }
 
@@ -182,7 +182,7 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
   ));
 
   if (!$result['success']) {
-    Helpers\hic_log('Brevo refund event dispatch FAILED: ' . $result['error']);
+    hic_log('Brevo refund event dispatch FAILED: ' . $result['error']);
   }
 
   return $result['success'];
@@ -193,13 +193,13 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
  */
 function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '') {
   if (!Helpers\hic_get_brevo_api_key()) {
-    Helpers\hic_log('Brevo disabilitato (API key vuota).');
+    hic_log('Brevo disabilitato (API key vuota).');
     return false;
   }
 
   $email = isset($data['email']) ? $data['email'] : '';
   if (!Helpers\hic_is_valid_email($email)) {
-    Helpers\hic_log('Brevo: email mancante o non valida, skip contatto.');
+    hic_log('Brevo: email mancante o non valida, skip contatto.');
     return false;
   }
 
@@ -320,7 +320,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   ));
 
   if (!$result['success']) {
-    Helpers\hic_log('Brevo contact dispatch FAILED: ' . $result['error']);
+    hic_log('Brevo contact dispatch FAILED: ' . $result['error']);
     return false;
   }
 
@@ -343,7 +343,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
  */
 function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '') {
   if (!Helpers\hic_get_brevo_api_key()) {
-    Helpers\hic_log('Brevo reservation_created event SKIPPED: API key mancante');
+    hic_log('Brevo reservation_created event SKIPPED: API key mancante');
     return array(
       'success' => false,
       'retryable' => false,
@@ -353,7 +353,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   }
 
   if (!Helpers\hic_realtime_brevo_sync_enabled()) {
-    Helpers\hic_log('Brevo reservation_created event SKIPPED: real-time sync disabilitato');
+    hic_log('Brevo reservation_created event SKIPPED: real-time sync disabilitato');
     return array(
       'success' => false,
       'retryable' => false,
@@ -364,7 +364,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
 
   $email = isset($data['email']) ? $data['email'] : '';
   if (!Helpers\hic_is_valid_email($email)) {
-    Helpers\hic_log('Brevo reservation_created event SKIPPED: email mancante o non valida');
+    hic_log('Brevo reservation_created event SKIPPED: email mancante o non valida');
     return array(
       'success' => false,
       'retryable' => false,
@@ -383,7 +383,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   }
 
   if (!empty($validation_errors)) {
-    Helpers\hic_log('Brevo reservation_created event SKIPPED: validation errors - ' . implode(', ', $validation_errors));
+    hic_log('Brevo reservation_created event SKIPPED: validation errors - ' . implode(', ', $validation_errors));
     return array(
       'success' => false,
       'retryable' => false,
@@ -438,7 +438,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   }
 
   // Debug log the exact payload structure being sent
-  Helpers\hic_log(array('Brevo trackEvent payload debug' => array(
+  hic_log(array('Brevo trackEvent payload debug' => array(
     'email' => $email,
     'event' => 'reservation_created',  
     'properties_structure' => 'properties',
@@ -471,12 +471,12 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   ));
   
   if (!$result['success']) {
-    Helpers\hic_log('Brevo reservation_created event FAILED: ' . $result['error']);
+    hic_log('Brevo reservation_created event FAILED: ' . $result['error']);
     
     // Check if it's a retryable error or permanent failure
     $is_retryable = hic_is_brevo_error_retryable($result);
     if (!$is_retryable) {
-      Helpers\hic_log('Brevo error is not retryable - marking as permanently failed');
+      hic_log('Brevo error is not retryable - marking as permanently failed');
       // Mark reservation as permanently failed immediately for non-retryable errors
       $reservation_id = isset($data['transaction_id']) ? $data['transaction_id'] : '';
       if (!empty($reservation_id)) {
@@ -493,7 +493,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     );
   }
 
-  Helpers\hic_log(array('Brevo reservation_created event sent' => $result['log_data']));
+  hic_log(array('Brevo reservation_created event sent' => $result['log_data']));
   return array(
     'success' => true,
     'retryable' => null,
@@ -548,7 +548,7 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
     case 201: // Created
     case 202: // Accepted
     case 204: // No content
-      Helpers\hic_log(array('Brevo ' . $request_type . ' success' => $log_data));
+      hic_log(array('Brevo ' . $request_type . ' success' => $log_data));
       return array(
         'success' => true,
         'http_code' => $http_code,
@@ -656,14 +656,14 @@ function hic_is_brevo_error_retryable($result) {
  */
 function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $ttclid = '') {
   if (!Helpers\hic_get_brevo_api_key()) { 
-    Helpers\hic_log('Unified Brevo dispatch SKIPPED: API key mancante'); 
+    hic_log('Unified Brevo dispatch SKIPPED: API key mancante'); 
     return false; 
   }
 
   // Validate essential data
   $email = isset($data['email']) ? $data['email'] : null;
   if (!Helpers\hic_is_valid_email($email)) { 
-    Helpers\hic_log('Unified Brevo dispatch SKIPPED: email mancante o non valida'); 
+    hic_log('Unified Brevo dispatch SKIPPED: email mancante o non valida'); 
     return false; 
   }
 
@@ -700,7 +700,7 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
         return true;
       }
     } else {
-      Helpers\hic_log("Unified Brevo: reservation $reservation_id already processed for real-time sync");
+      hic_log("Unified Brevo: reservation $reservation_id already processed for real-time sync");
     }
   }
 
@@ -801,7 +801,7 @@ function hic_test_brevo_event_api() {
     )
   );
   
-  Helpers\hic_log(array('Brevo Event API Test' => array(
+  hic_log(array('Brevo Event API Test' => array(
     'endpoint' => $endpoint,
     'test_email' => $test_email,
     'payload' => $body
@@ -834,7 +834,7 @@ function hic_test_brevo_event_api() {
   if (!$result['success'] && $endpoint !== 'https://in-automate.brevo.com/api/v2/trackEvent') {
     $alt_endpoint = 'https://in-automate.brevo.com/api/v2/trackEvent';
     
-    Helpers\hic_log(array('Brevo Event API Alternative Test' => array(
+    hic_log(array('Brevo Event API Alternative Test' => array(
       'alt_endpoint' => $alt_endpoint,
       'reason' => 'Primary endpoint failed'
     )));

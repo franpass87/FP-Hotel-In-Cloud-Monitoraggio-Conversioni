@@ -29,25 +29,25 @@ function hic_validate_api_timestamp($timestamp, $context = 'api_request') {
     if (empty($timestamp) || !is_numeric($timestamp)) {
         $timestamp = $current_time - 7200; // Default to 2 hours ago
         $adjusted = true;
-        Helpers\hic_log("$context: Invalid timestamp, using default: " . wp_date('Y-m-d H:i:s', $timestamp));
+        hic_log("$context: Invalid timestamp, using default: " . wp_date('Y-m-d H:i:s', $timestamp));
     }
     // Handle timestamps that are too old
     elseif ($timestamp < $earliest_allowed) {
         $timestamp = $earliest_allowed;
         $adjusted = true;
-        Helpers\hic_log("$context: Timestamp too old (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
+        hic_log("$context: Timestamp too old (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
     }
     // Handle timestamps that are too far in the future
     elseif ($timestamp > $latest_allowed) {
         $timestamp = $current_time - 3600; // Set to 1 hour ago
         $adjusted = true;
-        Helpers\hic_log("$context: Timestamp too far in future (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
+        hic_log("$context: Timestamp too far in future (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
     }
     // Additional safety check for unreasonable timestamps
     elseif ($timestamp < 0 || $timestamp < ($current_time - (365 * DAY_IN_SECONDS))) {
         $timestamp = $earliest_allowed;
         $adjusted = true;
-        Helpers\hic_log("$context: Unreasonable timestamp (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to safe value: " . wp_date('Y-m-d H:i:s', $timestamp));
+        hic_log("$context: Unreasonable timestamp (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to safe value: " . wp_date('Y-m-d H:i:s', $timestamp));
     }
     
     return $timestamp;
@@ -58,20 +58,20 @@ function hic_validate_api_timestamp($timestamp, $context = 'api_request') {
  */
 function hic_handle_api_response($response, $context = 'API call') {
   if (is_wp_error($response)) {
-    Helpers\hic_log("$context failed: " . $response->get_error_message());
+    hic_log("$context failed: " . $response->get_error_message());
     return $response;
   }
   
   // Validate response object
   if (!is_array($response) && !is_object($response)) {
-    Helpers\hic_log("$context: Invalid response object");
+    hic_log("$context: Invalid response object");
     return new WP_Error('hic_invalid_response', 'Invalid response object');
   }
   
   $code = wp_remote_retrieve_response_code($response);
   if ($code !== 200) {
     $body = wp_remote_retrieve_body($response);
-    Helpers\hic_log("$context HTTP $code - Response body: " . substr($body, 0, 500));
+    hic_log("$context HTTP $code - Response body: " . substr($body, 0, 500));
     
     // Provide more specific error messages for common HTTP codes
     switch ($code) {
@@ -101,13 +101,13 @@ function hic_handle_api_response($response, $context = 'API call') {
   
   $body = wp_remote_retrieve_body($response);
   if (empty($body)) {
-    Helpers\hic_log("$context: Empty response body");
+    hic_log("$context: Empty response body");
     return new WP_Error('hic_empty_response', 'Empty response body');
   }
   
   $data = json_decode($body, true);
   if (json_last_error() !== JSON_ERROR_NONE) {
-    Helpers\hic_log("$context JSON error: " . json_last_error_msg() . " - Body: " . substr($body, 0, 200));
+    hic_log("$context JSON error: " . json_last_error_msg() . " - Body: " . substr($body, 0, 200));
     return new WP_Error('hic_json', 'Invalid JSON response: ' . json_last_error_msg());
   }
   
@@ -140,7 +140,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     $url = add_query_arg($args, $endpoint);
     
     // Log API call details for debugging
-    Helpers\hic_log("API Call (Reservations endpoint): $url with params: " . json_encode($args));
+    hic_log("API Call (Reservations endpoint): $url with params: " . json_encode($args));
 
     $res = wp_remote_get($url, array(
         'timeout' => 30,
@@ -163,7 +163,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     }
 
     // Log di debug iniziale (ridotto)
-    Helpers\hic_log(array('hic_reservations_count' => is_array($reservations) ? count($reservations) : 0));
+    hic_log(array('hic_reservations_count' => is_array($reservations) ? count($reservations) : 0));
 
     // Processa singole prenotazioni con la nuova pipeline
     $processed_count = 0;
@@ -175,7 +175,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
                     
                     // Acquire processing lock to prevent concurrent processing
                     if (!empty($uid) && !Helpers\hic_acquire_reservation_lock($uid)) {
-                        Helpers\hic_log("Polling skipped: reservation $uid is being processed concurrently");
+                        hic_log("Polling skipped: reservation $uid is being processed concurrently");
                         continue;
                     }
                     
@@ -194,11 +194,11 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
                     }
                 }
             } catch (Exception $e) { 
-                Helpers\hic_log('Process reservation error: '.$e->getMessage()); 
+                hic_log('Process reservation error: '.$e->getMessage()); 
             }
         }
         if (count($reservations) > 0) {
-            Helpers\hic_log("Processed $processed_count out of " . count($reservations) . " reservations (duplicates/invalid skipped)");
+            hic_log("Processed $processed_count out of " . count($reservations) . " reservations (duplicates/invalid skipped)");
         }
     }
     return $reservations;
@@ -213,17 +213,17 @@ function hic_extract_reservations_from_response($data) {
         // Check for error response
         if ($data['success'] == 0 || $data['success'] === false) {
             $error_message = isset($data['error']) ? $data['error'] : 'Unknown API error';
-            Helpers\hic_log("API returned error: $error_message");
+            hic_log("API returned error: $error_message");
             return new WP_Error('hic_api_error', "API Error: $error_message");
         }
         
         // Success response - extract reservations
         if (isset($data['reservations']) && is_array($data['reservations'])) {
-            Helpers\hic_log("New API format detected with " . count($data['reservations']) . " reservations");
+            hic_log("New API format detected with " . count($data['reservations']) . " reservations");
             return $data['reservations'];
         } else {
             // Success but no reservations array
-            Helpers\hic_log("API success but no reservations array found");
+            hic_log("API success but no reservations array found");
             return array(); // Return empty array for successful response with no data
         }
     }
@@ -232,13 +232,13 @@ function hic_extract_reservations_from_response($data) {
     if (is_array($data)) {
         // Check if this looks like an array of reservations (each element should be an array with reservation fields)
         if (empty($data) || (isset($data[0]) && is_array($data[0]))) {
-            Helpers\hic_log("Old API format detected with " . count($data) . " reservations");
+            hic_log("Old API format detected with " . count($data) . " reservations");
             return $data;
         }
     }
     
     // Invalid format
-    Helpers\hic_log("Invalid API response format - expected array with reservations");
+    hic_log("Invalid API response format - expected array with reservations");
     return new WP_Error('hic_invalid_format', 'Invalid API response format');
 }
 
@@ -262,14 +262,14 @@ function hic_should_process_reservation($reservation) {
         if (empty($to)) {
             $missing[] = 'to_date/checkout';
         }
-        Helpers\hic_log('Reservation skipped: missing critical field(s) ' . implode(', ', $missing));
+        hic_log('Reservation skipped: missing critical field(s) ' . implode(', ', $missing));
         return false;
     }
     
     // Check for any valid ID field (more flexible than requiring specific 'id' field)
     $uid = Helpers\hic_booking_uid($reservation);
     if (empty($uid)) {
-        Helpers\hic_log("Reservation skipped: no valid ID field found (tried: id, reservation_id, booking_id, transaction_id)");
+        hic_log("Reservation skipped: no valid ID field found (tried: id, reservation_id, booking_id, transaction_id)");
         return false;
     }
     
@@ -277,14 +277,14 @@ function hic_should_process_reservation($reservation) {
     $optional_fields = ['accommodation_id', 'accommodation_name'];
     foreach ($optional_fields as $field) {
         if (empty($reservation[$field])) {
-            Helpers\hic_log("Reservation $uid: Warning - missing optional field '$field', using defaults");
+            hic_log("Reservation $uid: Warning - missing optional field '$field', using defaults");
         }
     }
     
     // Check valid flag
     $valid = isset($reservation['valid']) ? intval($reservation['valid']) : 1;
     if ($valid === 0 && !Helpers\hic_process_invalid()) {
-        Helpers\hic_log("Reservation $uid skipped: valid=0 and process_invalid=false");
+        hic_log("Reservation $uid skipped: valid=0 and process_invalid=false");
         return false;
     }
     
@@ -294,11 +294,11 @@ function hic_should_process_reservation($reservation) {
         if (Helpers\hic_allow_status_updates()) {
             $presence = $reservation['presence'] ?? '';
             if (in_array($presence, ['arrived', 'departed'])) {
-                Helpers\hic_log("Reservation $uid: status update allowed for presence=$presence");
+                hic_log("Reservation $uid: status update allowed for presence=$presence");
                 return true;
             }
         }
-        Helpers\hic_log("Reservation $uid already processed, skipping");
+        hic_log("Reservation $uid already processed, skipping");
         return false;
     }
     
@@ -347,7 +347,7 @@ function hic_transform_reservation($reservation) {
         foreach ($reservation as $key => $value) {
             if (is_scalar($value) && !empty($value)) {
                 $transaction_id = (string) $value;
-                Helpers\hic_log("Using fallback transaction_id from field '$key': $transaction_id");
+                hic_log("Using fallback transaction_id from field '$key': $transaction_id");
                 break;
             }
         }
@@ -416,7 +416,7 @@ function hic_dispatch_reservation($transformed, $original) {
     // Debug log to verify fixes are in place
     $realtime_enabled = Helpers\hic_realtime_brevo_sync_enabled();
     $connection_type = Helpers\hic_get_connection_type();
-    Helpers\hic_log(array('Reservation dispatch debug' => array(
+    hic_log(array('Reservation dispatch debug' => array(
         'uid' => $uid,
         'is_status_update' => $is_status_update,
         'realtime_brevo_enabled' => $realtime_enabled,
@@ -478,20 +478,20 @@ function hic_dispatch_reservation($transformed, $original) {
             // (events are handled by webhook processor)
             $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid);
             if (!$brevo_success) {
-                Helpers\hic_log('Brevo contact dispatch failed for reservation ' . $uid);
+                hic_log('Brevo contact dispatch failed for reservation ' . $uid);
             }
         } else {
             // In polling mode, handle both contact and events
             $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid);
             if (!$brevo_success) {
-                Helpers\hic_log('Brevo contact dispatch failed for reservation ' . $uid);
+                hic_log('Brevo contact dispatch failed for reservation ' . $uid);
             }
 
             // Brevo real-time events - send reservation_created event for new reservations
             if (!$is_status_update && Helpers\hic_realtime_brevo_sync_enabled()) {
                 $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid);
                 if (is_array($event_result) && !$event_result['success']) {
-                    Helpers\hic_log('Failed to send Brevo reservation_created event in dispatch: ' . $event_result['error']);
+                    hic_log('Failed to send Brevo reservation_created event in dispatch: ' . $event_result['error']);
                 }
             }
         }
@@ -513,12 +513,12 @@ function hic_dispatch_reservation($transformed, $original) {
             );
 
             $email_result = Helpers\hic_send_admin_email($admin_data, $gclid, $fbclid, $transformed['transaction_id']);
-            Helpers\hic_log('Admin email dispatch result for reservation ' . $uid . ': ' . ($email_result ? 'success' : 'failure'));
+            hic_log('Admin email dispatch result for reservation ' . $uid . ': ' . ($email_result ? 'success' : 'failure'));
         }
 
-        Helpers\hic_log("Reservation $uid dispatched successfully (mode: $connection_type)");
+        hic_log("Reservation $uid dispatched successfully (mode: $connection_type)");
     } catch (Exception $e) {
-        Helpers\hic_log("Error dispatching reservation $uid: " . $e->getMessage());
+        hic_log("Error dispatching reservation $uid: " . $e->getMessage());
         throw $e;
     }
 }
@@ -548,7 +548,7 @@ function hic_mark_reservation_processed($reservation) {
 // Wrapper function - now simplified to use continuous polling by default
 function hic_api_poll_bookings(){
     $start_time = microtime(true);
-    Helpers\hic_log('Internal Scheduler: hic_api_poll_bookings execution started');
+    hic_log('Internal Scheduler: hic_api_poll_bookings execution started');
     $log_manager = hic_get_log_manager();
     if ($log_manager) {
         $log_manager->rotate_if_needed();
@@ -558,7 +558,7 @@ function hic_api_poll_bookings(){
     hic_api_poll_bookings_continuous();
 
     $execution_time = round((microtime(true) - $start_time) * 1000, 2);
-    Helpers\hic_log("Internal Scheduler: hic_api_poll_bookings completed in {$execution_time}ms");
+    hic_log("Internal Scheduler: hic_api_poll_bookings completed in {$execution_time}ms");
 }
 
 /**
@@ -577,7 +577,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $from_date = wp_date('Y-m-d H:i:s', $from_time);
     $to_date = wp_date('Y-m-d H:i:s', $to_time);
     
-    Helpers\hic_log("Internal Scheduler: Moving window polling from $from_date to $to_date (property: $prop_id)");
+    hic_log("Internal Scheduler: Moving window polling from $from_date to $to_date (property: $prop_id)");
     
     $total_new = 0;
     $total_skipped = 0;
@@ -599,17 +599,17 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
         if ($validated_check !== $last_update_check) {
             update_option('hic_last_update_check', $validated_check, false);
             Helpers\hic_clear_option_cache('hic_last_update_check');
-            Helpers\hic_log("Quasi-realtime Poll: Updated stored timestamp from " . wp_date('Y-m-d H:i:s', $last_update_check) . " to " . wp_date('Y-m-d H:i:s', $validated_check));
+            hic_log("Quasi-realtime Poll: Updated stored timestamp from " . wp_date('Y-m-d H:i:s', $last_update_check) . " to " . wp_date('Y-m-d H:i:s', $validated_check));
             $last_update_check = $validated_check;
         }
         
-        Helpers\hic_log("Internal Scheduler: Checking for updates since " . wp_date('Y-m-d H:i:s', $last_update_check));
+        hic_log("Internal Scheduler: Checking for updates since " . wp_date('Y-m-d H:i:s', $last_update_check));
         $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_update_check, 100);
         
         if (!is_wp_error($updated_reservations)) {
             $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
             if ($updated_count > 0) {
-                Helpers\hic_log("Internal Scheduler: Found $updated_count updated/new reservations");
+                hic_log("Internal Scheduler: Found $updated_count updated/new reservations");
                 $process_result = hic_process_reservations_batch($updated_reservations);
                 $total_new += $process_result['new'];
                 $total_skipped += $process_result['skipped'];
@@ -634,7 +634,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
                 
                 update_option('hic_last_update_check', $validated_reset, false);
                 Helpers\hic_clear_option_cache('hic_last_update_check');
-                Helpers\hic_log('Quasi-realtime Poll: Timestamp error detected, reset timestamp to: ' . wp_date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
+                hic_log('Quasi-realtime Poll: Timestamp error detected, reset timestamp to: ' . wp_date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
                 
                 // Also reset scheduler timestamps to restart polling immediately with safe values
                 $recent_timestamp = $current_time - 300; // 5 minutes ago
@@ -644,7 +644,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
                 Helpers\hic_clear_option_cache('hic_last_continuous_poll');
                 update_option('hic_last_deep_check', $validated_recent, false);
                 Helpers\hic_clear_option_cache('hic_last_deep_check');
-                Helpers\hic_log('Quasi-realtime Poll: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
+                hic_log('Quasi-realtime Poll: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
             }
         }
     
@@ -652,12 +652,12 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     $checkin_from = wp_date('Y-m-d', $from_time);
     $checkin_to = wp_date('Y-m-d', $to_time + (7 * DAY_IN_SECONDS)); // Extend checkin window
     
-    Helpers\hic_log("Internal Scheduler: Polling by checkin date from $checkin_from to $checkin_to");
+    hic_log("Internal Scheduler: Polling by checkin date from $checkin_from to $checkin_to");
     $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 100);
     
     if (!is_wp_error($checkin_reservations)) {
         $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
-        Helpers\hic_log("Internal Scheduler: Found $checkin_count reservations by checkin date");
+        hic_log("Internal Scheduler: Found $checkin_count reservations by checkin date");
         
         if ($checkin_count > 0) {
             $process_result = hic_process_reservations_batch($checkin_reservations);
@@ -686,7 +686,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     if ($polling_successful) {
         update_option('hic_last_successful_poll', $current_time, false);
         Helpers\hic_clear_option_cache('hic_last_successful_poll');
-        Helpers\hic_log("Internal Scheduler: Updated last successful poll timestamp");
+        hic_log("Internal Scheduler: Updated last successful poll timestamp");
     }
     
     // Comprehensive logging
@@ -704,7 +704,7 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
         $log_msg .= " - API Errors: " . implode('; ', $polling_errors);
     }
     
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
 }
 
 /**
@@ -734,11 +734,11 @@ function hic_process_reservations_batch($reservations) {
                 if (Helpers\hic_allow_status_updates()) {
                     $presence = $reservation['presence'] ?? '';
                     if (in_array($presence, ['arrived', 'departed'])) {
-                        Helpers\hic_log("Reservation $uid: processing status update for presence=$presence");
+                        hic_log("Reservation $uid: processing status update for presence=$presence");
                         
                         // Acquire lock for status update processing
                         if (!Helpers\hic_acquire_reservation_lock($uid, 10)) {
-                            Helpers\hic_log("Reservation $uid: skipped status update due to concurrent processing");
+                            hic_log("Reservation $uid: skipped status update due to concurrent processing");
                             continue;
                         }
                         
@@ -752,13 +752,13 @@ function hic_process_reservations_batch($reservations) {
                     }
                 }
                 $skipped_count++;
-                Helpers\hic_log("Reservation $uid: skipped (already processed)");
+                hic_log("Reservation $uid: skipped (already processed)");
                 continue;
             }
             
             // Acquire lock for new reservation processing
             if (!Helpers\hic_acquire_reservation_lock($uid)) {
-                Helpers\hic_log("Reservation $uid: skipped due to concurrent processing");
+                hic_log("Reservation $uid: skipped due to concurrent processing");
                 $skipped_count++;
                 continue;
             }
@@ -774,7 +774,7 @@ function hic_process_reservations_batch($reservations) {
             
         } catch (Exception $e) {
             $error_count++;
-            Helpers\hic_log("Error processing reservation: " . $e->getMessage());
+            hic_log("Error processing reservation: " . $e->getMessage());
         }
     }
     
@@ -798,7 +798,7 @@ function hic_should_process_reservation_with_email($reservation) {
 
     // Additional check: Skip reservations without email (minimal filter)
     if (empty($email) || !is_string($email)) {
-        Helpers\hic_log("Reservation skipped: missing or invalid email");
+        hic_log("Reservation skipped: missing or invalid email");
         return false;
     }
 
@@ -822,7 +822,7 @@ function hic_process_single_reservation($reservation) {
  * New updates polling wrapper function
  */
 function hic_api_poll_updates(){
-    Helpers\hic_log('Internal Scheduler: hic_api_poll_updates execution started');
+    hic_log('Internal Scheduler: hic_api_poll_updates execution started');
     
     // Always update execution timestamp regardless of results
     update_option('hic_last_api_poll', current_time('timestamp'), false);
@@ -848,20 +848,20 @@ function hic_api_poll_updates(){
     if ($validated_last_since !== $last_since) {
         update_option('hic_last_updates_since', $validated_last_since, false);
         Helpers\hic_clear_option_cache('hic_last_updates_since');
-        Helpers\hic_log("Internal Scheduler: Updated stored timestamp from " . wp_date('Y-m-d H:i:s', $last_since) . " to " . wp_date('Y-m-d H:i:s', $validated_last_since));
+        hic_log("Internal Scheduler: Updated stored timestamp from " . wp_date('Y-m-d H:i:s', $last_since) . " to " . wp_date('Y-m-d H:i:s', $validated_last_since));
         $last_since = $validated_last_since;
     }
     
     $since = max(0, $last_since - $overlap_seconds);
     
-    Helpers\hic_log("Internal Scheduler: polling updates for property $prop");
-    Helpers\hic_log("Internal Scheduler: last timestamp: " . wp_date('Y-m-d H:i:s', $last_since) . " ($last_since)");
-    Helpers\hic_log("Internal Scheduler: requesting since: " . wp_date('Y-m-d H:i:s', $since) . " ($since) [overlap: {$overlap_seconds}s]");
+    hic_log("Internal Scheduler: polling updates for property $prop");
+    hic_log("Internal Scheduler: last timestamp: " . wp_date('Y-m-d H:i:s', $last_since) . " ($last_since)");
+    hic_log("Internal Scheduler: requesting since: " . wp_date('Y-m-d H:i:s', $since) . " ($since) [overlap: {$overlap_seconds}s]");
     
     $out = hic_fetch_reservations_updates($prop, $since, 100); // limit opzionale se supportato
     if (!is_wp_error($out)) {
         $updates_count = is_array($out) ? count($out) : 0;
-        Helpers\hic_log("Internal Scheduler: Found $updates_count updates");
+        hic_log("Internal Scheduler: Found $updates_count updates");
         
         // Calculate new timestamp based on actual updates
         $new_timestamp = $current_time;
@@ -880,28 +880,28 @@ function hic_api_poll_updates(){
               // Use the max updated_at if found, otherwise use current time
               if ($max_updated_at > 0) {
                   $new_timestamp = $max_updated_at;
-                  Helpers\hic_log("Internal Scheduler: Using max updated_at timestamp: " . wp_date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+                  hic_log("Internal Scheduler: Using max updated_at timestamp: " . wp_date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
               } else {
-                  Helpers\hic_log("Internal Scheduler: No updated_at field found, using current time: " . wp_date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+                  hic_log("Internal Scheduler: No updated_at field found, using current time: " . wp_date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
               }
         } else {
             // No updates found - advance timestamp only if enough time has passed to prevent infinite polling
               $time_since_last_poll = $current_time - $last_since;
             if ($time_since_last_poll > 3600) { // 1 hour
-                Helpers\hic_log("Internal Scheduler: No updates found but 1+ hour passed, advancing timestamp to prevent infinite polling");
+                hic_log("Internal Scheduler: No updates found but 1+ hour passed, advancing timestamp to prevent infinite polling");
             } else {
                 // Keep previous timestamp for retry, but with small increment to avoid exact same request
                 $new_timestamp = $last_since + 60; // Advance by 1 minute to make progress
-                Helpers\hic_log("Internal Scheduler: No updates found, advancing by 1 minute for next retry: " . wp_date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
+                hic_log("Internal Scheduler: No updates found, advancing by 1 minute for next retry: " . wp_date('Y-m-d H:i:s', $new_timestamp) . " ($new_timestamp)");
             }
         }
         
         update_option('hic_last_updates_since', $new_timestamp, false);
         Helpers\hic_clear_option_cache('hic_last_updates_since');
-        Helpers\hic_log('Internal Scheduler: hic_api_poll_updates completed successfully');
+        hic_log('Internal Scheduler: hic_api_poll_updates completed successfully');
     } else {
         $error_message = $out->get_error_message();
-        Helpers\hic_log('Internal Scheduler: hic_api_poll_updates failed: ' . $error_message);
+        hic_log('Internal Scheduler: hic_api_poll_updates failed: ' . $error_message);
         
         // Check if this is a timestamp too old error and reset if necessary
         if ($out->get_error_code() === 'hic_timestamp_too_old') {
@@ -913,7 +913,7 @@ function hic_api_poll_updates(){
             
             update_option('hic_last_updates_since', $validated_reset, false);
             Helpers\hic_clear_option_cache('hic_last_updates_since');
-            Helpers\hic_log('Internal Scheduler: Timestamp error detected, reset timestamp to: ' . wp_date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
+            hic_log('Internal Scheduler: Timestamp error detected, reset timestamp to: ' . wp_date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
             
             // Also reset scheduler timestamps to restart polling immediately with safe values
             $recent_timestamp = $current_time - 300; // 5 minutes ago
@@ -923,7 +923,7 @@ function hic_api_poll_updates(){
             Helpers\hic_clear_option_cache('hic_last_continuous_poll');
             update_option('hic_last_deep_check', $validated_recent, false);
             Helpers\hic_clear_option_cache('hic_last_deep_check');
-            Helpers\hic_log('Internal Scheduler: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
+            hic_log('Internal Scheduler: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
         }
     }
 }
@@ -933,17 +933,17 @@ function hic_api_poll_updates(){
  */
 function hic_retry_failed_brevo_notifications() {
     if (!Helpers\hic_realtime_brevo_sync_enabled()) {
-        Helpers\hic_log('Real-time Brevo sync disabled, skipping retry');
+        hic_log('Real-time Brevo sync disabled, skipping retry');
         return;
     }
 
-    Helpers\hic_log('Internal Scheduler: hic_retry_failed_brevo_notifications execution started');
+    hic_log('Internal Scheduler: hic_retry_failed_brevo_notifications execution started');
     
     // Get failed reservations that need retry
     $failed_reservations = hic_get_failed_reservations_for_retry(3, 30); // max 3 attempts, 30 min delay
     
     if (empty($failed_reservations)) {
-        Helpers\hic_log('No failed reservations to retry');
+        hic_log('No failed reservations to retry');
         return;
     }
     
@@ -954,7 +954,7 @@ function hic_retry_failed_brevo_notifications() {
         $reservation_id = $failed->reservation_id;
         $retry_count++;
         
-        Helpers\hic_log("Retrying failed notification for reservation $reservation_id (attempt " . ($failed->attempt_count + 1) . ")");
+        hic_log("Retrying failed notification for reservation $reservation_id (attempt " . ($failed->attempt_count + 1) . ")");
         
         // Try to get reservation data from API for retry
         // For now, we'll use a simplified approach and just mark as failed after max attempts
@@ -963,15 +963,15 @@ function hic_retry_failed_brevo_notifications() {
         // For this implementation, we'll mark as permanently failed after max attempts
         if ($failed->attempt_count >= 2) { // 3rd attempt
             hic_mark_reservation_notification_failed($reservation_id, 'Max retry attempts reached');
-            Helpers\hic_log("Reservation $reservation_id marked as permanently failed after max retry attempts");
+            hic_log("Reservation $reservation_id marked as permanently failed after max retry attempts");
         } else {
             // Increment attempt count but keep in failed state for next retry
             hic_mark_reservation_notification_failed($reservation_id, 'Retry attempt failed');
-            Helpers\hic_log("Reservation $reservation_id retry failed, will try again later");
+            hic_log("Reservation $reservation_id retry failed, will try again later");
         }
     }
     
-    Helpers\hic_log("Retry process completed: $retry_count attempted, $success_count succeeded");
+    hic_log("Retry process completed: $retry_count attempted, $success_count succeeded");
 }
 
 /**
@@ -989,7 +989,7 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
     $validated_since = hic_validate_api_timestamp($since, 'HIC updates fetch');
     
     if ($validated_since !== $since) {
-        Helpers\hic_log("HIC updates fetch: Timestamp adjusted from " . wp_date('Y-m-d H:i:s', $since) . " to " . wp_date('Y-m-d H:i:s', $validated_since));
+        hic_log("HIC updates fetch: Timestamp adjusted from " . wp_date('Y-m-d H:i:s', $since) . " to " . wp_date('Y-m-d H:i:s', $validated_since));
     }
     
     $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
@@ -1018,7 +1018,7 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
     }
 
     // Log di debug iniziale
-    Helpers\hic_log(array('hic_updates_count' => is_array($updates) ? count($updates) : 0));
+    hic_log(array('hic_updates_count' => is_array($updates) ? count($updates) : 0));
 
     // Process each update
     if (is_array($updates)) {
@@ -1026,7 +1026,7 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
             try {
                 hic_process_update($u);
             } catch (Exception $e) { 
-                Helpers\hic_log('Process update error: '.$e->getMessage()); 
+                hic_log('Process update error: '.$e->getMessage()); 
             }
         }
     }
@@ -1040,21 +1040,21 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
 function hic_process_update(array $u){
     // Validate input array
     if (!is_array($u) || empty($u)) {
-        Helpers\hic_log('hic_process_update: invalid or empty update array');
+        hic_log('hic_process_update: invalid or empty update array');
         return;
     }
     
     // Get reservation ID with proper validation
     $id = Helpers\hic_extract_reservation_id($u);
     if (empty($id)) {
-        Helpers\hic_log('hic_process_update: missing or invalid reservation id');
+        hic_log('hic_process_update: missing or invalid reservation id');
         return;
     }
 
     // Check if this is a new reservation for real-time sync
     $is_new_reservation = hic_is_reservation_new_for_realtime($id);
     if ($is_new_reservation) {
-        Helpers\hic_log("New reservation detected for real-time sync: $id");
+        hic_log("New reservation detected for real-time sync: $id");
         hic_mark_reservation_new_for_realtime($id);
         
         // Process new reservation for real-time Brevo notification
@@ -1067,7 +1067,7 @@ function hic_process_update(array $u){
         ?? $u['client_email']
         ?? '';
     if (empty($email) || !is_string($email)) {
-        Helpers\hic_log("hic_process_update: no valid email in update for reservation $id");
+        hic_log("hic_process_update: no valid email in update for reservation $id");
         return;
     }
     
@@ -1081,15 +1081,15 @@ function hic_process_update(array $u){
             hic_dispatch_brevo_reservation($t, true, '', '', '', ''); // aggiorna contatto with enrichment flag
             // aggiorna store locale per id -> true_email
             Helpers\hic_mark_email_enriched($id, $email);
-            Helpers\hic_log("Enriched email for reservation $id");
+            hic_log("Enriched email for reservation $id");
         } else {
-            Helpers\hic_log("hic_process_update: failed to transform reservation $id");
+            hic_log("hic_process_update: failed to transform reservation $id");
         }
     }
 
     // Se cambia presence e impostazione consente aggiornamenti:
     if (Helpers\hic_allow_status_updates() && !empty($u['presence'])) {
-        Helpers\hic_log("Reservation $id presence update: ".$u['presence']);
+        hic_log("Reservation $id presence update: ".$u['presence']);
         // opzionale: dispatch evento custom (no purchase)
     }
 }
@@ -1099,20 +1099,20 @@ function hic_process_update(array $u){
  */
 function hic_process_new_reservation_for_realtime($reservation_data) {
     if (!Helpers\hic_realtime_brevo_sync_enabled()) {
-        Helpers\hic_log('Real-time Brevo sync disabled, skipping new reservation notification');
+        hic_log('Real-time Brevo sync disabled, skipping new reservation notification');
         return;
     }
 
     $reservation_id = Helpers\hic_extract_reservation_id($reservation_data);
     if (!$reservation_id) {
-        Helpers\hic_log('Cannot process new reservation: missing reservation ID');
+        hic_log('Cannot process new reservation: missing reservation ID');
         return;
     }
 
     // Transform reservation data to standard format
     $transformed = hic_transform_reservation($reservation_data);
     if ($transformed === false || !is_array($transformed)) {
-        Helpers\hic_log("Failed to transform new reservation $reservation_id for real-time sync");
+        hic_log("Failed to transform new reservation $reservation_id for real-time sync");
         hic_mark_reservation_notification_failed($reservation_id, 'Transformation failed');
         return;
     }
@@ -1148,28 +1148,28 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
     // Also send/update contact information regardless of event result
     if (Helpers\hic_is_valid_email($transformed['email']) && !Helpers\hic_is_ota_alias_email($transformed['email'])) {
         if (!hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid)) {
-            Helpers\hic_log("Failed to update Brevo contact for reservation $reservation_id");
+            hic_log("Failed to update Brevo contact for reservation $reservation_id");
         }
     }
 
     if (is_array($event_result) && $event_result['success']) {
         // Mark as successfully notified
         hic_mark_reservation_notified_to_brevo($reservation_id);
-        Helpers\hic_log("Successfully sent reservation_created event to Brevo for reservation $reservation_id");
+        hic_log("Successfully sent reservation_created event to Brevo for reservation $reservation_id");
     } elseif (is_array($event_result)) {
         // Handle failure based on retryability
         if (!empty($event_result['skipped'])) {
-            Helpers\hic_log("Brevo reservation_created event skipped for reservation $reservation_id: " . $event_result['error']);
+            hic_log("Brevo reservation_created event skipped for reservation $reservation_id: " . $event_result['error']);
         } elseif ($event_result['retryable']) {
             // Mark as failed for retry
             hic_mark_reservation_notification_failed($reservation_id, 'Failed to send Brevo event: ' . $event_result['error']);
-            Helpers\hic_log("Failed to send reservation_created event to Brevo for reservation $reservation_id (retryable error)");
+            hic_log("Failed to send reservation_created event to Brevo for reservation $reservation_id (retryable error)");
         } else {
             // Already marked as permanent failure in hic_send_brevo_reservation_created_event
-            Helpers\hic_log("Failed to send reservation_created event to Brevo for reservation $reservation_id (permanent failure)");
+            hic_log("Failed to send reservation_created event to Brevo for reservation $reservation_id (permanent failure)");
         }
     } else {
-        Helpers\hic_log("Brevo reservation_created event returned unexpected result for reservation $reservation_id");
+        hic_log("Brevo reservation_created event returned unexpected result for reservation $reservation_id");
     }
 }
 
@@ -1318,7 +1318,7 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
 function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin', $limit = null) {
     $start_time = microtime(true);
     
-    Helpers\hic_log("Backfill: Starting backfill from $from_date to $to_date (date_type: $date_type, limit: " . ($limit ?: 'none') . ")");
+    hic_log("Backfill: Starting backfill from $from_date to $to_date (date_type: $date_type, limit: " . ($limit ?: 'none') . ")");
     
     // Validate date_type (based on API documentation: checkin, checkout, presence for /reservations)
     // Note: For recent updates, use hic_fetch_reservations_updates() instead
@@ -1403,7 +1403,7 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
         }
         
         $stats['total_found'] = count($reservations);
-        Helpers\hic_log("Backfill: Found {$stats['total_found']} reservations");
+        hic_log("Backfill: Found {$stats['total_found']} reservations");
         
         // Process each reservation
         foreach ($reservations as $reservation) {
@@ -1421,19 +1421,19 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
                     $stats['total_processed']++;
                 } else {
                     $stats['total_errors']++;
-                    Helpers\hic_log("Backfill: Failed to transform reservation: " . json_encode($reservation));
+                    hic_log("Backfill: Failed to transform reservation: " . json_encode($reservation));
                 }
                 
             } catch (Exception $e) {
                 $stats['total_errors']++;
-                Helpers\hic_log("Backfill: Error processing reservation: " . $e->getMessage());
+                hic_log("Backfill: Error processing reservation: " . $e->getMessage());
             }
         }
         
         $stats['execution_time'] = round(microtime(true) - $start_time, 2);
         
         $message = "Backfill completato: {$stats['total_found']} trovate, {$stats['total_processed']} processate, {$stats['total_skipped']} saltate, {$stats['total_errors']} errori in {$stats['execution_time']}s";
-        Helpers\hic_log("Backfill: $message");
+        hic_log("Backfill: $message");
         
         return array(
             'success' => true,
@@ -1444,7 +1444,7 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
     } catch (Exception $e) {
         $stats['execution_time'] = round(microtime(true) - $start_time, 2);
         $error_message = "Errore durante il backfill: " . $e->getMessage();
-        Helpers\hic_log("Backfill: $error_message");
+        hic_log("Backfill: $error_message");
         
         return array(
             'success' => false,
@@ -1472,7 +1472,7 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
     if ($limit) $args['limit'] = (int)$limit;
     $url = add_query_arg($args, $endpoint);
     
-    Helpers\hic_log("Backfill Raw API Call (Reservations endpoint): $url");
+    hic_log("Backfill Raw API Call (Reservations endpoint): $url");
 
     $res = wp_remote_get($url, array(
         'timeout' => 30,
@@ -1484,14 +1484,14 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
     ));
     
     if (is_wp_error($res)) {
-        Helpers\hic_log("Backfill Raw API call failed: " . $res->get_error_message());
+        hic_log("Backfill Raw API call failed: " . $res->get_error_message());
         return $res;
     }
     
     $code = wp_remote_retrieve_response_code($res);
     if ($code !== 200) {
         $body = wp_remote_retrieve_body($res);
-        Helpers\hic_log("Backfill Raw API HTTP $code - Response body: " . substr($body, 0, 500));
+        hic_log("Backfill Raw API HTTP $code - Response body: " . substr($body, 0, 500));
         
         // Provide specific error messages for common HTTP codes in backfill context
         switch ($code) {
@@ -1517,7 +1517,7 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
     
     $data = json_decode($body, true);
     if (json_last_error() !== JSON_ERROR_NONE) {
-        Helpers\hic_log("Backfill JSON decode error: " . json_last_error_msg());
+        hic_log("Backfill JSON decode error: " . json_last_error_msg());
         return new WP_Error('hic_json_error', 'Invalid JSON response from backfill API');
     }
     
@@ -1536,18 +1536,18 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
  */
 function hic_api_poll_bookings_continuous() {
     $start_time = microtime(true);
-    Helpers\hic_log('Continuous Polling: Starting 1-minute interval check');
+    hic_log('Continuous Polling: Starting 1-minute interval check');
     
     // Try to acquire lock to prevent overlapping executions
     if (!Helpers\hic_acquire_polling_lock(120)) { // 2-minute timeout for continuous polling
-        Helpers\hic_log('Continuous Polling: Another polling process is running, skipping execution');
+        hic_log('Continuous Polling: Another polling process is running, skipping execution');
         return;
     }
     
     try {
         $prop_id = Helpers\hic_get_property_id();
         if (empty($prop_id)) {
-            Helpers\hic_log('Continuous Polling: No property ID configured');
+            hic_log('Continuous Polling: No property ID configured');
             return;
         }
         
@@ -1563,7 +1563,7 @@ function hic_api_poll_bookings_continuous() {
         $from_date = wp_date('Y-m-d H:i:s', $from_time);
         $to_date = wp_date('Y-m-d H:i:s', $to_time);
         
-        Helpers\hic_log("Continuous Polling: Checking window from $from_date to $to_date (property: $prop_id)");
+        hic_log("Continuous Polling: Checking window from $from_date to $to_date (property: $prop_id)");
         
         $total_new = 0;
         $total_skipped = 0;
@@ -1584,17 +1584,17 @@ function hic_api_poll_bookings_continuous() {
         if ($validated_check !== $last_continuous_check) {
             update_option('hic_last_continuous_check', $validated_check, false);
             Helpers\hic_clear_option_cache('hic_last_continuous_check');
-            Helpers\hic_log("Continuous Polling: Updated stored timestamp from " . wp_date('Y-m-d H:i:s', $last_continuous_check) . " to " . wp_date('Y-m-d H:i:s', $validated_check));
+            hic_log("Continuous Polling: Updated stored timestamp from " . wp_date('Y-m-d H:i:s', $last_continuous_check) . " to " . wp_date('Y-m-d H:i:s', $validated_check));
             $last_continuous_check = $validated_check;
         }
         
-        Helpers\hic_log("Continuous Polling: Checking for updates since " . wp_date('Y-m-d H:i:s', $last_continuous_check));
+        hic_log("Continuous Polling: Checking for updates since " . wp_date('Y-m-d H:i:s', $last_continuous_check));
         $updated_reservations = hic_fetch_reservations_updates($prop_id, $last_continuous_check, 50);
         
         if (!is_wp_error($updated_reservations)) {
             $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
             if ($updated_count > 0) {
-                Helpers\hic_log("Continuous Polling: Found $updated_count updated/new reservations");
+                hic_log("Continuous Polling: Found $updated_count updated/new reservations");
                 $process_result = hic_process_reservations_batch($updated_reservations);
                 $total_new += $process_result['new'];
                 $total_skipped += $process_result['skipped'];
@@ -1606,7 +1606,7 @@ function hic_api_poll_bookings_continuous() {
             Helpers\hic_clear_option_cache('hic_last_continuous_check');
         } else {
             $error_message = $updated_reservations->get_error_message();
-            Helpers\hic_log("Continuous Polling: Error checking for updates: " . $error_message);
+            hic_log("Continuous Polling: Error checking for updates: " . $error_message);
             $total_errors++;
             
             // Check if this is a timestamp too old error and reset if necessary
@@ -1619,7 +1619,7 @@ function hic_api_poll_bookings_continuous() {
                 
                 update_option('hic_last_continuous_check', $validated_reset, false);
                 Helpers\hic_clear_option_cache('hic_last_continuous_check');
-                Helpers\hic_log('Continuous Polling: Timestamp error detected, reset timestamp to: ' . wp_date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
+                hic_log('Continuous Polling: Timestamp error detected, reset timestamp to: ' . wp_date('Y-m-d H:i:s', $validated_reset) . " ($validated_reset)");
                 
                 // Also reset scheduler timestamps to restart polling immediately with safe values
                 $recent_timestamp = $current_time - 300; // 5 minutes ago
@@ -1629,7 +1629,7 @@ function hic_api_poll_bookings_continuous() {
                 Helpers\hic_clear_option_cache('hic_last_continuous_poll');
                 update_option('hic_last_deep_check', $validated_recent, false);
                 Helpers\hic_clear_option_cache('hic_last_deep_check');
-                Helpers\hic_log('Continuous Polling: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
+                hic_log('Continuous Polling: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
             }
         }
         
@@ -1642,7 +1642,7 @@ function hic_api_poll_bookings_continuous() {
         if (!is_wp_error($checkin_reservations)) {
             $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
             if ($checkin_count > 0) {
-                Helpers\hic_log("Continuous Polling: Found $checkin_count reservations by checkin date");
+                hic_log("Continuous Polling: Found $checkin_count reservations by checkin date");
                 $process_result = hic_process_reservations_batch($checkin_reservations);
                 $total_new += $process_result['new'];
                 $total_skipped += $process_result['skipped'];
@@ -1658,7 +1658,7 @@ function hic_api_poll_bookings_continuous() {
         update_option('hic_last_continuous_poll_duration', $execution_time, false);
         Helpers\hic_clear_option_cache('hic_last_continuous_poll_duration');
         
-        Helpers\hic_log("Continuous Polling: Completed in {$execution_time}ms - New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
+        hic_log("Continuous Polling: Completed in {$execution_time}ms - New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
         
     } finally {
         Helpers\hic_release_polling_lock();
@@ -1671,18 +1671,18 @@ function hic_api_poll_bookings_continuous() {
  */
 function hic_api_poll_bookings_deep_check() {
     $start_time = microtime(true);
-    Helpers\hic_log('Deep Check: Starting 10-minute interval deep check (5-day lookback)');
+    hic_log('Deep Check: Starting 10-minute interval deep check (5-day lookback)');
     
     // Try to acquire lock to prevent overlapping executions
     if (!Helpers\hic_acquire_polling_lock(600)) { // 10-minute timeout for deep check
-        Helpers\hic_log('Deep Check: Another polling process is running, skipping execution');
+        hic_log('Deep Check: Another polling process is running, skipping execution');
         return;
     }
     
     try {
         $prop_id = Helpers\hic_get_property_id();
         if (empty($prop_id)) {
-            Helpers\hic_log('Deep Check: No property ID configured');
+            hic_log('Deep Check: No property ID configured');
             return;
         }
         
@@ -1692,7 +1692,7 @@ function hic_api_poll_bookings_deep_check() {
         $from_date = wp_date('Y-m-d', $current_time - $lookback_seconds);
         $to_date = wp_date('Y-m-d', $current_time);
         
-        Helpers\hic_log("Deep Check: Searching 5-day window from $from_date to $to_date (property: $prop_id)");
+        hic_log("Deep Check: Searching 5-day window from $from_date to $to_date (property: $prop_id)");
         
         $total_new = 0;
         $total_skipped = 0;
@@ -1705,15 +1705,15 @@ function hic_api_poll_bookings_deep_check() {
         $lookback_timestamp = $current_time - $safe_lookback_seconds;
         
         if ($safe_lookback_seconds < $lookback_seconds) {
-            Helpers\hic_log("Deep Check: Reduced lookback from " . ($lookback_seconds / DAY_IN_SECONDS) . " days to " . ($safe_lookback_seconds / DAY_IN_SECONDS) . " days due to API limits");
+            hic_log("Deep Check: Reduced lookback from " . ($lookback_seconds / DAY_IN_SECONDS) . " days to " . ($safe_lookback_seconds / DAY_IN_SECONDS) . " days due to API limits");
         }
         
-        Helpers\hic_log("Deep Check: Checking for updates since " . wp_date('Y-m-d H:i:s', $lookback_timestamp));
+        hic_log("Deep Check: Checking for updates since " . wp_date('Y-m-d H:i:s', $lookback_timestamp));
         $updated_reservations = hic_fetch_reservations_updates($prop_id, $lookback_timestamp, 100);
         
         if (!is_wp_error($updated_reservations)) {
             $updated_count = is_array($updated_reservations) ? count($updated_reservations) : 0;
-            Helpers\hic_log("Deep Check: Found $updated_count updated/new reservations in 5-day window");
+            hic_log("Deep Check: Found $updated_count updated/new reservations in 5-day window");
             
             if ($updated_count > 0) {
                 $process_result = hic_process_reservations_batch($updated_reservations);
@@ -1723,12 +1723,12 @@ function hic_api_poll_bookings_deep_check() {
             }
         } else {
             $error_message = $updated_reservations->get_error_message();
-            Helpers\hic_log("Deep Check: Error checking updates: " . $error_message);
+            hic_log("Deep Check: Error checking updates: " . $error_message);
             $total_errors++;
             
             // Handle timestamp errors properly to prevent polling from getting stuck
             if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
-                Helpers\hic_log('Deep Check: Timestamp error detected - resetting all relevant timestamps to recover');
+                hic_log('Deep Check: Timestamp error detected - resetting all relevant timestamps to recover');
                 
                 // Reset all relevant timestamps to safe values to ensure recovery
                 $safe_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
@@ -1751,8 +1751,8 @@ function hic_api_poll_bookings_deep_check() {
                 update_option('hic_last_deep_check', $validated_recent, false);
                 Helpers\hic_clear_option_cache('hic_last_deep_check');
                 
-                Helpers\hic_log('Deep Check: Reset all timestamps to: ' . wp_date('Y-m-d H:i:s', $validated_safe) . " for recovery");
-                Helpers\hic_log('Deep Check: Reset scheduler timestamps to restart polling immediately: ' . wp_date('Y-m-d H:i:s', $validated_recent));
+                hic_log('Deep Check: Reset all timestamps to: ' . wp_date('Y-m-d H:i:s', $validated_safe) . " for recovery");
+                hic_log('Deep Check: Reset scheduler timestamps to restart polling immediately: ' . wp_date('Y-m-d H:i:s', $validated_recent));
                 
                 // Reduce error count since this is a recoverable error that's now handled
                 $total_errors--;
@@ -1763,20 +1763,20 @@ function hic_api_poll_bookings_deep_check() {
         $checkin_from = wp_date('Y-m-d', $current_time);
         $checkin_to = wp_date('Y-m-d', $current_time + (7 * DAY_IN_SECONDS));
         
-        Helpers\hic_log("Deep Check: Checking by checkin date from $checkin_from to $checkin_to");
+        hic_log("Deep Check: Checking by checkin date from $checkin_from to $checkin_to");
         $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 100);
         
         if (!is_wp_error($checkin_reservations)) {
             $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
             if ($checkin_count > 0) {
-                Helpers\hic_log("Deep Check: Found $checkin_count reservations by checkin date");
+                hic_log("Deep Check: Found $checkin_count reservations by checkin date");
                 $process_result = hic_process_reservations_batch($checkin_reservations);
                 $total_new += $process_result['new'];
                 $total_skipped += $process_result['skipped'];
                 $total_errors += $process_result['errors'];
             }
         } else {
-            Helpers\hic_log("Deep Check: Error checking checkin reservations: " . $checkin_reservations->get_error_message());
+            hic_log("Deep Check: Error checking checkin reservations: " . $checkin_reservations->get_error_message());
         }
         
         $execution_time = round((microtime(true) - $start_time) * 1000, 2);
@@ -1793,7 +1793,7 @@ function hic_api_poll_bookings_deep_check() {
             Helpers\hic_clear_option_cache('hic_last_successful_deep_check');
         }
         
-        Helpers\hic_log("Deep Check: Completed in {$execution_time}ms - Window: $from_date to $to_date, New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
+        hic_log("Deep Check: Completed in {$execution_time}ms - Window: $from_date to $to_date, New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
         
     } finally {
         Helpers\hic_release_polling_lock();

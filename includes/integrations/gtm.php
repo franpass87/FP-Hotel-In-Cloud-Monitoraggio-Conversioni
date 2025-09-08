@@ -18,7 +18,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
 
     // Validate input data
     if (!is_array($data)) {
-        Helpers\hic_log('GTM DataLayer: data is not an array');
+        hic_log('GTM DataLayer: data is not an array');
         return false;
     }
 
@@ -86,7 +86,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
     // Store the data to be pushed to dataLayer on next page load
     hic_queue_gtm_event($gtm_data);
 
-    Helpers\hic_log("GTM DataLayer: queued purchase event for transaction_id=$transaction_id, bucket=$bucket, value=$amount");
+    hic_log("GTM DataLayer: queued purchase event for transaction_id=$transaction_id, bucket=$bucket, value=$amount");
     return true;
 }
 
@@ -135,7 +135,7 @@ function hic_output_gtm_head_code() {
     
     // Validate GTM container ID format
     if (!preg_match('/^GTM-[A-Z0-9]+$/', $container_id)) {
-        Helpers\hic_log("GTM: Invalid container ID format: $container_id");
+        hic_log("GTM: Invalid container ID format: $container_id");
         return;
     }
     
@@ -234,7 +234,7 @@ function hic_dispatch_gtm_reservation($data) {
 
     // Validate input data
     if (!is_array($data)) {
-        Helpers\hic_log('GTM dispatch: data is not an array');
+        hic_log('GTM dispatch: data is not an array');
         return false;
     }
 
@@ -242,7 +242,7 @@ function hic_dispatch_gtm_reservation($data) {
     $required_fields = ['transaction_id', 'value', 'currency'];
     foreach ($required_fields as $field) {
         if (!isset($data[$field])) {
-            Helpers\hic_log("GTM dispatch: Missing required field '$field'");
+            hic_log("GTM dispatch: Missing required field '$field'");
             return false;
         }
     }
@@ -299,6 +299,6 @@ function hic_dispatch_gtm_reservation($data) {
     // Queue the event
     hic_queue_gtm_event($gtm_data);
 
-    Helpers\hic_log("GTM dispatch: queued purchase event for bucket=$bucket vertical=hotel transaction_id=$transaction_id value=$value $currency");
+    hic_log("GTM dispatch: queued purchase event for bucket=$bucket vertical=hotel transaction_id=$transaction_id value=$value $currency");
     return true;
 }

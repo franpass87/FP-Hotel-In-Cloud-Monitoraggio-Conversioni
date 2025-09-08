@@ -9,18 +9,18 @@ if (!defined('ABSPATH')) exit;
 /* ============ Meta CAPI (Purchase + bucket) ============ */
 function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
-    Helpers\hic_log('FB Pixel non configurato.');
+    hic_log('FB Pixel non configurato.');
     return false;
   }
   
   // Validate required data
   if (!is_array($data)) {
-    Helpers\hic_log('FB: data is not an array');
+    hic_log('FB: data is not an array');
     return false;
   }
   
   if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
-    Helpers\hic_log('FB: email mancante o non valida, evento non inviato');
+    hic_log('FB: email mancante o non valida, evento non inviato');
     return false;
   }
   
@@ -106,7 +106,7 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    Helpers\hic_log('FB: Failed to encode JSON payload');
+    hic_log('FB: Failed to encode JSON payload');
     return false;
   }
 
@@ -122,14 +122,14 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
   
   if ($code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
   
@@ -138,16 +138,16 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   $response_data = json_decode($response_body, true);
   
   if (json_last_error() !== JSON_ERROR_NONE) {
-    Helpers\hic_log('FB: Invalid JSON response: ' . json_last_error_msg());
+    hic_log('FB: Invalid JSON response: ' . json_last_error_msg());
     return false;
   }
   
   if (isset($response_data['error'])) {
-    Helpers\hic_log('FB: API Error: ' . json_encode($response_data['error']));
+    hic_log('FB: API Error: ' . json_encode($response_data['error']));
     return false;
   }
   
-  Helpers\hic_log($log_msg);
+  hic_log($log_msg);
   return true;
 }
 
@@ -156,17 +156,17 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
  */
 function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
-    Helpers\hic_log('FB refund: Pixel ID o Access Token mancanti.');
+    hic_log('FB refund: Pixel ID o Access Token mancanti.');
     return false;
   }
 
   if (!is_array($data)) {
-    Helpers\hic_log('FB refund: data is not an array');
+    hic_log('FB refund: data is not an array');
     return false;
   }
 
   if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
-    Helpers\hic_log('FB refund: email mancante o non valida, evento non inviato');
+    hic_log('FB refund: email mancante o non valida, evento non inviato');
     return false;
   }
 
@@ -246,7 +246,7 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
 
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    Helpers\hic_log('FB refund: Failed to encode JSON payload');
+    hic_log('FB refund: Failed to encode JSON payload');
     return false;
   }
 
@@ -262,29 +262,29 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
 
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
 
   if ($code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
 
   $response_body = wp_remote_retrieve_body($res);
   $response_data = json_decode($response_body, true);
   if (json_last_error() !== JSON_ERROR_NONE) {
-    Helpers\hic_log('FB refund: Invalid JSON response: ' . json_last_error_msg());
+    hic_log('FB refund: Invalid JSON response: ' . json_last_error_msg());
     return false;
   }
   if (isset($response_data['error'])) {
-    Helpers\hic_log('FB refund: API Error: ' . json_encode($response_data['error']));
+    hic_log('FB refund: API Error: ' . json_encode($response_data['error']));
     return false;
   }
 
-  Helpers\hic_log($log_msg);
+  hic_log($log_msg);
   return true;
 }
 
@@ -293,19 +293,19 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
  */
 function hic_dispatch_pixel_reservation($data) {
   if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
-    Helpers\hic_log('FB HIC dispatch SKIPPED: Pixel ID o Access Token mancanti');
+    hic_log('FB HIC dispatch SKIPPED: Pixel ID o Access Token mancanti');
     return false;
   }
   
   // Validate input data
   if (!is_array($data)) {
-    Helpers\hic_log('FB HIC dispatch: data is not an array');
+    hic_log('FB HIC dispatch: data is not an array');
     return false;
   }
   
   // Validate required data
   if (empty($data['email']) || !Helpers\hic_is_valid_email($data['email'])) {
-    Helpers\hic_log('FB HIC dispatch: email mancante o non valida, evento non inviato');
+    hic_log('FB HIC dispatch: email mancante o non valida, evento non inviato');
     return false;
   }
   
@@ -313,7 +313,7 @@ function hic_dispatch_pixel_reservation($data) {
   $required_fields = ['transaction_id', 'value', 'currency'];
   foreach ($required_fields as $field) {
     if (!isset($data[$field])) {
-      Helpers\hic_log("FB HIC dispatch: Missing required field '$field'");
+      hic_log("FB HIC dispatch: Missing required field '$field'");
       return false;
     }
   }
@@ -413,7 +413,7 @@ function hic_dispatch_pixel_reservation($data) {
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
-    Helpers\hic_log('FB HIC dispatch: Failed to encode JSON payload');
+    hic_log('FB HIC dispatch: Failed to encode JSON payload');
     return false;
   }
 
@@ -429,14 +429,14 @@ function hic_dispatch_pixel_reservation($data) {
   
   if (is_wp_error($res)) {
     $log_msg .= " ERROR: " . $res->get_error_message();
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
   
   if ($code !== 200) {
     $response_body = wp_remote_retrieve_body($res);
     $log_msg .= " RESPONSE: " . substr($response_body, 0, 200);
-    Helpers\hic_log($log_msg);
+    hic_log($log_msg);
     return false;
   }
   
@@ -445,15 +445,15 @@ function hic_dispatch_pixel_reservation($data) {
   $response_data = json_decode($response_body, true);
   
   if (json_last_error() !== JSON_ERROR_NONE) {
-    Helpers\hic_log('FB HIC dispatch: Invalid JSON response: ' . json_last_error_msg());
+    hic_log('FB HIC dispatch: Invalid JSON response: ' . json_last_error_msg());
     return false;
   }
   
   if (isset($response_data['error'])) {
-    Helpers\hic_log('FB HIC dispatch: API Error: ' . json_encode($response_data['error']));
+    hic_log('FB HIC dispatch: API Error: ' . json_encode($response_data['error']));
     return false;
   }
   
-  Helpers\hic_log($log_msg);
+  hic_log($log_msg);
   return true;
 }
