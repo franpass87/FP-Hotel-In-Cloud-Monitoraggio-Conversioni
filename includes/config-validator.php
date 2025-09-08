@@ -1,7 +1,10 @@
 <?php declare(strict_types=1);
+
+namespace FpHic {
+
 /**
  * Configuration Validation System for HIC Plugin
- * 
+ *
  * Provides comprehensive validation for all plugin settings and configurations.
  */
 
@@ -370,4 +373,11 @@ function hic_get_config_validator() {
         }
     }
     return isset($GLOBALS['hic_config_validator']) ? $GLOBALS['hic_config_validator'] : null;
+}
+}
+
+namespace {
+    function hic_get_config_validator() {
+        return \FpHic\hic_get_config_validator();
+    }
 }
