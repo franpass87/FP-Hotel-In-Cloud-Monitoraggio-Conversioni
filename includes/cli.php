@@ -253,8 +253,8 @@ if (defined('WP_CLI') && WP_CLI) {
                 return;
             }
 
-            if (!function_exists('hic_process_booking_data')) {
-                WP_CLI::error('hic_process_booking_data function not found');
+            if (!function_exists('\\FpHic\\hic_process_booking_data')) {
+                WP_CLI::error('\\FpHic\\hic_process_booking_data function not found');
                 return;
             }
 
@@ -277,7 +277,7 @@ if (defined('WP_CLI') && WP_CLI) {
             }
 
             WP_CLI::log('Resending reservation ' . $reservation_id . '...');
-            $result = hic_process_booking_data($data);
+            $result = \FpHic\hic_process_booking_data($data);
 
             if ($result !== false) {
                 WP_CLI::success('Reservation resent successfully');
