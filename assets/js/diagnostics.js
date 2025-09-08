@@ -569,23 +569,23 @@ jQuery(document).ready(function($) {
                 action: 'hic_trigger_watchdog',
                 nonce: hicDiagnostics.admin_nonce
             }).done(function(response) {
-                if (response.success) {
+                if (response.data.success) {
                     buttonController.setSuccess('Watchdog completato con successo!');
                     $status.text('✓ Watchdog completato').css('color', '#00a32a');
-                    
+
                     var html = '<div class="notice notice-success inline"><p><strong>Watchdog Completato:</strong><br>';
-                    html += response.message + '</p></div>';
-                    
+                    html += response.data.message + '</p></div>';
+
                     $resultsContent.html(html);
                     $results.show();
                 } else {
-                    buttonController.setError('Watchdog fallito: ' + (response.message || 'Errore sconosciuto'));
+                    buttonController.setError('Watchdog fallito: ' + (response.data.message || 'Errore sconosciuto'));
                     $status.text('✗ Watchdog fallito').css('color', '#d63638');
-                    
+
                     var html = '<div class="notice notice-warning inline"><p><strong>Watchdog Fallito:</strong><br>';
-                    html += response.message || 'Errore sconosciuto';
+                    html += response.data.message || 'Errore sconosciuto';
                     html += '</p></div>';
-                    
+
                     $resultsContent.html(html);
                     $results.show();
                 }
