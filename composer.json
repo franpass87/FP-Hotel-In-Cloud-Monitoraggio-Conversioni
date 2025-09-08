@@ -37,6 +37,8 @@
         "analyse": "vendor/bin/phpstan analyse",
         "analyse:baseline": "vendor/bin/phpstan analyse --generate-baseline",
         "mess": "vendor/bin/phpmd includes/,FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php text phpmd.xml",
+        "build": "php build-wordpress-zip.php",
+        "build:shell": "./build.sh",
         "quality": [
             "@lint:syntax",
             "@lint",
