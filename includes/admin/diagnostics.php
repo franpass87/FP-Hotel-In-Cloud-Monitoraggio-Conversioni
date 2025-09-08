@@ -1506,8 +1506,13 @@ function hic_ajax_download_error_logs() {
 
     $log_file = hic_get_log_file();
 
-    if (!file_exists($log_file) || !is_readable($log_file)) {
-        wp_die( __( 'File di log non trovato o non leggibile', 'hotel-in-cloud' ) );
+    if (!file_exists($log_file)) {
+        wp_mkdir_p(dirname($log_file));
+        touch($log_file);
+    }
+
+    if (!is_readable($log_file)) {
+        wp_die(__('File di log non leggibile', 'hotel-in-cloud'));
     }
     
     // Set headers for file download
