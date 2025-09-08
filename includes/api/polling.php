@@ -681,9 +681,9 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
     update_option('hic_last_poll_duration', $execution_time, false);
     Helpers\hic_clear_option_cache('hic_last_poll_duration');
     
-    // Update last successful run only if polling was successful
+    // Update last successful run if polling succeeded or processed new reservations
     $polling_successful = empty($polling_errors) && $total_errors === 0;
-    if ($polling_successful) {
+    if ($polling_successful || $total_new > 0) {
         update_option('hic_last_successful_poll', $current_time, false);
         Helpers\hic_clear_option_cache('hic_last_successful_poll');
         hic_log("Internal Scheduler: Updated last successful poll timestamp");
