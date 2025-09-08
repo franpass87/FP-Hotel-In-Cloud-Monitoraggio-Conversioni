@@ -117,7 +117,8 @@ function hic_activate($network_wide)
     require_once __DIR__ . '/includes/api/webhook.php';
     require_once __DIR__ . '/includes/api/polling.php';
     require_once __DIR__ . '/includes/cli.php';
-    
+    require_once __DIR__ . '/includes/config-validator.php';
+
     // Initialize helper action hooks
     Helpers\hic_init_helper_hooks();
     
