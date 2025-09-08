@@ -254,7 +254,7 @@ if (defined('WP_CLI') && WP_CLI) {
             }
 
             if (!function_exists('\\FpHic\\hic_process_booking_data')) {
-                WP_CLI::error('hic_process_booking_data function not found');
+                WP_CLI::error('\\FpHic\\hic_process_booking_data function not found');
                 return;
             }
 
