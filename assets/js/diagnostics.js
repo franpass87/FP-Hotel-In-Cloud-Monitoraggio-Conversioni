@@ -746,31 +746,31 @@ jQuery(document).ready(function($) {
                 nonce: hicDiagnostics.admin_nonce
             }).done(function(response) {
                 var html = '';
-                
+
                 if (response.success) {
                     html += '<div class="notice notice-success inline"><p><strong>Test Connettività Brevo Completato</strong></p>';
-                    
+
                     // Contact API results
                     html += '<h4>API Contatti:</h4>';
-                    if (response.contact_api.success) {
-                        html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.contact_api.http_code + '</p>';
+                    if (response.data.contact_api.success) {
+                        html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.data.contact_api.http_code + '</p>';
                     } else {
-                        html += '<p><span class="status error">✗ Errore</span> - ' + response.contact_api.error + '</p>';
+                        html += '<p><span class="status error">✗ Errore</span> - ' + response.data.contact_api.error + '</p>';
                     }
-                    
+
                     // Event API results
                     html += '<h4>API Eventi:</h4>';
-                    if (response.event_api.success) {
-                        html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.event_api.http_code + '</p>';
+                    if (response.data.event_api.success) {
+                        html += '<p><span class="status ok">✓ Successo</span> - HTTP ' + response.data.event_api.http_code + '</p>';
                     } else {
-                        html += '<p><span class="status error">✗ Errore</span> - ' + response.event_api.error + '</p>';
+                        html += '<p><span class="status error">✗ Errore</span> - ' + response.data.event_api.error + '</p>';
                     }
-                    
+
                     html += '</div>';
                 } else {
-                    html = '<div class="notice notice-error inline"><p><strong>Test Fallito:</strong><br>' + response.message + '</p></div>';
+                    html = '<div class="notice notice-error inline"><p><strong>Test Fallito:</strong><br>' + response.data.message + '</p></div>';
                 }
-                
+
                 $results.html(html).show();
                 
             }).fail(function() {
@@ -794,7 +794,7 @@ jQuery(document).ready(function($) {
                     $btn.removeClass('button-secondary').addClass('button-primary');
                     showToast('Brevo API test successful!', 'success');
                 } else {
-                    showToast('Brevo API test failed: ' + response.message, 'error');
+                    showToast('Brevo API test failed: ' + response.data.message, 'error');
                 }
             }).fail(function() {
                 showToast('Communication error during Brevo API test', 'error');
