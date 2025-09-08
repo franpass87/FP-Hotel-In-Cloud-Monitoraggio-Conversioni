@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) exit;
 */
 add_action('rest_api_init', function () {
   // Solo se siamo in modalità webhook
-  if (Helpers\hic_get_connection_type() === 'webhook') {
+  if (hic_get_connection_type() === 'webhook') {
     register_rest_route('hic/v1', '/conversion', [
       'methods'             => 'POST',
       'callback'            => 'hic_webhook_handler',
@@ -35,7 +35,7 @@ add_action('rest_api_init', function () {
 function hic_webhook_handler(WP_REST_Request $request) {
   // Validate token
   $token = $request->get_param('token');
-  $expected_token = Helpers\hic_get_webhook_token();
+  $expected_token = hic_get_webhook_token();
   
   if (empty($expected_token)) {
     hic_log('Webhook rifiutato: token webhook non configurato');
@@ -80,16 +80,16 @@ function hic_webhook_handler(WP_REST_Request $request) {
   hic_log(['Webhook ricevuto' => array_merge($data, ['email' => !empty($data['email']) ? '***HIDDEN***' : 'missing'])]);
 
   // Generate unique identifier for deduplication
-  $reservation_id = Helpers\hic_extract_reservation_id($data);
+  $reservation_id = hic_extract_reservation_id($data);
   
   // Check for duplication to prevent double processing
-  if (!empty($reservation_id) && Helpers\hic_is_reservation_already_processed($reservation_id)) {
+  if (!empty($reservation_id) && hic_is_reservation_already_processed($reservation_id)) {
     hic_log("Webhook skipped: reservation $reservation_id already processed");
     return ['status'=>'ok', 'processed' => false, 'reason' => 'already_processed'];
   }
 
   // Acquire processing lock to prevent concurrent processing
-  if (!empty($reservation_id) && !Helpers\hic_acquire_reservation_lock($reservation_id)) {
+  if (!empty($reservation_id) && !hic_acquire_reservation_lock($reservation_id)) {
     hic_log("Webhook skipped: reservation $reservation_id is being processed by another request");
     return ['status'=>'ok', 'processed' => false, 'reason' => 'concurrent_processing'];
   }
@@ -100,12 +100,12 @@ function hic_webhook_handler(WP_REST_Request $request) {
     
     // Mark reservation as processed if successful
     if ($result !== false && !empty($reservation_id)) {
-      Helpers\hic_mark_reservation_processed_by_id($reservation_id);
+      hic_mark_reservation_processed_by_id($reservation_id);
     }
     
     // Update last webhook processing time for diagnostics
     update_option('hic_last_webhook_processing', current_time('mysql'), false);
-    Helpers\hic_clear_option_cache('hic_last_webhook_processing');
+    hic_clear_option_cache('hic_last_webhook_processing');
     
     if ($result === false) {
       hic_log('Webhook: elaborazione fallita per dati ricevuti');
@@ -117,7 +117,7 @@ function hic_webhook_handler(WP_REST_Request $request) {
   } finally {
     // Always release the lock
     if (!empty($reservation_id)) {
-      Helpers\hic_release_reservation_lock($reservation_id);
+      hic_release_reservation_lock($reservation_id);
     }
   }
 }
@@ -136,7 +136,7 @@ function hic_validate_webhook_payload($payload) {
   }
 
   // Required field: email
-  if (empty($payload['email']) || !Helpers\hic_is_valid_email($payload['email'])) {
+  if (empty($payload['email']) || !hic_is_valid_email($payload['email'])) {
     hic_log('Webhook payload: email mancante o non valida');
     return new WP_Error('invalid_email', 'Campo email mancante o non valido', ['status' => 400]);
   }
