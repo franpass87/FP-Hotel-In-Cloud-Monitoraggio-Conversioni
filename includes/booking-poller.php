@@ -518,7 +518,8 @@ class HIC_Booking_Poller {
                 // Fallback implementation
                 $result = $this->fallback_deep_check();
             }
-            $success = !is_wp_error($result);
+            // Only mark success if the check ran and produced a valid result
+            $success = ($result !== null && $result !== false && !is_wp_error($result));
         } catch (\Throwable $e) {
             hic_log('Deep check error: ' . $e->getMessage(), HIC_LOG_LEVEL_ERROR);
             $failures = (int) get_option('hic_deep_check_failures', 0);
