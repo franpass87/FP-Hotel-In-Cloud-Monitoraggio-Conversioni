@@ -35,8 +35,8 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
   $body = array(
     'email' => $email,
     'attributes' => array(
-      'FIRSTNAME' => isset($data['first_name']) ? $data['first_name'] : '',
-      'LASTNAME'  => isset($data['last_name']) ? $data['last_name'] : '',
+      'FIRSTNAME' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
+      'LASTNAME'  => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
       'RESVID'    => isset($data['reservation_id']) ? $data['reservation_id'] : (isset($data['id']) ? $data['id'] : ''),
       'GCLID'     => isset($gclid) ? $gclid : '',
       'FBCLID'    => isset($fbclid) ? $fbclid : '',
