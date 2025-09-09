@@ -210,7 +210,17 @@ class HIC_Booking_Poller {
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         $last_deep = get_option('hic_last_deep_check', 0);
         $last_successful = get_option('hic_last_successful_poll', 0);
-        
+        $success_lag = $current_time - $last_successful;
+        $seven_days = (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400) * 7;
+
+        // If we've never had a successful poll or it's older than 7 days, force a deep check
+        if ($last_successful <= 0 || $success_lag > $seven_days) {
+            hic_log('Watchdog: Last successful poll older than 7 days or missing - forcing timestamp recovery');
+            if (function_exists('\\FpHic\\hic_api_poll_bookings_deep_check')) {
+                \FpHic\hic_api_poll_bookings_deep_check();
+            }
+        }
+
         hic_log("Watchdog: Running check - continuous lag: " . ($current_time - $last_continuous) . "s, deep lag: " . ($current_time - $last_deep) . "s");
         
         // Check for continuous polling lag (should run every minute)
@@ -228,7 +238,6 @@ class HIC_Booking_Poller {
         }
         
         // Check for completely stuck polling - no successful polls for 1+ hours
-        $success_lag = $current_time - $last_successful;
         if ($last_successful > 0 && $success_lag > 3600) { // 1 hour without success
             hic_log("Watchdog: No successful polling for {$success_lag}s - likely timestamp error, triggering timestamp recovery");
             $this->recover_from_failure('timestamp_error');
