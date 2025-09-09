@@ -738,6 +738,10 @@ function hic_ajax_backfill_reservations() {
     $date_type = sanitize_text_field( wp_unslash( $_POST['date_type'] ?? 'checkin' ) );
     $limit = isset($_POST['limit']) ? intval( wp_unslash( $_POST['limit'] ) ) : null;
 
+    if (null !== $limit) {
+        $limit = min( max( 1, $limit ), 200 );
+    }
+
     // Validate date type (based on API documentation: only checkin, checkout, presence are valid for /reservations endpoint)
     if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
         wp_send_json_error( [ 'message' => __( 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence".', 'hotel-in-cloud' ) ] );
@@ -1439,7 +1443,7 @@ function hic_diagnostics_page() {
                     <div class="hic-advanced-content">
                         <div class="hic-advanced-section">
                             <h3>📦 Backfill Storico</h3>
-                            <p>Recupera prenotazioni da un intervallo temporale specifico.</p>
+                            <p>Recupera prenotazioni da un intervallo temporale specifico. Limite consentito: 1-200 prenotazioni.</p>
                             
                             <div class="hic-backfill-form">
                                 <div class="hic-form-row">
@@ -1456,7 +1460,7 @@ function hic_diagnostics_page() {
                                         <option value="presence">Presenza</option>
                                     </select>
                                     
-                                    <input type="number" id="backfill-limit" placeholder="Limite (opz.)" min="1" max="1000" />
+                                    <input type="number" id="backfill-limit" placeholder="Limite (1-200)" min="1" max="200" />
                                 </div>
                                 
                                 <div class="hic-form-actions">

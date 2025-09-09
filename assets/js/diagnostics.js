@@ -203,6 +203,15 @@ jQuery(document).ready(function($) {
                 return;
             }
             
+            // Validate limit range if provided
+            if (limit) {
+                limit = parseInt(limit, 10);
+                if (limit < 1 || limit > 200) {
+                    alert('Il limite deve essere compreso tra 1 e 200.');
+                    return;
+                }
+            }
+
             // Confirmation
             var message = 'Vuoi avviare il backfill delle prenotazioni dal ' + fromDate + ' al ' + toDate + '?';
             if (limit) {
@@ -228,7 +237,7 @@ jQuery(document).ready(function($) {
             };
             
             if (limit) {
-                postData.limit = parseInt(limit);
+                postData.limit = limit;
             }
             
             $.post(ajaxurl, postData, function(response) {
