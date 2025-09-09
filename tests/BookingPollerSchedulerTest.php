@@ -32,6 +32,7 @@ namespace FpHic {
         if (!empty($GLOBALS['simulate_deep_skip'])) {
             return null;
         }
+        update_option('hic_last_successful_poll', time());
         return true;
     }
     function hic_fetch_reservations_raw($prop_id, $mode, $from_date, $to_date, $limit) {
@@ -200,6 +201,23 @@ namespace {
             );
             $this->assertCount(2, $continuous);
             unset($GLOBALS['simulate_continuous_error']);
+        }
+
+        public function test_watchdog_not_blocked_with_deep_check_only(): void {
+            $poller = new \HIC_Booking_Poller();
+            $sentinel = 123;
+            update_option('hic_last_updates_since', $sentinel);
+            update_option('hic_last_successful_poll', time() - 7200);
+            update_option('hic_last_continuous_poll', 0);
+            update_option('hic_last_deep_check', 0);
+
+            $poller->execute_deep_check();
+
+            $this->assertNotEquals(0, get_option('hic_last_successful_poll'));
+
+            $poller->run_watchdog_check();
+
+            $this->assertSame($sentinel, get_option('hic_last_updates_since'));
         }
     }
 }

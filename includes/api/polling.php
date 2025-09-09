@@ -1809,6 +1809,9 @@ function hic_api_poll_bookings_deep_check() {
         if ($total_errors === 0) {
             update_option('hic_last_successful_deep_check', $current_time, false);
             Helpers\hic_clear_option_cache('hic_last_successful_deep_check');
+
+            update_option('hic_last_successful_poll', $current_time, false);
+            Helpers\hic_clear_option_cache('hic_last_successful_poll');
         }
         
         hic_log("Deep Check: Completed in {$execution_time}ms - Window: $from_date to $to_date, New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
