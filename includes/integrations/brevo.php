@@ -306,6 +306,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'HIC_PRICE' => isset($data['original_price']) ? $data['original_price'] : '',
     'HIC_PRESENCE' => isset($data['presence']) ? $data['presence'] : '',
     'HIC_BALANCE' => isset($data['unpaid_balance']) ? Helpers\hic_normalize_price($data['unpaid_balance']) : '',
+    'HIC_VALID' => $data['valid'] ?? '',
     
     // Legacy webhook attributes (for backward compatibility)
     'RESVID' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
@@ -324,6 +325,10 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     $attributes['TAGS'] = implode(',', $data['tags']);
   }
 
+  if (isset($data['relocations'])) {
+    $attributes['HIC_RELOCATIONS'] = json_encode($data['relocations']);
+  }
+
   // Populate UTM attributes if available
   if (!empty($data['transaction_id'])) {
     $utm = Helpers\hic_get_utm_params_by_sid($data['transaction_id']);
@@ -336,8 +341,8 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
 
   // Remove empty values but keep valid zeros for numeric fields
   $attributes = array_filter($attributes, function($value, $key) {
-    // Keep numeric zero values for AMOUNT, HIC_PRICE and HIC_BALANCE
-    if (in_array($key, ['AMOUNT', 'HIC_PRICE', 'HIC_BALANCE']) && is_numeric($value)) {
+    // Keep numeric zero values for AMOUNT, HIC_PRICE, HIC_BALANCE and HIC_VALID
+    if (in_array($key, ['AMOUNT', 'HIC_PRICE', 'HIC_BALANCE', 'HIC_VALID']) && is_numeric($value)) {
       return true;
     }
     return $value !== null && $value !== '';
@@ -489,6 +494,8 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'guest_last_name' => $data['guest_last_name'] ?? '',
       'presence' => isset($data['presence']) ? $data['presence'] : '',
       'unpaid_balance' => isset($data['unpaid_balance']) ? Helpers\hic_normalize_price($data['unpaid_balance']) : 0,
+      'valid' => $data['valid'] ?? '',
+      'relocations' => isset($data['relocations']) ? json_encode($data['relocations']) : '',
       'bucket' => $bucket,
       'vertical' => 'hotel',
       'msclkid' => $msclkid,
