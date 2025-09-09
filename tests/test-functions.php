@@ -198,6 +198,34 @@ class HICFunctionsTest {
         echo "✅ Brevo phone language override tests passed\n";
     }
 
+    public function testBrevoContactLanguageAndTags() {
+        // Ensure required WordPress stubs exist
+        if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
+        if (!function_exists('wp_remote_retrieve_response_code')) { function wp_remote_retrieve_response_code($res) { return $res['response']['code'] ?? 0; } }
+        if (!function_exists('wp_remote_retrieve_body')) { function wp_remote_retrieve_body($res) { return $res['body'] ?? ''; } }
+        if (!function_exists('is_wp_error')) { function is_wp_error($thing) { return false; } }
+        if (!function_exists('wp_date')) { function wp_date($format, $ts = null) { return date($format, $ts ?? time()); } }
+
+        require_once dirname(__DIR__) . '/includes/integrations/brevo.php';
+        update_option('hic_brevo_api_key', 'test');
+
+        global $hic_last_request;
+
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_contact([
+            'email' => 'tags@example.com',
+            'language' => 'en',
+            'tags' => ['one', 'two']
+        ], '', '');
+
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['attributes']['LANGUAGE'] === 'en', 'Contact should include LANGUAGE attribute');
+        assert($payload['attributes']['TAGS'] === 'one,two', 'Contact should include TAGS attribute');
+        assert($payload['tags'] === ['one','two'], 'Tags array should be preserved');
+
+        echo "✅ Brevo contact language and tags tests passed\n";
+    }
+
     public function testBrevoLanguageListFiltering() {
         // Ensure required WordPress stubs exist
         if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
@@ -389,6 +417,7 @@ class HICFunctionsTest {
             $this->testReservationPhoneFallback();
             $this->testPhoneLanguageDetection();
             $this->testBrevoPhoneLanguageOverride();
+            $this->testBrevoContactLanguageAndTags();
             $this->testBrevoLanguageListFiltering();
             $this->testBrevoReservationCreatedPhoneLanguageOverride();
             $this->testEventRoomNameFallback();

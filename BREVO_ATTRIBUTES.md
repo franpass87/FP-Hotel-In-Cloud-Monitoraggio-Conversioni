@@ -2,6 +2,8 @@
 
 Questo documento elenca tutti gli attributi che devi configurare nel tuo account Brevo per ricevere correttamente i dati dal plugin Hotel in Cloud.
 
+I recenti aggiornamenti introducono gli attributi `LANGUAGE` e `TAGS` per memorizzare rispettivamente la lingua del contatto e l'elenco di tag associati.
+
 ## Attributi Contatto (Contact Attributes)
 
 Il plugin invia i seguenti attributi per ogni contatto creato o aggiornato in Brevo:
