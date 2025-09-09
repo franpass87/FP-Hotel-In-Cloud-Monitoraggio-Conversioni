@@ -506,15 +506,23 @@ class HIC_Booking_Poller {
     public function execute_deep_check() {
         hic_log("Scheduler: Executing deep check (10-minute interval, " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback)");
         
-        // Update timestamp first to prevent overlapping executions
-        update_option('hic_last_deep_check', time(), false);
-        \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
-        
-        if (function_exists('\\FpHic\\hic_api_poll_bookings_deep_check')) {
-            \FpHic\hic_api_poll_bookings_deep_check();
-        } else {
-            // Fallback implementation
-            $this->fallback_deep_check();
+        $result = null;
+        $success = false;
+        try {
+            if (function_exists('\\FpHic\\hic_api_poll_bookings_deep_check')) {
+                $result = \FpHic\hic_api_poll_bookings_deep_check();
+            } else {
+                // Fallback implementation
+                $result = $this->fallback_deep_check();
+            }
+            $success = !is_wp_error($result);
+        } catch (\Throwable $e) {
+            throw $e;
+        } finally {
+            if ($success) {
+                update_option('hic_last_deep_check', time(), false);
+                \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
+            }
         }
     }
     
