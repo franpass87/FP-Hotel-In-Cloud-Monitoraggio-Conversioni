@@ -281,6 +281,8 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'HIC_GUESTS' => isset($data['guests']) ? $data['guests'] : '',
     'HIC_ROOM' => isset($data['accommodation_name']) ? $data['accommodation_name'] : '',
     'HIC_PRICE' => isset($data['original_price']) ? $data['original_price'] : '',
+    'HIC_PRESENCE' => isset($data['presence']) ? $data['presence'] : '',
+    'HIC_BALANCE' => isset($data['unpaid_balance']) ? Helpers\hic_normalize_price($data['unpaid_balance']) : '',
     
     // Legacy webhook attributes (for backward compatibility)
     'RESVID' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
@@ -296,7 +298,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   );
 
   if (isset($data['tags']) && is_array($data['tags'])) {
-    $attributes['TAGS'] = wp_json_encode(array_values($data['tags']));
+    $attributes['TAGS'] = implode(',', $data['tags']);
   }
 
   // Populate UTM attributes if available
@@ -311,8 +313,8 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
 
   // Remove empty values but keep valid zeros for numeric fields
   $attributes = array_filter($attributes, function($value, $key) {
-    // Keep numeric zero values for AMOUNT and HIC_PRICE
-    if (in_array($key, ['AMOUNT', 'HIC_PRICE']) && is_numeric($value)) {
+    // Keep numeric zero values for AMOUNT, HIC_PRICE and HIC_BALANCE
+    if (in_array($key, ['AMOUNT', 'HIC_PRICE', 'HIC_BALANCE']) && is_numeric($value)) {
       return true;
     }
     return $value !== null && $value !== '';
@@ -458,6 +460,9 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'language' => isset($data['language']) ? $data['language'] : '',
       'firstname' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
       'lastname' => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
+      'presence' => isset($data['presence']) ? $data['presence'] : '',
+      'unpaid_balance' => isset($data['unpaid_balance']) ? Helpers\hic_normalize_price($data['unpaid_balance']) : 0,
+      'tags' => isset($data['tags']) && is_array($data['tags']) ? implode(',', $data['tags']) : '',
       'bucket' => $bucket,
       'vertical' => 'hotel',
       'msclkid' => $msclkid,

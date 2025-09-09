@@ -23,7 +23,9 @@ Il sistema di polling API moderno (versione attuale) invia **ENTRAMBI** i set di
 | `HIC_GUESTS` | Numero | Numero di ospiti | `guests` dalla prenotazione |
 | `HIC_ROOM` | Testo | Nome dell'alloggio/camera | `accommodation_name` dalla prenotazione |
 | `HIC_PRICE` | Numero | Prezzo originale della prenotazione | `price` dalla prenotazione |
-| `TAGS` | Testo (JSON) | Elenco di tag associati al contatto | Array `tags` dalla prenotazione |
+| `HIC_PRESENCE` | Numero (0/1) | Indica se il cliente ha effettuato il check-in | `presence` dalla prenotazione |
+| `HIC_BALANCE` | Numero | Saldo non pagato della prenotazione | `unpaid_balance` dalla prenotazione |
+| `TAGS` | Testo | Elenco di tag associati al contatto, separati da virgola | Array `tags` dalla prenotazione |
 
 #### Attributi Legacy (Compatibilità)
 Il sistema moderno invia **ANCHE** questi attributi legacy per garantire la retrocompatibilità:
@@ -82,6 +84,8 @@ HIC_TO - Tipo: Data
 HIC_GUESTS - Tipo: Numero
 HIC_ROOM - Tipo: Testo
 HIC_PRICE - Tipo: Numero (decimale)
+HIC_PRESENCE - Tipo: Numero
+HIC_BALANCE - Tipo: Numero (decimale)
 TAGS - Tipo: Testo
 ```
 
