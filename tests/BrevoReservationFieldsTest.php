@@ -25,6 +25,7 @@ final class BrevoReservationFieldsTest extends TestCase {
             'tags' => ['vip', 'promo'],
             'accommodation_id' => 'A1',
             'room_id' => 'R1',
+            'room_name' => 'Room 1',
             'offer' => 'OFF1'
         ];
 
@@ -37,6 +38,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame(50.5, $payload['attributes']['HIC_BALANCE']);
         $this->assertSame('A1', $payload['attributes']['HIC_ACCOM_ID']);
         $this->assertSame('R1', $payload['attributes']['HIC_ROOM_ID']);
+        $this->assertSame('Room 1', $payload['attributes']['HIC_ROOM_NAME']);
         $this->assertSame('OFF1', $payload['attributes']['HIC_OFFER']);
     }
 
@@ -54,6 +56,7 @@ final class BrevoReservationFieldsTest extends TestCase {
             'tags' => ['vip', 'promo'],
             'accommodation_id' => 'A1',
             'room_id' => 'R1',
+            'room_name' => 'Room 1',
             'offer' => 'OFF1',
             'guest_first_name' => 'Mario',
             'guest_last_name' => 'Rossi'
@@ -68,6 +71,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame(50.5, $payload['properties']['unpaid_balance']);
         $this->assertSame('A1', $payload['properties']['accommodation_id']);
         $this->assertSame('R1', $payload['properties']['room_id']);
+        $this->assertSame('Room 1', $payload['properties']['room_name']);
         $this->assertSame('OFF1', $payload['properties']['offer']);
         $this->assertSame('Mario', $payload['properties']['guest_first_name']);
         $this->assertSame('Rossi', $payload['properties']['guest_last_name']);
