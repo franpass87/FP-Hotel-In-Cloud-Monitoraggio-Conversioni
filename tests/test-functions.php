@@ -160,12 +160,20 @@ class HICFunctionsTest {
         assert($payload['attributes']['LANGUAGE'] === 'en', 'Foreign phone should force language en');
         assert($payload['attributes']['PHONE'] === '+441234567890', 'Phone should be normalized');
 
-        // Contact with Italian phone
+        // Contact with Italian phone and guest name mapping
         $hic_last_request = null;
-        \FpHic\hic_send_brevo_contact(['email' => 'c@example.com', 'whatsapp' => '+39 3331234567', 'lang' => 'en'], '', '');
+        \FpHic\hic_send_brevo_contact([
+            'email' => 'c@example.com',
+            'whatsapp' => '+39 3331234567',
+            'lang' => 'en',
+            'guest_first_name' => 'Mario',
+            'guest_last_name' => 'Rossi'
+        ], '', '');
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['attributes']['LINGUA'] === 'it', 'Contact Italian phone forces language it');
         assert($payload['attributes']['WHATSAPP'] === '+393331234567', 'WhatsApp should be normalized');
+        assert($payload['attributes']['FIRSTNAME'] === 'Mario', 'Guest first name should map to FIRSTNAME');
+        assert($payload['attributes']['LASTNAME'] === 'Rossi', 'Guest last name should map to LASTNAME');
 
         // Contact with foreign phone
         $hic_last_request = null;
