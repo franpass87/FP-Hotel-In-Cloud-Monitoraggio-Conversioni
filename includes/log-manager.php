@@ -400,33 +400,48 @@ class HIC_Log_Manager {
      */
     private function tail_file($file, $lines) {
         $buffer = 4096;
-        $output = [];
         $chunk = [];
-        
+
         $fp = fopen($file, 'rb');
         if (!$fp) {
             return [];
         }
-        
-        fseek($fp, -1, SEEK_END);
-        
-        if (fread($fp, 1) != "\n") {
+
+        $size = @filesize($file);
+        if ($size === 0) {
+            fclose($fp);
+            return [];
+        }
+
+        if (@fseek($fp, -1, SEEK_END) !== 0) {
+            fclose($fp);
+            return [];
+        }
+
+        if (fread($fp, 1) !== "\n") {
             $lines -= 1;
         }
-        
+
         $output = '';
         while (ftell($fp) > 0 && count($chunk) < $lines) {
             $seek = min(ftell($fp), $buffer);
-            fseek($fp, -$seek, SEEK_CUR);
+            if (@fseek($fp, -$seek, SEEK_CUR) !== 0) {
+                break;
+            }
             $temp = fread($fp, $seek);
-            fseek($fp, -$seek, SEEK_CUR);
-            
+            if ($temp === false) {
+                break;
+            }
+            if (@fseek($fp, -$seek, SEEK_CUR) !== 0) {
+                break;
+            }
+
             $output = $temp . $output;
             $chunk = explode("\n", $output);
         }
-        
+
         fclose($fp);
-        
+
         return array_slice($chunk, -$lines);
     }
     

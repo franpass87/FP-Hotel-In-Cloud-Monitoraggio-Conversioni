@@ -71,5 +71,28 @@ final class LogManagerTest extends TestCase {
 
         $this->assertGreaterThan($old_time, get_option('hic_log_created'));
     }
+
+    public function test_get_recent_logs_handles_empty_file(): void {
+        $log_file = sys_get_temp_dir() . '/hic-log-empty.log';
+        update_option('hic_log_file', $log_file);
+        \FpHic\Helpers\hic_clear_option_cache('log_file');
+        file_put_contents($log_file, '');
+
+        $manager = new \HIC_Log_Manager();
+
+        $warnings = [];
+        set_error_handler(function ($severity, $message) use (&$warnings) {
+            if ($severity === E_WARNING) {
+                $warnings[] = $message;
+            }
+            return true;
+        });
+
+        $logs = $manager->get_recent_logs(10);
+        restore_error_handler();
+
+        $this->assertSame([], $logs);
+        $this->assertEmpty($warnings);
+    }
 }
 }

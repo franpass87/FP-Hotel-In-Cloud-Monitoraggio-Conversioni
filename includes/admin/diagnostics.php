@@ -1405,7 +1405,11 @@ function hic_diagnostics_page() {
                         <h3>📝 Log Recenti</h3>
                         <div class="hic-logs-container">
                             <?php if (empty($recent_logs)): ?>
-                                <p class="hic-no-logs">Nessun log recente disponibile.</p>
+                                <?php if (!empty($execution_stats['log_file_exists']) && (int) $execution_stats['log_file_size'] === 0): ?>
+                                    <p class="hic-no-logs">File di log presente ma vuoto.</p>
+                                <?php else: ?>
+                                    <p class="hic-no-logs">Nessun log recente disponibile.</p>
+                                <?php endif; ?>
                             <?php else: ?>
                                 <?php foreach (array_slice($recent_logs, 0, 8) as $log_entry): ?>
                                     <div class="hic-log-entry"><?php echo esc_html(sprintf('[%s] [%s] [%s] %s', $log_entry['timestamp'], $log_entry['level'], $log_entry['memory'], $log_entry['message'])); ?></div>
