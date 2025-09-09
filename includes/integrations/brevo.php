@@ -16,8 +16,8 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
   $email = isset($data['email']) ? $data['email'] : null;
   if (!$email) { hic_log('Nessuna email nel payload → skip Brevo contact.'); return; }
 
-  // Lista in base alla lingua (supporta sia 'lingua' sia 'lang')
-  $lang = isset($data['lingua']) ? $data['lingua'] : (isset($data['lang']) ? $data['lang'] : '');
+  // Determine language from payload (supports 'language', 'lingua', 'lang')
+  $lang = $data['language'] ?? ($data['lingua'] ?? ($data['lang'] ?? ''));
 
   // Detect language from phone prefix if available
   $phone_data = Helpers\hic_detect_phone_language($data['phone'] ?? ($data['whatsapp'] ?? ''));
@@ -30,7 +30,14 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
   }
 
   $list_ids = array();
-  if (strtolower($lang) === 'en') { $list_ids[] = intval(Helpers\hic_get_brevo_list_en()); } else { $list_ids[] = intval(Helpers\hic_get_brevo_list_it()); }
+  if (strtolower($lang) === 'en') {
+    $list_ids[] = intval(Helpers\hic_get_brevo_list_en());
+  } else {
+    $list_ids[] = intval(Helpers\hic_get_brevo_list_it());
+  }
+
+  // Remove empty list IDs (e.g., 0)
+  $list_ids = array_filter($list_ids);
 
   $body = array(
     'email' => $email,
