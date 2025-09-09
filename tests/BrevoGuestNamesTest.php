@@ -29,8 +29,8 @@ final class BrevoGuestNamesTest extends TestCase {
         \FpHic\hic_send_brevo_event($reservation, null, null);
 
         $payload = json_decode($hic_last_request['args']['body'], true);
-        $this->assertSame('Mario', $payload['properties']['firstname']);
-        $this->assertSame('Rossi', $payload['properties']['lastname']);
+        $this->assertSame('Mario', $payload['properties']['guest_first_name']);
+        $this->assertSame('Rossi', $payload['properties']['guest_last_name']);
     }
 
     public function testRefundEventSendsGuestNames() {
@@ -49,7 +49,7 @@ final class BrevoGuestNamesTest extends TestCase {
         \FpHic\hic_send_brevo_refund_event($reservation, null, null);
 
         $payload = json_decode($hic_last_request['args']['body'], true);
-        $this->assertSame('Mario', $payload['properties']['firstname']);
-        $this->assertSame('Rossi', $payload['properties']['lastname']);
+        $this->assertSame('Mario', $payload['properties']['guest_first_name']);
+        $this->assertSame('Rossi', $payload['properties']['guest_last_name']);
     }
 }
