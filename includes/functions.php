@@ -168,7 +168,56 @@ function hic_mask_sensitive_data($message) {
  * @return string
  */
 function hic_default_log_message_filter($message, $level) {
-    return hic_mask_sensitive_data($message);
+    if (is_array($message)) {
+        foreach ($message as $key => $value) {
+            if (is_string($key) && preg_match('/^(?:email)$/i', $key)) {
+                $message[$key] = '[masked-email]';
+                continue;
+            }
+            if (is_string($key) && preg_match('/(token|api[_-]?key|secret|password)/i', $key)) {
+                $message[$key] = '[masked]';
+                continue;
+            }
+            $message[$key] = hic_default_log_message_filter($value, $level);
+        }
+        return $message;
+    }
+
+    if (is_object($message)) {
+        foreach ($message as $key => $value) {
+            if (is_string($key) && preg_match('/^(?:email)$/i', $key)) {
+                $message->$key = '[masked-email]';
+                continue;
+            }
+            if (is_string($key) && preg_match('/(token|api[_-]?key|secret|password)/i', $key)) {
+                $message->$key = '[masked]';
+                continue;
+            }
+            $message->$key = hic_default_log_message_filter($value, $level);
+        }
+        return $message;
+    }
+
+    if (is_bool($message) || $message === null) {
+        return $message;
+    }
+
+    if (is_string($message)) {
+        $masked = hic_mask_sensitive_data($message);
+        if ($masked !== $message) {
+            return $masked;
+        }
+        if (is_numeric($message)) {
+            return '[masked-number]';
+        }
+        return $masked;
+    }
+
+    if (is_numeric($message)) {
+        return '[masked-number]';
+    }
+
+    return $message;
 }
 
 if (function_exists('add_filter')) {
