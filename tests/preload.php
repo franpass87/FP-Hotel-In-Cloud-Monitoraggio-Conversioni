@@ -69,3 +69,8 @@ if (!function_exists('wp_date')) {
         return date($format, $timestamp ?? time());
     }
 }
+if (!function_exists('esc_sql')) {
+    function esc_sql($sql) {
+        return $sql;
+    }
+}
