@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
  * @return int Validated and potentially adjusted timestamp
  */
 function hic_validate_api_timestamp($timestamp, $context = 'api_request') {
-    $current_time = current_time('timestamp');
+    $current_time = time();
     $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin from 7-day API limit
     $max_lookahead_seconds = 1 * DAY_IN_SECONDS; // 1 day in future for safety
     $earliest_allowed = $current_time - $max_lookback_seconds;
@@ -565,7 +565,7 @@ function hic_api_poll_bookings(){
  * Quasi-realtime polling with moving window approach
  */
 function hic_quasi_realtime_poll($prop_id, $start_time) {
-    $current_time = current_time('timestamp');
+    $current_time = time();
     
     // Moving window: 15 minutes back + 5 minutes forward
     $window_back_minutes = 15;
@@ -834,7 +834,7 @@ function hic_api_poll_updates(){
     $overlap_seconds = 300; // 5 minute overlap for safety
     
     // Ensure we never use a timestamp older than 6 days (API limit is 7 days)
-    $current_time = current_time('timestamp');
+    $current_time = time();
     $max_lookback_seconds = 6 * DAY_IN_SECONDS; // 6 days for safety margin
     $earliest_allowed = $current_time - $max_lookback_seconds;
     $default_since = max($earliest_allowed, $current_time - DAY_IN_SECONDS); // Default to 1 day ago or earliest allowed
@@ -1219,7 +1219,7 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
     // Use a small date range to minimize data transfer
     $test_args = array(
         'date_type' => 'checkin',
-        'from_date' => wp_date('Y-m-d', strtotime('-7 days', current_time('timestamp'))),
+        'from_date' => wp_date('Y-m-d', strtotime('-7 days', time())),
         'to_date' => wp_date('Y-m-d'),
         'limit' => 1
     );
@@ -1551,7 +1551,7 @@ function hic_api_poll_bookings_continuous() {
             return;
         }
         
-        $current_time = current_time('timestamp');
+        $current_time = time();
         
         // Check recent reservations (last 2 hours) to catch new bookings and updates
         $window_back_minutes = 120; // 2 hours back
@@ -1686,7 +1686,7 @@ function hic_api_poll_bookings_deep_check() {
             return;
         }
         
-        $current_time = current_time('timestamp');
+        $current_time = time();
         $lookback_seconds = 5 * DAY_IN_SECONDS; // 5 days
         
         $from_date = wp_date('Y-m-d', $current_time - $lookback_seconds);

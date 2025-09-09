@@ -206,7 +206,7 @@ class HIC_Booking_Poller {
      * Watchdog to detect and recover from polling failures
      */
     public function run_watchdog_check() {
-        $current_time = current_time('timestamp');
+        $current_time = time();
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         $last_deep = get_option('hic_last_deep_check', 0);
         $last_successful = get_option('hic_last_successful_poll', 0);
@@ -285,8 +285,9 @@ class HIC_Booking_Poller {
             case 'timestamp_error':
                 // Handle stuck polling due to timestamp errors
                 hic_log("Recovery: Resetting all timestamps due to timestamp errors");
-                $safe_timestamp = current_time('timestamp') - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
-                $recent_timestamp = current_time('timestamp') - HIC_WATCHDOG_THRESHOLD; // 5 minutes ago for polling timestamps
+                $current_time = time();
+                $safe_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
+                $recent_timestamp = $current_time - HIC_WATCHDOG_THRESHOLD; // 5 minutes ago for polling timestamps
                 
                 // Validate timestamps before using them (if hic_validate_api_timestamp is available)
                 if (function_exists('\\FpHic\\hic_validate_api_timestamp')) {
@@ -358,7 +359,7 @@ class HIC_Booking_Poller {
             'last_continuous' => get_option('hic_last_continuous_poll', 0),
             'last_deep' => get_option('hic_last_deep_check', 0),
             'wp_cron_working' => $this->is_wp_cron_working(),
-            'time' => current_time('timestamp')
+            'time' => time()
         );
         
         return $response;
@@ -375,7 +376,7 @@ class HIC_Booking_Poller {
         
         // Run a lightweight watchdog check
         if ($this->should_poll()) {
-            $current_time = current_time('timestamp');
+            $current_time = time();
             $last_continuous = get_option('hic_last_continuous_poll', 0);
             
             // If polling hasn't run in more than 5 minutes, trigger recovery
@@ -407,7 +408,7 @@ class HIC_Booking_Poller {
             return;
         }
         
-        $current_time = current_time('timestamp');
+        $current_time = time();
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         
         // If WP-Cron is not working and polling is severely delayed (>10 minutes), run fallback
@@ -417,7 +418,7 @@ class HIC_Booking_Poller {
             // Use a transient to prevent multiple simultaneous executions
             $fallback_lock = get_transient('hic_fallback_polling_lock');
             if (!$fallback_lock) {
-                set_transient('hic_fallback_polling_lock', current_time('timestamp'), 120); // 2-minute lock
+                set_transient('hic_fallback_polling_lock', $current_time, 120); // 2-minute lock
                 
                 // Run polling in background (don't block page load)
                 wp_schedule_single_event(time() + 5, 'hic_fallback_poll_event');
@@ -438,7 +439,7 @@ class HIC_Booking_Poller {
         }
         
         // Very quick check - just log if polling seems to be failing
-        $current_time = current_time('timestamp');
+        $current_time = time();
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         
         if ($current_time - $last_continuous > 1800) { // 30 minutes lag
@@ -460,7 +461,7 @@ class HIC_Booking_Poller {
             $this->execute_continuous_polling();
             
             // Also run deep check if it's been a while
-            $current_time = current_time('timestamp');
+            $current_time = time();
             $last_deep = get_option('hic_last_deep_check', 0);
             if ($current_time - $last_deep > 1800) { // 30 minutes
                 $this->execute_deep_check();
@@ -480,7 +481,7 @@ class HIC_Booking_Poller {
         hic_log("Scheduler: Executing continuous polling (1-minute interval)");
         
         // Update timestamp first to prevent overlapping executions
-        update_option('hic_last_continuous_poll', current_time('timestamp'), false);
+        update_option('hic_last_continuous_poll', time(), false);
         \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
         
         if (function_exists('\\FpHic\\hic_api_poll_bookings_continuous')) {
@@ -499,7 +500,7 @@ class HIC_Booking_Poller {
         hic_log("Scheduler: Executing deep check (10-minute interval, " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback)");
         
         // Update timestamp first to prevent overlapping executions
-        update_option('hic_last_deep_check', current_time('timestamp'), false);
+        update_option('hic_last_deep_check', time(), false);
         \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
         
         if (function_exists('\\FpHic\\hic_api_poll_bookings_deep_check')) {
@@ -521,8 +522,9 @@ class HIC_Booking_Poller {
         }
         
         $lookback_seconds = HIC_DEEP_CHECK_LOOKBACK_DAYS * DAY_IN_SECONDS;
-        $from_date = wp_date('Y-m-d', current_time('timestamp') - $lookback_seconds);
-        $to_date = wp_date('Y-m-d', current_time('timestamp'));
+        $current_time = time();
+        $from_date = wp_date('Y-m-d', $current_time - $lookback_seconds);
+        $to_date = wp_date('Y-m-d', $current_time);
         
         hic_log("Deep check: Searching for reservations from $from_date to $to_date (property: $prop_id)");
         
