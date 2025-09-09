@@ -43,7 +43,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('Room 1', $payload['attributes']['HIC_ROOM_NAME']);
         $this->assertSame('OFF1', $payload['attributes']['HIC_OFFER']);
         $this->assertSame(1, $payload['attributes']['HIC_VALID']);
-        $this->assertSame(json_encode($data['relocations']), $payload['attributes']['HIC_RELOCATIONS']);
+        $this->assertSame(wp_json_encode($data['relocations']), $payload['attributes']['HIC_RELOCATIONS']);
     }
 
     public function testReservationCreatedEventSendsFields() {
@@ -84,7 +84,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('Mario', $payload['properties']['guest_first_name']);
         $this->assertSame('Rossi', $payload['properties']['guest_last_name']);
         $this->assertSame(1, $payload['properties']['valid']);
-        $this->assertSame(json_encode($reservation['relocations']), $payload['properties']['relocations']);
+        $this->assertSame(wp_json_encode($reservation['relocations']), $payload['properties']['relocations']);
     }
 
     public function testPhoneAndWhatsappSeparated() {
