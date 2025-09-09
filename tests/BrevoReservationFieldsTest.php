@@ -72,4 +72,43 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('Mario', $payload['properties']['guest_first_name']);
         $this->assertSame('Rossi', $payload['properties']['guest_last_name']);
     }
+
+    public function testPhoneAndWhatsappSeparated() {
+        global $hic_last_request;
+        $hic_last_request = null;
+
+        $data = [
+            'email' => 'both@example.com',
+            'transaction_id' => 'TB',
+            'phone' => '+39 333 1234567',
+            'whatsapp' => '+44 1234567890',
+            'language' => 'en'
+        ];
+
+        \FpHic\hic_dispatch_brevo_reservation($data);
+
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        $this->assertSame('+393331234567', $payload['attributes']['PHONE']);
+        $this->assertSame('+44 1234567890', $payload['attributes']['WHATSAPP']);
+        $this->assertSame('it', $payload['attributes']['LANGUAGE']);
+    }
+
+    public function testWhatsappOnlyFallback() {
+        global $hic_last_request;
+        $hic_last_request = null;
+
+        $data = [
+            'email' => 'wa@example.com',
+            'transaction_id' => 'TW',
+            'whatsapp' => '+44 1234567890',
+            'language' => 'it'
+        ];
+
+        \FpHic\hic_dispatch_brevo_reservation($data);
+
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        $this->assertSame('+441234567890', $payload['attributes']['PHONE']);
+        $this->assertSame('+441234567890', $payload['attributes']['WHATSAPP']);
+        $this->assertSame('en', $payload['attributes']['LANGUAGE']);
+    }
 }
