@@ -529,17 +529,17 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     $prop_id = hic_get_property_id();
     
     if (!$prop_id) {
-        return new WP_Error('missing_prop_id', 'Property ID non configurato');
+        return new \WP_Error('missing_prop_id', 'Property ID non configurato');
     }
     
     // Check API connection type
     if (hic_get_connection_type() !== 'api') {
-        return new WP_Error('wrong_connection', 'Sistema configurato per webhook, non API');
+        return new \WP_Error('wrong_connection', 'Sistema configurato per webhook, non API');
     }
     
     // Validate credentials
     if (!hic_has_basic_auth_credentials()) {
-        return new WP_Error('missing_credentials', 'Credenziali Basic Auth non configurate');
+        return new \WP_Error('missing_credentials', 'Credenziali Basic Auth non configurate');
     }
     
     // Get downloaded booking IDs for filtering
@@ -563,7 +563,7 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     }
     
     if (!is_array($result)) {
-        return new WP_Error('invalid_response', 'Risposta API non valida');
+        return new \WP_Error('invalid_response', 'Risposta API non valida');
     }
     
     // Sort by creation date (newest first)
