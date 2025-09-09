@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 namespace FpHic\Helpers {
 
+use WP_Error;
+
 /**
  * Helper functions for HIC Plugin
  */
