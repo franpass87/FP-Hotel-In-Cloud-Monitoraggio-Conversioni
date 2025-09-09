@@ -422,6 +422,11 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     if (empty($ttclid))  { $ttclid  = $tracking['ttclid'] ?? ''; }
   }
 
+  // Normalize phone number and detect language from prefix
+  $phone_data = Helpers\hic_detect_phone_language($data['phone'] ?? '');
+  $data['phone'] = $phone_data['phone'] ?? ($data['phone'] ?? '');
+  $data['language'] = $phone_data['language'] ?? ($data['language'] ?? '');
+
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
 
   $body = array(

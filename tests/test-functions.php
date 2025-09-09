@@ -184,6 +184,51 @@ class HICFunctionsTest {
         echo "✅ Brevo phone language override tests passed\n";
     }
 
+    public function testBrevoReservationCreatedPhoneLanguageOverride() {
+        // Ensure required WordPress stubs exist
+        if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
+        if (!function_exists('wp_remote_retrieve_response_code')) { function wp_remote_retrieve_response_code($res) { return $res['response']['code'] ?? 0; } }
+        if (!function_exists('wp_remote_retrieve_body')) { function wp_remote_retrieve_body($res) { return $res['body'] ?? ''; } }
+        if (!function_exists('is_wp_error')) { function is_wp_error($thing) { return false; } }
+        if (!function_exists('wp_date')) { function wp_date($format, $ts = null) { return date($format, $ts ?? time()); } }
+
+        require_once dirname(__DIR__) . '/includes/integrations/brevo.php';
+        update_option('hic_brevo_api_key', 'test');
+        update_option('hic_realtime_brevo_sync', '1');
+
+        global $hic_last_request;
+
+        // Event with Italian phone
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_reservation_created_event([
+            'email' => 'it@example.com',
+            'phone' => '+39 333 1234567',
+            'language' => 'en',
+            'transaction_id' => 't1',
+            'original_price' => 100,
+            'currency' => 'EUR'
+        ]);
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['properties']['language'] === 'it', 'Italian phone should force language it');
+        assert($payload['properties']['phone'] === '+393331234567', 'Phone should be normalized');
+
+        // Event with foreign phone
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_reservation_created_event([
+            'email' => 'en@example.com',
+            'phone' => '+44 1234567890',
+            'language' => 'it',
+            'transaction_id' => 't2',
+            'original_price' => 100,
+            'currency' => 'EUR'
+        ]);
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['properties']['language'] === 'en', 'Foreign phone should force language en');
+        assert($payload['properties']['phone'] === '+441234567890', 'Phone should be normalized');
+
+        echo "✅ Brevo reservation_created phone language override tests passed\n";
+    }
+
     public function testEventRoomNameFallback() {
         // Ensure required WordPress stubs exist
         if (!function_exists('home_url')) {
@@ -273,6 +318,7 @@ class HICFunctionsTest {
             $this->testReservationPhoneFallback();
             $this->testPhoneLanguageDetection();
             $this->testBrevoPhoneLanguageOverride();
+            $this->testBrevoReservationCreatedPhoneLanguageOverride();
             $this->testEventRoomNameFallback();
 
             echo "\n🎉 All tests passed successfully!\n";
