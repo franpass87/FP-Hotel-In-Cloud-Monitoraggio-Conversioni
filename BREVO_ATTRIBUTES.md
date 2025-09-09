@@ -23,6 +23,7 @@ Il sistema di polling API moderno (versione attuale) invia **ENTRAMBI** i set di
 | `HIC_GUESTS` | Numero | Numero di ospiti | `guests` dalla prenotazione |
 | `HIC_ROOM` | Testo | Nome dell'alloggio/camera | `accommodation_name` dalla prenotazione |
 | `HIC_PRICE` | Numero | Prezzo originale della prenotazione | `price` dalla prenotazione |
+| `TAGS` | Testo (JSON) | Elenco di tag associati al contatto | Array `tags` dalla prenotazione |
 
 #### Attributi Legacy (Compatibilità)
 Il sistema moderno invia **ANCHE** questi attributi legacy per garantire la retrocompatibilità:
@@ -80,6 +81,7 @@ HIC_TO - Tipo: Data
 HIC_GUESTS - Tipo: Numero
 HIC_ROOM - Tipo: Testo
 HIC_PRICE - Tipo: Numero (decimale)
+TAGS - Tipo: Testo
 ```
 
 #### Attributi Opzionali (Compatibilità Legacy)

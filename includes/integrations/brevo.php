@@ -106,6 +106,10 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
     )
   );
 
+  if (isset($reservation['tags']) && is_array($reservation['tags'])) {
+    $event_data['tags'] = array_values($reservation['tags']);
+  }
+
   // Attach UTM parameters if SID available
   if (!empty($reservation['sid'])) {
     $utm = Helpers\hic_get_utm_params_by_sid($reservation['sid']);
@@ -290,6 +294,10 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'LINGUA' => $language
   );
 
+  if (isset($data['tags']) && is_array($data['tags'])) {
+    $attributes['TAGS'] = wp_json_encode(array_values($data['tags']));
+  }
+
   // Populate UTM attributes if available
   if (!empty($data['transaction_id'])) {
     $utm = Helpers\hic_get_utm_params_by_sid($data['transaction_id']);
@@ -315,6 +323,10 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'listIds' => $list_ids,
     'updateEnabled' => true
   );
+
+  if (isset($data['tags']) && is_array($data['tags'])) {
+    $body['tags'] = array_values($data['tags']);
+  }
 
   // Add marketing opt-in only if not alias and default is enabled, or if enrichment is happening and double opt-in is enabled
   if (!$is_alias) {
