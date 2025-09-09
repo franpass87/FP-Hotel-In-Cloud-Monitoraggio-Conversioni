@@ -1657,9 +1657,15 @@ function hic_api_poll_bookings_continuous() {
         Helpers\hic_clear_option_cache('hic_last_continuous_poll_count');
         update_option('hic_last_continuous_poll_duration', $execution_time, false);
         Helpers\hic_clear_option_cache('hic_last_continuous_poll_duration');
-        
+
+        // Update last successful poll timestamp if polling had no errors or found new bookings
+        if ($total_errors === 0 || $total_new > 0) {
+            update_option('hic_last_successful_poll', $current_time, false);
+            Helpers\hic_clear_option_cache('hic_last_successful_poll');
+        }
+
         hic_log("Continuous Polling: Completed in {$execution_time}ms - New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
-        
+
     } finally {
         Helpers\hic_release_polling_lock();
     }
