@@ -669,14 +669,18 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
 
   // Transform webhook data to modern format for consistency
   $transformed_data = hic_transform_webhook_data_for_brevo($data);
-  
+
   // Use the modern dispatcher for contact management and capture result
   $contact_updated = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid, $msclkid, $ttclid);
-  if (!$contact_updated) {
-    return false;
-  }
-  
+  hic_log(
+    $contact_updated
+      ? 'Unified Brevo: contact update succeeded'
+      : 'Unified Brevo: contact update failed',
+    $contact_updated ? HIC_LOG_LEVEL_INFO : HIC_LOG_LEVEL_ERROR
+  );
+
   // Send event for new reservations, allowing override via filter
+  $event_sent = false;
   $reservation_id = Helpers\hic_extract_reservation_id($data);
   if (!empty($reservation_id)) {
     $is_new = hic_is_reservation_new_for_realtime($reservation_id);
@@ -686,25 +690,34 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
       if ($send_event) {
         $event_result = hic_send_brevo_reservation_created_event($transformed_data, $gclid, $fbclid, $msclkid, $ttclid);
         if ($event_result['success']) {
+          hic_log('Unified Brevo: reservation_created event sent');
           hic_mark_reservation_notified_to_brevo($reservation_id);
+          $event_sent = true;
         } else {
+          hic_log('Unified Brevo: reservation_created event failed', HIC_LOG_LEVEL_WARNING);
           if ($event_result['retryable']) {
             hic_mark_reservation_notification_failed($reservation_id, 'Failed to send reservation_created event: ' . $event_result['error']);
           }
           // Non-retryable errors are already handled in hic_send_brevo_reservation_created_event
         }
-        return $event_result['success'];
       } else {
         // Event sending disabled via filter, mark as notified to avoid retries
+        hic_log('Unified Brevo: reservation_created event skipped via filter');
         hic_mark_reservation_notified_to_brevo($reservation_id);
-        return true;
       }
     } else {
       hic_log("Unified Brevo: reservation $reservation_id already processed for real-time sync");
     }
   }
 
-  // Return true since contact update succeeded (event sending is optional)
+  if (!$contact_updated && !$event_sent) {
+    return false;
+  }
+
+  if (!$contact_updated && $event_sent) {
+    hic_log('Unified Brevo: contact update failed but event sent', HIC_LOG_LEVEL_WARNING);
+  }
+
   return true;
 }
 
