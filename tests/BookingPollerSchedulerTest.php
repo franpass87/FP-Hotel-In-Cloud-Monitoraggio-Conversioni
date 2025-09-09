@@ -109,6 +109,21 @@ namespace {
             unset($GLOBALS['simulate_deep_exception']);
         }
 
+        public function test_deep_check_recovers_after_exception(): void {
+            $poller = new \HIC_Booking_Poller();
+            update_option('hic_deep_check_failures', 0);
+            update_option('hic_last_deep_check', 0);
+
+            $GLOBALS['simulate_deep_exception'] = true;
+            $poller->execute_deep_check();
+            unset($GLOBALS['simulate_deep_exception']);
+
+            $poller->execute_deep_check();
+
+            $this->assertNotEquals(0, get_option('hic_last_deep_check'));
+            $this->assertSame(1, get_option('hic_deep_check_failures'));
+        }
+
         public function test_execute_continuous_polling_updates_timestamp_on_success(): void {
             $poller = new \HIC_Booking_Poller();
             update_option('hic_last_continuous_poll', 0);
@@ -146,6 +161,23 @@ namespace {
             $this->assertSame(0, get_option('hic_last_continuous_poll'));
             $this->assertSame(1, get_option('hic_continuous_poll_failures'));
             unset($GLOBALS['simulate_continuous_exception']);
+        }
+
+        public function test_continuous_polling_recovers_after_exception(): void {
+            $poller = new \HIC_Booking_Poller();
+            update_option('hic_continuous_poll_failures', 0);
+            update_option('hic_last_continuous_poll', 0);
+            update_option('hic_last_successful_poll', 0);
+
+            $GLOBALS['simulate_continuous_exception'] = true;
+            $poller->execute_continuous_polling();
+            unset($GLOBALS['simulate_continuous_exception']);
+
+            $poller->execute_continuous_polling();
+
+            $this->assertNotEquals(0, get_option('hic_last_continuous_poll'));
+            $this->assertNotEquals(0, get_option('hic_last_successful_poll'));
+            $this->assertSame(1, get_option('hic_continuous_poll_failures'));
         }
 
         public function test_watchdog_detects_polling_failure(): void {
