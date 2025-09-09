@@ -83,7 +83,9 @@ function hic_activate($network_wide)
 
     $htaccess = $log_dir . '/.htaccess';
     if (!file_exists($htaccess)) {
-        file_put_contents($htaccess, "Order allow,deny\nDeny from all\n");
+        if (false === @file_put_contents($htaccess, "Order allow,deny\nDeny from all\n")) {
+            \hic_log('Impossibile creare .htaccess nella cartella dei log');
+        }
     }
 }
 
