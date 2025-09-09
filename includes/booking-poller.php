@@ -490,7 +490,10 @@ class HIC_Booking_Poller {
                 $result = null;
             }
         } catch (\Throwable $e) {
-            throw $e;
+            hic_log('Continuous polling error: ' . $e->getMessage(), HIC_LOG_LEVEL_ERROR);
+            $failures = (int) get_option('hic_continuous_poll_failures', 0);
+            update_option('hic_continuous_poll_failures', $failures + 1, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_continuous_poll_failures');
         } finally {
             if ($result === true) {
                 update_option('hic_last_continuous_poll', time(), false);
@@ -517,7 +520,10 @@ class HIC_Booking_Poller {
             }
             $success = !is_wp_error($result);
         } catch (\Throwable $e) {
-            throw $e;
+            hic_log('Deep check error: ' . $e->getMessage(), HIC_LOG_LEVEL_ERROR);
+            $failures = (int) get_option('hic_deep_check_failures', 0);
+            update_option('hic_deep_check_failures', $failures + 1, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_deep_check_failures');
         } finally {
             if ($success) {
                 update_option('hic_last_deep_check', time(), false);

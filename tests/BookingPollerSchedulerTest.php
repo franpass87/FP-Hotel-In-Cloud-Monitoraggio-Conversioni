@@ -6,6 +6,9 @@ namespace FpHic {
     }
     function hic_api_poll_bookings_continuous() {
         $GLOBALS['poll_calls'][] = 'continuous';
+        if (!empty($GLOBALS['simulate_continuous_exception'])) {
+            throw new \Exception('Simulated exception');
+        }
         if (!empty($GLOBALS['simulate_continuous_error'])) {
             return new \WP_Error('poll_error', 'Simulated error');
         }
@@ -20,6 +23,9 @@ namespace FpHic {
     }
     function hic_api_poll_bookings_deep_check() {
         $GLOBALS['poll_calls'][] = 'deep';
+        if (!empty($GLOBALS['simulate_deep_exception'])) {
+            throw new \Exception('Simulated exception');
+        }
         if (!empty($GLOBALS['simulate_deep_error'])) {
             return new \WP_Error('poll_error', 'Simulated error');
         }
@@ -76,6 +82,18 @@ namespace {
             unset($GLOBALS['simulate_deep_error']);
         }
 
+        public function test_execute_deep_check_exception_is_handled(): void {
+            $poller = new \HIC_Booking_Poller();
+            update_option('hic_deep_check_failures', 0);
+
+            $GLOBALS['simulate_deep_exception'] = true;
+            $poller->execute_deep_check();
+
+            $this->assertSame(0, get_option('hic_last_deep_check'));
+            $this->assertSame(1, get_option('hic_deep_check_failures'));
+            unset($GLOBALS['simulate_deep_exception']);
+        }
+
         public function test_execute_continuous_polling_updates_timestamp_on_success(): void {
             $poller = new \HIC_Booking_Poller();
             update_option('hic_last_continuous_poll', 0);
@@ -99,6 +117,20 @@ namespace {
             $this->assertSame($old, get_option('hic_last_continuous_poll'));
             $this->assertSame($old_success, get_option('hic_last_successful_poll'));
             unset($GLOBALS['simulate_continuous_skip']);
+        }
+
+        public function test_execute_continuous_polling_exception_is_handled(): void {
+            $poller = new \HIC_Booking_Poller();
+            update_option('hic_continuous_poll_failures', 0);
+            update_option('hic_last_continuous_poll', 0);
+            update_option('hic_last_successful_poll', 0);
+
+            $GLOBALS['simulate_continuous_exception'] = true;
+            $poller->execute_continuous_polling();
+
+            $this->assertSame(0, get_option('hic_last_continuous_poll'));
+            $this->assertSame(1, get_option('hic_continuous_poll_failures'));
+            unset($GLOBALS['simulate_continuous_exception']);
         }
 
         public function test_watchdog_detects_polling_failure(): void {
