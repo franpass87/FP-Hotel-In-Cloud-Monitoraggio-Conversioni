@@ -497,7 +497,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     )
   );
 
-  if (!empty($data['tags']) && is_array($data['tags'])) {
+  if (is_array($data['tags'] ?? null)) {
     $body['tags'] = array_values($data['tags']);
     $body['properties']['tags'] = implode(',', $data['tags']);
   }
