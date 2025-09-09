@@ -1541,14 +1541,14 @@ function hic_api_poll_bookings_continuous() {
     // Try to acquire lock to prevent overlapping executions
     if (!Helpers\hic_acquire_polling_lock(120)) { // 2-minute timeout for continuous polling
         hic_log('Continuous Polling: Another polling process is running, skipping execution');
-        return;
+        return false;
     }
-    
+
     try {
         $prop_id = Helpers\hic_get_property_id();
         if (empty($prop_id)) {
             hic_log('Continuous Polling: No property ID configured');
-            return;
+            return new WP_Error('hic_missing_prop_id', 'No property ID configured');
         }
         
         $current_time = time();
@@ -1638,7 +1638,7 @@ function hic_api_poll_bookings_continuous() {
         $checkin_to = wp_date('Y-m-d', $current_time + DAY_IN_SECONDS);
         
         $checkin_reservations = hic_fetch_reservations_raw($prop_id, 'checkin', $checkin_from, $checkin_to, 30);
-        
+
         if (!is_wp_error($checkin_reservations)) {
             $checkin_count = is_array($checkin_reservations) ? count($checkin_reservations) : 0;
             if ($checkin_count > 0) {
@@ -1648,6 +1648,9 @@ function hic_api_poll_bookings_continuous() {
                 $total_skipped += $process_result['skipped'];
                 $total_errors += $process_result['errors'];
             }
+        } else {
+            hic_log("Continuous Polling: Error fetching reservations by checkin date: " . $checkin_reservations->get_error_message());
+            $total_errors++;
         }
         
         $execution_time = round((microtime(true) - $start_time) * 1000, 2);
@@ -1666,6 +1669,15 @@ function hic_api_poll_bookings_continuous() {
 
         hic_log("Continuous Polling: Completed in {$execution_time}ms - New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
 
+        if ($total_errors > 0) {
+            return new WP_Error('hic_polling_errors', 'Errors occurred during continuous polling');
+        }
+
+        return true;
+
+    } catch (\Throwable $e) {
+        hic_log('Continuous Polling exception: ' . $e->getMessage());
+        return new WP_Error('hic_polling_exception', $e->getMessage());
     } finally {
         Helpers\hic_release_polling_lock();
     }

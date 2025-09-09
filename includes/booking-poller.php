@@ -479,22 +479,20 @@ class HIC_Booking_Poller {
      */
     public function execute_continuous_polling() {
         hic_log("Scheduler: Executing continuous polling (1-minute interval)");
-        $success = false;
+        $result = false;
         try {
-            if (function_exists('\\FpHic\\hic_api_poll_bookings_continuous')) {
+            if (function_exists('\FpHic\hic_api_poll_bookings_continuous')) {
                 $result = \FpHic\hic_api_poll_bookings_continuous();
-            } elseif (function_exists('\\FpHic\\hic_api_poll_bookings')) {
+            } elseif (function_exists('\FpHic\hic_api_poll_bookings')) {
                 // Fallback to existing function if new one doesn't exist yet
                 $result = \FpHic\hic_api_poll_bookings();
             } else {
                 $result = null;
             }
-
-            $success = !is_wp_error($result);
         } catch (\Throwable $e) {
             throw $e;
         } finally {
-            if ($success) {
+            if ($result === true) {
                 update_option('hic_last_continuous_poll', time(), false);
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
             }
