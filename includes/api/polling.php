@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 namespace FpHic;
+
+use WP_Error;
 /**
  * API Polling Handler - Core API Functions Only
  * Note: WP-Cron scheduling removed in favor of internal scheduler (booking-poller.php)
