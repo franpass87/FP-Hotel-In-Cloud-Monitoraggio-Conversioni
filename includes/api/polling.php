@@ -364,13 +364,31 @@ function hic_transform_reservation($reservation) {
 
     // Determine guest name from available fields
     $first = $reservation['guest_first_name']
+        ?? $reservation['guest_firstname']
         ?? $reservation['first_name']
+        ?? $reservation['firstname']
         ?? $reservation['client_first_name']
+        ?? $reservation['customer_first_name']
+        ?? $reservation['customer_firstname']
         ?? '';
     $last = $reservation['guest_last_name']
+        ?? $reservation['guest_lastname']
         ?? $reservation['last_name']
+        ?? $reservation['lastname']
         ?? $reservation['client_last_name']
+        ?? $reservation['customer_last_name']
+        ?? $reservation['customer_lastname']
         ?? '';
+
+    if ((empty($first) || empty($last)) && !empty($reservation['guest_name']) && is_string($reservation['guest_name'])) {
+        $parts = preg_split('/\s+/', trim($reservation['guest_name']), 2);
+        if (empty($first) && isset($parts[0])) {
+            $first = $parts[0];
+        }
+        if (empty($last) && isset($parts[1])) {
+            $last = $parts[1];
+        }
+    }
 
     // Determine primary email from available fields
     $email = $reservation['guest_email']

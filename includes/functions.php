@@ -847,7 +847,42 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   $body  = "Hai ricevuto una nuova prenotazione da $site_name:\n\n";
   $body .= "Reservation ID: " . ($data['reservation_id'] ?? ($data['id'] ?? 'n/a')) . "\n";
   $body .= "Importo: " . (isset($data['amount']) ? hic_normalize_price($data['amount']) : '0') . " " . ($data['currency'] ?? 'EUR') . "\n";
-  $body .= "Nome: " . trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? '')) . "\n";
+
+  $first = $data['first_name']
+      ?? $data['guest_first_name']
+      ?? $data['guest_firstname']
+      ?? $data['firstname']
+      ?? $data['customer_first_name']
+      ?? $data['customer_firstname']
+      ?? '';
+  $last = $data['last_name']
+      ?? $data['guest_last_name']
+      ?? $data['guest_lastname']
+      ?? $data['lastname']
+      ?? $data['customer_last_name']
+      ?? $data['customer_lastname']
+      ?? '';
+
+  if ((empty($first) || empty($last)) && !empty($data['guest_name']) && is_string($data['guest_name'])) {
+      $parts = preg_split('/\s+/', trim($data['guest_name']), 2);
+      if (empty($first) && isset($parts[0])) {
+          $first = $parts[0];
+      }
+      if (empty($last) && isset($parts[1])) {
+          $last = $parts[1];
+      }
+  }
+  if ((empty($first) || empty($last)) && !empty($data['name']) && is_string($data['name'])) {
+      $parts = preg_split('/\s+/', trim($data['name']), 2);
+      if (empty($first) && isset($parts[0])) {
+          $first = $parts[0];
+      }
+      if (empty($last) && isset($parts[1])) {
+          $last = $parts[1];
+      }
+  }
+
+  $body .= "Nome: " . trim($first . ' ' . $last) . "\n";
   $body .= "Email: " . ($data['email'] ?? 'n/a') . "\n";
   $body .= "Telefono: " . ($data['phone'] ?? 'n/a') . "\n";
   $body .= "Lingua: " . ($data['lingua'] ?? ($data['lang'] ?? 'n/a')) . "\n";
