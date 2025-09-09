@@ -43,7 +43,9 @@ Il sistema moderno invia **ANCHE** questi attributi legacy per garantire la retr
 | `CURRENCY` | Testo | Valuta (es. "EUR", "USD") | `currency` dalla prenotazione |
 | `PHONE` | Testo | Numero di telefono | `phone` dalla prenotazione |
 | `WHATSAPP` | Testo | Numero WhatsApp | Mappato da `phone` |
-| `LINGUA` | Testo | Lingua | Mappato da `language` |
+| `LINGUA` | Testo | Lingua (alias legacy di `LANGUAGE`) | Mappato da `language` |
+> **Nota:** l'attributo `LANGUAGE` viene sempre inviato insieme a `LINGUA` per garantire la retro-compatibilità.
+>
 
 **\*Nota sui tracking ID**: Nel sistema API moderno, `GCLID` e `FBCLID` sono disponibili solo se la prenotazione è stata originariamente tracciata attraverso il sito web con parametri di tracking. Se la prenotazione è stata creata direttamente in Hotel in Cloud senza passare dal sito web, questi campi saranno vuoti.
 
@@ -112,7 +114,7 @@ Il plugin gestisce automaticamente l'assegnazione ai seguenti tipi di liste:
 
 - **Lista Italiana**: Per contatti con lingua "it"
 - **Lista Inglese**: Per contatti con lingua "en"  
-- **Lista Default**: Per altre lingue
+- **Lista Default**: Fallback per lingue mancanti o diverse da "it" e "en"
 - **Lista Alias**: Per email temporanee di OTA (Booking.com, Airbnb, etc.)
 
 Configura gli ID di queste liste nel pannello admin del plugin WordPress.
