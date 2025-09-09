@@ -30,7 +30,7 @@ class RetryFailedRequestsTest extends TestCase {
         $wpdb->rows = [(object)[
             'id' => 1,
             'endpoint' => 'https://example.com',
-            'payload' => '{invalid',
+            'payload' => '{"incomplete":',
             'attempts' => 0,
             'last_try' => '2024-01-01 00:00:00',
         ]];
