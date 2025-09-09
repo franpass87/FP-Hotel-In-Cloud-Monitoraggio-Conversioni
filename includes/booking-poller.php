@@ -634,14 +634,20 @@ class HIC_Booking_Poller {
         
         try {
             // Execute continuous polling
-            $this->execute_continuous_polling();
-            
+            $result = $this->execute_continuous_polling();
+
+            if (is_wp_error($result) || $result !== true) {
+                $error_message = is_wp_error($result) ? $result->get_error_message() : 'Unexpected polling result';
+                hic_log('Manual polling failed: ' . $error_message);
+                return array('success' => false, 'message' => $error_message);
+            }
+
             $execution_time = round(microtime(true) - $start_time, 2);
             $message = "Manual polling completed in {$execution_time}s";
             hic_log($message);
-            
+
             return array(
-                'success' => true, 
+                'success' => true,
                 'message' => $message,
                 'execution_time' => $execution_time
             );
@@ -675,17 +681,27 @@ class HIC_Booking_Poller {
             }
             
             // Execute continuous polling
-            $this->execute_continuous_polling();
-            
+            $result = $this->execute_continuous_polling();
+
+            if (is_wp_error($result) || $result !== true) {
+                $error_message = is_wp_error($result) ? $result->get_error_message() : 'Unexpected polling result';
+                hic_log('Force manual polling failed: ' . $error_message);
+                return array(
+                    'success' => false,
+                    'message' => $error_message,
+                    'lock_cleared' => $lock_cleared
+                );
+            }
+
             $execution_time = round(microtime(true) - $start_time, 2);
             $message = "Force manual polling completed in {$execution_time}s";
             if ($lock_cleared) {
                 $message .= " (lock was cleared)";
             }
             hic_log($message);
-            
+
             return array(
-                'success' => true, 
+                'success' => true,
                 'message' => $message,
                 'execution_time' => $execution_time,
                 'lock_cleared' => $lock_cleared
