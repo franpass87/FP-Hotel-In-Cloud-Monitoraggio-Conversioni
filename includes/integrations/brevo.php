@@ -521,6 +521,15 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
   
   // Parse response body for additional error information
   $parsed_body = json_decode($response_body, true);
+  if (json_last_error() !== JSON_ERROR_NONE) {
+    $log_data = array_merge($log_context, array('error_type' => 'json', 'HTTP' => $http_code));
+    hic_log(array('Brevo response JSON parse error' => array_merge($log_data, array('error' => json_last_error_msg()))));
+    return array(
+      'success' => false,
+      'error' => 'Invalid JSON: ' . json_last_error_msg(),
+      'log_data' => $log_data
+    );
+  }
   $brevo_error_code = null;
   $brevo_error_message = null;
   
