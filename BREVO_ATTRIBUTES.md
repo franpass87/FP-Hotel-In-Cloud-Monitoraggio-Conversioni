@@ -22,6 +22,9 @@ Il sistema di polling API moderno (versione attuale) invia **ENTRAMBI** i set di
 | `HIC_TO` | Data | Data di check-out | `to_date` dalla prenotazione |
 | `HIC_GUESTS` | Numero | Numero di ospiti | `guests` dalla prenotazione |
 | `HIC_ROOM` | Testo | Nome dell'alloggio/camera | `accommodation_name` dalla prenotazione |
+| `HIC_ACCOM_ID` | Testo | ID dell'alloggio | `accommodation_id` dalla prenotazione |
+| `HIC_ROOM_ID` | Testo | ID della camera | `room_id` dalla prenotazione |
+| `HIC_OFFER` | Testo | Offerta associata | `offer` dalla prenotazione |
 | `HIC_PRICE` | Numero | Prezzo originale della prenotazione | `price` dalla prenotazione |
 | `HIC_PRESENCE` | Numero (0/1) | Indica se il cliente ha effettuato il check-in | `presence` dalla prenotazione |
 | `HIC_BALANCE` | Numero | Saldo non pagato della prenotazione | `unpaid_balance` dalla prenotazione |
@@ -83,6 +86,9 @@ HIC_FROM - Tipo: Data
 HIC_TO - Tipo: Data
 HIC_GUESTS - Tipo: Numero
 HIC_ROOM - Tipo: Testo
+HIC_ACCOM_ID - Tipo: Testo
+HIC_ROOM_ID - Tipo: Testo
+HIC_OFFER - Tipo: Testo
 HIC_PRICE - Tipo: Numero (decimale)
 HIC_PRESENCE - Tipo: Numero
 HIC_BALANCE - Tipo: Numero (decimale)

@@ -22,7 +22,10 @@ final class BrevoReservationFieldsTest extends TestCase {
             'transaction_id' => 'T1',
             'presence' => 1,
             'unpaid_balance' => 50.5,
-            'tags' => ['vip', 'promo']
+            'tags' => ['vip', 'promo'],
+            'accommodation_id' => 'A1',
+            'room_id' => 'R1',
+            'offer' => 'OFF1'
         ];
 
         \FpHic\hic_dispatch_brevo_reservation($data);
@@ -32,6 +35,9 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('vip,promo', $payload['attributes']['TAGS']);
         $this->assertSame(1, $payload['attributes']['HIC_PRESENCE']);
         $this->assertSame(50.5, $payload['attributes']['HIC_BALANCE']);
+        $this->assertSame('A1', $payload['attributes']['HIC_ACCOM_ID']);
+        $this->assertSame('R1', $payload['attributes']['HIC_ROOM_ID']);
+        $this->assertSame('OFF1', $payload['attributes']['HIC_OFFER']);
     }
 
     public function testReservationCreatedEventSendsFields() {
@@ -45,7 +51,10 @@ final class BrevoReservationFieldsTest extends TestCase {
             'currency' => 'EUR',
             'presence' => 1,
             'unpaid_balance' => 50.5,
-            'tags' => ['vip', 'promo']
+            'tags' => ['vip', 'promo'],
+            'accommodation_id' => 'A1',
+            'room_id' => 'R1',
+            'offer' => 'OFF1'
         ];
 
         \FpHic\hic_send_brevo_reservation_created_event($reservation);
@@ -54,5 +63,8 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame(1, $payload['properties']['presence']);
         $this->assertSame(50.5, $payload['properties']['unpaid_balance']);
         $this->assertSame('vip,promo', $payload['properties']['tags']);
+        $this->assertSame('A1', $payload['properties']['accommodation_id']);
+        $this->assertSame('R1', $payload['properties']['room_id']);
+        $this->assertSame('OFF1', $payload['properties']['offer']);
     }
 }
