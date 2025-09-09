@@ -1443,7 +1443,7 @@ function hic_diagnostics_page() {
                     <div class="hic-advanced-content">
                         <div class="hic-advanced-section">
                             <h3>📦 Backfill Storico</h3>
-                            <p>Recupera prenotazioni da un intervallo temporale specifico. Limite consentito: 1-200 prenotazioni.</p>
+                            <p>Recupera prenotazioni da un intervallo temporale specifico. Il limite deve essere compreso tra 1 e 200 prenotazioni; valori fuori da questo intervallo verranno adattati automaticamente.</p>
                             
                             <div class="hic-backfill-form">
                                 <div class="hic-form-row">
