@@ -739,12 +739,38 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
   }
   
   // Map webhook field names to modern field names
+  $first = $webhook_data['guest_first_name']
+      ?? $webhook_data['guest_firstname']
+      ?? $webhook_data['first_name']
+      ?? $webhook_data['firstname']
+      ?? $webhook_data['customer_first_name']
+      ?? $webhook_data['customer_firstname']
+      ?? null;
+
+  $last = $webhook_data['guest_last_name']
+      ?? $webhook_data['guest_lastname']
+      ?? $webhook_data['last_name']
+      ?? $webhook_data['lastname']
+      ?? $webhook_data['customer_last_name']
+      ?? $webhook_data['customer_lastname']
+      ?? null;
+
+  if ((empty($first) || empty($last)) && !empty($webhook_data['name']) && is_string($webhook_data['name'])) {
+      $parts = preg_split('/\s+/', trim($webhook_data['name']), 2);
+      if (empty($first) && isset($parts[0])) {
+          $first = $parts[0];
+      }
+      if (empty($last) && isset($parts[1])) {
+          $last = $parts[1];
+      }
+  }
+
   $transformed = array(
     'transaction_id' => Helpers\hic_extract_reservation_id($webhook_data),
     'reservation_code' => isset($webhook_data['reservation_code']) ? $webhook_data['reservation_code'] : '',
     'email' => isset($webhook_data['email']) ? $webhook_data['email'] : '',
-    'guest_first_name' => isset($webhook_data['first_name']) ? $webhook_data['first_name'] : '',
-    'guest_last_name' => isset($webhook_data['last_name']) ? $webhook_data['last_name'] : '',
+    'guest_first_name' => $first ?? '',
+    'guest_last_name' => $last ?? '',
     'phone' => isset($webhook_data['whatsapp']) ? $webhook_data['whatsapp'] : (isset($webhook_data['phone']) ? $webhook_data['phone'] : ''),
     'original_price' => isset($webhook_data['amount']) ? Helpers\hic_normalize_price($webhook_data['amount']) : 0,
     'currency' => isset($webhook_data['currency']) ? $webhook_data['currency'] : 'EUR',
