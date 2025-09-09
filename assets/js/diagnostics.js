@@ -743,8 +743,14 @@ jQuery(document).ready(function($) {
             }).done(function(response) {
                 var html = '';
 
-                if (response.success) {
-                    html += '<div class="notice notice-success inline"><p><strong>Test Connettività Brevo Completato</strong></p>';
+                if (response.data && response.data.contact_api && response.data.event_api) {
+                    var noticeClass = response.success ? 'notice-success' : 'notice-error';
+                    html += '<div class="notice ' + noticeClass + ' inline">';
+                    if (response.success) {
+                        html += '<p><strong>Test Connettività Brevo Completato</strong></p>';
+                    } else {
+                        html += '<p><strong>Test Fallito:</strong> ' + response.data.message + '</p>';
+                    }
 
                     // Contact API results
                     html += '<h4>API Contatti:</h4>';
@@ -768,7 +774,7 @@ jQuery(document).ready(function($) {
                 }
 
                 $results.html(html).show();
-                
+
             }).fail(function() {
                 $results.html('<div class="notice notice-error inline"><p><strong>Errore di comunicazione con il server</strong></p></div>').show();
             }).always(function() {
@@ -787,7 +793,25 @@ jQuery(document).ready(function($) {
                 nonce: hicDiagnostics.admin_nonce
             }).done(function(response) {
                 if (!response.success) {
-                    showToast('Brevo API test failed: ' + response.data.message, 'error');
+                    var message = 'Brevo API test failed:';
+                    if (response.data.contact_api) {
+                        if (response.data.contact_api.success) {
+                            message += ' Contact API OK.';
+                        } else {
+                            message += ' Contact API - ' + response.data.contact_api.message + '.';
+                        }
+                    }
+                    if (response.data.event_api) {
+                        if (response.data.event_api.success) {
+                            message += ' Event API OK.';
+                        } else {
+                            message += ' Event API - ' + response.data.event_api.message + '.';
+                        }
+                    }
+                    if (!response.data.contact_api && !response.data.event_api && response.data.message) {
+                        message += ' ' + response.data.message;
+                    }
+                    showToast(message, 'error');
                     return;
                 }
 
