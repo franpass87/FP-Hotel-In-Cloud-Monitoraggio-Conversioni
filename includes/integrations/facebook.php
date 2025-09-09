@@ -93,8 +93,8 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
       'event_id'         => $event_id,
       'action_source'    => 'website',
       'event_source_url' => home_url(),
-      'client_ip_address'  => $_SERVER['REMOTE_ADDR'] ?? '',
-      'client_user_agent'  => $_SERVER['HTTP_USER_AGENT'] ?? '',
+      'client_ip_address'  => sanitize_text_field($_SERVER['REMOTE_ADDR'] ?? ''),
+      'client_user_agent'  => sanitize_text_field($_SERVER['HTTP_USER_AGENT'] ?? ''),
       'user_data'        => $user_data,
       'custom_data'      => $custom_data
     ]]
