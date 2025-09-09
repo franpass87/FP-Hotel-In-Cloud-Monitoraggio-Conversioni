@@ -147,7 +147,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
             'Authorization' => 'Basic ' . base64_encode("$email:$pass"),
         ),
     );
-    $res = Helpers\hic_http_request($url, array_merge($request_args, ['method' => 'GET']));
+    $res = Helpers\hic_http_request($url, $request_args);
     
     $data = hic_handle_api_response($res, 'HIC reservations fetch');
     if (is_wp_error($data)) {
