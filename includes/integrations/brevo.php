@@ -477,11 +477,10 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'offer' => isset($data['offer']) ? $data['offer'] : '',
       'phone' => isset($data['phone']) ? $data['phone'] : '',
       'language' => isset($data['language']) ? $data['language'] : '',
-      'firstname' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
-      'lastname' => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
+      'guest_first_name' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
+      'guest_last_name' => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
       'presence' => isset($data['presence']) ? $data['presence'] : '',
       'unpaid_balance' => isset($data['unpaid_balance']) ? Helpers\hic_normalize_price($data['unpaid_balance']) : 0,
-      'tags' => isset($data['tags']) && is_array($data['tags']) ? implode(',', $data['tags']) : '',
       'bucket' => $bucket,
       'vertical' => 'hotel',
       'msclkid' => $msclkid,
@@ -489,6 +488,11 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'created_at' => current_time('mysql')
     )
   );
+
+  if (!empty($data['tags']) && is_array($data['tags'])) {
+    $body['tags'] = array_values($data['tags']);
+    $body['properties']['tags'] = implode(',', $data['tags']);
+  }
 
   // Add UTM parameters if available
   if (!empty($data['transaction_id'])) {

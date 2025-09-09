@@ -65,11 +65,35 @@ Il plugin invia anche eventi personalizzati a Brevo con le seguenti proprietà:
 | `amount` | Numero | Importo della prenotazione |
 | `currency` | Testo | Valuta |
 | `date` | Data | Data della prenotazione |
-| `whatsapp` | Testo | Numero WhatsApp |
-| `lingua` | Testo | Lingua |
-| `firstname` | Testo | Nome |
-| `lastname` | Testo | Cognome |
+| `phone` | Testo | Numero di telefono |
+| `language` | Testo | Lingua |
+| `guest_first_name` | Testo | Nome |
+| `guest_last_name` | Testo | Cognome |
 | `bucket` | Testo | Categoria di attribuzione (Direct, Google, Facebook, etc.) |
+
+### Evento "reservation_created"
+| Proprietà | Tipo | Descrizione |
+|-----------|------|-------------|
+| `reservation_id` | Testo | ID della prenotazione |
+| `reservation_code` | Testo | Codice prenotazione |
+| `amount` | Numero | Importo originale della prenotazione |
+| `currency` | Testo | Valuta |
+| `from_date` | Data | Data di check-in |
+| `to_date` | Data | Data di check-out |
+| `guests` | Numero | Numero di ospiti |
+| `accommodation` | Testo | Nome alloggio |
+| `accommodation_id` | Testo | ID dell'alloggio |
+| `room_id` | Testo | ID della camera |
+| `offer` | Testo | Offerta associata |
+| `phone` | Testo | Numero di telefono |
+| `language` | Testo | Lingua |
+| `guest_first_name` | Testo | Nome ospite |
+| `guest_last_name` | Testo | Cognome ospite |
+| `presence` | Numero | Indica se l'ospite è presente |
+| `unpaid_balance` | Numero | Saldo non pagato |
+| `tags` | Testo | Tag separati da virgola (inviati anche come array `tags`) |
+| `bucket` | Testo | Categoria di attribuzione |
+| `vertical` | Testo | Verticale (es. hotel) |
 
 ## Configurazione Raccomandata in Brevo
 
