@@ -1195,11 +1195,11 @@ function hic_diagnostics_page() {
                 <div class="hic-quick-actions">
                     <div class="hic-action-group">
                         <h3>Test Sistema</h3>
-                        <button class="button button-primary" id="force-polling">
+                        <button class="hic-button hic-button--primary hic-button--block" id="force-polling">
                             <span class="dashicons dashicons-update"></span>
                             Test Polling
                         </button>
-                        <button class="button button-secondary" id="test-connectivity">
+                        <button class="hic-button hic-button--secondary hic-button--block" id="test-connectivity">
                             <span class="dashicons dashicons-cloud"></span>
                             Test Connessione
                         </button>
@@ -1207,11 +1207,11 @@ function hic_diagnostics_page() {
                     
                     <div class="hic-action-group">
                         <h3>Risoluzione Problemi</h3>
-                        <button class="button button-secondary" id="trigger-watchdog">
+                        <button class="hic-button hic-button--secondary hic-button--block" id="trigger-watchdog">
                             <span class="dashicons dashicons-shield"></span>
                             Watchdog
                         </button>
-                        <button class="button button-link-delete" id="reset-timestamps">
+                        <button class="hic-button hic-button--danger hic-button--block" id="reset-timestamps">
                             <span class="dashicons dashicons-warning"></span>
                             Reset Emergenza
                         </button>
@@ -1220,7 +1220,7 @@ function hic_diagnostics_page() {
                     <?php if (current_user_can('hic_view_logs')): ?>
                     <div class="hic-action-group">
                         <h3>Logs & Export</h3>
-                        <button class="button button-secondary" id="download-error-logs">
+                        <button class="hic-button hic-button--secondary hic-button--block" id="download-error-logs">
                             <span class="dashicons dashicons-download"></span>
                             Scarica Log
                         </button>
@@ -1276,7 +1276,7 @@ function hic_diagnostics_page() {
                         </div>
                         <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
                         <div class="hic-integration-actions">
-                            <button class="button button-small" id="test-brevo-connectivity-quick">Test API</button>
+                            <button class="hic-button hic-button--secondary hic-button--small" id="test-brevo-connectivity-quick">Test API</button>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -1334,12 +1334,12 @@ function hic_diagnostics_page() {
                 <div class="hic-integration-actions-section">
                     <h3>🚀 Azioni Rapide</h3>
                     <div class="hic-quick-actions">
-                        <button class="button button-primary" id="download-latest-bookings">
+                        <button class="hic-button hic-button--primary" id="download-latest-bookings">
                             <span class="dashicons dashicons-upload"></span>
                             Invia Ultime 5 Prenotazioni
                         </button>
                         <?php if ($downloaded_count > 0): ?>
-                            <button class="button button-secondary" id="reset-download-tracking">
+                            <button class="hic-button hic-button--secondary" id="reset-download-tracking">
                                 <span class="dashicons dashicons-update-alt"></span>
                                 Reset Tracking (<?php echo esc_html($downloaded_count); ?> inviate)
                             </button>
@@ -1465,7 +1465,7 @@ function hic_diagnostics_page() {
                                 </div>
                                 
                                 <div class="hic-form-actions">
-                                    <button class="button button-primary" id="start-backfill">
+                                    <button class="hic-button hic-button--primary" id="start-backfill">
                                         <span class="dashicons dashicons-download"></span>
                                         Avvia Backfill
                                     </button>
@@ -1486,13 +1486,13 @@ function hic_diagnostics_page() {
                             </p>
                             
                             <div class="hic-emergency-tools">
-                                <button class="button button-secondary" id="reset-timestamps-advanced">
+                                <button class="hic-button hic-button--secondary" id="reset-timestamps-advanced">
                                     <span class="dashicons dashicons-update"></span>
                                     Reset Timestamp
                                 </button>
                                 
                                 <div class="hic-brevo-test" <?php echo (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) ? '' : 'style="display:none;"'; ?>>
-                                    <button class="button button-secondary" id="test-brevo-connectivity">
+                                    <button class="hic-button hic-button--secondary" id="test-brevo-connectivity">
                                         <span class="dashicons dashicons-cloud"></span>
                                         Test Brevo API
                                     </button>

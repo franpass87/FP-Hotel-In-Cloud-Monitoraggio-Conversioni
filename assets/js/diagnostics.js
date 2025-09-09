@@ -839,7 +839,7 @@ jQuery(document).ready(function($) {
                 var eventOk   = response.data.event_api && response.data.event_api.success;
 
                 if (contactOk && eventOk) {
-                    $btn.removeClass('button-secondary').addClass('button-primary');
+                    $btn.removeClass('hic-button--secondary').addClass('hic-button--primary');
                     showToast('Brevo API test successful!', 'success');
                 } else {
                     var message = 'Brevo API test failed:';
@@ -856,7 +856,7 @@ jQuery(document).ready(function($) {
             }).always(function() {
                 $btn.prop('disabled', false).text('Test API');
                 setTimeout(function() {
-                    $btn.removeClass('button-primary').addClass('button-secondary');
+                    $btn.removeClass('hic-button--primary').addClass('hic-button--secondary');
                 }, 3000);
             });
         });
@@ -864,7 +864,7 @@ jQuery(document).ready(function($) {
         // Accessibility and keyboard navigation improvements
         
         // Add ARIA labels to buttons and status indicators
-        $('.hic-action-group .button').each(function() {
+        $('.hic-button').each(function() {
             var $btn = $(this);
             var text = $btn.text().trim();
             $btn.attr('aria-label', 'Azione: ' + text);
@@ -917,7 +917,7 @@ jQuery(document).ready(function($) {
         });
         
         // Add confirmation dialogs for destructive actions
-        $('.button-link-delete, #reset-timestamps, #reset-timestamps-advanced').on('click', function(e) {
+        $('.hic-button--danger').on('click', function(e) {
             var action = $(this).text().trim();
             announceToScreenReader('Azione di emergenza: ' + action + ' richiede conferma');
         });
