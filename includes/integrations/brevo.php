@@ -237,10 +237,14 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   // Determine list based on language and alias status
   $language = isset($data['language']) ? $data['language'] : '';
 
-  // Detect language from phone prefix
-  $phone_data = Helpers\hic_detect_phone_language($data['phone'] ?? '');
+  // Detect language from phone or WhatsApp prefix
+  $is_whatsapp_source = empty($data['phone']) && !empty($data['whatsapp']);
+  $phone_data = Helpers\hic_detect_phone_language($data['phone'] ?? ($data['whatsapp'] ?? ''));
   if (!empty($phone_data['phone'])) {
     $data['phone'] = $phone_data['phone'];
+    if ($is_whatsapp_source) {
+      $data['whatsapp'] = $phone_data['phone'];
+    }
   }
   if (!empty($phone_data['language'])) {
     $language = $phone_data['language'];
@@ -309,7 +313,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'DATE' => isset($data['from_date']) ? $data['from_date'] : wp_date('Y-m-d'),
     'AMOUNT' => isset($data['original_price']) ? Helpers\hic_normalize_price($data['original_price']) : 0,
     'CURRENCY' => isset($data['currency']) ? $data['currency'] : 'EUR',
-    'WHATSAPP' => isset($data['phone']) ? $data['phone'] : '',
+    'WHATSAPP' => isset($data['whatsapp']) ? $data['whatsapp'] : '',
     'LINGUA' => $language
   );
 
