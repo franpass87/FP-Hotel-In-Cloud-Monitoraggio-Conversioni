@@ -61,6 +61,11 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
     'updateEnabled' => true
   );
 
+  if (!empty($data['tags']) && is_array($data['tags'])) {
+    $body['tags'] = array_values($data['tags']);
+    $body['attributes']['TAGS'] = implode(',', $data['tags']);
+  }
+
   // Populate UTM attributes if SID available
   if (!empty($data['sid'])) {
     $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
