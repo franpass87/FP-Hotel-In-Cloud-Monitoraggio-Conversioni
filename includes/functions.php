@@ -1247,7 +1247,12 @@ function hic_safe_wp_schedule_event($timestamp, $recurrence, $hook, $args = arra
     if (!function_exists('wp_schedule_event')) {
         return false;
     }
-    return wp_schedule_event($timestamp, $recurrence, $hook, $args);
+    $result = wp_schedule_event($timestamp, $recurrence, $hook, $args, true);
+    if (is_wp_error($result)) {
+        hic_log('Scheduling error for ' . $hook . ': ' . $result->get_error_message(), HIC_LOG_LEVEL_ERROR);
+        return false;
+    }
+    return $result;
 }
 
 /**
