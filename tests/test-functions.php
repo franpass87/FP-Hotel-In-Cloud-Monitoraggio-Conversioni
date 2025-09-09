@@ -192,6 +192,45 @@ class HICFunctionsTest {
         echo "✅ Brevo phone language override tests passed\n";
     }
 
+    public function testBrevoLanguageListFiltering() {
+        // Ensure required WordPress stubs exist
+        if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
+        if (!function_exists('wp_remote_retrieve_response_code')) { function wp_remote_retrieve_response_code($res) { return $res['response']['code'] ?? 0; } }
+        if (!function_exists('wp_remote_retrieve_body')) { function wp_remote_retrieve_body($res) { return $res['body'] ?? ''; } }
+        if (!function_exists('is_wp_error')) { function is_wp_error($thing) { return false; } }
+        if (!function_exists('wp_date')) { function wp_date($format, $ts = null) { return date($format, $ts ?? time()); } }
+
+        require_once dirname(__DIR__) . '/includes/integrations/brevo.php';
+        update_option('hic_brevo_api_key', 'test');
+        update_option('hic_brevo_list_en', '123');
+        update_option('hic_brevo_list_it', '456');
+        \FpHic\Helpers\hic_clear_option_cache();
+
+        global $hic_last_request;
+
+        // Using 'language' should map to the correct list
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_contact([
+            'email' => 'c@example.com',
+            'language' => 'en'
+        ], '', '');
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['listIds'] === [123], 'Language en should map to English list');
+
+        // List ID 0 should be filtered out
+        update_option('hic_brevo_list_en', '0');
+        \FpHic\Helpers\hic_clear_option_cache('hic_brevo_list_en');
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_contact([
+            'email' => 'c2@example.com',
+            'language' => 'en'
+        ], '', '');
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert(empty($payload['listIds']), 'List ID 0 should be filtered out');
+
+        echo "✅ Brevo language list filtering tests passed\n";
+    }
+
     public function testBrevoReservationCreatedPhoneLanguageOverride() {
         // Ensure required WordPress stubs exist
         if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
@@ -326,6 +365,7 @@ class HICFunctionsTest {
             $this->testReservationPhoneFallback();
             $this->testPhoneLanguageDetection();
             $this->testBrevoPhoneLanguageOverride();
+            $this->testBrevoLanguageListFiltering();
             $this->testBrevoReservationCreatedPhoneLanguageOverride();
             $this->testEventRoomNameFallback();
 
