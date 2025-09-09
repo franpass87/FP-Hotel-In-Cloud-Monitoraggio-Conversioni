@@ -401,7 +401,8 @@ function hic_get_error_stats() {
     }
     
     // Get last N log lines without loading entire file
-    $log_manager = function_exists('hic_get_log_manager') ? hic_get_log_manager() : null;
+    $has_log_manager = function_exists('hic_get_log_manager');
+    $log_manager = $has_log_manager ? hic_get_log_manager() : null;
     $lines = array();
 
     if ($log_manager && method_exists($log_manager, 'get_recent_logs')) {
