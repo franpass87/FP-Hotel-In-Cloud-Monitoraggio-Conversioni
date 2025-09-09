@@ -2,7 +2,7 @@
 
 Questo documento elenca tutti gli attributi che devi configurare nel tuo account Brevo per ricevere correttamente i dati dal plugin Hotel in Cloud.
 
-I recenti aggiornamenti introducono gli attributi `LANGUAGE` e `TAGS` per memorizzare rispettivamente la lingua del contatto e l'elenco di tag associati.
+I recenti aggiornamenti introducono gli attributi `LANGUAGE`, `TAGS` e `HIC_ROOM_NAME` per memorizzare rispettivamente la lingua del contatto, l'elenco di tag associati e il nome specifico della camera prenotata.
 
 ## Attributi Contatto (Contact Attributes)
 

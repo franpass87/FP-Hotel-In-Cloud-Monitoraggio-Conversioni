@@ -283,6 +283,47 @@ class HICFunctionsTest {
         echo "✅ Brevo language list filtering tests passed\n";
     }
 
+    public function testBrevoRoomNamePropagation() {
+        // Ensure required WordPress stubs exist
+        if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
+        if (!function_exists('wp_remote_retrieve_response_code')) { function wp_remote_retrieve_response_code($res) { return $res['response']['code'] ?? 0; } }
+        if (!function_exists('wp_remote_retrieve_body')) { function wp_remote_retrieve_body($res) { return $res['body'] ?? ''; } }
+        if (!function_exists('is_wp_error')) { function is_wp_error($thing) { return false; } }
+        if (!function_exists('wp_date')) { function wp_date($format, $ts = null) { return date($format, $ts ?? time()); } }
+
+        require_once dirname(__DIR__) . '/includes/integrations/brevo.php';
+        update_option('hic_brevo_api_key', 'test');
+        update_option('hic_realtime_brevo_sync', '1');
+
+        global $hic_last_request;
+
+        // Contact dispatch should include HIC_ROOM_NAME
+        $hic_last_request = null;
+        \FpHic\hic_dispatch_brevo_reservation([
+            'email' => 'room@example.com',
+            'transaction_id' => 'TR',
+            'room_name' => 'Camera Deluxe',
+            'original_price' => 100,
+            'currency' => 'EUR'
+        ]);
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['attributes']['HIC_ROOM_NAME'] === 'Camera Deluxe', 'Contact should include HIC_ROOM_NAME');
+
+        // Event should include room_name property
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_reservation_created_event([
+            'email' => 'room@example.com',
+            'transaction_id' => 'TR',
+            'original_price' => 100,
+            'currency' => 'EUR',
+            'room_name' => 'Camera Deluxe'
+        ]);
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['properties']['room_name'] === 'Camera Deluxe', 'Event should include room_name');
+
+        echo "✅ Brevo room name propagation tests passed\n";
+    }
+
     public function testBrevoReservationCreatedPhoneLanguageOverride() {
         // Ensure required WordPress stubs exist
         if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
@@ -419,6 +460,7 @@ class HICFunctionsTest {
             $this->testBrevoPhoneLanguageOverride();
             $this->testBrevoContactLanguageAndTags();
             $this->testBrevoLanguageListFiltering();
+            $this->testBrevoRoomNamePropagation();
             $this->testBrevoReservationCreatedPhoneLanguageOverride();
             $this->testEventRoomNameFallback();
 
