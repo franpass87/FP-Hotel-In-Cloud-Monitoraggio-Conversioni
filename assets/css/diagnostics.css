@@ -264,6 +264,7 @@
 
         .hic-button--danger:hover {
             background: #b32d2e;
+            border-color: #b32d2e;
         }
 
         /* Quick Actions */
