@@ -142,14 +142,12 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
     // Log API call details for debugging
     hic_log("API Call (Reservations endpoint): $url with params: " . json_encode($args));
 
-    $res = wp_remote_get($url, array(
-        'timeout' => 30,
+    $request_args = array(
         'headers' => array(
             'Authorization' => 'Basic ' . base64_encode("$email:$pass"),
-            'Accept'        => 'application/json',
-            'User-Agent'    => 'WP/FP-HIC-Plugin'
         ),
-    ));
+    );
+    $res = Helpers\hic_http_request($url, $request_args);
     
     $data = hic_handle_api_response($res, 'HIC reservations fetch');
     if (is_wp_error($data)) {
@@ -1502,59 +1500,25 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
     
     hic_log("Backfill Raw API Call (Reservations endpoint): $url");
 
-    $res = wp_remote_get($url, array(
-        'timeout' => 30,
+    $request_args = array(
         'headers' => array(
             'Authorization' => 'Basic ' . base64_encode("$email:$pass"),
-            'Accept' => 'application/json',
-            'User-Agent' => 'WP/FP-HIC-Plugin-Backfill'
         ),
-    ));
-    
-    if (is_wp_error($res)) {
-        hic_log("Backfill Raw API call failed: " . $res->get_error_message());
-        return $res;
+    );
+
+    $res = Helpers\hic_http_request($url, $request_args);
+
+    $data = hic_handle_api_response($res, 'Backfill Raw API call');
+    if (is_wp_error($data)) {
+        return $data;
     }
-    
-    $code = wp_remote_retrieve_response_code($res);
-    if ($code !== 200) {
-        $body = wp_remote_retrieve_body($res);
-        hic_log("Backfill Raw API HTTP $code - Response body: " . substr($body, 0, 500));
-        
-        // Provide specific error messages for common HTTP codes in backfill context
-        switch ($code) {
-            case 400:
-                return new WP_Error('hic_http', "HTTP 400 - Richiesta backfill non valida. Verifica i parametri: date_type deve essere checkin, checkout o presence.");
-            case 401:
-                return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide per backfill. Verifica email e password API.");
-            case 403:
-                return new WP_Error('hic_http', "HTTP 403 - Accesso negato per backfill. L'account potrebbe non avere permessi per questa struttura.");
-            case 404:
-                return new WP_Error('hic_http', "HTTP 404 - Struttura non trovata per backfill. Verifica l'ID Struttura (propId).");
-            case 429:
-                return new WP_Error('hic_http', "HTTP 429 - Troppe richieste per backfill. Riprova tra qualche minuto.");
-            default:
-                return new WP_Error('hic_http', "HTTP $code - Errore backfill API");
-        }
-    }
-    
-    $body = wp_remote_retrieve_body($res);
-    if (empty($body)) {
-        return new WP_Error('hic_empty_response', 'Empty response body from backfill API');
-    }
-    
-    $data = json_decode($body, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        hic_log("Backfill JSON decode error: " . json_last_error_msg());
-        return new WP_Error('hic_json_error', 'Invalid JSON response from backfill API');
-    }
-    
+
     // Handle new API response format with success/error structure
     $reservations = hic_extract_reservations_from_response($data);
     if (is_wp_error($reservations)) {
         return $reservations;
     }
-    
+
     return $reservations;
 }
 
