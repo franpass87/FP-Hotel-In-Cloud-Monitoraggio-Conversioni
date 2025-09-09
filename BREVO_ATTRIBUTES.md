@@ -26,6 +26,7 @@ Il sistema di polling API moderno (versione attuale) invia **ENTRAMBI** i set di
 | `HIC_ROOM` | Testo | Nome dell'alloggio/camera | `accommodation_name` dalla prenotazione |
 | `HIC_ACCOM_ID` | Testo | ID dell'alloggio | `accommodation_id` dalla prenotazione |
 | `HIC_ROOM_ID` | Testo | ID della camera | `room_id` dalla prenotazione |
+| `HIC_ROOM_NAME` | Testo | Nome della camera | `room_name` dalla prenotazione |
 | `HIC_OFFER` | Testo | Offerta associata | `offer` dalla prenotazione |
 | `HIC_PRICE` | Numero | Prezzo originale della prenotazione | `price` dalla prenotazione |
 | `HIC_PRESENCE` | Numero (0/1) | Indica se il cliente ha effettuato il check-in | `presence` dalla prenotazione |
@@ -86,6 +87,7 @@ Il plugin invia anche eventi personalizzati a Brevo con le seguenti proprietà:
 | `accommodation` | Testo | Nome alloggio |
 | `accommodation_id` | Testo | ID dell'alloggio |
 | `room_id` | Testo | ID della camera |
+| `room_name` | Testo | Nome della camera |
 | `offer` | Testo | Offerta associata |
 | `phone` | Testo | Numero di telefono |
 | `language` | Testo | Lingua |
@@ -116,6 +118,7 @@ HIC_GUESTS - Tipo: Numero
 HIC_ROOM - Tipo: Testo
 HIC_ACCOM_ID - Tipo: Testo
 HIC_ROOM_ID - Tipo: Testo
+HIC_ROOM_NAME - Tipo: Testo
 HIC_OFFER - Tipo: Testo
 HIC_PRICE - Tipo: Numero (decimale)
 HIC_PRESENCE - Tipo: Numero
