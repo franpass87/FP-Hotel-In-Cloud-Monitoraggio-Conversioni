@@ -670,6 +670,33 @@ function hic_is_ota_alias_email($e){
     return false;
 }
 
+/**
+ * Normalize a phone number and detect language by international prefix.
+ *
+ * @param string $phone Raw phone number
+ * @return array{phone:string, language:?string} Normalized phone and detected language ('it','en' or null)
+ */
+function hic_detect_phone_language($phone) {
+    $normalized = preg_replace('/[^0-9+]/', '', (string) $phone);
+    if ($normalized === '') {
+        return ['phone' => '', 'language' => null];
+    }
+
+    if (strpos($normalized, '00') === 0) {
+        $normalized = '+' . substr($normalized, 2);
+    }
+
+    if (strlen($normalized) <= 1 || strpos($normalized, '+') !== 0) {
+        return ['phone' => $normalized, 'language' => null];
+    }
+
+    if (strpos($normalized, '+39') === 0) {
+        return ['phone' => $normalized, 'language' => 'it'];
+    }
+
+    return ['phone' => $normalized, 'language' => 'en'];
+}
+
 function hic_booking_uid($reservation) {
     if (!is_array($reservation)) {
         hic_log('hic_booking_uid: reservation is not an array');
@@ -1469,6 +1496,7 @@ namespace {
     function hic_normalize_price($value) { return \FpHic\Helpers\hic_normalize_price($value); }
     function hic_is_valid_email($email) { return \FpHic\Helpers\hic_is_valid_email($email); }
     function hic_is_ota_alias_email($e) { return \FpHic\Helpers\hic_is_ota_alias_email($e); }
+    function hic_detect_phone_language($phone) { return \FpHic\Helpers\hic_detect_phone_language($phone); }
     function hic_booking_uid($reservation) { return \FpHic\Helpers\hic_booking_uid($reservation); }
     function hic_mask_sensitive_data($message) { return \FpHic\Helpers\hic_mask_sensitive_data($message); }
     function hic_default_log_message_filter($message, $level) { return \FpHic\Helpers\hic_default_log_message_filter($message, $level); }

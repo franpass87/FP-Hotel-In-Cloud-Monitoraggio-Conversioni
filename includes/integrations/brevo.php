@@ -18,6 +18,17 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
 
   // Lista in base alla lingua (supporta sia 'lingua' sia 'lang')
   $lang = isset($data['lingua']) ? $data['lingua'] : (isset($data['lang']) ? $data['lang'] : '');
+
+  // Detect language from phone prefix if available
+  $phone_data = Helpers\hic_detect_phone_language($data['phone'] ?? ($data['whatsapp'] ?? ''));
+  if (!empty($phone_data['phone'])) {
+    if (isset($data['phone'])) { $data['phone'] = $phone_data['phone']; }
+    if (isset($data['whatsapp'])) { $data['whatsapp'] = $phone_data['phone']; }
+  }
+  if (!empty($phone_data['language'])) {
+    $lang = $phone_data['language'];
+  }
+
   $list_ids = array();
   if (strtolower($lang) === 'en') { $list_ids[] = intval(Helpers\hic_get_brevo_list_en()); } else { $list_ids[] = intval(Helpers\hic_get_brevo_list_it()); }
 
@@ -207,6 +218,16 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
 
   // Determine list based on language and alias status
   $language = isset($data['language']) ? $data['language'] : '';
+
+  // Detect language from phone prefix
+  $phone_data = Helpers\hic_detect_phone_language($data['phone'] ?? '');
+  if (!empty($phone_data['phone'])) {
+    $data['phone'] = $phone_data['phone'];
+  }
+  if (!empty($phone_data['language'])) {
+    $language = $phone_data['language'];
+  }
+
   $list_ids = array();
   
   if ($is_alias) {

@@ -115,6 +115,67 @@ class HICFunctionsTest {
         echo "✅ Reservation phone fallback tests passed\n";
     }
 
+    public function testPhoneLanguageDetection() {
+        $res = Helpers\hic_detect_phone_language('+39 333 1234567');
+        assert($res['language'] === 'it', 'Should detect Italian prefix');
+        assert($res['phone'] === '+393331234567', 'Should normalize Italian phone');
+
+        $res = Helpers\hic_detect_phone_language('00393331234567');
+        assert($res['language'] === 'it', 'Should detect 00 Italian prefix');
+
+        $res = Helpers\hic_detect_phone_language('+44 1234567890');
+        assert($res['language'] === 'en', 'Should detect foreign prefix');
+        assert($res['phone'] === '+441234567890', 'Should normalize foreign phone');
+
+        $res = Helpers\hic_detect_phone_language('3331234567');
+        assert($res['language'] === null, 'Should not detect language without prefix');
+
+        echo "✅ Phone language detection tests passed\n";
+    }
+
+    public function testBrevoPhoneLanguageOverride() {
+        // Ensure required WordPress stubs exist
+        if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
+        if (!function_exists('wp_remote_retrieve_response_code')) { function wp_remote_retrieve_response_code($res) { return $res['response']['code'] ?? 0; } }
+        if (!function_exists('wp_remote_retrieve_body')) { function wp_remote_retrieve_body($res) { return $res['body'] ?? ''; } }
+        if (!function_exists('is_wp_error')) { function is_wp_error($thing) { return false; } }
+        if (!function_exists('wp_date')) { function wp_date($format, $ts = null) { return date($format, $ts ?? time()); } }
+
+        require_once dirname(__DIR__) . '/includes/integrations/brevo.php';
+        update_option('hic_brevo_api_key', 'test');
+
+        global $hic_last_request;
+
+        // Reservation with Italian phone
+        $hic_last_request = null;
+        \FpHic\hic_dispatch_brevo_reservation(['email' => 'it@example.com', 'phone' => '+39 333 1234567', 'language' => 'en', 'transaction_id' => 't1']);
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['attributes']['LANGUAGE'] === 'it', 'Italian phone should force language it');
+        assert($payload['attributes']['PHONE'] === '+393331234567', 'Phone should be normalized');
+
+        // Reservation with foreign phone
+        $hic_last_request = null;
+        \FpHic\hic_dispatch_brevo_reservation(['email' => 'en@example.com', 'phone' => '+44 1234567890', 'language' => 'it', 'transaction_id' => 't2']);
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['attributes']['LANGUAGE'] === 'en', 'Foreign phone should force language en');
+        assert($payload['attributes']['PHONE'] === '+441234567890', 'Phone should be normalized');
+
+        // Contact with Italian phone
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_contact(['email' => 'c@example.com', 'whatsapp' => '+39 3331234567', 'lang' => 'en'], '', '');
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['attributes']['LINGUA'] === 'it', 'Contact Italian phone forces language it');
+        assert($payload['attributes']['WHATSAPP'] === '+393331234567', 'WhatsApp should be normalized');
+
+        // Contact with foreign phone
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_contact(['email' => 'c2@example.com', 'whatsapp' => '+44 3331234567', 'lingua' => 'it'], '', '');
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['attributes']['LINGUA'] === 'en', 'Contact foreign phone forces language en');
+
+        echo "✅ Brevo phone language override tests passed\n";
+    }
+
     public function testEventRoomNameFallback() {
         // Ensure required WordPress stubs exist
         if (!function_exists('home_url')) {
@@ -145,6 +206,7 @@ class HICFunctionsTest {
         update_option('hic_fb_pixel_id', 'FBTEST');
         update_option('hic_fb_access_token', 'FBTOKEN');
         update_option('hic_log_file', sys_get_temp_dir() . '/hic-test.log');
+        Helpers\hic_clear_option_cache();
 
         global $hic_last_request;
 
@@ -201,6 +263,8 @@ class HICFunctionsTest {
             $this->testOTAEmailDetection();
             $this->testConfigurationHelpers();
             $this->testReservationPhoneFallback();
+            $this->testPhoneLanguageDetection();
+            $this->testBrevoPhoneLanguageOverride();
             $this->testEventRoomNameFallback();
 
             echo "\n🎉 All tests passed successfully!\n";
