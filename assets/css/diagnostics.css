@@ -244,6 +244,7 @@
 
         .hic-button--primary:hover {
             background: #135e96;
+            border-color: #135e96;
         }
 
         .hic-button--secondary {
