@@ -29,6 +29,9 @@ namespace FpHic {
         if (!empty($GLOBALS['simulate_deep_error'])) {
             return new \WP_Error('poll_error', 'Simulated error');
         }
+        if (!empty($GLOBALS['simulate_deep_skip'])) {
+            return null;
+        }
         return true;
     }
     function hic_fetch_reservations_raw($prop_id, $mode, $from_date, $to_date, $limit) {
@@ -80,6 +83,18 @@ namespace {
 
             $this->assertSame($old, get_option('hic_last_deep_check'));
             unset($GLOBALS['simulate_deep_error']);
+        }
+
+        public function test_execute_deep_check_skipped_does_not_update_timestamp(): void {
+            $poller = new \HIC_Booking_Poller();
+            $old = time() - 100;
+            update_option('hic_last_deep_check', $old);
+
+            $GLOBALS['simulate_deep_skip'] = true;
+            $poller->execute_deep_check();
+
+            $this->assertSame($old, get_option('hic_last_deep_check'));
+            unset($GLOBALS['simulate_deep_skip']);
         }
 
         public function test_execute_deep_check_exception_is_handled(): void {
