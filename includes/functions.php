@@ -1284,7 +1284,7 @@ function hic_retry_failed_requests() {
         return;
     }
 
-    $table = $wpdb->prefix . 'hic_failed_requests';
+    $table = esc_sql($wpdb->prefix . 'hic_failed_requests');
     $rows  = $wpdb->get_results("SELECT * FROM $table");
 
     if (empty($rows)) {
