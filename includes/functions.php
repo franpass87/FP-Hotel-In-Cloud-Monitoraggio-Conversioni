@@ -755,7 +755,7 @@ function hic_store_failed_request($url, $args, $error) {
 }
 
 function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
-    $log_manager = function_exists('FpHic\\Helpers\\hic_get_log_manager') ? \FpHic\Helpers\hic_get_log_manager() : null;
+    $log_manager = function_exists('\\hic_get_log_manager') ? \hic_get_log_manager() : null;
 
     if ($log_manager) {
         return $log_manager->log($msg, $level, $context);
@@ -1027,7 +1027,7 @@ function hic_diagnose_email_issues() {
     
     // Check 5: Recent email sending attempts (if function exists)
     $email_errors = 0;
-    $log_manager = function_exists('FpHic\\Helpers\\hic_get_log_manager') ? \FpHic\Helpers\hic_get_log_manager() : null;
+    $log_manager = function_exists('\\hic_get_log_manager') ? \hic_get_log_manager() : null;
     $recent_lines = $log_manager ? $log_manager->get_recent_logs(50) : array();
 
     foreach ($recent_lines as $line) {
