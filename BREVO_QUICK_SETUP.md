@@ -37,9 +37,13 @@ Nel pannello admin WordPress (Impostazioni > HIC Monitoring), sezione "Brevo Set
 
 1. **API Key**: La tua chiave API Brevo
 2. **Lista Italiana**: ID lista per contatti italiani
-3. **Lista Inglese**: ID lista per contatti inglesi  
+3. **Lista Inglese**: ID lista per contatti inglesi
 4. **Lista Default**: ID lista per altre lingue
 5. **Lista Alias**: ID lista per email temporanee OTA (opzionale)
+6. Il prefisso telefonico, se presente, ha priorità sul campo `language`:
+   - numeri con prefisso `+39` o `0039` vengono forzati sulla lista italiana;
+   - numeri con altri prefissi vengono assegnati alla lista inglese;
+   - se il numero non è riconoscibile si utilizza il valore del campo `language` o, se assente, la lista di default.
 
 ## Evento "purchase"
 
