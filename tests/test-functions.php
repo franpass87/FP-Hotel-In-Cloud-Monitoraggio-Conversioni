@@ -164,6 +164,7 @@ class HICFunctionsTest {
         $hic_last_request = null;
         \FpHic\hic_send_brevo_contact([
             'email' => 'c@example.com',
+            'phone' => '+39 3331234567',
             'whatsapp' => '+39 3331234567',
             'lang' => 'en',
             'guest_first_name' => 'Mario',
@@ -171,15 +172,22 @@ class HICFunctionsTest {
         ], '', '');
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['attributes']['LINGUA'] === 'it', 'Contact Italian phone forces language it');
+        assert($payload['attributes']['PHONE'] === '+393331234567', 'Phone should be normalized');
         assert($payload['attributes']['WHATSAPP'] === '+393331234567', 'WhatsApp should be normalized');
         assert($payload['attributes']['FIRSTNAME'] === 'Mario', 'Guest first name should map to FIRSTNAME');
         assert($payload['attributes']['LASTNAME'] === 'Rossi', 'Guest last name should map to LASTNAME');
 
         // Contact with foreign phone
         $hic_last_request = null;
-        \FpHic\hic_send_brevo_contact(['email' => 'c2@example.com', 'whatsapp' => '+44 3331234567', 'lingua' => 'it'], '', '');
+        \FpHic\hic_send_brevo_contact([
+            'email' => 'c2@example.com',
+            'phone' => '+44 3331234567',
+            'whatsapp' => '+44 3331234567',
+            'lingua' => 'it'
+        ], '', '');
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['attributes']['LINGUA'] === 'en', 'Contact foreign phone forces language en');
+        assert($payload['attributes']['PHONE'] === '+443331234567', 'Phone should be normalized');
 
         echo "✅ Brevo phone language override tests passed\n";
     }
