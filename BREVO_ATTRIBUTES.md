@@ -4,6 +4,9 @@ Questo documento elenca tutti gli attributi che devi configurare nel tuo account
 
 I recenti aggiornamenti introducono gli attributi `LANGUAGE`, `TAGS` e `HIC_ROOM_NAME` per memorizzare rispettivamente la lingua del contatto, l'elenco di tag associati e il nome specifico della camera prenotata.
 
+> **Nota sui Tag**
+> I tag vengono inviati due volte per massima compatibilità: come array nel campo nativo `tags` di Brevo e come stringa separata da virgole (`TAGS` negli attributi del contatto e `tags` nelle proprietà degli eventi).
+
 ## Attributi Contatto (Contact Attributes)
 
 Il plugin invia i seguenti attributi per ogni contatto creato o aggiornato in Brevo:

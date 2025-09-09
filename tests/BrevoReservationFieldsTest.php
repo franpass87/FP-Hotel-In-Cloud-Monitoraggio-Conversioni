@@ -117,4 +117,25 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('+441234567890', $payload['attributes']['WHATSAPP']);
         $this->assertSame('en', $payload['attributes']['LANGUAGE']);
     }
+
+    public function testReservationCreatedEventHandlesEmptyTags() {
+        global $hic_last_request;
+        $hic_last_request = null;
+
+        $reservation = [
+            'email' => 'empty@example.com',
+            'transaction_id' => 'E1',
+            'original_price' => 10,
+            'currency' => 'EUR',
+            'tags' => []
+        ];
+
+        \FpHic\hic_send_brevo_reservation_created_event($reservation);
+
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        $this->assertArrayHasKey('tags', $payload);
+        $this->assertSame([], $payload['tags']);
+        $this->assertArrayHasKey('tags', $payload['properties']);
+        $this->assertSame('', $payload['properties']['tags']);
+    }
 }
