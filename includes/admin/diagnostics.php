@@ -400,17 +400,51 @@ function hic_get_error_stats() {
         return array('error_count' => 0, 'last_error' => null);
     }
     
-    $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    // Get last N log lines without loading entire file
+    $log_manager = function_exists('hic_get_log_manager') ? hic_get_log_manager() : null;
+    $lines = array();
+
+    if ($log_manager && method_exists($log_manager, 'get_recent_logs')) {
+        // Use log manager which already reads only the last N lines
+        $entries = $log_manager->get_recent_logs($log_lines_to_check);
+
+        foreach ($entries as $entry) {
+            $lines[] = sprintf(
+                '[%s] [%s] [%s] %s',
+                $entry['timestamp'] ?? '',
+                $entry['level'] ?? '',
+                $entry['memory'] ?? '',
+                $entry['message'] ?? ''
+            );
+        }
+    } else {
+        // Fallback to streaming read using SplFileObject
+        $file = new SplFileObject($log_file, 'r');
+        $file->seek(PHP_INT_MAX);
+        $last_line = $file->key();
+        $start = max(0, $last_line - $log_lines_to_check + 1);
+
+        for ($i = $start; $i <= $last_line; $i++) {
+            $file->seek($i);
+            $line = trim((string) $file->current());
+            if ($line !== '') {
+                $lines[] = $line;
+            }
+        }
+
+        // Ensure most recent lines are processed first
+        $lines = array_reverse($lines);
+    }
+
     if (!$lines) {
         return array('error_count' => 0, 'last_error' => null);
     }
-    
-    // Count errors in recent lines
-    $recent_lines = array_slice($lines, -$log_lines_to_check);
+
+    // Count errors in last lines (already most recent first)
     $error_count = 0;
     $last_error = null;
-    
-    foreach (array_reverse($recent_lines) as $line) {
+
+    foreach ($lines as $line) {
         if (preg_match('/(error|errore|fallita|failed|HTTP [45]\d\d)/i', $line)) {
             $error_count++;
             if (!$last_error) {
@@ -418,7 +452,7 @@ function hic_get_error_stats() {
             }
         }
     }
-    
+
     return array(
         'error_count' => $error_count,
         'last_error' => $last_error
