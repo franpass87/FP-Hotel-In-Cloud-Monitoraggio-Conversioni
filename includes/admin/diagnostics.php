@@ -938,17 +938,16 @@ function hic_ajax_force_polling() {
         $stats_after = $poller->get_stats();
 
         // Prepare response
-        $response = array_merge($result, array(
+        $response = array(
+            'polling_result' => $result,
             'diagnostics_before' => $diagnostics_before,
             'stats_after' => $stats_after,
             'force_mode' => $force
-        ));
+        );
 
-        if (!empty($response['success'])) {
-            unset($response['success']);
+        if (!empty($result['success'])) {
             wp_send_json_success($response);
         } else {
-            unset($response['success']);
             wp_send_json_error($response);
         }
     } catch (Exception $e) {
