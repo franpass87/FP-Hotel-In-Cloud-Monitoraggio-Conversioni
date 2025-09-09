@@ -30,13 +30,13 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
   }
 
   $list_ids = array();
-  if (strtolower($lang) === 'en') {
+  if (strtolower($lang) === 'it') {
+    $list_ids[] = intval(Helpers\hic_get_brevo_list_it());
+  } elseif (strtolower($lang) === 'en') {
     $list_ids[] = intval(Helpers\hic_get_brevo_list_en());
   } else {
-    $list_ids[] = intval(Helpers\hic_get_brevo_list_it());
+    $list_ids[] = intval(Helpers\hic_get_brevo_list_default());
   }
-
-  // Remove empty list IDs (e.g., 0)
   $list_ids = array_filter($list_ids);
 
   $body = array(
@@ -54,6 +54,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
       'AMOUNT'    => isset($data['amount']) ? Helpers\hic_normalize_price($data['amount']) : 0,
       'CURRENCY'  => isset($data['currency']) ? $data['currency'] : 'EUR',
       'WHATSAPP'  => isset($data['whatsapp']) ? $data['whatsapp'] : '',
+      'LANGUAGE'  => $lang,
       'LINGUA'    => $lang
     ),
     'listIds'       => $list_ids,

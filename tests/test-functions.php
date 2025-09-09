@@ -176,6 +176,7 @@ class HICFunctionsTest {
         ], '', '');
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['attributes']['LINGUA'] === 'it', 'Contact Italian phone forces language it');
+        assert($payload['attributes']['LANGUAGE'] === 'it', 'Contact should include LANGUAGE attribute');
         assert($payload['attributes']['PHONE'] === '+393331234567', 'Phone should be normalized');
         assert($payload['attributes']['WHATSAPP'] === '+393331234567', 'WhatsApp should be normalized');
         assert($payload['attributes']['FIRSTNAME'] === 'Mario', 'Guest first name should map to FIRSTNAME');
@@ -191,6 +192,7 @@ class HICFunctionsTest {
         ], '', '');
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['attributes']['LINGUA'] === 'en', 'Contact foreign phone forces language en');
+        assert($payload['attributes']['LANGUAGE'] === 'en', 'Contact should include LANGUAGE attribute');
         assert($payload['attributes']['PHONE'] === '+443331234567', 'Phone should be normalized');
 
         echo "✅ Brevo phone language override tests passed\n";
@@ -208,11 +210,12 @@ class HICFunctionsTest {
         update_option('hic_brevo_api_key', 'test');
         update_option('hic_brevo_list_en', '123');
         update_option('hic_brevo_list_it', '456');
+        update_option('hic_brevo_list_default', '789');
         \FpHic\Helpers\hic_clear_option_cache();
 
         global $hic_last_request;
 
-        // Using 'language' should map to the correct list
+        // Language en should map to English list
         $hic_last_request = null;
         \FpHic\hic_send_brevo_contact([
             'email' => 'c@example.com',
@@ -220,6 +223,23 @@ class HICFunctionsTest {
         ], '', '');
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['listIds'] === [123], 'Language en should map to English list');
+
+        // Missing language should fall back to default list
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_contact([
+            'email' => 'c-missing@example.com'
+        ], '', '');
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['listIds'] === [789], 'Missing language should map to default list');
+
+        // Unknown language should fall back to default list
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_contact([
+            'email' => 'c-unknown@example.com',
+            'language' => 'de'
+        ], '', '');
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['listIds'] === [789], 'Unknown language should map to default list');
 
         // List ID 0 should be filtered out
         update_option('hic_brevo_list_en', '0');
