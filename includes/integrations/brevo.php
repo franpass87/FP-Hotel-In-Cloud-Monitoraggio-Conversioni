@@ -307,7 +307,8 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'HIC_PRESENCE' => isset($data['presence']) ? $data['presence'] : '',
     'HIC_BALANCE' => isset($data['unpaid_balance']) ? Helpers\hic_normalize_price($data['unpaid_balance']) : '',
     'HIC_VALID' => $data['valid'] ?? '',
-    
+    'HIC_RELOCATIONS' => !empty($data['relocations']) ? wp_json_encode($data['relocations']) : '',
+
     // Legacy webhook attributes (for backward compatibility)
     'RESVID' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
     'GCLID'  => $gclid,
@@ -323,10 +324,6 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
 
   if (isset($data['tags']) && is_array($data['tags'])) {
     $attributes['TAGS'] = implode(',', $data['tags']);
-  }
-
-  if (isset($data['relocations'])) {
-    $attributes['HIC_RELOCATIONS'] = json_encode($data['relocations']);
   }
 
   // Populate UTM attributes if available
@@ -495,7 +492,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'presence' => isset($data['presence']) ? $data['presence'] : '',
       'unpaid_balance' => isset($data['unpaid_balance']) ? Helpers\hic_normalize_price($data['unpaid_balance']) : 0,
       'valid' => $data['valid'] ?? '',
-      'relocations' => isset($data['relocations']) ? json_encode($data['relocations']) : '',
+      'relocations' => !empty($data['relocations']) ? wp_json_encode($data['relocations']) : '',
       'bucket' => $bucket,
       'vertical' => 'hotel',
       'msclkid' => $msclkid,
