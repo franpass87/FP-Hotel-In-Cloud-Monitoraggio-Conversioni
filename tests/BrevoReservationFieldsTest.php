@@ -26,7 +26,9 @@ final class BrevoReservationFieldsTest extends TestCase {
             'accommodation_id' => 'A1',
             'room_id' => 'R1',
             'room_name' => 'Room 1',
-            'offer' => 'OFF1'
+            'offer' => 'OFF1',
+            'valid' => 1,
+            'relocations' => [['from' => '2024-01-01', 'to' => '2024-01-05']]
         ];
 
         \FpHic\hic_dispatch_brevo_reservation($data);
@@ -40,6 +42,8 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('R1', $payload['attributes']['HIC_ROOM_ID']);
         $this->assertSame('Room 1', $payload['attributes']['HIC_ROOM_NAME']);
         $this->assertSame('OFF1', $payload['attributes']['HIC_OFFER']);
+        $this->assertSame(1, $payload['attributes']['HIC_VALID']);
+        $this->assertSame(json_encode($data['relocations']), $payload['attributes']['HIC_RELOCATIONS']);
     }
 
     public function testReservationCreatedEventSendsFields() {
@@ -60,7 +64,9 @@ final class BrevoReservationFieldsTest extends TestCase {
             'room_name' => 'Room 1',
             'offer' => 'OFF1',
             'guest_first_name' => 'Mario',
-            'guest_last_name' => 'Rossi'
+            'guest_last_name' => 'Rossi',
+            'valid' => 1,
+            'relocations' => [['from' => '2024-01-01', 'to' => '2024-01-05']]
         ];
 
         \FpHic\hic_send_brevo_reservation_created_event($reservation);
@@ -77,6 +83,8 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('OFF1', $payload['properties']['offer']);
         $this->assertSame('Mario', $payload['properties']['guest_first_name']);
         $this->assertSame('Rossi', $payload['properties']['guest_last_name']);
+        $this->assertSame(1, $payload['properties']['valid']);
+        $this->assertSame(json_encode($reservation['relocations']), $payload['properties']['relocations']);
     }
 
     public function testPhoneAndWhatsappSeparated() {

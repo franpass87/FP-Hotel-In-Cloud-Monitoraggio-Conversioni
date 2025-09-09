@@ -2,7 +2,7 @@
 
 Questo documento elenca tutti gli attributi che devi configurare nel tuo account Brevo per ricevere correttamente i dati dal plugin Hotel in Cloud.
 
-I recenti aggiornamenti introducono gli attributi `LANGUAGE`, `TAGS` e `HIC_ROOM_NAME` per memorizzare rispettivamente la lingua del contatto, l'elenco di tag associati e il nome specifico della camera prenotata.
+I recenti aggiornamenti introducono gli attributi `LANGUAGE`, `TAGS`, `HIC_ROOM_NAME`, `HIC_VALID` e `HIC_RELOCATIONS` per memorizzare rispettivamente la lingua del contatto, l'elenco di tag associati, il nome specifico della camera prenotata, la validità della prenotazione e gli eventuali spostamenti.
 
 > **Nota sui Tag**
 > I tag vengono inviati due volte per massima compatibilità: come array nel campo nativo `tags` di Brevo e come stringa separata da virgole (`TAGS` negli attributi del contatto e `tags` nelle proprietà degli eventi).
@@ -34,6 +34,8 @@ Il sistema di polling API moderno (versione attuale) invia **ENTRAMBI** i set di
 | `HIC_PRICE` | Numero | Prezzo originale della prenotazione | `price` dalla prenotazione |
 | `HIC_PRESENCE` | Numero (0/1) | Indica se il cliente ha effettuato il check-in | `presence` dalla prenotazione |
 | `HIC_BALANCE` | Numero | Saldo non pagato della prenotazione | `unpaid_balance` dalla prenotazione |
+| `HIC_VALID` | Numero (0/1) | Indica se la prenotazione è valida | `valid` dalla prenotazione |
+| `HIC_RELOCATIONS` | Testo | Elenco di spostamenti serializzato in JSON | `relocations` dalla prenotazione |
 | `TAGS` | Testo | Elenco di tag associati al contatto, separati da virgola (inviati anche nel campo `tags` nativo) | Array `tags` dalla prenotazione |
 
 #### Attributi Legacy (Compatibilità)
@@ -98,6 +100,8 @@ Il plugin invia anche eventi personalizzati a Brevo con le seguenti proprietà:
 | `guest_last_name` | Testo | Cognome ospite |
 | `presence` | Numero | Indica se l'ospite è presente |
 | `unpaid_balance` | Numero | Saldo non pagato |
+| `valid` | Numero | Indica se la prenotazione è valida |
+| `relocations` | Testo | Elenco di spostamenti serializzato in JSON |
 | `tags` | Testo | Tag separati da virgola (inviati anche come array `tags`) |
 | `bucket` | Testo | Categoria di attribuzione |
 | `vertical` | Testo | Verticale (es. hotel) |
@@ -126,6 +130,8 @@ HIC_OFFER - Tipo: Testo
 HIC_PRICE - Tipo: Numero (decimale)
 HIC_PRESENCE - Tipo: Numero
 HIC_BALANCE - Tipo: Numero (decimale)
+HIC_VALID - Tipo: Numero
+HIC_RELOCATIONS - Tipo: Testo
 TAGS - Tipo: Testo
 ```
 
