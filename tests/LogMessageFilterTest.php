@@ -27,5 +27,31 @@ final class LogMessageFilterTest extends TestCase {
         $this->assertStringNotContainsString('abcdef', $contents);
         $this->assertStringContainsString('[masked-email]', $contents);
     }
+
+    public function test_default_filter_masks_sensitive_data_in_structures(): void {
+        $manager = new \HIC_Log_Manager();
+        $data = [
+            'email' => 'jane.doe@example.com',
+            'token' => 'secret123',
+            'number' => 12345,
+            'nested' => (object) [
+                'phone' => '1234567890',
+                'inner' => ['api_key' => 'abcdef']
+            ]
+        ];
+        $manager->info($data);
+
+        $log_file = Helpers\hic_get_log_file();
+        $this->assertFileExists($log_file);
+        $contents = file_get_contents($log_file);
+        $this->assertStringNotContainsString('jane.doe@example.com', $contents);
+        $this->assertStringNotContainsString('secret123', $contents);
+        $this->assertStringNotContainsString('1234567890', $contents);
+        $this->assertStringNotContainsString('12345', $contents);
+        $this->assertStringContainsString('[masked-email]', $contents);
+        $this->assertStringContainsString('[masked]', $contents);
+        $this->assertStringContainsString('[masked-phone]', $contents);
+        $this->assertStringContainsString('[masked-number]', $contents);
+    }
 }
 }
