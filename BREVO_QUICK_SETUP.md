@@ -43,6 +43,7 @@ Nel pannello admin WordPress (Impostazioni > HIC Monitoring), sezione "Brevo Set
 6. Il prefisso telefonico, se presente, ha priorità sul campo `language`:
    - numeri con prefisso `+39` o `0039` vengono forzati sulla lista italiana;
    - numeri con altri prefissi vengono assegnati alla lista inglese;
+   - numeri senza prefisso, lunghi 9-10 cifre e che iniziano con `3` o `0` vengono trattati come italiani;
    - se il numero non è riconoscibile si utilizza il valore del campo `language` o, se assente, la lista di default.
 
 ## Evento "purchase"

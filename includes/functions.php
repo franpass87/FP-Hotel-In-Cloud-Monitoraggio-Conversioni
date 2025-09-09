@@ -686,7 +686,14 @@ function hic_detect_phone_language($phone) {
         $normalized = '+' . substr($normalized, 2);
     }
 
-    if (strlen($normalized) <= 1 || strpos($normalized, '+') !== 0) {
+    if (strlen($normalized) <= 1) {
+        return ['phone' => $normalized, 'language' => null];
+    }
+
+    if (strpos($normalized, '+') !== 0) {
+        if ((strlen($normalized) >= 9 && strlen($normalized) <= 10) && ($normalized[0] === '3' || $normalized[0] === '0')) {
+            return ['phone' => $normalized, 'language' => 'it'];
+        }
         return ['phone' => $normalized, 'language' => null];
     }
 
