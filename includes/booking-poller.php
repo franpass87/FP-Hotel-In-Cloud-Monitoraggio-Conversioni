@@ -498,6 +498,7 @@ class HIC_Booking_Poller {
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
             }
         }
+        return $result;
     }
     
     /**
