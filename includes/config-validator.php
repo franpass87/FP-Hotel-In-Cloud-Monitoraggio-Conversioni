@@ -268,7 +268,7 @@ class HIC_Config_Validator {
      * Check if running in local environment
      */
     private function is_local_environment() {
-        $host = $_SERVER['HTTP_HOST'] ?? '';
+        $host = sanitize_text_field($_SERVER['HTTP_HOST'] ?? '');
         $local_hosts = ['localhost', '127.0.0.1', '::1'];
         
         foreach ($local_hosts as $local_host) {
