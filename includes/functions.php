@@ -912,7 +912,7 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   $body .= "Nome: " . trim($first . ' ' . $last) . "\n";
   $body .= "Email: " . ($data['email'] ?? 'n/a') . "\n";
   $body .= "Telefono: " . ($data['phone'] ?? 'n/a') . "\n";
-  $body .= "Lingua: " . ($data['lingua'] ?? ($data['lang'] ?? 'n/a')) . "\n";
+  $body .= "Lingua: " . ($data['language'] ?? ($data['lingua'] ?? ($data['lang'] ?? 'n/a'))) . "\n";
   $body .= "Camera: " . ($data['room'] ?? 'n/a') . "\n";
   $body .= "Check-in: " . ($data['checkin'] ?? 'n/a') . "\n";
   $body .= "Check-out: " . ($data['checkout'] ?? 'n/a') . "\n";

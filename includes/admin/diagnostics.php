@@ -243,7 +243,8 @@ function hic_test_dispatch_functions() {
         'email' => 'test@example.com',
         'guest_first_name' => 'John',
         'guest_last_name' => 'Doe',
-        'lingua' => 'it',
+        'language' => 'it',
+        'phone' => '+39 3331234567',
         'room' => 'Standard Room',
         'checkin' => wp_date('Y-m-d', strtotime('+7 days', current_time('timestamp'))),
         'checkout' => wp_date('Y-m-d', strtotime('+10 days', current_time('timestamp')))
@@ -834,7 +835,7 @@ function hic_convert_api_booking_to_processor_format($api_booking) {
         'email' => $api_booking['client_email'] ?? $api_booking['email'] ?? '',
         'first_name' => $api_booking['client_first_name'] ?? $api_booking['first_name'] ?? '',
         'last_name' => $api_booking['client_last_name'] ?? $api_booking['last_name'] ?? '',
-        'lingua' => 'it', // Default to Italian
+        'language' => 'it', // Default to Italian
         'room' => $api_booking['accommodation_name'] ?? $api_booking['room'] ?? '',
         'checkin' => $api_booking['from_date'] ?? $api_booking['checkin'] ?? '',
         'checkout' => $api_booking['to_date'] ?? $api_booking['checkout'] ?? '',

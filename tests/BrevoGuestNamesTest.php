@@ -22,6 +22,8 @@ final class BrevoGuestNamesTest extends TestCase {
             'reservation_id' => 'R1',
             'amount' => 100,
             'currency' => 'EUR',
+            'phone' => '+39 1234567890',
+            'language' => 'it',
             'guest_first_name' => 'Mario',
             'guest_last_name' => 'Rossi',
         ];
@@ -31,6 +33,8 @@ final class BrevoGuestNamesTest extends TestCase {
         $payload = json_decode($hic_last_request['args']['body'], true);
         $this->assertSame('Mario', $payload['properties']['guest_first_name']);
         $this->assertSame('Rossi', $payload['properties']['guest_last_name']);
+        $this->assertSame('+39 1234567890', $payload['properties']['phone']);
+        $this->assertSame('it', $payload['properties']['language']);
     }
 
     public function testRefundEventSendsGuestNames() {
@@ -42,6 +46,8 @@ final class BrevoGuestNamesTest extends TestCase {
             'reservation_id' => 'R1',
             'amount' => 100,
             'currency' => 'EUR',
+            'phone' => '+39 1234567890',
+            'language' => 'it',
             'guest_first_name' => 'Mario',
             'guest_last_name' => 'Rossi',
         ];
@@ -51,5 +57,7 @@ final class BrevoGuestNamesTest extends TestCase {
         $payload = json_decode($hic_last_request['args']['body'], true);
         $this->assertSame('Mario', $payload['properties']['guest_first_name']);
         $this->assertSame('Rossi', $payload['properties']['guest_last_name']);
+        $this->assertSame('+39 1234567890', $payload['properties']['phone']);
+        $this->assertSame('it', $payload['properties']['language']);
     }
 }
