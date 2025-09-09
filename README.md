@@ -26,8 +26,8 @@ Il webhook `POST /wp-json/hic/v1/conversion?token=IL_TUO_TOKEN` accetta un corpo
 {
   "email": "mario.rossi@example.com",
   "reservation_id": "ABC123",
-  "first_name": "Mario",
-  "last_name": "Rossi",
+  "guest_first_name": "Mario",
+  "guest_last_name": "Rossi",
   "amount": 199.99,
   "currency": "EUR",
   "checkin": "2025-06-01",
@@ -43,8 +43,8 @@ Schema campi principali:
 
 - `email` *(stringa, obbligatorio)* – indirizzo email del cliente
 - `reservation_id` *(stringa)* – identificativo della prenotazione
-- `first_name` *(stringa)* – nome dell'ospite
-- `last_name` *(stringa)* – cognome dell'ospite
+- `guest_first_name` *(stringa)* – nome dell'ospite
+- `guest_last_name` *(stringa)* – cognome dell'ospite
 - `amount` *(numero)* – totale della prenotazione
 - `currency` *(stringa)* – valuta dell'importo (es. `EUR`)
 - `checkin` *(data Y-m-d)* – data di arrivo
