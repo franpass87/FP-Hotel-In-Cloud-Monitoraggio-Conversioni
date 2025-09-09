@@ -163,72 +163,56 @@
             font-weight: 600;
             font-size: 13px;
         }
-        
+
         .status.ok { color: #00a32a; }
         .status.error { color: #d63638; }
         .status.warning { color: #dba617; }
         .status.neutral { color: #646970; }
-        
-        /* Quick Actions */
-        .hic-quick-actions {
-            display: flex;
-            gap: 32px;
-            margin-top: 16px;
-            flex-wrap: wrap;
-        }
-        
-        .hic-action-group {
-            flex: 1;
-            min-width: 200px;
-        }
-        
-        .hic-action-group h3 {
-            margin: 0 0 12px 0;
-            font-size: 14px;
-            font-weight: 600;
-            color: #646970;
-            text-transform: uppercase;
-        }
-        
-        .hic-action-group .button {
-            display: block;
-            width: 100%;
-            margin-bottom: 8px;
-            text-align: center;
+
+        /* Button Styles */
+        .hic-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             padding: 10px 16px;
+            border: 1px solid transparent;
             border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
             transition: all 0.2s ease;
             position: relative;
             overflow: hidden;
+            margin-bottom: 8px;
         }
-        
-        .hic-action-group .button:hover {
+
+        .hic-button:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
-        
-        .hic-action-group .button:active {
+
+        .hic-button:active {
             transform: translateY(0);
         }
-        
-        .hic-action-group .button:disabled {
+
+        .hic-button:disabled {
             transform: none;
             opacity: 0.6;
             cursor: not-allowed;
         }
-        
-        .hic-action-group .button .dashicons {
+
+        .hic-button .dashicons {
             margin-right: 6px;
             margin-top: 0;
             transition: transform 0.2s ease;
         }
-        
-        .hic-action-group .button:hover .dashicons {
+
+        .hic-button:hover .dashicons {
             transform: scale(1.1);
         }
-        
-        /* Enhanced button states */
-        .hic-action-group .button.loading::after {
+
+        .hic-button.loading::after {
             content: '';
             position: absolute;
             top: 50%;
@@ -240,6 +224,67 @@
             border-top: 1px solid transparent;
             border-radius: 50%;
             animation: spin 1s linear infinite;
+        }
+
+        .hic-button--block {
+            display: block;
+            width: 100%;
+        }
+
+        .hic-button--small {
+            font-size: 12px;
+            padding: 4px 12px;
+        }
+
+        .hic-button--primary {
+            background: #2271b1;
+            color: #fff;
+            border-color: #2271b1;
+        }
+
+        .hic-button--primary:hover {
+            background: #135e96;
+        }
+
+        .hic-button--secondary {
+            background: #f6f7f7;
+            color: #1d2327;
+            border-color: #cccccc;
+        }
+
+        .hic-button--secondary:hover {
+            background: #f0f0f0;
+        }
+
+        .hic-button--danger {
+            background: #d63638;
+            color: #fff;
+            border-color: #d63638;
+        }
+
+        .hic-button--danger:hover {
+            background: #b32d2e;
+        }
+
+        /* Quick Actions */
+        .hic-quick-actions {
+            display: flex;
+            gap: 32px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .hic-action-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .hic-action-group h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #646970;
+            text-transform: uppercase;
         }
         
         /* Integration Grid */
@@ -291,28 +336,18 @@
             margin-top: 12px;
         }
         
-        .hic-integration-actions .button {
-            font-size: 12px;
-            padding: 4px 12px;
-        }
-        
         .hic-integration-actions-section {
             margin-top: 24px;
             padding-top: 24px;
             border-top: 1px solid #e1e5e8;
         }
-        
+
         .hic-integration-actions-section h3 {
             margin-top: 0;
         }
-        
+
         .hic-integration-actions-section .hic-quick-actions {
             margin-top: 12px;
-        }
-        
-        .hic-integration-actions-section .button {
-            margin-right: 12px;
-            margin-bottom: 8px;
         }
         
         /* Activity Grid */
@@ -661,12 +696,12 @@
         }
         
         @media (max-width: 480px) {
-            .hic-action-group .button {
+            .hic-button {
                 padding: 12px 16px;
                 font-size: 14px;
                 min-height: 44px; /* Better touch targets */
             }
-            
+
             .hic-overview-section h3 {
                 font-size: 12px;
             }
@@ -696,7 +731,7 @@
             box-shadow: none;
         }
         
-        .high-contrast .button {
+        .high-contrast .hic-button {
             border: 2px solid #000;
             font-weight: bold;
         }
@@ -715,7 +750,7 @@
         }
         
         /* Enhanced focus indicators for keyboard navigation */
-        .button:focus,
+        .hic-button:focus,
         .hic-copy-button:focus,
         .hic-advanced-details summary:focus {
             outline: 3px solid #0073aa;
@@ -725,42 +760,12 @@
         
         /* Improved touch targets for mobile accessibility */
         @media (max-width: 768px) {
-            .button,
+            .hic-button,
             .hic-copy-button,
             .hic-toast-close {
                 min-height: 44px;
                 min-width: 44px;
             }
-        }
-        
-        /* Button Improvements */
-        .button {
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-        
-        .button:hover {
-            transform: translateY(-1px);
-        }
-        
-        .button-primary {
-            background: #0073aa;
-            border-color: #0073aa;
-        }
-        
-        .button-primary:hover {
-            background: #005a87;
-            border-color: #005a87;
-        }
-        
-        .button-link-delete {
-            color: #d63638;
-            border-color: #d63638;
-        }
-        
-        .button-link-delete:hover {
-            background: #d63638;
-            color: white;
         }
         
         /* Tables */
