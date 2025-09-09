@@ -418,22 +418,44 @@ function hic_get_error_stats() {
             );
         }
     } else {
-        // Fallback to streaming read using SplFileObject
-        $file = new SplFileObject($log_file, 'r');
-        $file->seek(PHP_INT_MAX);
-        $last_line = $file->key();
-        $start = max(0, $last_line - $log_lines_to_check + 1);
-
-        for ($i = $start; $i <= $last_line; $i++) {
-            $file->seek($i);
-            $line = trim((string) $file->current());
-            if ($line !== '') {
-                $lines[] = $line;
+        // Fallback: efficiently read last N lines by reading from end of file in chunks
+        $fp = fopen($log_file, 'rb');
+        if ($fp) {
+            $buffer = '';
+            $lines_found = 0;
+            $pos = -1;
+            $lines = array();
+            fseek($fp, 0, SEEK_END);
+            $filesize = ftell($fp);
+            $chunk_size = 4096;
+            while ($filesize > 0 && $lines_found < $log_lines_to_check) {
+                $read_size = ($filesize >= $chunk_size) ? $chunk_size : $filesize;
+                $filesize -= $read_size;
+                fseek($fp, $filesize, SEEK_SET);
+                $chunk = fread($fp, $read_size);
+                $buffer = $chunk . $buffer;
+                $lines_in_buffer = explode("\n", $buffer);
+                // If not at start of file, the first line may be incomplete
+                if ($filesize > 0) {
+                    $buffer = array_shift($lines_in_buffer);
+                } else {
+                    $buffer = '';
+                }
+                while (!empty($lines_in_buffer)) {
+                    $line = array_pop($lines_in_buffer);
+                    $line = trim($line);
+                    if ($line !== '') {
+                        $lines[] = $line;
+                        $lines_found++;
+                        if ($lines_found >= $log_lines_to_check) {
+                            break 2;
+                        }
+                    }
+                }
             }
+            fclose($fp);
         }
-
-        // Ensure most recent lines are processed first
-        $lines = array_reverse($lines);
+        // $lines already has most recent lines first
     }
 
     if (!$lines) {
