@@ -726,7 +726,7 @@ function hic_process_reservations_batch($reservations) {
                 $skipped_count++;
                 continue;
             }
-            
+
             // Check deduplication
             $uid = Helpers\hic_booking_uid($reservation);
             if (Helpers\hic_is_reservation_already_processed($uid)) {
@@ -735,16 +735,21 @@ function hic_process_reservations_batch($reservations) {
                     $presence = $reservation['presence'] ?? '';
                     if (in_array($presence, ['arrived', 'departed'])) {
                         hic_log("Reservation $uid: processing status update for presence=$presence");
-                        
+
                         // Acquire lock for status update processing
                         if (!Helpers\hic_acquire_reservation_lock($uid, 10)) {
                             hic_log("Reservation $uid: skipped status update due to concurrent processing");
                             continue;
                         }
-                        
+
                         try {
                             // Process as status update but don't count as new
-                            hic_process_single_reservation($reservation);
+                            if (hic_process_single_reservation($reservation)) {
+                                hic_log("Reservation $uid: status update processed");
+                            } else {
+                                $error_count++;
+                                hic_log("Reservation $uid: status update failed");
+                            }
                         } finally {
                             Helpers\hic_release_reservation_lock($uid);
                         }
@@ -755,29 +760,36 @@ function hic_process_reservations_batch($reservations) {
                 hic_log("Reservation $uid: skipped (already processed)");
                 continue;
             }
-            
+
             // Acquire lock for new reservation processing
             if (!Helpers\hic_acquire_reservation_lock($uid)) {
                 hic_log("Reservation $uid: skipped due to concurrent processing");
                 $skipped_count++;
                 continue;
             }
-            
+
             try {
                 // Process new reservation
-                hic_process_single_reservation($reservation);
-                hic_mark_reservation_processed($reservation);
-                $new_count++;
+                if (hic_process_single_reservation($reservation)) {
+                    hic_mark_reservation_processed($reservation);
+                    $new_count++;
+                    hic_log("Reservation $uid: processed");
+                } else {
+                    $skipped_count++;
+                    hic_log("Reservation $uid: processing failed");
+                }
             } finally {
                 Helpers\hic_release_reservation_lock($uid);
             }
-            
+
         } catch (Exception $e) {
             $error_count++;
-            hic_log("Error processing reservation: " . $e->getMessage());
+            $uid = Helpers\hic_booking_uid($reservation);
+            hic_log("Reservation $uid: failed with error - " . $e->getMessage());
         }
     }
-    
+
+    hic_log("Batch summary: processed=$new_count, skipped=$skipped_count, failed=$error_count");
     return array('new' => $new_count, 'skipped' => $skipped_count, 'errors' => $error_count);
 }
 
@@ -796,8 +808,8 @@ function hic_should_process_reservation_with_email($reservation) {
         ?? $reservation['client_email']
         ?? '';
 
-    // Additional check: Skip reservations without email (minimal filter)
-    if (empty($email) || !is_string($email)) {
+    // Additional check: Skip reservations without or with invalid email
+    if (empty($email) || !is_string($email) || !Helpers\hic_is_valid_email($email)) {
         hic_log("Reservation skipped: missing or invalid email");
         return false;
     }
@@ -807,15 +819,19 @@ function hic_should_process_reservation_with_email($reservation) {
 
 /**
  * Process a single reservation (transform and dispatch)
+ *
+ * @return bool True on success, false on transformation failure
  */
-function hic_process_single_reservation($reservation) {
+function hic_process_single_reservation($reservation): bool {
     $transformed = hic_transform_reservation($reservation);
     if ($transformed !== false && is_array($transformed)) {
         hic_dispatch_reservation($transformed, $reservation);
-    } else {
-        $uid = Helpers\hic_booking_uid($reservation);
-        throw new Exception('Failed to transform reservation ' . ($uid ?: 'unknown'));
+        return true;
     }
+
+    $uid = Helpers\hic_booking_uid($reservation);
+    hic_log("Reservation $uid: transformation failed");
+    return false;
 }
 
 /**
