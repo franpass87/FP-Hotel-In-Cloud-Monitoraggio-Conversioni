@@ -786,11 +786,26 @@ jQuery(document).ready(function($) {
                 action: 'hic_test_brevo_connectivity',
                 nonce: hicDiagnostics.admin_nonce
             }).done(function(response) {
-                if (response.success) {
+                if (!response.success) {
+                    showToast('Brevo API test failed: ' + response.data.message, 'error');
+                    return;
+                }
+
+                var contactOk = response.data.contact_api && response.data.contact_api.success;
+                var eventOk   = response.data.event_api && response.data.event_api.success;
+
+                if (contactOk && eventOk) {
                     $btn.removeClass('button-secondary').addClass('button-primary');
                     showToast('Brevo API test successful!', 'success');
                 } else {
-                    showToast('Brevo API test failed: ' + response.data.message, 'error');
+                    var message = 'Brevo API test failed:';
+                    if (!contactOk) {
+                        message += ' Contact API - ' + response.data.contact_api.message + '.';
+                    }
+                    if (!eventOk) {
+                        message += ' Event API - ' + response.data.event_api.message + '.';
+                    }
+                    showToast(message, 'error');
                 }
             }).fail(function() {
                 showToast('Communication error during Brevo API test', 'error');

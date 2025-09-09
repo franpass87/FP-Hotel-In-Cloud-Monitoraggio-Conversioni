@@ -71,3 +71,9 @@ add_filter('hic_brevo_event', function( $event_data, $reservation ) {
 
 - `$event_data`: array dell'evento inviato a Brevo
 - `$reservation`: dati originali della prenotazione
+
+## Test API e Diagnostica
+
+Il pulsante **Test API** della diagnosi crea temporaneamente un contatto di prova
+utilizzando la lista italiana predefinita. Il contatto viene eliminato subito dopo
+il test per mantenere pulite le liste reali.

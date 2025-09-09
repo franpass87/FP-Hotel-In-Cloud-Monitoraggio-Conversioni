@@ -750,14 +750,16 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
  */
 function hic_test_brevo_contact_api() {
   $test_email = 'test-' . current_time('timestamp') . '@example.com';
-  
+  // Use default Italian list for the test contact to ensure a valid payload
+  $list_id = intval(Helpers\hic_get_brevo_list_it());
+
   $body = array(
     'email' => $test_email,
     'attributes' => array(
       'FIRSTNAME' => 'Test',
       'LASTNAME' => 'Connectivity'
     ),
-    'listIds' => array(), // Empty list to avoid adding test contact to real lists
+    'listIds' => array($list_id),
     'updateEnabled' => false // Don't update if exists
   );
   
@@ -775,6 +777,17 @@ function hic_test_brevo_contact_api() {
     'test_email' => $test_email,
     'endpoint' => 'https://api.brevo.com/v3/contacts'
   ));
+
+  // Remove the test contact to keep the Brevo list clean
+  if ($result['success']) {
+    Helpers\hic_http_request('https://api.brevo.com/v3/contacts/' . rawurlencode($test_email), array(
+      'method'  => 'DELETE',
+      'headers' => array(
+        'accept'  => 'application/json',
+        'api-key' => Helpers\hic_get_brevo_api_key()
+      )
+    ));
+  }
   
   return array(
     'success' => $result['success'],
