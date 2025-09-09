@@ -1567,10 +1567,18 @@ function hic_ajax_test_brevo_connectivity() {
     // Test event API
     $event_test = hic_test_brevo_event_api();
 
+    if ( ! ( $contact_test['success'] && $event_test['success'] ) ) {
+        wp_send_json_error( array(
+            'message'     => __( 'Test connettività Brevo fallito', 'hotel-in-cloud' ),
+            'contact_api' => $contact_test,
+            'event_api'   => $event_test,
+        ) );
+    }
+
     wp_send_json_success( array(
-        'message' => __( 'Test connettività Brevo completato', 'hotel-in-cloud' ),
+        'message'     => __( 'Test connettività Brevo completato', 'hotel-in-cloud' ),
         'contact_api' => $contact_test,
-        'event_api' => $event_test
+        'event_api'   => $event_test,
     ) );
 }
 
