@@ -558,12 +558,12 @@ class HIC_Booking_Poller {
                 $count = count($reservations);
                 hic_log("Deep check: Found $count reservations in " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback period");
 
-                if ($count > 0 && function_exists('hic_process_reservations_batch')) {
-                    $process_result = hic_process_reservations_batch($reservations);
-                    $total_new += $process_result['new'];
-                    $total_skipped += $process_result['skipped'];
-                    $total_errors += $process_result['errors'];
-                }
+                $process_result = hic_process_reservations_batch($reservations);
+                $total_new += $process_result['new'];
+                $total_skipped += $process_result['skipped'];
+                $total_errors += $process_result['errors'];
+
+                hic_log("Deep check: Processed batch - New: {$process_result['new']}, Skipped: {$process_result['skipped']}, Errors: {$process_result['errors']}");
             } else {
                 $error_message = is_wp_error($reservations) ? $reservations->get_error_message() : 'Unknown error';
                 hic_log("Deep check: Error fetching reservations: $error_message", HIC_LOG_LEVEL_ERROR);
@@ -573,12 +573,11 @@ class HIC_Booking_Poller {
 
         $execution_time = round((microtime(true) - $start_time) * 1000, 2);
 
-        update_option('hic_last_deep_check_count', $total_new, false);
-        \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check_count');
-        update_option('hic_last_deep_check_duration', $execution_time, false);
-        \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check_duration');
-
         if ($total_errors === 0) {
+            update_option('hic_last_deep_check_count', $total_new, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check_count');
+            update_option('hic_last_deep_check_duration', $execution_time, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check_duration');
             update_option('hic_last_successful_deep_check', $current_time, false);
             \FpHic\Helpers\hic_clear_option_cache('hic_last_successful_deep_check');
         }
