@@ -42,25 +42,25 @@ function hic_webhook_handler(WP_REST_Request $request) {
   
   if (empty($expected_token)) {
     hic_log('Webhook rifiutato: token webhook non configurato');
-    return new WP_Error('missing_token','Token webhook non configurato',['status'=>500]);
+    return new \WP_Error('missing_token','Token webhook non configurato',['status'=>500]);
   }
   
   if ($token !== $expected_token) {
     hic_log('Webhook rifiutato: token invalido');
-    return new WP_Error('invalid_token','Token non valido',['status'=>403]);
+    return new \WP_Error('invalid_token','Token non valido',['status'=>403]);
   }
 
   // Validate Content-Type header
   $content_type = $request->get_header('content-type');
   if ( stripos($content_type, 'application/json') === false ) {
-    return new WP_Error('invalid_content_type', 'Content-Type non supportato', ['status' => 415]);
+    return new \WP_Error('invalid_content_type', 'Content-Type non supportato', ['status' => 415]);
   }
 
   // Get raw body and validate size
   $raw = file_get_contents('php://input');
   if (strlen($raw) > HIC_WEBHOOK_MAX_PAYLOAD_SIZE) {
     hic_log('Webhook payload troppo grande');
-    return new WP_Error('payload_too_large', 'Payload troppo grande', ['status' => 413]);
+    return new \WP_Error('payload_too_large', 'Payload troppo grande', ['status' => 413]);
   }
 
   // Decode JSON data
@@ -69,7 +69,7 @@ function hic_webhook_handler(WP_REST_Request $request) {
   if (json_last_error() !== JSON_ERROR_NONE) {
     $error_message = json_last_error_msg();
     hic_log('Webhook JSON non valido: ' . $error_message);
-    return new WP_Error('invalid_json', 'JSON non valido: ' . $error_message, ['status' => 400]);
+    return new \WP_Error('invalid_json', 'JSON non valido: ' . $error_message, ['status' => 400]);
   }
 
   if (!$data || !is_array($data)) {
@@ -142,13 +142,13 @@ function hic_webhook_handler(WP_REST_Request $request) {
  */
 function hic_validate_webhook_payload($payload) {
   if (!is_array($payload)) {
-    return new WP_Error('invalid_payload', 'Payload non valido', ['status' => 400]);
+    return new \WP_Error('invalid_payload', 'Payload non valido', ['status' => 400]);
   }
 
   // Required field: email
   if (empty($payload['email']) || !hic_is_valid_email($payload['email'])) {
     hic_log('Webhook payload: email mancante o non valida');
-    return new WP_Error('invalid_email', 'Campo email mancante o non valido', ['status' => 400]);
+    return new \WP_Error('invalid_email', 'Campo email mancante o non valido', ['status' => 400]);
   }
 
   return true;
