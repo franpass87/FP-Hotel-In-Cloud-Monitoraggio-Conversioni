@@ -55,12 +55,14 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
       'CURRENCY'  => isset($data['currency']) ? $data['currency'] : 'EUR',
       'WHATSAPP'  => isset($data['whatsapp']) ? $data['whatsapp'] : '',
       'LANGUAGE'  => $lang,
+      // Legacy alias for LANGUAGE
       'LINGUA'    => $lang
     ),
     'listIds'       => $list_ids,
     'updateEnabled' => true
   );
 
+  // Map tags array to both Brevo native tags and TAGS attribute
   if (!empty($data['tags']) && is_array($data['tags'])) {
     $body['tags'] = array_values($data['tags']);
     $body['attributes']['TAGS'] = implode(',', $data['tags']);
