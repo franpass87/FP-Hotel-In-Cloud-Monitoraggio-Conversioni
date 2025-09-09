@@ -149,7 +149,7 @@ Parametri:
 - `date_type`: Tipo di data (`checkin`, `checkout`) - default: `checkin`
 - `from_date`: Data inizio (formato Y-m-d)
 - `to_date`: Data fine (formato Y-m-d)  
-- `limit`: Numero massimo di risultati (opzionale)
+- `limit`: Numero massimo di risultati (opzionale, 1-200)
 
 ### Diagnostici e Test
 
