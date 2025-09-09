@@ -746,9 +746,9 @@ class HIC_Booking_Poller {
             'last_continuous_human' => $last_continuous > 0 ? human_time_diff($last_continuous) . ' fa' : 'Mai',
             'last_deep_check' => $last_deep,
             'last_deep_human' => $last_deep > 0 ? human_time_diff($last_deep) . ' fa' : 'Mai',
-            'lag_seconds' => $last_general > 0 ? current_time('timestamp') - $last_general : 0,
-            'continuous_lag' => $last_continuous > 0 ? current_time('timestamp') - $last_continuous : 0,
-            'deep_lag' => $last_deep > 0 ? current_time('timestamp') - $last_deep : 0,
+            'lag_seconds' => $last_general > 0 ? time() - $last_general : 0,
+            'continuous_lag' => $last_continuous > 0 ? time() - $last_continuous : 0,
+            'deep_lag' => $last_deep > 0 ? time() - $last_deep : 0,
             'polling_active' => $should_poll,
             'polling_interval' => HIC_CONTINUOUS_POLLING_INTERVAL,
             'deep_check_interval' => HIC_DEEP_CHECK_INTERVAL
