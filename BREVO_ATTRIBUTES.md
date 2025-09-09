@@ -36,6 +36,7 @@ Il sistema moderno invia **ANCHE** questi attributi legacy per garantire la retr
 | `DATE` | Data | Data della prenotazione | Mappato da `from_date` |
 | `AMOUNT` | Numero | Importo della prenotazione | Mappato da `original_price` |
 | `CURRENCY` | Testo | Valuta (es. "EUR", "USD") | `currency` dalla prenotazione |
+| `PHONE` | Testo | Numero di telefono | `phone` dalla prenotazione |
 | `WHATSAPP` | Testo | Numero WhatsApp | Mappato da `phone` |
 | `LINGUA` | Testo | Lingua | Mappato da `language` |
 
