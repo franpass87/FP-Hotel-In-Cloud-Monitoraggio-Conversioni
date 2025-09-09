@@ -1759,31 +1759,26 @@ function hic_api_poll_bookings_deep_check() {
             // Handle timestamp errors properly to prevent polling from getting stuck
             if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
                 hic_log('Deep Check: Timestamp error detected - resetting all relevant timestamps to recover');
-                
-                // Reset all relevant timestamps to safe values to ensure recovery
-                $safe_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago
-                
-                // Validate all reset timestamps before using them
-                $validated_safe = hic_validate_api_timestamp($safe_timestamp, 'Deep Check data timestamp reset');
-                $recent_timestamp = $current_time - 300; // 5 minutes ago
-                $validated_recent = hic_validate_api_timestamp($recent_timestamp, 'Deep Check scheduler restart');
-                
-                update_option('hic_last_updates_since', $validated_safe, false);
-                Helpers\hic_clear_option_cache('hic_last_updates_since');
-                update_option('hic_last_update_check', $validated_safe, false);
-                Helpers\hic_clear_option_cache('hic_last_update_check');
-                update_option('hic_last_continuous_check', $validated_safe, false);
-                Helpers\hic_clear_option_cache('hic_last_continuous_check');
-                
-                // Reset scheduler timestamps to restart polling immediately
-                update_option('hic_last_continuous_poll', $validated_recent, false);
-                Helpers\hic_clear_option_cache('hic_last_continuous_poll');
-                update_option('hic_last_deep_check', $validated_recent, false);
-                Helpers\hic_clear_option_cache('hic_last_deep_check');
-                
-                hic_log('Deep Check: Reset all timestamps to: ' . wp_date('Y-m-d H:i:s', $validated_safe) . " for recovery");
-                hic_log('Deep Check: Reset scheduler timestamps to restart polling immediately: ' . wp_date('Y-m-d H:i:s', $validated_recent));
-                
+
+                // Reset all relevant timestamps to a safe value
+                $safe_timestamp   = $current_time - (3 * DAY_IN_SECONDS); // 3 days ago
+                $validated_safe   = hic_validate_api_timestamp($safe_timestamp, 'Deep Check timestamp recovery');
+
+                $options_to_reset = [
+                    'hic_last_updates_since',
+                    'hic_last_update_check',
+                    'hic_last_continuous_check',
+                    'hic_last_continuous_poll',
+                    'hic_last_deep_check',
+                ];
+
+                foreach ($options_to_reset as $option) {
+                    update_option($option, $validated_safe, false);
+                    Helpers\hic_clear_option_cache($option);
+                }
+
+                hic_log('Timestamp recovery completed – polling restarted');
+
                 // Reduce error count since this is a recoverable error that's now handled
                 $total_errors--;
             }
