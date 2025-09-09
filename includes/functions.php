@@ -1301,8 +1301,14 @@ function hic_retry_failed_requests() {
             continue;
         }
 
-        $args     = json_decode($row->payload, true);
-        $response = wp_safe_remote_request($row->endpoint, is_array($args) ? $args : array());
+        $args = json_decode($row->payload, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $error_message = 'JSON decode error: ' . json_last_error_msg();
+            hic_log('Retry failed for ' . $row->endpoint . ': ' . $error_message, HIC_LOG_LEVEL_ERROR);
+            $wpdb->delete($table, array('id' => $row->id));
+            continue;
+        }
+        $response = hic_http_request($row->endpoint, is_array($args) ? $args : array());
 
         if (is_wp_error($response) || wp_remote_retrieve_response_code($response) >= 400) {
             $error_message = is_wp_error($response) ? $response->get_error_message() : 'HTTP ' . wp_remote_retrieve_response_code($response);
