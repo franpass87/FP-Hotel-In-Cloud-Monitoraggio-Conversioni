@@ -491,9 +491,7 @@ class HIC_Booking_Poller {
             }
         } catch (\Throwable $e) {
             hic_log('Continuous polling error: ' . $e->getMessage(), HIC_LOG_LEVEL_ERROR);
-            $failures = (int) get_option('hic_continuous_poll_failures', 0);
-            update_option('hic_continuous_poll_failures', $failures + 1, false);
-            \FpHic\Helpers\hic_clear_option_cache('hic_continuous_poll_failures');
+            $this->increment_failure_counter('hic_continuous_poll_failures');
         } finally {
             if ($result === true) {
                 update_option('hic_last_continuous_poll', time(), false);
@@ -522,9 +520,7 @@ class HIC_Booking_Poller {
             $success = ($result !== null && $result !== false && !is_wp_error($result));
         } catch (\Throwable $e) {
             hic_log('Deep check error: ' . $e->getMessage(), HIC_LOG_LEVEL_ERROR);
-            $failures = (int) get_option('hic_deep_check_failures', 0);
-            update_option('hic_deep_check_failures', $failures + 1, false);
-            \FpHic\Helpers\hic_clear_option_cache('hic_deep_check_failures');
+            $this->increment_failure_counter('hic_deep_check_failures');
         } finally {
             if ($success) {
                 update_option('hic_last_deep_check', time(), false);
@@ -818,8 +814,19 @@ class HIC_Booking_Poller {
         $stats['next_continuous_scheduled'] = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         $stats['next_deep_scheduled'] = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         $stats['wp_cron_disabled'] = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
-        
+
         return $stats;
+    }
+
+    /**
+     * Increment a failure counter for diagnostics.
+     *
+     * @param string $option_name Option storing the failure count.
+     */
+    private function increment_failure_counter($option_name) {
+        $failures = (int) get_option($option_name, 0);
+        update_option($option_name, $failures + 1, false);
+        \FpHic\Helpers\hic_clear_option_cache($option_name);
     }
 }
 
