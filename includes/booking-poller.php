@@ -489,6 +489,10 @@ class HIC_Booking_Poller {
             } else {
                 $result = null;
             }
+            if (is_wp_error($result)) {
+                hic_log('Continuous polling error: ' . $result->get_error_message(), HIC_LOG_LEVEL_ERROR);
+                $this->increment_failure_counter('hic_continuous_poll_failures');
+            }
         } catch (\Throwable $e) {
             hic_log('Continuous polling error: ' . $e->getMessage(), HIC_LOG_LEVEL_ERROR);
             $this->increment_failure_counter('hic_continuous_poll_failures');
