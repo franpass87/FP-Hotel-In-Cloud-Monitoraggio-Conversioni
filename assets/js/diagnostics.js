@@ -703,39 +703,50 @@ jQuery(document).ready(function($) {
             });
         });
         
-        // Log download handler (same functionality)
+        // Log download handler with size check
         $('#download-error-logs').click(function() {
             var $btn = $(this);
-            
+
             if (!confirm('Vuoi scaricare il file di log degli errori?')) {
                 return;
             }
-            
-            // Create hidden form for download
-            var form = document.createElement('form');
-            form.method = 'POST';
-            form.action = ajaxurl;
-            form.style.display = 'none';
-            
-            // Add action parameter
-            var actionInput = document.createElement('input');
-            actionInput.type = 'hidden';
-            actionInput.name = 'action';
-            actionInput.value = 'hic_download_error_logs';
-            form.appendChild(actionInput);
-            
-            // Add nonce parameter
-            var nonceInput = document.createElement('input');
-            nonceInput.type = 'hidden';
-            nonceInput.name = 'nonce';
-            nonceInput.value = hicDiagnostics.diagnostics_nonce;
-            form.appendChild(nonceInput);
-            
-            // Submit form for download
-            document.body.appendChild(form);
-            form.submit();
-            document.body.removeChild(form);
-        
+
+            $.post(ajaxurl, {
+                action: 'hic_get_error_log_info',
+                nonce: hicDiagnostics.diagnostics_nonce
+            }).done(function(response) {
+                if (response.success && response.data.limited) {
+                    showToast('Il log è stato limitato a 5MB. Il file scaricato potrebbe essere incompleto.', 'warning');
+                }
+
+                // Create hidden form for download
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = ajaxurl;
+                form.style.display = 'none';
+
+                // Add action parameter
+                var actionInput = document.createElement('input');
+                actionInput.type = 'hidden';
+                actionInput.name = 'action';
+                actionInput.value = 'hic_download_error_logs';
+                form.appendChild(actionInput);
+
+                // Add nonce parameter
+                var nonceInput = document.createElement('input');
+                nonceInput.type = 'hidden';
+                nonceInput.name = 'nonce';
+                nonceInput.value = hicDiagnostics.diagnostics_nonce;
+                form.appendChild(nonceInput);
+
+                // Submit form for download
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+            }).fail(function() {
+                showToast('Errore di comunicazione con il server', 'error');
+            });
+
         });
         
         // Brevo connectivity test handler (same functionality, using existing structure)

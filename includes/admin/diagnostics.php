@@ -600,6 +600,7 @@ function hic_format_bookings_as_csv($bookings) {
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_download_latest_bookings', 'hic_ajax_download_latest_bookings');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_reset_download_tracking', 'hic_ajax_reset_download_tracking');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_force_polling', 'hic_ajax_force_polling');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_get_error_log_info', 'hic_ajax_get_error_log_info');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_download_error_logs', 'hic_ajax_download_error_logs');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_trigger_watchdog', 'hic_ajax_trigger_watchdog');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_reset_timestamps', 'hic_ajax_reset_timestamps');
@@ -1513,6 +1514,29 @@ function hic_diagnostics_page() {
 } // End of hic_diagnostics_page() function
 
 /**
+ * AJAX handler for retrieving error log info
+ */
+function hic_ajax_get_error_log_info() {
+    if ( ! current_user_can('hic_view_logs') ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
+    }
+
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
+    }
+
+    $log_file = hic_get_log_file();
+    $limit    = 5 * 1024 * 1024; // 5 MB limit
+    $size     = file_exists($log_file) ? filesize($log_file) : 0;
+
+    wp_send_json_success( [
+        'size'    => $size,
+        'limit'   => $limit,
+        'limited' => $size > $limit,
+    ] );
+}
+
+/**
  * AJAX handler for downloading error logs
  */
 function hic_ajax_download_error_logs() {
@@ -1534,19 +1558,34 @@ function hic_ajax_download_error_logs() {
     if (!is_readable($log_file)) {
         wp_die(__('File di log non leggibile', 'hotel-in-cloud'));
     }
-    
-    // Set headers for file download
+
+    $limit    = 5 * 1024 * 1024; // 5 MB limit
+    $size     = filesize($log_file);
+    $limited  = $size > $limit;
     $filename = 'hic-error-log-' . wp_date('Y-m-d-H-i-s') . '.txt';
 
     nocache_headers();
     header('Content-Type: text/plain');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Content-Length: ' . filesize($log_file));
     header('Pragma: no-cache');
     header('Expires: 0');
-    
-    // Output the file content
-    readfile($log_file);
+
+    if (!$limited) {
+        header('Content-Length: ' . $size);
+    } else {
+        header('X-HIC-Log-Limited: 1');
+    }
+
+    $handle = fopen($log_file, 'rb');
+    if ($limited) {
+        $offset = $size - $limit;
+        if ($offset > 0) {
+            fseek($handle, $offset);
+        }
+        echo "=== LOG TRONCATO A 5MB ===\n";
+    }
+    fpassthru($handle);
+    fclose($handle);
 
     exit; // Stop execution after download
 }
