@@ -84,7 +84,7 @@ Il plugin invia anche eventi personalizzati a Brevo con le seguenti proprietà:
 | `from_date` | Data | Data di check-in |
 | `to_date` | Data | Data di check-out |
 | `guests` | Numero | Numero di ospiti |
-| `accommodation` | Testo | Nome alloggio |
+| `accommodation_name` | Testo | Nome alloggio |
 | `accommodation_id` | Testo | ID dell'alloggio |
 | `room_id` | Testo | ID della camera |
 | `room_name` | Testo | Nome della camera |
