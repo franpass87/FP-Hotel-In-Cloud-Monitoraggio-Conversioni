@@ -9,6 +9,9 @@ namespace FpHic {
         if (!empty($GLOBALS['simulate_continuous_error'])) {
             return new \WP_Error('poll_error', 'Simulated error');
         }
+        if (!empty($GLOBALS['simulate_continuous_skip'])) {
+            return false;
+        }
         update_option('hic_last_successful_poll', time());
         return true;
     }
@@ -55,6 +58,21 @@ namespace {
 
             $this->assertNotEquals(0, get_option('hic_last_continuous_poll'));
             $this->assertNotEquals(0, get_option('hic_last_successful_poll'));
+        }
+
+        public function test_execute_continuous_polling_skipped_does_not_update_timestamp(): void {
+            $poller = new \HIC_Booking_Poller();
+            $old = time() - 100;
+            $old_success = time() - 50;
+            update_option('hic_last_continuous_poll', $old);
+            update_option('hic_last_successful_poll', $old_success);
+
+            $GLOBALS['simulate_continuous_skip'] = true;
+            $poller->execute_continuous_polling();
+
+            $this->assertSame($old, get_option('hic_last_continuous_poll'));
+            $this->assertSame($old_success, get_option('hic_last_successful_poll'));
+            unset($GLOBALS['simulate_continuous_skip']);
         }
 
         public function test_watchdog_detects_polling_failure(): void {
