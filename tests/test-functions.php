@@ -128,7 +128,11 @@ class HICFunctionsTest {
         assert($res['phone'] === '+441234567890', 'Should normalize foreign phone');
 
         $res = Helpers\hic_detect_phone_language('3331234567');
-        assert($res['language'] === null, 'Should not detect language without prefix');
+        assert($res['language'] === 'it', 'Should detect Italian mobile without prefix');
+        assert($res['phone'] === '3331234567', 'Should keep phone without prefix');
+
+        $res = Helpers\hic_detect_phone_language('031234567');
+        assert($res['language'] === 'it', 'Should detect Italian landline without prefix');
 
         echo "✅ Phone language detection tests passed\n";
     }
