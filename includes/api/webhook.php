@@ -65,6 +65,13 @@ function hic_webhook_handler(WP_REST_Request $request) {
 
   // Decode JSON data
   $data = json_decode($raw, true);
+
+  if (json_last_error() !== JSON_ERROR_NONE) {
+    $error_message = json_last_error_msg();
+    hic_log('Webhook JSON non valido: ' . $error_message);
+    return new WP_Error('invalid_json', 'JSON non valido: ' . $error_message, ['status' => 400]);
+  }
+
   if (!$data || !is_array($data)) {
     hic_log('Webhook senza payload valido');
     return new WP_REST_Response(['error' => 'no valid data'], 400);
