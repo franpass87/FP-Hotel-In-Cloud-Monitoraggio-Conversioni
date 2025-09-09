@@ -478,7 +478,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'from_date' => isset($data['from_date']) ? $data['from_date'] : '',
       'to_date' => isset($data['to_date']) ? $data['to_date'] : '',
       'guests' => isset($data['guests']) ? $data['guests'] : '',
-      'accommodation' => $data['accommodation_name'] ?? '',
+      'accommodation_name' => $data['accommodation_name'] ?? '',
       'accommodation_id' => $data['accommodation_id'] ?? '',
       'room_id' => $data['room_id'] ?? '',
       'room_name' => $data['room_name'] ?? '',

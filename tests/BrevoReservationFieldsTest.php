@@ -54,6 +54,7 @@ final class BrevoReservationFieldsTest extends TestCase {
             'presence' => 1,
             'unpaid_balance' => 50.5,
             'tags' => ['vip', 'promo'],
+            'accommodation_name' => 'Hotel Test',
             'accommodation_id' => 'A1',
             'room_id' => 'R1',
             'room_name' => 'Room 1',
@@ -69,6 +70,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('vip,promo', $payload['properties']['tags']);
         $this->assertSame(1, $payload['properties']['presence']);
         $this->assertSame(50.5, $payload['properties']['unpaid_balance']);
+        $this->assertSame('Hotel Test', $payload['properties']['accommodation_name']);
         $this->assertSame('A1', $payload['properties']['accommodation_id']);
         $this->assertSame('R1', $payload['properties']['room_id']);
         $this->assertSame('Room 1', $payload['properties']['room_name']);
