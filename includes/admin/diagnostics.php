@@ -400,17 +400,74 @@ function hic_get_error_stats() {
         return array('error_count' => 0, 'last_error' => null);
     }
     
-    $lines = file($log_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    // Get last N log lines without loading entire file
+    $has_log_manager = function_exists('hic_get_log_manager');
+    $log_manager = $has_log_manager ? hic_get_log_manager() : null;
+    $lines = array();
+
+    if ($log_manager && method_exists($log_manager, 'get_recent_logs')) {
+        // Use log manager which already reads only the last N lines
+        $entries = $log_manager->get_recent_logs($log_lines_to_check);
+
+        foreach ($entries as $entry) {
+            $lines[] = sprintf(
+                '[%s] [%s] [%s] %s',
+                $entry['timestamp'] ?? '',
+                $entry['level'] ?? '',
+                $entry['memory'] ?? '',
+                $entry['message'] ?? ''
+            );
+        }
+    } else {
+        // Fallback: efficiently read last N lines by reading from end of file in chunks
+        $fp = fopen($log_file, 'rb');
+        if ($fp) {
+            $buffer = '';
+            $lines_found = 0;
+            $pos = -1;
+            $lines = array();
+            fseek($fp, 0, SEEK_END);
+            $filesize = ftell($fp);
+            $chunk_size = 4096;
+            while ($filesize > 0 && $lines_found < $log_lines_to_check) {
+                $read_size = ($filesize >= $chunk_size) ? $chunk_size : $filesize;
+                $filesize -= $read_size;
+                fseek($fp, $filesize, SEEK_SET);
+                $chunk = fread($fp, $read_size);
+                $buffer = $chunk . $buffer;
+                $lines_in_buffer = explode("\n", $buffer);
+                // If not at start of file, the first line may be incomplete
+                if ($filesize > 0) {
+                    $buffer = array_shift($lines_in_buffer);
+                } else {
+                    $buffer = '';
+                }
+                while (!empty($lines_in_buffer)) {
+                    $line = array_pop($lines_in_buffer);
+                    $line = trim($line);
+                    if ($line !== '') {
+                        $lines[] = $line;
+                        $lines_found++;
+                        if ($lines_found >= $log_lines_to_check) {
+                            break 2;
+                        }
+                    }
+                }
+            }
+            fclose($fp);
+        }
+        // $lines already has most recent lines first
+    }
+
     if (!$lines) {
         return array('error_count' => 0, 'last_error' => null);
     }
-    
-    // Count errors in recent lines
-    $recent_lines = array_slice($lines, -$log_lines_to_check);
+
+    // Count errors in last lines (already most recent first)
     $error_count = 0;
     $last_error = null;
-    
-    foreach (array_reverse($recent_lines) as $line) {
+
+    foreach ($lines as $line) {
         if (preg_match('/(error|errore|fallita|failed|HTTP [45]\d\d)/i', $line)) {
             $error_count++;
             if (!$last_error) {
@@ -418,7 +475,7 @@ function hic_get_error_stats() {
             }
         }
     }
-    
+
     return array(
         'error_count' => $error_count,
         'last_error' => $last_error
