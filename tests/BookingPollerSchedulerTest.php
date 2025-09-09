@@ -20,6 +20,10 @@ namespace FpHic {
     }
     function hic_api_poll_bookings_deep_check() {
         $GLOBALS['poll_calls'][] = 'deep';
+        if (!empty($GLOBALS['simulate_deep_error'])) {
+            return new \WP_Error('poll_error', 'Simulated error');
+        }
+        return true;
     }
     function hic_fetch_reservations_raw($prop_id, $mode, $from_date, $to_date, $limit) {
         $GLOBALS['poll_calls'][] = 'fetch';
@@ -36,6 +40,7 @@ namespace {
         protected function setUp(): void {
             $GLOBALS['poll_calls'] = [];
             update_option('hic_last_successful_poll', 0);
+            update_option('hic_last_deep_check', 0);
         }
 
         public function test_execute_continuous_polling_calls_namespaced_function(): void {
@@ -48,6 +53,27 @@ namespace {
             $poller = new \HIC_Booking_Poller();
             $poller->execute_deep_check();
             $this->assertContains('deep', $GLOBALS['poll_calls']);
+        }
+
+        public function test_execute_deep_check_updates_timestamp_on_success(): void {
+            $poller = new \HIC_Booking_Poller();
+            update_option('hic_last_deep_check', 0);
+
+            $poller->execute_deep_check();
+
+            $this->assertNotEquals(0, get_option('hic_last_deep_check'));
+        }
+
+        public function test_execute_deep_check_failure_does_not_update_timestamp(): void {
+            $poller = new \HIC_Booking_Poller();
+            $old = time() - 100;
+            update_option('hic_last_deep_check', $old);
+
+            $GLOBALS['simulate_deep_error'] = true;
+            $poller->execute_deep_check();
+
+            $this->assertSame($old, get_option('hic_last_deep_check'));
+            unset($GLOBALS['simulate_deep_error']);
         }
 
         public function test_execute_continuous_polling_updates_timestamp_on_success(): void {
