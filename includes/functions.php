@@ -85,7 +85,9 @@ function hic_init_helper_hooks() {
         add_filter('wp_privacy_personal_data_erasers', __NAMESPACE__ . '\\hic_register_eraser');
         add_filter('cron_schedules', __NAMESPACE__ . '\\hic_add_failed_request_schedule');
         add_action('init', __NAMESPACE__ . '\\hic_schedule_failed_request_retry');
+        add_action('init', __NAMESPACE__ . '\\hic_schedule_failed_request_cleanup');
         add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
+        add_action('hic_cleanup_failed_requests', __NAMESPACE__ . '\\hic_cleanup_failed_requests');
     }
 }
 
@@ -1333,8 +1335,45 @@ function hic_retry_failed_requests() {
         }
     }
 }
+
+function hic_cleanup_failed_requests($days = 30) {
+    if ($days <= 0) {
+        return 0;
+    }
+
+    global $wpdb;
+    if (!$wpdb) {
+        hic_log('hic_cleanup_failed_requests: wpdb is not available');
+        return false;
+    }
+
+    $table  = $wpdb->prefix . 'hic_failed_requests';
+    $cutoff = gmdate('Y-m-d H:i:s', strtotime("-{$days} days"));
+
+    $deleted = $wpdb->query(
+        $wpdb->prepare(
+            "DELETE FROM $table WHERE last_try < %s",
+            $cutoff
+        )
+    );
+
+    if ($deleted === false) {
+        hic_log('hic_cleanup_failed_requests: Database error: ' . $wpdb->last_error);
+        return false;
+    }
+
+    hic_log("hic_cleanup_failed_requests: Removed $deleted records older than $days days");
+    return $deleted;
+}
+
+function hic_schedule_failed_request_cleanup() {
+    if (!hic_safe_wp_next_scheduled('hic_cleanup_failed_requests')) {
+        hic_safe_wp_schedule_event(time(), 'daily', 'hic_cleanup_failed_requests');
+    }
+}
 // Note: This hook is now registered in hic_init_helper_hooks() function
 // add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
+// add_action('hic_cleanup_failed_requests', __NAMESPACE__ . '\\hic_cleanup_failed_requests');
 
 }
 
