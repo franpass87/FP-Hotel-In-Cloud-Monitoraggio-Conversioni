@@ -711,15 +711,27 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
  * Process a batch of reservations with comprehensive filtering and counting
  */
 function hic_process_reservations_batch($reservations) {
+    $start = microtime(true);
     $new_count = 0;
     $skipped_count = 0;
     $error_count = 0;
-    
+    $remaining_count = 0;
+
     if (!is_array($reservations)) {
-        return array('new' => 0, 'skipped' => 0, 'errors' => 1);
+        return array('new' => 0, 'skipped' => 0, 'errors' => 1, 'remaining' => 0);
     }
-    
-    foreach ($reservations as $reservation) {
+
+    foreach ($reservations as $index => $reservation) {
+        // Stop processing if execution time exceeds 25 seconds
+        if ((microtime(true) - $start) > 25) {
+            $remaining_count = count($reservations) - $index;
+            hic_log("Batch processing time limit reached, $remaining_count reservations remaining");
+            // Schedule immediate retry via WP-Cron
+            if (function_exists('wp_schedule_single_event')) {
+                \wp_schedule_single_event(time() + 5, 'hic_continuous_poll_event');
+            }
+            break;
+        }
         try {
             // Apply minimal filters first
             if (!hic_should_process_reservation_with_email($reservation)) {
@@ -789,8 +801,8 @@ function hic_process_reservations_batch($reservations) {
         }
     }
 
-    hic_log("Batch summary: processed=$new_count, skipped=$skipped_count, failed=$error_count");
-    return array('new' => $new_count, 'skipped' => $skipped_count, 'errors' => $error_count);
+    hic_log("Batch summary: processed=$new_count, skipped=$skipped_count, failed=$error_count, remaining=$remaining_count");
+    return array('new' => $new_count, 'skipped' => $skipped_count, 'errors' => $error_count, 'remaining' => $remaining_count);
 }
 
 /**
