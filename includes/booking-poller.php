@@ -536,27 +536,63 @@ class HIC_Booking_Poller {
      * Fallback deep check implementation
      */
     private function fallback_deep_check() {
+        $start_time = microtime(true);
         $prop_id = \FpHic\Helpers\hic_get_property_id();
         if (empty($prop_id)) {
             hic_log("Deep check: No property ID configured");
             return;
         }
-        
+
         $lookback_seconds = HIC_DEEP_CHECK_LOOKBACK_DAYS * DAY_IN_SECONDS;
         $current_time = time();
         $from_date = wp_date('Y-m-d', $current_time - $lookback_seconds);
         $to_date = wp_date('Y-m-d', $current_time);
-        
+
         hic_log("Deep check: Searching for reservations from $from_date to $to_date (property: $prop_id)");
-        
+
+        $total_new = 0;
+        $total_skipped = 0;
+        $total_errors = 0;
+
         // Check by check-in date to catch manual bookings and any missed ones
         if (function_exists('\\FpHic\\hic_fetch_reservations_raw')) {
             $reservations = \FpHic\hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, 200);
             if (!is_wp_error($reservations) && is_array($reservations)) {
                 $count = count($reservations);
                 hic_log("Deep check: Found $count reservations in " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback period");
+
+                if ($count > 0 && function_exists('hic_process_reservations_batch')) {
+                    $process_result = hic_process_reservations_batch($reservations);
+                    $total_new += $process_result['new'];
+                    $total_skipped += $process_result['skipped'];
+                    $total_errors += $process_result['errors'];
+                }
+            } else {
+                $error_message = is_wp_error($reservations) ? $reservations->get_error_message() : 'Unknown error';
+                hic_log("Deep check: Error fetching reservations: $error_message", HIC_LOG_LEVEL_ERROR);
+                $total_errors++;
             }
         }
+
+        $execution_time = round((microtime(true) - $start_time) * 1000, 2);
+
+        update_option('hic_last_deep_check_count', $total_new, false);
+        \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check_count');
+        update_option('hic_last_deep_check_duration', $execution_time, false);
+        \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check_duration');
+
+        if ($total_errors === 0) {
+            update_option('hic_last_successful_deep_check', $current_time, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_last_successful_deep_check');
+        }
+
+        hic_log("Deep check: Completed fallback in {$execution_time}ms - Window: $from_date to $to_date, New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
+
+        return array(
+            'new' => $total_new,
+            'skipped' => $total_skipped,
+            'errors' => $total_errors,
+        );
     }
     /**
      * Check if polling should be active based on configuration
