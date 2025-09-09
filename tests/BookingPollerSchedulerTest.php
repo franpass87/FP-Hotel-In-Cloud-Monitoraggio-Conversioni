@@ -6,6 +6,10 @@ namespace FpHic {
     }
     function hic_api_poll_bookings_continuous() {
         $GLOBALS['poll_calls'][] = 'continuous';
+        if (!empty($GLOBALS['simulate_continuous_error'])) {
+            return new \WP_Error('poll_error', 'Simulated error');
+        }
+        return true;
     }
     function hic_api_poll_bookings() {
         $GLOBALS['poll_calls'][] = 'fallback';
@@ -39,6 +43,33 @@ namespace {
             $poller = new \HIC_Booking_Poller();
             $poller->execute_deep_check();
             $this->assertContains('deep', $GLOBALS['poll_calls']);
+        }
+
+        public function test_execute_continuous_polling_updates_timestamp_on_success(): void {
+            $poller = new \HIC_Booking_Poller();
+            update_option('hic_last_continuous_poll', 0);
+
+            $poller->execute_continuous_polling();
+
+            $this->assertNotEquals(0, get_option('hic_last_continuous_poll'));
+        }
+
+        public function test_watchdog_detects_polling_failure(): void {
+            $poller = new \HIC_Booking_Poller();
+            $old = time() - (HIC_WATCHDOG_THRESHOLD + 10);
+            update_option('hic_last_continuous_poll', $old);
+
+            $GLOBALS['simulate_continuous_error'] = true;
+            $poller->execute_continuous_polling();
+            $this->assertSame($old, get_option('hic_last_continuous_poll'));
+
+            $poller->run_watchdog_check();
+            $continuous = array_filter(
+                $GLOBALS['poll_calls'],
+                function ($call) { return $call === 'continuous'; }
+            );
+            $this->assertCount(2, $continuous);
+            unset($GLOBALS['simulate_continuous_error']);
         }
     }
 }
