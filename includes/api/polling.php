@@ -825,7 +825,7 @@ function hic_api_poll_updates(){
     hic_log('Internal Scheduler: hic_api_poll_updates execution started');
     
     // Always update execution timestamp regardless of results
-    update_option('hic_last_api_poll', current_time('timestamp'), false);
+    update_option('hic_last_api_poll', time(), false);
     Helpers\hic_clear_option_cache('hic_last_api_poll');
     
     $prop = Helpers\hic_get_property_id();
