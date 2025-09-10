@@ -55,23 +55,48 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // Assicura un SID anche per traffico non-ads
   var sid = getCookie('hic_sid');
-  if (!sid) { 
-    sid = uuidv4(); 
+  if (!sid) {
+    sid = uuidv4();
     if (sid && !setCookie('hic_sid', sid, 90)) {
       console.warn('HIC: Failed to set SID cookie');
     }
   }
 
+  // Capture gclid/fbclid from URL and persist in cookies for redirect preservation
+  safeExecute(function() {
+    var params = new URLSearchParams(window.location.search);
+    ['gclid', 'fbclid'].forEach(function(key) {
+      var val = params.get(key);
+      if (val && isValidTrackingId(val)) {
+        setCookie('hic_' + key, val, 90);
+      }
+    });
+  }, 'captureTrackingParams');
+
   // Helper function to validate SID format (enhanced validation)
   function isValidSid(sid) {
     try {
-      return sid && 
-             typeof sid === 'string' && 
-             sid.length > 8 && 
+      return sid &&
+             typeof sid === 'string' &&
+             sid.length > 8 &&
              sid.length < 256 &&
              /^[a-zA-Z0-9_-]+$/.test(sid); // Only allow safe characters
     } catch(e) {
       console.warn('HIC: SID validation error:', e);
+      return false;
+    }
+  }
+
+  // Generic validation for tracking IDs like gclid/fbclid
+  function isValidTrackingId(val) {
+    try {
+      return val &&
+             typeof val === 'string' &&
+             val.length > 0 &&
+             val.length < 256 &&
+             /^[A-Za-z0-9_-]+$/.test(val);
+    } catch(e) {
+      console.warn('HIC: tracking ID validation error:', e);
       return false;
     }
   }
@@ -86,31 +111,35 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }
 
-  // Helper function to add SID to a link on click
+  // Helper function to add SID and tracking IDs to a link on click
   function addSidToLink(link) {
     if (!link || typeof link.addEventListener !== 'function') {
       console.warn('HIC: Invalid link element provided to addSidToLink');
       return;
     }
-    
+
     link.addEventListener('click', function(){
       safeExecute(function() {
         var s = getCookie('hic_sid');
+        var g = getCookie('hic_gclid');
+        var f = getCookie('hic_fbclid');
         if (s && isValidSid(s)) {
           if (!link.href || !isValidUrl(link.href)) {
             console.warn('HIC: Invalid link URL:', link.href);
             return;
           }
-          
+
           var url = new URL(link.href);
           url.searchParams.set('sid', s);
+          if (g && isValidTrackingId(g)) url.searchParams.set('gclid', g);
+          if (f && isValidTrackingId(f)) url.searchParams.set('fbclid', f);
           link.href = url.toString();
         }
       }, 'addSidToLink');
     });
   }
 
-  // Funzione per appendere SID ai link
+  // Funzione per appendere SID e tracking IDs ai link
   function appendSidToLinks() {
     safeExecute(function() {
       var links = document.querySelectorAll('a.js-book, a[href*="booking.hotelincloud.com"]');
@@ -122,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }, 'appendSidToLinks');
   }
 
-  // Appendi sid ai link nel documento principale
+  // Appendi sid e tracking IDs ai link nel documento principale
   appendSidToLinks();
 
   // Supporto per iframe - monitora per nuovi link aggiunti dinamicamente
