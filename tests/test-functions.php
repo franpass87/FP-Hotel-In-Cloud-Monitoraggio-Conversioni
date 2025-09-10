@@ -182,6 +182,17 @@ class HICFunctionsTest {
         assert($payload['attributes']['FIRSTNAME'] === 'Mario', 'Guest first name should map to FIRSTNAME');
         assert($payload['attributes']['LASTNAME'] === 'Rossi', 'Guest last name should map to LASTNAME');
 
+        // Contact with phone only should populate WHATSAPP
+        $hic_last_request = null;
+        \FpHic\hic_send_brevo_contact([
+            'email' => 'onlyphone@example.com',
+            'phone' => '+39 3331234567',
+            'lingua' => 'en'
+        ], '', '');
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        assert($payload['attributes']['PHONE'] === '+393331234567', 'Phone should be normalized');
+        assert($payload['attributes']['WHATSAPP'] === '+393331234567', 'WhatsApp should fall back to phone');
+
         // Contact with foreign phone
         $hic_last_request = null;
         \FpHic\hic_send_brevo_contact([

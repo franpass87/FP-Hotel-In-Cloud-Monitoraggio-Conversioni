@@ -23,11 +23,14 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
   $phone_data = Helpers\hic_detect_phone_language($data['phone'] ?? ($data['whatsapp'] ?? ''));
   if (!empty($phone_data['phone'])) {
     if (isset($data['phone'])) { $data['phone'] = $phone_data['phone']; }
-    if (isset($data['whatsapp'])) { $data['whatsapp'] = $phone_data['phone']; }
+    if (empty($data['whatsapp'])) { $data['whatsapp'] = $phone_data['phone']; }
   }
   if (!empty($phone_data['language'])) {
     $lang = $phone_data['language'];
   }
+
+  // Normalized phone value for attributes
+  $normalized_phone = $data['phone'] ?? ($data['whatsapp'] ?? '');
 
   $list_ids = array();
   if (strtolower($lang) === 'it') {
@@ -44,7 +47,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
     'attributes' => array(
       'FIRSTNAME' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
       'LASTNAME'  => isset($data['guest_last_name']) ? $data['guest_last_name'] : '',
-      'PHONE'     => $data['phone'] ?? '',
+      'PHONE'     => $normalized_phone,
       'RESVID'    => isset($data['reservation_id']) ? $data['reservation_id'] : (isset($data['id']) ? $data['id'] : ''),
       'GCLID'     => isset($gclid) ? $gclid : '',
       'FBCLID'    => isset($fbclid) ? $fbclid : '',
@@ -53,7 +56,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
       'DATE'      => isset($data['date']) ? $data['date'] : wp_date('Y-m-d'),
       'AMOUNT'    => isset($data['amount']) ? Helpers\hic_normalize_price($data['amount']) : 0,
       'CURRENCY'  => isset($data['currency']) ? $data['currency'] : 'EUR',
-      'WHATSAPP'  => isset($data['whatsapp']) ? $data['whatsapp'] : '',
+      'WHATSAPP'  => $normalized_phone,
       'LANGUAGE'  => $lang,
       // Legacy alias for LANGUAGE
       'LINGUA'    => $lang
