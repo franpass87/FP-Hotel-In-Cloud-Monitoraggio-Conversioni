@@ -9,12 +9,27 @@ namespace FpHic;
 if (!defined('ABSPATH')) exit;
 
 // Funzione comune per processare i dati di prenotazione (sia webhook che API)
-function hic_process_booking_data($data) {
-  // Validate input data
-  if (!is_array($data)) {
-    hic_log('hic_process_booking_data: dati non validi (non array)');
-    return false;
-  }
+/**
+ * Process booking data by sending tracking events to configured integrations.
+ *
+ * Expected keys in the $data array:
+ * - "email"   (string) Cliente associato alla prenotazione (obbligatorio).
+ * - "sid"     (string|null) Session identifier per recuperare i tracciamenti.
+ * - "amount"  (int|float|string|null) Importo della prenotazione.
+ * - "status"  (string|null) Stato della prenotazione usato per determinare i rimborsi.
+ * - "presence" (string|null) Campo alternativo allo stato proveniente dall'API.
+ *
+ * @param array{
+ *   email: string,
+ *   sid?: string|null,
+ *   amount?: int|float|string|null,
+ *   status?: string|null,
+ *   presence?: string|null
+ * } $data Dati della prenotazione da processare.
+ *
+ * @return bool True se la prenotazione è stata processata con successo, false in caso contrario.
+ */
+function hic_process_booking_data(array $data): bool {
 
   // Validate required fields
   $required_fields = ['email'];

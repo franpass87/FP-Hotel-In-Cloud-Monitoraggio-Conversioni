@@ -107,9 +107,9 @@ function hic_webhook_handler(WP_REST_Request $request) {
   try {
     // Process booking data with error handling
     $result = hic_process_booking_data($data);
-    
+
     // Mark reservation as processed if successful
-    if ($result !== false && !empty($reservation_id)) {
+    if ($result && !empty($reservation_id)) {
       hic_mark_reservation_processed_by_id($reservation_id);
     }
     
@@ -117,7 +117,7 @@ function hic_webhook_handler(WP_REST_Request $request) {
     update_option('hic_last_webhook_processing', current_time('mysql'), false);
     hic_clear_option_cache('hic_last_webhook_processing');
     
-    if ($result === false) {
+    if (!$result) {
       hic_log('Webhook: elaborazione fallita per dati ricevuti');
       return new WP_REST_Response(['error'=>'processing failed'], 500);
     }
