@@ -142,7 +142,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $payload = json_decode($hic_last_request['args']['body'], true);
         $this->assertSame('+393331234567', $payload['attributes']['PHONE']);
         $this->assertSame('+393331234567', $payload['attributes']['WHATSAPP']);
-        $this->assertSame('it', $payload['attributes']['LANGUAGE']);
+        $this->assertSame('en', $payload['attributes']['LANGUAGE']);
     }
 
     public function testReservationCreatedEventHandlesEmptyTags() {
