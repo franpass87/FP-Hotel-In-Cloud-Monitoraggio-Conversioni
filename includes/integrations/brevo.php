@@ -255,6 +255,10 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     $language = $phone_data['language'];
   }
 
+  if (!empty($data['phone']) && empty($data['whatsapp'])) {
+    $data['whatsapp'] = $data['phone'];
+  }
+
   $list_ids = array();
   
   if ($is_alias) {
@@ -321,7 +325,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'DATE' => isset($data['from_date']) ? $data['from_date'] : wp_date('Y-m-d'),
     'AMOUNT' => isset($data['original_price']) ? Helpers\hic_normalize_price($data['original_price']) : 0,
     'CURRENCY' => isset($data['currency']) ? $data['currency'] : 'EUR',
-    'WHATSAPP' => isset($data['whatsapp']) ? $data['whatsapp'] : '',
+    'WHATSAPP' => $data['whatsapp'] ?? '',
     'LINGUA' => $language
   );
 
