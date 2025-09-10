@@ -280,7 +280,7 @@ if (defined('WP_CLI') && WP_CLI) {
             WP_CLI::log('Resending reservation ' . $reservation_id . '...');
             $result = \FpHic\hic_process_booking_data($data);
 
-            if ($result !== false) {
+            if ($result) {
                 WP_CLI::success('Reservation resent successfully');
             } else {
                 WP_CLI::error('Failed to resend reservation');
