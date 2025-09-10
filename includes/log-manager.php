@@ -8,23 +8,28 @@
 if (!defined('ABSPATH')) exit;
 
 class HIC_Log_Manager {
-    
-    private $log_file;
-    private $max_size;
-    private $retention_days;
-    private $log_level;
-    
+
+    private string $log_file;
+    private int $max_size;
+    private int $retention_days;
+    private string $log_level;
+
     public function __construct() {
+        // Initialize defaults
+        $this->log_file = '';
+        $this->max_size = (int) HIC_LOG_MAX_SIZE;
+        $this->retention_days = (int) HIC_LOG_RETENTION_DAYS;
+        $this->log_level = (string) HIC_LOG_LEVEL_INFO;
+
         // Ensure WordPress functions are available
         if (!function_exists('hic_get_log_file')) {
             return;
         }
-        
-        $this->log_file = hic_get_log_file();
-        $this->max_size = HIC_LOG_MAX_SIZE;
-        $this->retention_days = apply_filters( 'hic_log_retention_days', HIC_LOG_RETENTION_DAYS );
-        $this->log_level = function_exists('hic_get_option') ? hic_get_option('log_level', HIC_LOG_LEVEL_INFO) : HIC_LOG_LEVEL_INFO;
-        
+
+        $this->log_file = (string) hic_get_log_file();
+        $this->retention_days = (int) (function_exists('apply_filters') ? apply_filters('hic_log_retention_days', HIC_LOG_RETENTION_DAYS) : HIC_LOG_RETENTION_DAYS);
+        $this->log_level = function_exists('hic_get_option') ? (string) hic_get_option('log_level', HIC_LOG_LEVEL_INFO) : (string) HIC_LOG_LEVEL_INFO;
+
         // Hook into WordPress shutdown to clean up logs (only if add_action exists)
         if (function_exists('add_action')) {
             add_action('shutdown', [$this, 'cleanup_old_logs']);
