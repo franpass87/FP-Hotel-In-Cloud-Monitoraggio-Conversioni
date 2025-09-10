@@ -115,7 +115,11 @@ if (function_exists('add_filter')) {
 }
 
 function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
-    $log_manager = function_exists('\\hic_get_log_manager') ? \hic_get_log_manager() : null;
+    static $log_manager = null;
+
+    if (null === $log_manager && function_exists('\\hic_get_log_manager')) {
+        $log_manager = \hic_get_log_manager();
+    }
 
     if ($log_manager) {
         return $log_manager->log($msg, $level, $context);
