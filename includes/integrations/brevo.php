@@ -251,7 +251,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
       $data['whatsapp'] = $phone_data['phone'];
     }
   }
-  if (!empty($phone_data['language'])) {
+  if (!empty($phone_data['language']) && (!empty($data['whatsapp']) || empty($language))) {
     $language = $phone_data['language'];
   }
 

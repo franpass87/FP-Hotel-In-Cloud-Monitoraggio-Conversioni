@@ -10,6 +10,9 @@
         "files": [
             "includes/constants.php",
             "includes/functions.php",
+            "includes/helpers-logging.php",
+            "includes/helpers-tracking.php",
+            "includes/helpers-scheduling.php",
             "includes/database.php"
         ]
     },
