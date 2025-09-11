@@ -15,23 +15,23 @@
 
 ### Q: Funziona tramite un sistema interno di scheduling?
 
-**R**: **Sì, esatto!** Il plugin include un sistema di scheduling interno dual-mode (`HIC_Booking_Poller`) che:
+**R**: **Sì, esatto!** Il plugin include un sistema di scheduling interno ottimizzato (`HIC_Booking_Poller`) che:
 
 - ⏰ **Polling continuo ogni 30 secondi** per prenotazioni recenti e manuali (quasi real-time)
-- 🔍 **Deep check ogni 10 minuti** con lookback di 5 giorni per recuperare prenotazioni perse
+- 🚀 **Deep check disabilitato** - il polling continuo ogni 30 secondi è sufficiente per la copertura totale
 - 🔒 **Non dipende da WordPress cron** (più affidabile)
 - 🛡️ **Ha protezioni anti-overlap** (lock e watchdog)
 - 📋 **Cattura TUTTE le prenotazioni** (online + manuali dello staff)
-- 🚀 **È completamente automatico** una volta configurato
+- 🎯 **È completamente automatico** una volta configurato
 
 ### Q: Quanto tempo ci vuole dall'arrivo della prenotazione all'invio?
 
 **R**: 
 - **Prenotazioni recenti**: 30-60 secondi (polling continuo ogni 30 secondi - quasi real-time)
 - **Prenotazioni manuali**: 30-60 secondi (rilevate dal polling continuo)
-- **Controllo di sicurezza**: Ogni 10 minuti il sistema fa un deep check degli ultimi 5 giorni
+- **Copertura totale**: Il polling ogni 30 secondi garantisce che nessuna prenotazione venga persa
 
-Il sistema **dual-mode è sempre attivo** e garantisce che nessuna prenotazione venga persa.
+Il sistema di **polling ottimizzato è sempre attivo** e fornisce copertura completa con latenza minima.
 
 ## Configurazione
 
