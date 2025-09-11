@@ -103,7 +103,7 @@ function hic_get_internal_scheduler_status() {
                 'wp_cron_disabled' => $wp_cron_disabled,
                 'current_time' => time(),
                 'continuous_overdue' => $continuous_next && $continuous_next < (time() - 120),
-                'deep_overdue' => $deep_next && $deep_next < (time() - 720)
+                'deep_overdue' => $deep_next && $deep_next < (time() - 2100) // 35 minutes
             );
             
             // Calculate next run estimates for both continuous and deep check

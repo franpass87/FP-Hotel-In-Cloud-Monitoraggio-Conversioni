@@ -68,7 +68,7 @@ Access Token: [token di accesso CAPI]
 Il nuovo sistema è **già ottimizzato** e non richiede configurazioni aggiuntive:
 
 - ✅ **Polling Continuo**: Ogni minuto controlla prenotazioni recenti e manuali
-- ✅ **Deep Check**: Ogni 10 minuti controlla indietro 5 giorni per recuperare eventuali prenotazioni perse  
+- ✅ **Deep Check**: Ogni 30 minuti controlla le ultime 5 prenotazioni per verificare che nulla venga perso  
 - ✅ **Non dipende da WP-Cron**: Utilizza WordPress Heartbeat API (più affidabile)
 - ✅ **Cattura prenotazioni manuali**: Include automaticamente le prenotazioni inserite manualmente dallo staff
 
@@ -163,7 +163,7 @@ Il nuovo sistema è **già ottimizzato** e non richiede configurazioni aggiuntiv
 Controlla periodicamente in **HIC Diagnostics**:
 - ✅ "Sistema Polling Interno: Attivo" 
 - ✅ "Polling Continuo: < 2 minuti fa"
-- ✅ "Deep Check: < 15 minuti fa"
+- ✅ "Deep Check: < 35 minuti fa"
 - ✅ Nessun errore nei log recenti
 
 ### Metriche Chiave
@@ -172,4 +172,4 @@ Controlla periodicamente in **HIC Diagnostics**:
 - **Contatti Brevo**: Nuovi contatti/aggiornamenti
 - **Attribution**: Bucket gads/fbads/organic corretto
 
-Il sistema dual-mode funziona **automaticamente** e rileva ogni prenotazione HIC (incluse quelle manuali) entro 1-2 minuti, con deep check ogni 10 minuti per garantire che nulla venga perso.
+Il sistema dual-mode funziona **automaticamente** e rileva ogni prenotazione HIC (incluse quelle manuali) entro 1-2 minuti, con deep check ogni 30 minuti che verifica le ultime 5 prenotazioni per garantire che nulla venga perso.
