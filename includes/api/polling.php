@@ -1696,15 +1696,15 @@ function hic_api_poll_bookings_continuous() {
 }
 
 /**
- * Deep check polling function - runs every 10 minutes
+ * Deep check polling function - runs every 30 minutes
  * Looks back 5 days to catch any missed reservations
  */
 function hic_api_poll_bookings_deep_check() {
     $start_time = microtime(true);
-    hic_log('Deep Check: Starting 10-minute interval deep check (5-day lookback)');
+    hic_log('Deep Check: Starting 30-minute interval deep check (5-day lookback)');
     
     // Try to acquire lock to prevent overlapping executions
-    if (!Helpers\hic_acquire_polling_lock(600)) { // 10-minute timeout for deep check
+    if (!Helpers\hic_acquire_polling_lock(1800)) { // 30-minute timeout for deep check
         hic_log('Deep Check: Another polling process is running, skipping execution');
         return;
     }
