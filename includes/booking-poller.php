@@ -18,13 +18,15 @@ class HIC_Booking_Poller {
         
         // WP-Cron system for reliable 24/7 operation
         add_action('hic_continuous_poll_event', array($this, 'execute_continuous_polling'));
-        add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
+        // Deep check disabled - continuous 30s polling is sufficient for near real-time monitoring
+        // add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
         add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
         add_action('hic_cleanup_event', 'hic_cleanup_old_gclids');
         add_action('hic_booking_events_cleanup', 'hic_cleanup_booking_events');
         
-        // Initialize scheduler on activation
+        // ENHANCED: Multiple scheduler activation points for better reliability
         add_action('init', array($this, 'ensure_scheduler_is_active'), 20);
+        add_action('wp', array($this, 'proactive_scheduler_check'), 5); // Runs on frontend AND backend
         
         // Add immediate check when admin page is loaded
         add_action('admin_init', array($this, 'admin_watchdog_check'));
@@ -40,6 +42,7 @@ class HIC_Booking_Poller {
     
     /**
      * Ensure the scheduler is active - uses WP-Cron system
+     * Enhanced to detect and recover from dormant states
      */
     public function ensure_scheduler_is_active() {
         if (!$this->should_poll()) {
@@ -49,40 +52,47 @@ class HIC_Booking_Poller {
             return;
         }
         
+        $current_time = time();
+        $last_continuous = get_option('hic_last_continuous_poll', 0);
+        
+        // ENHANCED: Check for dormancy indicators (deep check disabled - using continuous only)
+        $polling_lag = $current_time - $last_continuous;
+        $dormancy_threshold = 3600; // 1 hour indicates potential dormancy
+        
+        $is_dormant = ($polling_lag > $dormancy_threshold);
+        
+        if ($is_dormant) {
+            hic_log("Scheduler: Detected dormant scheduler (polling lag: {$polling_lag}s) - forcing complete restart");
+            // Clear all events and reschedule fresh
+            $this->clear_all_scheduled_events();
+            // Add a small delay to ensure cleanup completes
+            sleep(1);
+        }
+        
         // Check and schedule continuous polling event
         $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         if (!$continuous_next) {
             $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             if ($scheduled) {
-                hic_log('WP-Cron Scheduler: Scheduled continuous polling every minute');
+                hic_log('WP-Cron Scheduler: Scheduled continuous polling every 30 seconds (near real-time) - Deep check disabled');
             } else {
                 hic_log('WP-Cron Scheduler: FAILED to schedule continuous polling event');
             }
         } else {
-            // Check if event is overdue (more than 2 minutes in the past)
-            if ($continuous_next < (time() - 120)) {
+            // ENHANCED: Be more aggressive about rescheduling overdue events
+            $overdue_threshold = $is_dormant ? 60 : 120; // 1 minute if dormant, 2 minutes normally
+            if ($continuous_next < (time() - $overdue_threshold)) {
                 hic_log('WP-Cron Scheduler: Continuous polling event is overdue, rescheduling');
                 \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
                 \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             }
         }
         
-        // Check and schedule deep check event
-        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
-        if (!$deep_next) {
-            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
-            if ($scheduled) {
-                hic_log('WP-Cron Scheduler: Scheduled deep check every 10 minutes');
-            } else {
-                hic_log('WP-Cron Scheduler: FAILED to schedule deep check event');
-            }
-        } else {
-            // Check if event is overdue (more than 12 minutes in the past)
-            if ($deep_next < (time() - 720)) {
-                hic_log('WP-Cron Scheduler: Deep check event is overdue, rescheduling');
-                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
-                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
-            }
+        // Deep check disabled - 30-second continuous polling provides sufficient coverage
+        // Clear any existing deep check events
+        if (\FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event')) {
+            hic_log('WP-Cron Scheduler: Clearing existing deep check events (disabled for optimization)');
+            \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
         }
 
         // Schedule daily cleanup event
@@ -117,12 +127,15 @@ class HIC_Booking_Poller {
     public function add_custom_cron_intervals($schedules) {
         $schedules['hic_every_minute'] = array(
             'interval' => HIC_CONTINUOUS_POLLING_INTERVAL,
-            'display' => 'Every Minute (HIC Continuous Polling)'
+            'display' => 'Every 30 Seconds (HIC Near Real-Time Polling)'
         );
+        // Deep check interval removed - feature disabled for optimization
+        /*
         $schedules['hic_every_ten_minutes'] = array(
             'interval' => HIC_DEEP_CHECK_INTERVAL,
             'display' => 'Every 10 Minutes (HIC Deep Check)'
         );
+        */
         return $schedules;
     }
     
@@ -131,10 +144,10 @@ class HIC_Booking_Poller {
      */
     public function clear_all_scheduled_events() {
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event'); // Clear deep check even though disabled
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_cleanup_event');
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_booking_events_cleanup');
-        hic_log('WP-Cron Scheduler: Cleared all scheduled events');
+        hic_log('WP-Cron Scheduler: Cleared all scheduled events (deep check disabled)');
     }
     
     /**
@@ -147,19 +160,17 @@ class HIC_Booking_Poller {
             return false;
         }
         
-        // Check if events are scheduled
+        // Check if events are scheduled (deep check excluded - disabled for optimization)
         $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
-        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
 
-        $is_working = ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false);
+        $is_working = ($continuous_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false);
 
         if (!$is_working) {
             $debug_info = sprintf(
-                'WP-Cron events check: continuous=%s, deep=%s, cleanup=%s, booking_cleanup=%s',
+                'WP-Cron events check: continuous=%s, cleanup=%s, booking_cleanup=%s (deep check disabled)',
                 $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
-                $deep_next ? wp_date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
                 $cleanup_next ? wp_date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
                 $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED'
             );
@@ -174,7 +185,6 @@ class HIC_Booking_Poller {
      */
     private function log_scheduler_status() {
         $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
-        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
 
@@ -186,9 +196,8 @@ class HIC_Booking_Poller {
         $has_auth = \FpHic\Helpers\hic_has_basic_auth_credentials();
 
         $status_msg = sprintf(
-            'WP-Cron Status: Continuous next=%s, Deep next=%s, Cleanup next=%s, Booking cleanup next=%s, WP-Cron disabled=%s, Should poll=%s (reliable=%s, type=%s, url=%s, auth=%s)',
+            'WP-Cron Status: Continuous next=%s, Cleanup next=%s, Booking cleanup next=%s, WP-Cron disabled=%s, Should poll=%s (reliable=%s, type=%s, url=%s, auth=%s) - Deep check DISABLED for optimization',
             $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
-            $deep_next ? wp_date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
             $cleanup_next ? wp_date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
             $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED',
             (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) ? 'YES' : 'NO',
@@ -221,20 +230,13 @@ class HIC_Booking_Poller {
             }
         }
 
-        hic_log("Watchdog: Running check - continuous lag: " . ($current_time - $last_continuous) . "s, deep lag: " . ($current_time - $last_deep) . "s");
+        hic_log("Watchdog: Running check - continuous lag: " . ($current_time - $last_continuous) . "s (deep check disabled for optimization)");
         
-        // Check for continuous polling lag (should run every minute)
+        // Check for continuous polling lag (should run every 30 seconds)
         $continuous_lag = $current_time - $last_continuous;
         if ($continuous_lag > HIC_WATCHDOG_THRESHOLD) {
             hic_log("Watchdog: Continuous polling lag detected ({$continuous_lag}s), attempting recovery");
             $this->recover_from_failure('continuous');
-        }
-        
-        // Check for deep check lag (should run every 10 minutes)  
-        $deep_lag = $current_time - $last_deep;
-        if ($deep_lag > (HIC_DEEP_CHECK_INTERVAL * 2)) {
-            hic_log("Watchdog: Deep check lag detected ({$deep_lag}s), attempting recovery");
-            $this->recover_from_failure('deep');
         }
         
         // Check for completely stuck polling - no successful polls for 1+ hours
@@ -252,10 +254,9 @@ class HIC_Booking_Poller {
         // Additional check: if polling should be active but no events are scheduled
         if ($this->should_poll()) {
             $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
-            $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
             
-            if (!$continuous_next || !$deep_next) {
-                hic_log("Watchdog: Polling should be active but events not scheduled, forcing restart");
+            if (!$continuous_next) {
+                hic_log("Watchdog: Polling should be active but continuous event not scheduled, forcing restart");
                 $this->recover_from_failure('scheduling');
             }
         }
@@ -277,11 +278,9 @@ class HIC_Booking_Poller {
                 break;
                 
             case 'deep':
-                // Force reschedule deep check
-                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
-                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_ten_minutes', 'hic_deep_check_event');
-                // Trigger immediate execution
-                $this->execute_deep_check();
+                // Deep check disabled - redirect to continuous polling recovery
+                hic_log("Recovery: Deep check disabled, redirecting to continuous polling recovery");
+                $this->recover_from_failure('continuous');
                 break;
                 
             case 'scheduling':
@@ -312,7 +311,8 @@ class HIC_Booking_Poller {
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_check');
                 update_option('hic_last_continuous_poll', $recent_timestamp, false);
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
-                update_option('hic_last_deep_check', $recent_timestamp, false);
+                // Deep check timestamps cleared but not updated (feature disabled)
+                delete_option('hic_last_deep_check');
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
                 
                 // Also restart the scheduler to ensure clean state
@@ -320,7 +320,7 @@ class HIC_Booking_Poller {
                 sleep(1);
                 $this->ensure_scheduler_is_active();
                 
-                hic_log("Recovery: All timestamps reset - data timestamps to " . wp_date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . wp_date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restarted");
+                hic_log("Recovery: All timestamps reset - data timestamps to " . wp_date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . wp_date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restarted (deep check disabled)");
                 break;
         }
         
@@ -346,7 +346,7 @@ class HIC_Booking_Poller {
     public function heartbeat_settings($settings) {
         // Only modify heartbeat if we're responsible for polling
         if ($this->should_poll()) {
-            $settings['interval'] = HIC_CONTINUOUS_POLLING_INTERVAL; // Run every minute for watchdog
+            $settings['interval'] = HIC_CONTINUOUS_POLLING_INTERVAL; // Run every 30 seconds for watchdog
         }
         return $settings;
     }
@@ -366,7 +366,7 @@ class HIC_Booking_Poller {
         // Add polling status to heartbeat response for debugging
         $response['hic_polling_status'] = array(
             'last_continuous' => get_option('hic_last_continuous_poll', 0),
-            'last_deep' => get_option('hic_last_deep_check', 0),
+            'deep_check_disabled' => true,
             'wp_cron_working' => $this->is_wp_cron_working(),
             'time' => time()
         );
@@ -405,36 +405,92 @@ class HIC_Booking_Poller {
     
     /**
      * Fallback polling check - triggers on every page load as last resort
+     * Enhanced to be more proactive in restarting dormant schedulers
      */
     public function fallback_polling_check() {
-        // Only run as fallback if polling should be active but WP-Cron isn't working
+        // Only run as fallback if polling should be active
         if (!$this->should_poll()) {
-            return;
-        }
-        
-        // Check if WP-Cron is working - if so, don't interfere
-        if ($this->is_wp_cron_working()) {
             return;
         }
         
         $current_time = time();
         $last_continuous = get_option('hic_last_continuous_poll', 0);
+        $polling_lag = $current_time - $last_continuous;
         
-        // If WP-Cron is not working and polling is severely delayed (>10 minutes), run fallback
-        if ($current_time - $last_continuous > HIC_DEEP_CHECK_INTERVAL) {
-            hic_log("Fallback: WP-Cron not working and polling severely delayed, running fallback polling");
+        // ENHANCED: Be more aggressive about restarting dormant schedulers
+        // If polling hasn't run in over 1 hour (3600 seconds), it's likely dormant regardless of WP-Cron status
+        $dormancy_threshold = 3600; // 1 hour - indicates system has been dormant
+        $critical_threshold = HIC_DEEP_CHECK_INTERVAL; // 10 minutes - WP-Cron definitely not working
+        
+        $should_restart = false;
+        $restart_reason = '';
+        
+        if ($polling_lag > $dormancy_threshold) {
+            $should_restart = true;
+            $restart_reason = "Polling dormant for " . round($polling_lag / 60, 1) . " minutes - likely no recent traffic";
+        } elseif (!$this->is_wp_cron_working() && $polling_lag > $critical_threshold) {
+            $should_restart = true;
+            $restart_reason = "WP-Cron not working and polling delayed for " . round($polling_lag / 60, 1) . " minutes";
+        } elseif ($polling_lag > $critical_threshold) {
+            // Even if WP-Cron appears to be working, if polling is severely delayed, restart it
+            $should_restart = true;
+            $restart_reason = "Polling severely delayed for " . round($polling_lag / 60, 1) . " minutes despite WP-Cron appearing active";
+        }
+        
+        if ($should_restart) {
+            hic_log("Fallback: $restart_reason - attempting scheduler restart");
             
             // Use a transient to prevent multiple simultaneous executions
             $fallback_lock = get_transient('hic_fallback_polling_lock');
             if (!$fallback_lock) {
                 set_transient('hic_fallback_polling_lock', $current_time, 120); // 2-minute lock
                 
-                // Run polling in background (don't block page load)
+                // First try to restart the scheduler
+                $this->ensure_scheduler_is_active();
+                
+                // Then schedule immediate fallback polling
                 wp_schedule_single_event(time() + 5, 'hic_fallback_poll_event');
                 add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
                 
-                hic_log("Fallback: Scheduled fallback polling event");
+                hic_log("Fallback: Restarted scheduler and scheduled immediate fallback polling");
+            } else {
+                hic_log("Fallback: Recovery already in progress (lock active)");
             }
+        }
+    }
+    
+    /**
+     * Proactive scheduler check - runs on all page loads (frontend and backend)
+     * More lightweight than fallback check but ensures scheduler stays active
+     */
+    public function proactive_scheduler_check() {
+        // Only run if polling should be active
+        if (!$this->should_poll()) {
+            return;
+        }
+        
+        // Use a transient to limit how often this check runs (every 5 minutes max)
+        $last_proactive_check = get_transient('hic_last_proactive_check');
+        if ($last_proactive_check) {
+            return; // Don't run too frequently
+        }
+        
+        $current_time = time();
+        $last_continuous = get_option('hic_last_continuous_poll', 0);
+        $polling_lag = $current_time - $last_continuous;
+        
+        // Set the transient to prevent too frequent checks
+        set_transient('hic_last_proactive_check', $current_time, 300); // 5 minutes
+        
+        // If polling hasn't run in 30 minutes, proactively restart scheduler
+        if ($polling_lag > 1800) { // 30 minutes
+            hic_log("Proactive: Polling inactive for " . round($polling_lag / 60, 1) . " minutes - restarting scheduler");
+            $this->ensure_scheduler_is_active();
+        }
+        // If events aren't scheduled at all, restart
+        else if (!$this->is_wp_cron_working()) {
+            hic_log("Proactive: WP-Cron events not properly scheduled - restarting scheduler");
+            $this->ensure_scheduler_is_active();
         }
     }
     
@@ -469,12 +525,12 @@ class HIC_Booking_Poller {
             // Execute continuous polling
             $this->execute_continuous_polling();
             
-            // Also run deep check if it's been a while
-            $current_time = time();
-            $last_deep = get_option('hic_last_deep_check', 0);
-            if ($current_time - $last_deep > 1800) { // 30 minutes
-                $this->execute_deep_check();
-            }
+            // Also run deep check if it's been a while - DISABLED: Deep check removed for optimization
+            // $current_time = time();
+            // $last_deep = get_option('hic_last_deep_check', 0);
+            // if ($current_time - $last_deep > 1800) { // 30 minutes
+            //     $this->execute_deep_check();
+            // }
             
             hic_log("Fallback: Fallback polling completed successfully");
         } catch (Exception $e) {
@@ -483,11 +539,11 @@ class HIC_Booking_Poller {
     }
     
     /**
-     * Execute continuous polling (every minute)
+     * Execute continuous polling (every 30 seconds)
      * Checks for recent reservations and manual bookings
      */
     public function execute_continuous_polling() {
-        hic_log("Scheduler: Executing continuous polling (1-minute interval)");
+        hic_log("Scheduler: Executing continuous polling (30-second interval)");
         $result = false;
         try {
             if (function_exists('\FpHic\hic_api_poll_bookings_continuous')) {
@@ -515,10 +571,16 @@ class HIC_Booking_Poller {
     }
     
     /**
-     * Execute deep check (every 10 minutes)
-     * Looks back HIC_DEEP_CHECK_LOOKBACK_DAYS days to catch any missed reservations
+     * Execute deep check (every 10 minutes) - DISABLED FOR OPTIMIZATION
+     * 30-second continuous polling provides sufficient coverage
+     * Keeping method for potential manual troubleshooting use
      */
     public function execute_deep_check() {
+        hic_log("Deep check: DISABLED - 30-second continuous polling provides sufficient coverage");
+        return array('disabled' => true, 'reason' => '30-second continuous polling sufficient');
+        
+        // Original deep check code preserved but disabled
+        /*
         hic_log("Scheduler: Executing deep check (10-minute interval, " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback)");
         
         $result = null;
@@ -541,6 +603,7 @@ class HIC_Booking_Poller {
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
             }
         }
+        */
     }
     
     /**
@@ -615,7 +678,7 @@ class HIC_Booking_Poller {
     }
     
     /**
-     * Get polling interval in seconds (simplified - always 1 minute for continuous)
+     * Get polling interval in seconds (simplified - always 30 seconds for continuous)
      */
     private function get_polling_interval_seconds() {
         return HIC_CONTINUOUS_POLLING_INTERVAL;
@@ -801,7 +864,6 @@ class HIC_Booking_Poller {
      */
     public function get_stats() {
         $last_continuous = get_option('hic_last_continuous_poll', 0);
-        $last_deep = get_option('hic_last_deep_check', 0);
         $last_general = get_option('hic_last_api_poll', 0);
         
         // Check scheduler type - WP-Cron only now
@@ -829,19 +891,16 @@ class HIC_Booking_Poller {
             'last_poll_human' => $last_general > 0 ? human_time_diff($last_general) . ' fa' : 'Mai',
             'last_continuous_poll' => $last_continuous,
             'last_continuous_human' => $last_continuous > 0 ? human_time_diff($last_continuous) . ' fa' : 'Mai',
-            'last_deep_check' => $last_deep,
-            'last_deep_human' => $last_deep > 0 ? human_time_diff($last_deep) . ' fa' : 'Mai',
+            'deep_check_disabled' => true, // Deep check disabled for optimization
             'lag_seconds' => $last_general > 0 ? time() - $last_general : 0,
             'continuous_lag' => $last_continuous > 0 ? time() - $last_continuous : 0,
-            'deep_lag' => $last_deep > 0 ? time() - $last_deep : 0,
             'polling_active' => $should_poll,
-            'polling_interval' => HIC_CONTINUOUS_POLLING_INTERVAL,
-            'deep_check_interval' => HIC_DEEP_CHECK_INTERVAL
+            'polling_interval' => HIC_CONTINUOUS_POLLING_INTERVAL
         );
         
         // Add WP-Cron specific info (always show for debugging)
         $stats['next_continuous_scheduled'] = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
-        $stats['next_deep_scheduled'] = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        $stats['deep_check_disabled'] = true; // Deep check disabled for optimization
         $stats['wp_cron_disabled'] = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
 
         return $stats;

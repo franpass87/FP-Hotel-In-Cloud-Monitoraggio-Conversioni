@@ -6,7 +6,7 @@
 
 **R**: Quando arriva una prenotazione su Hotel in Cloud, il plugin:
 
-1. **La intercetta automaticamente** usando il sistema di polling interno (ogni 1-5 minuti)
+1. **La intercetta automaticamente** usando il sistema di polling interno (ogni 30 secondi - quasi real-time)
 2. **La processa** validando i dati e recuperando i tracking IDs (gclid, fbclid)
 3. **La invia simultaneamente** a tutte le piattaforme integrate:
    - ✅ **GA4** → Evento `purchase` per analytics
@@ -15,23 +15,23 @@
 
 ### Q: Funziona tramite un sistema interno di scheduling?
 
-**R**: **Sì, esatto!** Il plugin include un sistema di scheduling interno dual-mode (`HIC_Booking_Poller`) che:
+**R**: **Sì, esatto!** Il plugin include un sistema di scheduling interno ottimizzato (`HIC_Booking_Poller`) che:
 
-- ⏰ **Polling continuo ogni minuto** per prenotazioni recenti e manuali
-- 🔍 **Deep check ogni 10 minuti** con lookback di 5 giorni per recuperare prenotazioni perse
+- ⏰ **Polling continuo ogni 30 secondi** per prenotazioni recenti e manuali (quasi real-time)
+- 🚀 **Deep check disabilitato** - il polling continuo ogni 30 secondi è sufficiente per la copertura totale
 - 🔒 **Non dipende da WordPress cron** (più affidabile)
 - 🛡️ **Ha protezioni anti-overlap** (lock e watchdog)
 - 📋 **Cattura TUTTE le prenotazioni** (online + manuali dello staff)
-- 🚀 **È completamente automatico** una volta configurato
+- 🎯 **È completamente automatico** una volta configurato
 
 ### Q: Quanto tempo ci vuole dall'arrivo della prenotazione all'invio?
 
 **R**: 
-- **Prenotazioni recenti**: 1-2 minuti (polling continuo ogni minuto)
-- **Prenotazioni manuali**: 1-2 minuti (rilevate dal polling continuo)
-- **Controllo di sicurezza**: Ogni 10 minuti il sistema fa un deep check degli ultimi 5 giorni
+- **Prenotazioni recenti**: 30-60 secondi (polling continuo ogni 30 secondi - quasi real-time)
+- **Prenotazioni manuali**: 30-60 secondi (rilevate dal polling continuo)
+- **Copertura totale**: Il polling ogni 30 secondi garantisce che nessuna prenotazione venga persa
 
-Il sistema **dual-mode è sempre attivo** e garantisce che nessuna prenotazione venga persa.
+Il sistema di **polling ottimizzato è sempre attivo** e fornisce copertura completa con latenza minima.
 
 ## Configurazione
 
@@ -44,7 +44,7 @@ Il sistema **dual-mode è sempre attivo** e garantisce che nessuna prenotazione 
 | Affidabilità | ✅ Molto alta | ⚠️ Dipende da HIC |
 | Prenotazioni manuali | ✅ Catturate | ❌ Spesso perse |
 | Configurazione | ✅ Solo plugin | ⚠️ Plugin + HIC |
-| Latenza | 1-5 minuti | Tempo reale |
+| Latenza | 30-60 secondi | Tempo reale |
 
 ### Q: Come faccio a sapere se funziona?
 
@@ -235,6 +235,20 @@ Per massima affidabilità:
 1. Usa hosting WordPress stabile
 2. Configura **polling ogni 2-5 minuti** (non ogni minuto se hosting lento)
 3. Monitora i log regolarmente
+
+### Q: Il sistema si riavvia automaticamente se non accedo all'admin per giorni?
+
+**R**: **Sì! Il sistema ha meccanismi di auto-recovery migliorati**:
+
+1. ✅ **Recovery automatico su qualsiasi visita**: Ogni caricamento pagina (frontend o backend) verifica lo stato del polling
+2. ✅ **Rilevamento dormancy intelligente**: Se il polling è inattivo per >1 ora, viene riavviato automaticamente  
+3. ✅ **Fallback multi-livello**: 
+   - Controlli proattivi ogni 5 minuti
+   - Fallback su caricamento pagina se polling fermo >30 minuti
+   - Recovery completo se sistema dormiente >1 ora
+4. ✅ **Non dipende dall'accesso admin**: Funziona con qualsiasi traffico sul sito
+
+**In pratica**: Non è più necessario accedere all'admin per far ripartire il sistema. Qualsiasi visita al sito (anche solo una pagina frontend) riattiva automaticamente il polling se necessario.
 
 ## Supporto Tecnico
 

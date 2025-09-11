@@ -82,7 +82,7 @@ function hic_get_internal_scheduler_status() {
                 'lag_seconds' => $poller_stats['lag_seconds'] ?? 0,
                 'continuous_lag' => $poller_stats['continuous_lag'] ?? 0,
                 'deep_lag' => $poller_stats['deep_lag'] ?? 0,
-                'polling_interval' => $poller_stats['polling_interval'] ?? 60,
+                'polling_interval' => $poller_stats['polling_interval'] ?? 30,
                 'deep_check_interval' => $poller_stats['deep_check_interval'] ?? 600,
                 'wp_cron_working' => $poller_stats['wp_cron_working'] ?? false,
                 'scheduler_type' => $poller_stats['scheduler_type'] ?? 'Unknown',
