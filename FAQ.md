@@ -236,6 +236,20 @@ Per massima affidabilità:
 2. Configura **polling ogni 2-5 minuti** (non ogni minuto se hosting lento)
 3. Monitora i log regolarmente
 
+### Q: Il sistema si riavvia automaticamente se non accedo all'admin per giorni?
+
+**R**: **Sì! Il sistema ha meccanismi di auto-recovery migliorati**:
+
+1. ✅ **Recovery automatico su qualsiasi visita**: Ogni caricamento pagina (frontend o backend) verifica lo stato del polling
+2. ✅ **Rilevamento dormancy intelligente**: Se il polling è inattivo per >1 ora, viene riavviato automaticamente  
+3. ✅ **Fallback multi-livello**: 
+   - Controlli proattivi ogni 5 minuti
+   - Fallback su caricamento pagina se polling fermo >30 minuti
+   - Recovery completo se sistema dormiente >1 ora
+4. ✅ **Non dipende dall'accesso admin**: Funziona con qualsiasi traffico sul sito
+
+**In pratica**: Non è più necessario accedere all'admin per far ripartire il sistema. Qualsiasi visita al sito (anche solo una pagina frontend) riattiva automaticamente il polling se necessario.
+
 ## Supporto Tecnico
 
 ### Q: Dove trovo i log per il supporto?
