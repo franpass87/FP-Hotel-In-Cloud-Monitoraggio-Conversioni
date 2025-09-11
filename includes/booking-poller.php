@@ -75,7 +75,7 @@ class HIC_Booking_Poller {
         if (!$continuous_next) {
             $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             if ($scheduled) {
-                hic_log('WP-Cron Scheduler: Scheduled continuous polling every minute');
+                hic_log('WP-Cron Scheduler: Scheduled continuous polling every 30 seconds (near real-time)');
             } else {
                 hic_log('WP-Cron Scheduler: FAILED to schedule continuous polling event');
             }
@@ -140,7 +140,7 @@ class HIC_Booking_Poller {
     public function add_custom_cron_intervals($schedules) {
         $schedules['hic_every_minute'] = array(
             'interval' => HIC_CONTINUOUS_POLLING_INTERVAL,
-            'display' => 'Every Minute (HIC Continuous Polling)'
+            'display' => 'Every 30 Seconds (HIC Near Real-Time Polling)'
         );
         $schedules['hic_every_ten_minutes'] = array(
             'interval' => HIC_DEEP_CHECK_INTERVAL,
@@ -246,7 +246,7 @@ class HIC_Booking_Poller {
 
         hic_log("Watchdog: Running check - continuous lag: " . ($current_time - $last_continuous) . "s, deep lag: " . ($current_time - $last_deep) . "s");
         
-        // Check for continuous polling lag (should run every minute)
+        // Check for continuous polling lag (should run every 30 seconds)
         $continuous_lag = $current_time - $last_continuous;
         if ($continuous_lag > HIC_WATCHDOG_THRESHOLD) {
             hic_log("Watchdog: Continuous polling lag detected ({$continuous_lag}s), attempting recovery");
@@ -369,7 +369,7 @@ class HIC_Booking_Poller {
     public function heartbeat_settings($settings) {
         // Only modify heartbeat if we're responsible for polling
         if ($this->should_poll()) {
-            $settings['interval'] = HIC_CONTINUOUS_POLLING_INTERVAL; // Run every minute for watchdog
+            $settings['interval'] = HIC_CONTINUOUS_POLLING_INTERVAL; // Run every 30 seconds for watchdog
         }
         return $settings;
     }
@@ -562,11 +562,11 @@ class HIC_Booking_Poller {
     }
     
     /**
-     * Execute continuous polling (every minute)
+     * Execute continuous polling (every 30 seconds)
      * Checks for recent reservations and manual bookings
      */
     public function execute_continuous_polling() {
-        hic_log("Scheduler: Executing continuous polling (1-minute interval)");
+        hic_log("Scheduler: Executing continuous polling (30-second interval)");
         $result = false;
         try {
             if (function_exists('\FpHic\hic_api_poll_bookings_continuous')) {
@@ -694,7 +694,7 @@ class HIC_Booking_Poller {
     }
     
     /**
-     * Get polling interval in seconds (simplified - always 1 minute for continuous)
+     * Get polling interval in seconds (simplified - always 30 seconds for continuous)
      */
     private function get_polling_interval_seconds() {
         return HIC_CONTINUOUS_POLLING_INTERVAL;

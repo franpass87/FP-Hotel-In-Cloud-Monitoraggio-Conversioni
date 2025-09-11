@@ -9,7 +9,7 @@
 if (!defined('ABSPATH')) exit;
 
 // === POLLING INTERVALS ===
-define('HIC_CONTINUOUS_POLLING_INTERVAL', 60);    // 1 minute for continuous polling
+define('HIC_CONTINUOUS_POLLING_INTERVAL', 30);    // 30 seconds for near real-time polling (optimized for limited hosting)
 define('HIC_DEEP_CHECK_INTERVAL', 600);           // 10 minutes for deep check  
 define('HIC_DEEP_CHECK_LOOKBACK_DAYS', 5);        // Look back 5 days in deep check
 define('HIC_WATCHDOG_THRESHOLD', 300);            // 5 minutes threshold

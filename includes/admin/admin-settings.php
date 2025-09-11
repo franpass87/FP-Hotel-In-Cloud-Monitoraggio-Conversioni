@@ -494,7 +494,7 @@ function hic_property_id_render() {
 function hic_polling_interval_render() {
     $interval = \FpHic\Helpers\hic_get_polling_interval();
     echo '<select name="hic_polling_interval">';
-    echo '<option value="every_minute"' . selected($interval, 'every_minute', false) . '>Ogni minuto (quasi real-time)</option>';
+    echo '<option value="every_minute"' . selected($interval, 'every_minute', false) . '>Ogni 30 secondi (quasi real-time)</option>';
     echo '<option value="every_two_minutes"' . selected($interval, 'every_two_minutes', false) . '>Ogni 2 minuti (bilanciato)</option>';
     echo '<option value="hic_poll_interval"' . selected($interval, 'hic_poll_interval', false) . '>Ogni 5 minuti (compatibilità)</option>';
     echo '<option value="hic_reliable_interval"' . selected($interval, 'hic_reliable_interval', false) . '>Ogni 5 minuti (affidabile)</option>';

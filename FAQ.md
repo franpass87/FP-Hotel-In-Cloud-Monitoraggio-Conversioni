@@ -6,7 +6,7 @@
 
 **R**: Quando arriva una prenotazione su Hotel in Cloud, il plugin:
 
-1. **La intercetta automaticamente** usando il sistema di polling interno (ogni 1-5 minuti)
+1. **La intercetta automaticamente** usando il sistema di polling interno (ogni 30 secondi - quasi real-time)
 2. **La processa** validando i dati e recuperando i tracking IDs (gclid, fbclid)
 3. **La invia simultaneamente** a tutte le piattaforme integrate:
    - ✅ **GA4** → Evento `purchase` per analytics
@@ -17,7 +17,7 @@
 
 **R**: **Sì, esatto!** Il plugin include un sistema di scheduling interno dual-mode (`HIC_Booking_Poller`) che:
 
-- ⏰ **Polling continuo ogni minuto** per prenotazioni recenti e manuali
+- ⏰ **Polling continuo ogni 30 secondi** per prenotazioni recenti e manuali (quasi real-time)
 - 🔍 **Deep check ogni 10 minuti** con lookback di 5 giorni per recuperare prenotazioni perse
 - 🔒 **Non dipende da WordPress cron** (più affidabile)
 - 🛡️ **Ha protezioni anti-overlap** (lock e watchdog)
@@ -27,8 +27,8 @@
 ### Q: Quanto tempo ci vuole dall'arrivo della prenotazione all'invio?
 
 **R**: 
-- **Prenotazioni recenti**: 1-2 minuti (polling continuo ogni minuto)
-- **Prenotazioni manuali**: 1-2 minuti (rilevate dal polling continuo)
+- **Prenotazioni recenti**: 30-60 secondi (polling continuo ogni 30 secondi - quasi real-time)
+- **Prenotazioni manuali**: 30-60 secondi (rilevate dal polling continuo)
 - **Controllo di sicurezza**: Ogni 10 minuti il sistema fa un deep check degli ultimi 5 giorni
 
 Il sistema **dual-mode è sempre attivo** e garantisce che nessuna prenotazione venga persa.
@@ -44,7 +44,7 @@ Il sistema **dual-mode è sempre attivo** e garantisce che nessuna prenotazione 
 | Affidabilità | ✅ Molto alta | ⚠️ Dipende da HIC |
 | Prenotazioni manuali | ✅ Catturate | ❌ Spesso perse |
 | Configurazione | ✅ Solo plugin | ⚠️ Plugin + HIC |
-| Latenza | 1-5 minuti | Tempo reale |
+| Latenza | 30-60 secondi | Tempo reale |
 
 ### Q: Come faccio a sapere se funziona?
 

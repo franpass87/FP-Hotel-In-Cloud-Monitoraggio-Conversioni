@@ -1543,12 +1543,12 @@ function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, 
 }
 
 /**
- * Continuous polling function - runs every minute
+ * Continuous polling function - runs every 30 seconds
  * Focuses on recent reservations and manual bookings
  */
 function hic_api_poll_bookings_continuous() {
     $start_time = microtime(true);
-    hic_log('Continuous Polling: Starting 1-minute interval check');
+    hic_log('Continuous Polling: Starting 30-second interval check');
     
     // Try to acquire lock to prevent overlapping executions
     if (!Helpers\hic_acquire_polling_lock(120)) { // 2-minute timeout for continuous polling
