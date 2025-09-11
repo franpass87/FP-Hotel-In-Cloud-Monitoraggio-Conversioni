@@ -18,8 +18,8 @@ class HIC_Booking_Poller {
         
         // WP-Cron system for reliable 24/7 operation
         add_action('hic_continuous_poll_event', array($this, 'execute_continuous_polling'));
-        // Deep check disabled - continuous 30s polling is sufficient for near real-time monitoring
-        // add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
+        // Deep check re-enabled for 30-minute safety checks
+        add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
         add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
         add_action('hic_cleanup_event', 'hic_cleanup_old_gclids');
         add_action('hic_booking_events_cleanup', 'hic_cleanup_booking_events');
@@ -55,7 +55,7 @@ class HIC_Booking_Poller {
         $current_time = time();
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         
-        // ENHANCED: Check for dormancy indicators (deep check disabled - using continuous only)
+        // ENHANCED: Check for dormancy indicators (with re-enabled 30-minute deep check)
         $polling_lag = $current_time - $last_continuous;
         $dormancy_threshold = 3600; // 1 hour indicates potential dormancy
         
@@ -74,7 +74,7 @@ class HIC_Booking_Poller {
         if (!$continuous_next) {
             $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
             if ($scheduled) {
-                hic_log('WP-Cron Scheduler: Scheduled continuous polling every 30 seconds (near real-time) - Deep check disabled');
+                hic_log('WP-Cron Scheduler: Scheduled continuous polling every 30 seconds (near real-time) with 30-minute deep check');
             } else {
                 hic_log('WP-Cron Scheduler: FAILED to schedule continuous polling event');
             }
@@ -88,11 +88,23 @@ class HIC_Booking_Poller {
             }
         }
         
-        // Deep check disabled - 30-second continuous polling provides sufficient coverage
-        // Clear any existing deep check events
-        if (\FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event')) {
-            hic_log('WP-Cron Scheduler: Clearing existing deep check events (disabled for optimization)');
-            \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+        // Deep check re-enabled with 30-minute interval for safety
+        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        if (!$deep_next) {
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_thirty_minutes', 'hic_deep_check_event');
+            if ($scheduled) {
+                hic_log('WP-Cron Scheduler: Scheduled deep check every 30 minutes (re-enabled for safety)');
+            } else {
+                hic_log('WP-Cron Scheduler: FAILED to schedule deep check event');
+            }
+        } else {
+            // Check if existing event is overdue and reschedule if needed
+            $overdue_threshold = $is_dormant ? 1800 : 3600; // 30 minutes if dormant, 1 hour normally
+            if ($deep_next < (time() - $overdue_threshold)) {
+                hic_log('WP-Cron Scheduler: Deep check event is overdue, rescheduling');
+                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_thirty_minutes', 'hic_deep_check_event');
+            }
         }
 
         // Schedule daily cleanup event
@@ -129,13 +141,11 @@ class HIC_Booking_Poller {
             'interval' => HIC_CONTINUOUS_POLLING_INTERVAL,
             'display' => 'Every 30 Seconds (HIC Near Real-Time Polling)'
         );
-        // Deep check interval removed - feature disabled for optimization
-        /*
-        $schedules['hic_every_ten_minutes'] = array(
+        // Deep check interval re-enabled with 30-minute interval
+        $schedules['hic_every_thirty_minutes'] = array(
             'interval' => HIC_DEEP_CHECK_INTERVAL,
-            'display' => 'Every 10 Minutes (HIC Deep Check)'
+            'display' => 'Every 30 Minutes (HIC Deep Check)'
         );
-        */
         return $schedules;
     }
     
@@ -144,10 +154,10 @@ class HIC_Booking_Poller {
      */
     public function clear_all_scheduled_events() {
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event'); // Clear deep check even though disabled
+        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event'); 
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_cleanup_event');
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_booking_events_cleanup');
-        hic_log('WP-Cron Scheduler: Cleared all scheduled events (deep check disabled)');
+        hic_log('WP-Cron Scheduler: Cleared all scheduled events (including re-enabled deep check)');
     }
     
     /**
@@ -160,17 +170,19 @@ class HIC_Booking_Poller {
             return false;
         }
         
-        // Check if events are scheduled (deep check excluded - disabled for optimization)
+        // Check if events are scheduled (including re-enabled deep check)
         $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
 
-        $is_working = ($continuous_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false);
+        $is_working = ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false);
 
         if (!$is_working) {
             $debug_info = sprintf(
-                'WP-Cron events check: continuous=%s, cleanup=%s, booking_cleanup=%s (deep check disabled)',
+                'WP-Cron events check: continuous=%s, deep=%s, cleanup=%s, booking_cleanup=%s',
                 $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
+                $deep_next ? wp_date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
                 $cleanup_next ? wp_date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
                 $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED'
             );
@@ -230,7 +242,7 @@ class HIC_Booking_Poller {
             }
         }
 
-        hic_log("Watchdog: Running check - continuous lag: " . ($current_time - $last_continuous) . "s (deep check disabled for optimization)");
+        hic_log("Watchdog: Running check - continuous lag: " . ($current_time - $last_continuous) . "s (with 30-minute deep check)");
         
         // Check for continuous polling lag (should run every 30 seconds)
         $continuous_lag = $current_time - $last_continuous;
@@ -320,7 +332,7 @@ class HIC_Booking_Poller {
                 sleep(1);
                 $this->ensure_scheduler_is_active();
                 
-                hic_log("Recovery: All timestamps reset - data timestamps to " . wp_date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . wp_date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restarted (deep check disabled)");
+                hic_log("Recovery: All timestamps reset - data timestamps to " . wp_date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . wp_date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restarted with 30-minute deep check");
                 break;
         }
         
@@ -420,7 +432,7 @@ class HIC_Booking_Poller {
         // ENHANCED: Be more aggressive about restarting dormant schedulers
         // If polling hasn't run in over 1 hour (3600 seconds), it's likely dormant regardless of WP-Cron status
         $dormancy_threshold = 3600; // 1 hour - indicates system has been dormant
-        $critical_threshold = HIC_DEEP_CHECK_INTERVAL; // 10 minutes - WP-Cron definitely not working
+        $critical_threshold = HIC_DEEP_CHECK_INTERVAL; // 30 minutes - WP-Cron definitely not working
         
         $should_restart = false;
         $restart_reason = '';
@@ -525,12 +537,12 @@ class HIC_Booking_Poller {
             // Execute continuous polling
             $this->execute_continuous_polling();
             
-            // Also run deep check if it's been a while - DISABLED: Deep check removed for optimization
-            // $current_time = time();
-            // $last_deep = get_option('hic_last_deep_check', 0);
-            // if ($current_time - $last_deep > 1800) { // 30 minutes
-            //     $this->execute_deep_check();
-            // }
+            // Also run deep check if it's been a while - RE-ENABLED for safety
+            $current_time = time();
+            $last_deep = get_option('hic_last_deep_check', 0);
+            if ($current_time - $last_deep > 1800) { // 30 minutes
+                $this->execute_deep_check();
+            }
             
             hic_log("Fallback: Fallback polling completed successfully");
         } catch (Exception $e) {
@@ -571,17 +583,12 @@ class HIC_Booking_Poller {
     }
     
     /**
-     * Execute deep check (every 10 minutes) - DISABLED FOR OPTIMIZATION
-     * 30-second continuous polling provides sufficient coverage
-     * Keeping method for potential manual troubleshooting use
+     * Execute deep check (every 30 minutes) - RE-ENABLED for safety
+     * Focuses on checking the last 5 bookings to ensure none are missed
+     * Runs in addition to continuous polling for comprehensive coverage
      */
     public function execute_deep_check() {
-        hic_log("Deep check: DISABLED - 30-second continuous polling provides sufficient coverage");
-        return array('disabled' => true, 'reason' => '30-second continuous polling sufficient');
-        
-        // Original deep check code preserved but disabled
-        /*
-        hic_log("Scheduler: Executing deep check (10-minute interval, " . HIC_DEEP_CHECK_LOOKBACK_DAYS . "-day lookback)");
+        hic_log("Scheduler: Executing deep check (30-minute interval, focusing on last 5 bookings)");
         
         $result = null;
         $success = false;
@@ -589,8 +596,8 @@ class HIC_Booking_Poller {
             if (function_exists('\\FpHic\\hic_api_poll_bookings_deep_check')) {
                 $result = \FpHic\hic_api_poll_bookings_deep_check();
             } else {
-                // Fallback implementation
-                $result = $this->fallback_deep_check();
+                // Fallback implementation - focus on last 5 bookings
+                $result = $this->fallback_deep_check_last_bookings();
             }
             // Only mark success if the check ran and produced a valid result
             $success = ($result !== null && $result !== false && !is_wp_error($result));
@@ -603,7 +610,8 @@ class HIC_Booking_Poller {
                 \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check');
             }
         }
-        */
+        
+        return $result;
     }
     
     /**
@@ -660,6 +668,99 @@ class HIC_Booking_Poller {
         }
 
         hic_log("Deep check: Completed fallback in {$execution_time}ms - Window: $from_date to $to_date, New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
+
+        return array(
+            'new' => $total_new,
+            'skipped' => $total_skipped,
+            'errors' => $total_errors,
+        );
+    }
+    
+    /**
+     * Optimized deep check focusing on last 5 bookings
+     * More efficient than full lookback approach
+     */
+    private function fallback_deep_check_last_bookings() {
+        $start_time = microtime(true);
+        $prop_id = \FpHic\Helpers\hic_get_property_id();
+        if (empty($prop_id)) {
+            hic_log("Deep check (last 5): No property ID configured");
+            return array('new' => 0, 'skipped' => 0, 'errors' => 1);
+        }
+
+        hic_log("Deep check (last 5): Checking latest 5 bookings for any missed items");
+
+        $total_new = 0;
+        $total_skipped = 0;
+        $total_errors = 0;
+
+        // Use the diagnostics function to get latest 5 bookings
+        if (function_exists('hic_get_latest_bookings')) {
+            // Check both processed and unprocessed bookings
+            $reservations = hic_get_latest_bookings(5, false);
+            if (!is_wp_error($reservations) && is_array($reservations)) {
+                $count = count($reservations);
+                hic_log("Deep check (last 5): Found $count latest bookings");
+
+                if ($count > 0) {
+                    $process_result = hic_process_reservations_batch($reservations);
+                    $total_new += $process_result['new'];
+                    $total_skipped += $process_result['skipped'];
+                    $total_errors += $process_result['errors'];
+
+                    hic_log("Deep check (last 5): Processed batch - New: {$process_result['new']}, Skipped: {$process_result['skipped']}, Errors: {$process_result['errors']}");
+                } else {
+                    hic_log("Deep check (last 5): No recent bookings found");
+                }
+            } else {
+                $error_message = is_wp_error($reservations) ? $reservations->get_error_message() : 'Unknown error';
+                hic_log("Deep check (last 5): Error fetching latest bookings: $error_message", HIC_LOG_LEVEL_ERROR);
+                $total_errors++;
+            }
+        } else {
+            hic_log("Deep check (last 5): hic_get_latest_bookings function not available, falling back to date range check", HIC_LOG_LEVEL_WARNING);
+            
+            // Fallback to last 3 days if function not available
+            $current_time = time();
+            $from_date = wp_date('Y-m-d', $current_time - (3 * DAY_IN_SECONDS));
+            $to_date = wp_date('Y-m-d', $current_time);
+            
+            if (function_exists('\\FpHic\\hic_fetch_reservations_raw')) {
+                $reservations = \FpHic\hic_fetch_reservations_raw($prop_id, 'checkin', $from_date, $to_date, 5);
+                if (!is_wp_error($reservations) && is_array($reservations)) {
+                    $count = count($reservations);
+                    hic_log("Deep check (last 5): Found $count reservations in last 3 days");
+
+                    $process_result = hic_process_reservations_batch($reservations);
+                    $total_new += $process_result['new'];
+                    $total_skipped += $process_result['skipped'];
+                    $total_errors += $process_result['errors'];
+
+                    hic_log("Deep check (last 5): Processed fallback batch - New: {$process_result['new']}, Skipped: {$process_result['skipped']}, Errors: {$process_result['errors']}");
+                } else {
+                    $error_message = is_wp_error($reservations) ? $reservations->get_error_message() : 'Unknown error';
+                    hic_log("Deep check (last 5): Error in fallback fetch: $error_message", HIC_LOG_LEVEL_ERROR);
+                    $total_errors++;
+                }
+            } else {
+                hic_log("Deep check (last 5): No reservation fetching functions available", HIC_LOG_LEVEL_ERROR);
+                $total_errors++;
+            }
+        }
+
+        $execution_time = round((microtime(true) - $start_time) * 1000, 2);
+        $current_time = time();
+
+        if ($total_errors === 0) {
+            update_option('hic_last_deep_check_count', $total_new, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check_count');
+            update_option('hic_last_deep_check_duration', $execution_time, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_last_deep_check_duration');
+            update_option('hic_last_successful_deep_check', $current_time, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_last_successful_deep_check');
+        }
+
+        hic_log("Deep check (last 5): Completed in {$execution_time}ms - New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
 
         return array(
             'new' => $total_new,
