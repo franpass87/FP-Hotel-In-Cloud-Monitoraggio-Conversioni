@@ -816,7 +816,7 @@ class CircuitBreakerManager {
             'hic-circuit-breaker',
             plugins_url('assets/js/circuit-breaker.js', dirname(__FILE__, 2)),
             ['jquery'],
-            '3.0.0',
+            '3.1.0',
             true
         );
         

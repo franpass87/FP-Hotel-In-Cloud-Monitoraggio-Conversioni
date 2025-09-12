@@ -199,7 +199,7 @@ class RealtimeDashboard {
             'hic-realtime-dashboard',
             plugins_url('assets/js/realtime-dashboard.js', dirname(__FILE__, 2)),
             ['jquery', 'chart-js'],
-            '3.0.0',
+            '3.1.0',
             true
         );
         
@@ -208,7 +208,7 @@ class RealtimeDashboard {
             'hic-realtime-dashboard',
             plugins_url('assets/css/realtime-dashboard.css', dirname(__FILE__, 2)),
             [],
-            '3.0.0'
+            '3.1.0'
         );
         
         // Localize script with data and settings

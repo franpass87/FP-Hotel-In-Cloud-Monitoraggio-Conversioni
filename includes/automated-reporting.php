@@ -832,7 +832,7 @@ class AutomatedReportingManager {
             'hic-reporting',
             plugins_url('assets/js/reporting.js', dirname(__FILE__, 2)),
             ['jquery'],
-            '3.0.0',
+            '3.1.0',
             true
         );
         

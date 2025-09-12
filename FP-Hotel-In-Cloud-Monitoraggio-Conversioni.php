@@ -2,7 +2,7 @@
 /**
  * Plugin Name: FP HIC Monitor
  * Description: Monitoraggio conversioni Hotel in Cloud con tracciamento avanzato verso GA4, Meta CAPI e Brevo. Sistema sicuro enterprise-grade con cache intelligente e validazione input.
- * Version: 3.0.0
+ * Version: 3.1.0
  * Author: Francesco Passeri
  * Requires at least: 5.8
  * Requires PHP: 7.4

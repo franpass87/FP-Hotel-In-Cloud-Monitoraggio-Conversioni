@@ -761,7 +761,7 @@ class GoogleAdsEnhancedConversions {
             'hic-enhanced-conversions',
             plugins_url('assets/js/enhanced-conversions.js', dirname(__FILE__, 2)),
             ['jquery'],
-            '3.0.0',
+            '3.1.0',
             true
         );
         
