@@ -38,6 +38,8 @@ require_once __DIR__ . '/includes/database-optimizer.php';
 require_once __DIR__ . '/includes/realtime-dashboard.php';
 require_once __DIR__ . '/includes/automated-reporting.php';
 require_once __DIR__ . '/includes/google-ads-enhanced.php';
+require_once __DIR__ . '/includes/circuit-breaker.php';
+require_once __DIR__ . '/includes/enterprise-management-suite.php';
 
 // Log vendor autoloader status after all includes are loaded
 if (!$vendor_available) {
