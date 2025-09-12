@@ -33,6 +33,9 @@ require_once __DIR__ . '/includes/http-security.php';
 require_once __DIR__ . '/includes/input-validator.php';
 require_once __DIR__ . '/includes/cache-manager.php';
 require_once __DIR__ . '/includes/booking-poller.php';
+require_once __DIR__ . '/includes/intelligent-polling-manager.php';
+require_once __DIR__ . '/includes/database-optimizer.php';
+require_once __DIR__ . '/includes/realtime-dashboard.php';
 
 // Log vendor autoloader status after all includes are loaded
 if (!$vendor_available) {
