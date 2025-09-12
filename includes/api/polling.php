@@ -1043,12 +1043,11 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
     if ($limit) $args['limit'] = $limit;
     $url = add_query_arg($args, $endpoint);
     
-    $res = wp_remote_get($url, array(
-      'timeout'=>30,
+    $res = \FpHic\HIC_HTTP_Security::secure_get($url, array(
+      'timeout'=>HIC_API_TIMEOUT,
       'headers'=>array(
         'Authorization'=>'Basic '.base64_encode("$email:$pass"), 
-        'Accept'=>'application/json',
-        'User-Agent'=>'WP/FP-HIC-Plugin'
+        'Accept'=>'application/json'
       )
     ));
     
@@ -1271,14 +1270,22 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
     );
     $test_url = add_query_arg($test_args, $endpoint);
     
-    // Make the API request
-    $response = wp_remote_get($test_url, array(
+    // Check for cached response first (for test connections, cache for 5 minutes)
+    $cache_key = "api_test_$endpoint" . md5($email . $password);
+    $cached_response = \FpHic\HIC_Cache_Manager::get($cache_key);
+    
+    if ($cached_response !== null) {
+        hic_log('Using cached API test response');
+        return $cached_response;
+    }
+    
+    // Make the API request using secure HTTP
+    $response = \FpHic\HIC_HTTP_Security::secure_get($test_url, array(
         'timeout' => 15,
         'headers' => array(
             'Authorization' => 'Basic ' . base64_encode("$email:$password"),
-            'Accept' => 'application/json',
-            'User-Agent' => 'WP/FP-HIC-Plugin-Test'
-        ),
+            'Accept' => 'application/json'
+        )
     ));
     
     // Check for connection errors
@@ -1298,17 +1305,21 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
             // Validate JSON response
             $data = json_decode($response_body, true);
             if (json_last_error() !== JSON_ERROR_NONE) {
-                return array(
+                $result = array(
                     'success' => false,
                     'message' => 'Risposta API non valida (JSON malformato)'
                 );
+            } else {
+                $result = array(
+                    'success' => true,
+                    'message' => 'Connessione API riuscita! Credenziali valide.',
+                    'data_count' => is_array($data) ? count($data) : 0
+                );
             }
             
-            return array(
-                'success' => true,
-                'message' => 'Connessione API riuscita! Credenziali valide.',
-                'data_count' => is_array($data) ? count($data) : 0
-            );
+            // Cache successful result for 5 minutes
+            \FpHic\HIC_Cache_Manager::set($cache_key, $result, 300);
+            return $result;
             
         case 401:
             return array(

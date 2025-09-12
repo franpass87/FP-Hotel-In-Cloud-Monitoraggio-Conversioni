@@ -29,6 +29,9 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 require_once __DIR__ . '/includes/constants.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/log-manager.php';
+require_once __DIR__ . '/includes/http-security.php';
+require_once __DIR__ . '/includes/input-validator.php';
+require_once __DIR__ . '/includes/cache-manager.php';
 require_once __DIR__ . '/includes/booking-poller.php';
 
 // Log vendor autoloader status after all includes are loaded
