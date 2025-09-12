@@ -1,8 +1,8 @@
 <?php declare(strict_types=1);
 /**
- * Plugin Name: HIC GA4 + Brevo + Meta (bucket strategy)
- * Description: Tracciamento prenotazioni Hotel in Cloud → GA4 (purchase), Meta CAPI (Purchase) e Brevo (contact+event), con bucket gads/fbads/organic. Salvataggio gclid/fbclid↔sid e append sid ai link HIC.
- * Version: 2.0.0
+ * Plugin Name: FP HIC Monitor
+ * Description: Monitoraggio conversioni Hotel in Cloud con tracciamento avanzato verso GA4, Meta CAPI e Brevo. Sistema sicuro enterprise-grade con cache intelligente e validazione input.
+ * Version: 3.1.0
  * Author: Francesco Passeri
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -29,7 +29,17 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
 require_once __DIR__ . '/includes/constants.php';
 require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/log-manager.php';
+require_once __DIR__ . '/includes/http-security.php';
+require_once __DIR__ . '/includes/input-validator.php';
+require_once __DIR__ . '/includes/cache-manager.php';
 require_once __DIR__ . '/includes/booking-poller.php';
+require_once __DIR__ . '/includes/intelligent-polling-manager.php';
+require_once __DIR__ . '/includes/database-optimizer.php';
+require_once __DIR__ . '/includes/realtime-dashboard.php';
+require_once __DIR__ . '/includes/automated-reporting.php';
+require_once __DIR__ . '/includes/google-ads-enhanced.php';
+require_once __DIR__ . '/includes/circuit-breaker.php';
+require_once __DIR__ . '/includes/enterprise-management-suite.php';
 
 // Log vendor autoloader status after all includes are loaded
 if (!$vendor_available) {

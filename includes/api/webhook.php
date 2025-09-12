@@ -80,11 +80,15 @@ function hic_webhook_handler(WP_REST_Request $request) {
   // Use sanitized email from request params
   $data['email'] = $request->get_param('email');
 
-  // Validate payload structure and required fields
-  $payload_validation = hic_validate_webhook_payload($data);
+  // Validate payload structure and required fields using enhanced validator
+  $payload_validation = \FpHic\HIC_Input_Validator::validate_webhook_payload($data);
   if (is_wp_error($payload_validation)) {
+    hic_log('Webhook validation failed: ' . $payload_validation->get_error_message());
     return $payload_validation;
   }
+  
+  // Use validated data
+  $data = $payload_validation;
   
   // Log received data (be careful with sensitive information)
   hic_log(['Webhook ricevuto' => array_merge($data, ['email' => !empty($data['email']) ? '***HIDDEN***' : 'missing'])]);

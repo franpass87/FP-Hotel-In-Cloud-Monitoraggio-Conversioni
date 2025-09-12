@@ -791,11 +791,29 @@ function hic_ajax_backfill_reservations() {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
     }
 
-    // Get and validate input parameters
-    $from_date = sanitize_text_field( wp_unslash( $_POST['from_date'] ?? '' ) );
-    $to_date = sanitize_text_field( wp_unslash( $_POST['to_date'] ?? '' ) );
-    $date_type = sanitize_text_field( wp_unslash( $_POST['date_type'] ?? 'checkin' ) );
-    $limit = isset($_POST['limit']) ? intval( wp_unslash( $_POST['limit'] ) ) : null;
+    // Get and validate input parameters using enhanced validator
+    $raw_params = [
+        'from_date' => wp_unslash( $_POST['from_date'] ?? '' ),
+        'to_date' => wp_unslash( $_POST['to_date'] ?? '' ),
+        'date_type' => wp_unslash( $_POST['date_type'] ?? 'checkin' ),
+        'limit' => isset($_POST['limit']) ? intval( wp_unslash( $_POST['limit'] ) ) : null
+    ];
+    
+    // Validate dates
+    $from_date_validation = \FpHic\HIC_Input_Validator::validate_date($raw_params['from_date']);
+    if (is_wp_error($from_date_validation)) {
+        wp_send_json_error(['message' => 'Data inizio non valida: ' . $from_date_validation->get_error_message()]);
+    }
+    
+    $to_date_validation = \FpHic\HIC_Input_Validator::validate_date($raw_params['to_date']);
+    if (is_wp_error($to_date_validation)) {
+        wp_send_json_error(['message' => 'Data fine non valida: ' . $to_date_validation->get_error_message()]);
+    }
+    
+    $from_date = $from_date_validation;
+    $to_date = $to_date_validation;
+    $date_type = sanitize_text_field($raw_params['date_type']);
+    $limit = $raw_params['limit'];
 
     if (null !== $limit) {
         $limit = min( max( 1, $limit ), 200 );

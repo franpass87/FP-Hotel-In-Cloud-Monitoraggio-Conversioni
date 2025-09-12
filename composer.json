@@ -1,6 +1,6 @@
 {
-    "name": "fp-hotel-in-cloud/monitoraggio-conversioni",
-    "description": "HIC GA4 + Brevo + Meta plugin",
+    "name": "fp-hotel-in-cloud/hic-monitor",
+    "description": "FP HIC Monitor - Plugin per monitoraggio conversioni Hotel in Cloud",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
     "autoload": {

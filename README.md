@@ -1,6 +1,6 @@
-# FP-Hotel-In-Cloud-Monitoraggio-Conversioni
+# FP HIC Monitor
 
-Plugin WordPress per il tracciamento delle conversioni da Hotel in Cloud verso GA4, Facebook Meta e Brevo.
+Plugin WordPress per il monitoraggio avanzato delle conversioni da Hotel in Cloud verso GA4, Facebook Meta e Brevo con sistema di sicurezza enterprise-grade.
 
 ## Come Funziona in Sintesi
 
