@@ -1,9 +1,9 @@
-# Guida Migrazione Miglioramenti HIC Plugin
+# Guida Migrazione FP HIC Monitor v3.0
 
-## 🔄 Procedura di Aggiornamento
+## 🔄 Procedura di Aggiornamento v3.0
 
 ### Pre-Requisiti
-- WordPress 5.0+
+- WordPress 5.8+
 - PHP 7.4+
 - Backup completo del sito
 
@@ -18,7 +18,7 @@ mysqldump -u user -p database_name > backup_database.sql
 
 ### Step 2: Aggiornamento Plugin
 1. Disattiva il plugin temporaneamente
-2. Sostituisci i file del plugin con la nuova versione
+2. Sostituisci i file del plugin con la nuova versione 3.0
 3. Riattiva il plugin
 
 ### Step 3: Verifica Funzionamento
@@ -26,7 +26,19 @@ mysqldump -u user -p database_name > backup_database.sql
 2. Scheda **Diagnostics** > clicca **Test Connessione API**
 3. Verifica che il test passi con successo
 
-## ⚠️ Note Importanti
+## ⚠️ Note Importanti per v3.0
+
+### Novità Versione 3.0
+- **Nome aggiornato**: FP HIC Monitor (invece di "HIC GA4 + Brevo + Meta")
+- **Sicurezza HTTP avanzata**: Sistema enterprise-grade per richieste API
+- **Cache intelligente**: Performance migliorate per installazioni high-traffic
+- **Validazione input**: Protezione anti-XSS e validazione RFC-compliant
+
+### Compatibilità
+✅ **100% backward compatible** - zero breaking changes
+- Tutte le configurazioni esistenti rimangono valide
+- API pubbliche mantengono le stesse signature
+- Interfaccia admin identica per gli utenti finali
 
 ### Compatibilità
 - ✅ **100% backward compatible** - nessuna configurazione richiesta

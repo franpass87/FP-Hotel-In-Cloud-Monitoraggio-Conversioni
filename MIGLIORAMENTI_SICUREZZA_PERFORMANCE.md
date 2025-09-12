@@ -1,8 +1,12 @@
-# Miglioramenti di Sicurezza e Performance - HIC Plugin
+# Miglioramenti di Sicurezza e Performance - FP HIC Monitor
 
 ## Panoramica delle Migliorie Implementate
 
-Questo documento descrive i miglioramenti critici di sicurezza, performance e qualità del codice implementati nel plugin HIC (Hotel in Cloud) per WordPress.
+Questo documento descrive i miglioramenti critici di sicurezza, performance e qualità del codice implementati in **FP HIC Monitor** (ex HIC Plugin) per WordPress.
+
+## 🚀 Aggiornamento v3.0 - FP HIC Monitor
+
+Con la versione 3.0, il plugin è stato rinominato da "HIC GA4 + Brevo + Meta" a **"FP HIC Monitor"** per riflettere la sua evoluzione verso una soluzione enterprise-grade completa di monitoraggio conversioni Hotel in Cloud.
 
 ## 🔒 Miglioramenti di Sicurezza
 

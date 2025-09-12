@@ -1,8 +1,8 @@
 <?php declare(strict_types=1);
 /**
- * Plugin Name: HIC GA4 + Brevo + Meta (bucket strategy)
- * Description: Tracciamento prenotazioni Hotel in Cloud → GA4 (purchase), Meta CAPI (Purchase) e Brevo (contact+event), con bucket gads/fbads/organic. Salvataggio gclid/fbclid↔sid e append sid ai link HIC.
- * Version: 2.0.0
+ * Plugin Name: FP HIC Monitor
+ * Description: Monitoraggio conversioni Hotel in Cloud con tracciamento avanzato verso GA4, Meta CAPI e Brevo. Sistema sicuro enterprise-grade con cache intelligente e validazione input.
+ * Version: 3.0.0
  * Author: Francesco Passeri
  * Requires at least: 5.8
  * Requires PHP: 7.4
