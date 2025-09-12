@@ -15,7 +15,7 @@ The workflow automatically creates a production-ready ZIP file of the WordPress 
 
 The build workflow is triggered by:
 
-1. **Version Tags**: When you push a tag like `v2.0.0`, `v1.5.0`, etc.
+1. **Version Tags**: When you push a tag like `v3.0.0`, `v2.5.0`, etc.
 2. **GitHub Releases**: When you create a release through GitHub UI
 3. **Manual Trigger**: Can be manually triggered from the Actions tab
 
@@ -54,8 +54,8 @@ The workflow produces:
 
 ```bash
 # Tag the current commit with a version
-git tag v2.0.0
-git push origin v2.0.0
+git tag v3.0.0
+git push origin v3.0.0
 ```
 
 ### Method 2: Using GitHub Releases
@@ -63,7 +63,7 @@ git push origin v2.0.0
 1. Go to the repository on GitHub
 2. Click "Releases" in the right sidebar
 3. Click "Create a new release"
-4. Choose or create a tag (e.g., `v2.0.0`)
+4. Choose or create a tag (e.g., `v3.0.0`)
 5. Fill in release notes
 6. Click "Publish release"
 
@@ -95,7 +95,7 @@ rsync -av \
 
 # Create ZIP
 cd build
-zip -r fp-hotel-in-cloud-monitoraggio-conversioni-v2.0.0.zip fp-hotel-in-cloud-monitoraggio-conversioni
+zip -r fp-hotel-in-cloud-monitoraggio-conversioni-v3.0.0.zip fp-hotel-in-cloud-monitoraggio-conversioni
 ```
 
 ## Version Management
@@ -103,7 +103,7 @@ zip -r fp-hotel-in-cloud-monitoraggio-conversioni-v2.0.0.zip fp-hotel-in-cloud-m
 The workflow automatically extracts the version from the main plugin file:
 
 ```php
-* Version: 2.0.0
+* Version: 3.0.0
 ```
 
 Make sure to update this version number in `FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php` before creating releases.
