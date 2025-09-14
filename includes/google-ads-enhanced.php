@@ -23,6 +23,14 @@ class GoogleAdsEnhancedConversions {
     private const BATCH_SIZE = 100;
     
     public function __construct() {
+        // Check if Enhanced Conversions is explicitly disabled
+        if (!$this->is_enhanced_conversions_enabled()) {
+            // Only add admin menu to allow enabling/configuration
+            add_action('admin_menu', [$this, 'add_enhanced_conversions_menu']);
+            add_action('admin_init', [$this, 'handle_enhanced_conversions_form']);
+            return;
+        }
+        
         add_action('init', [$this, 'initialize_enhanced_conversions'], 35);
         add_action('hic_process_booking', [$this, 'process_enhanced_conversion'], 10, 2);
         add_action('hic_enhanced_conversions_batch_upload', [$this, 'batch_upload_enhanced_conversions']);
@@ -30,6 +38,7 @@ class GoogleAdsEnhancedConversions {
         // Admin integration
         add_action('admin_menu', [$this, 'add_enhanced_conversions_menu']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_enhanced_conversions_assets']);
+        add_action('admin_init', [$this, 'handle_enhanced_conversions_form']);
         
         // AJAX handlers
         add_action('wp_ajax_hic_test_google_ads_connection', [$this, 'ajax_test_google_ads_connection']);
@@ -42,6 +51,20 @@ class GoogleAdsEnhancedConversions {
         
         // Schedule batch processing
         add_action('wp', [$this, 'schedule_batch_processing']);
+    }
+    
+    /**
+     * Check if Enhanced Conversions is enabled
+     */
+    private function is_enhanced_conversions_enabled() {
+        // Check explicit enable/disable option
+        $enabled = get_option('hic_google_ads_enhanced_enabled', false);
+        
+        // Also check if basic configuration is present
+        $settings = get_option('hic_google_ads_enhanced_settings', []);
+        $has_config = !empty($settings['customer_id']) && !empty($settings['conversion_action_id']);
+        
+        return $enabled && $has_config;
     }
     
     /**
@@ -776,25 +799,64 @@ class GoogleAdsEnhancedConversions {
      */
     public function render_enhanced_conversions_page() {
         $settings = get_option('hic_google_ads_enhanced_settings', []);
-        $status = get_option('hic_google_ads_enhanced_status', 'not_configured');
+        $enabled = get_option('hic_google_ads_enhanced_enabled', false);
+        $has_config = !empty($settings['customer_id']) && !empty($settings['conversion_action_id']);
+        
+        // Determine status
+        if (!$enabled) {
+            $status = 'disabled';
+        } elseif (!$has_config) {
+            $status = 'not_configured';
+        } else {
+            $status = 'configured';
+        }
         
         ?>
         <div class="wrap">
             <h1>Google Ads Enhanced Conversions</h1>
             
+            <?php if (!$enabled): ?>
+                <div class="notice notice-info">
+                    <p><strong>Nota:</strong> Il sistema HIC funziona perfettamente anche senza Google Ads Enhanced Conversions. 
+                    Questa funzionalità è opzionale e migliora l'accuratezza del tracciamento solo se utilizzi Google Ads.</p>
+                </div>
+            <?php endif; ?>
+            
             <div class="hic-enhanced-conversions-dashboard">
                 <!-- Configuration Status -->
                 <div class="postbox">
-                    <h2>Configuration Status</h2>
+                    <h2>Stato Configurazione</h2>
                     <div class="inside">
                         <p class="status-indicator status-<?php echo esc_attr($status); ?>">
-                            Status: <?php echo esc_html(ucfirst(str_replace('_', ' ', $status))); ?>
+                            <?php if ($status === 'disabled'): ?>
+                                Status: <strong>Disabilitato</strong> - Il sistema funziona normalmente senza Enhanced Conversions
+                            <?php elseif ($status === 'not_configured'): ?>
+                                Status: <strong>Abilitato ma non configurato</strong> - Inserire credenziali Google Ads
+                            <?php else: ?>
+                                Status: <strong>Configurato e attivo</strong> - Enhanced Conversions funzionanti
+                            <?php endif; ?>
                         </p>
                         
-                        <?php if ($status === 'credentials_missing'): ?>
-                            <p>Please configure your Google Ads API credentials below.</p>
-                        <?php elseif ($status === 'credentials_configured'): ?>
-                            <p>Enhanced conversions are configured and ready to use.</p>
+                        <form method="post" action="">
+                            <?php wp_nonce_field('hic_enhanced_conversions_toggle', 'hic_enhanced_nonce'); ?>
+                            
+                            <label>
+                                <input type="checkbox" name="hic_enhanced_enabled" value="1" <?php checked($enabled); ?>>
+                                Abilita Google Ads Enhanced Conversions (opzionale)
+                            </label>
+                            
+                            <p class="description">
+                                Il sistema HIC funziona completamente anche senza questa funzionalità. 
+                                Abilitare solo se si utilizzano campagne Google Ads e si desidera un tracciamento più accurato.
+                            </p>
+                            
+                            <?php submit_button('Salva Impostazioni', 'primary', 'save_enhanced_settings'); ?>
+                        </form>
+                        
+                        <?php if ($status === 'not_configured'): ?>
+                            <p>Configura le credenziali Google Ads API per utilizzare Enhanced Conversions.</p>
+                        <?php elseif ($status === 'configured'): ?>
+                            <p>Enhanced Conversions configurate e pronte all'uso.</p>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -954,6 +1016,30 @@ class GoogleAdsEnhancedConversions {
         } catch (\Exception $e) {
             wp_send_json_error(['message' => 'Upload failed: ' . $e->getMessage()]);
         }
+    }
+    
+    /**
+     * Handle Enhanced Conversions form submission
+     */
+    public function handle_enhanced_conversions_form() {
+        if (!isset($_POST['save_enhanced_settings']) || !current_user_can('manage_options')) {
+            return;
+        }
+        
+        if (!wp_verify_nonce($_POST['hic_enhanced_nonce'] ?? '', 'hic_enhanced_conversions_toggle')) {
+            wp_die('Security check failed');
+        }
+        
+        $enabled = !empty($_POST['hic_enhanced_enabled']);
+        update_option('hic_google_ads_enhanced_enabled', $enabled);
+        
+        $message = $enabled 
+            ? 'Google Ads Enhanced Conversions abilitato.' 
+            : 'Google Ads Enhanced Conversions disabilitato. Il sistema continua a funzionare normalmente.';
+            
+        add_action('admin_notices', function() use ($message) {
+            echo '<div class="notice notice-success"><p>' . esc_html($message) . '</p></div>';
+        });
     }
     
     /**
