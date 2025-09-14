@@ -1,5 +1,27 @@
 # FAQ - Domande Frequenti
 
+## 🔥 DOMANDA PRINCIPALE
+
+### Il sistema funziona anche senza Google Ads Enhanced?
+
+**SÌ, ASSOLUTAMENTE!** Il sistema FP HIC Monitor funziona perfettamente anche senza Google Ads Enhanced Conversions.
+
+✅ **Cosa funziona sempre**:
+- Google Analytics 4 (GA4) - Tracciamento conversioni completo
+- Facebook/Meta CAPI - Advertising su social  
+- Brevo - Email marketing e automazioni
+- Google Tag Manager - Integrazione client-side
+- Email notifiche admin - Avvisi prenotazioni
+
+❌ **Cosa NON serve obbligatoriamente**:
+- Google Ads Enhanced Conversions (solo se usi Google Ads)
+- Configurazione Google Ads API
+- Service Account Google Cloud
+
+**📖 Guida completa**: [SISTEMA_SENZA_ENHANCED.md](SISTEMA_SENZA_ENHANCED.md)
+
+---
+
 ## Funzionamento Base
 
 ### Q: Come funziona questo plugin quando arriva una prenotazione su HIC?
