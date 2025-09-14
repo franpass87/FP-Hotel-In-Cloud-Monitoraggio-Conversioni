@@ -167,4 +167,10 @@ if (\is_admin()) {
     require_once __DIR__ . '/includes/admin/admin-settings.php';
     require_once __DIR__ . '/includes/admin/diagnostics.php';
     require_once __DIR__ . '/includes/site-health.php';
+    
+    // Initialize admin-only classes that create submenus
+    // This ensures the parent menu exists before submenus are added
+    new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
+    new \FpHic\CircuitBreaker\CircuitBreakerManager();
+    new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
 }

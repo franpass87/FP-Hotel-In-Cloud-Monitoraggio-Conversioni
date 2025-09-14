@@ -979,5 +979,4 @@ class CircuitBreakerManager {
     }
 }
 
-// Initialize the circuit breaker manager
-new CircuitBreakerManager();
+// Note: Class instantiation moved to main plugin file for proper admin menu ordering
