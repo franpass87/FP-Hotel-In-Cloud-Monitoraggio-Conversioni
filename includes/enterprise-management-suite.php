@@ -1042,5 +1042,4 @@ class EnterpriseManagementSuite {
     }
 }
 
-// Initialize the enterprise management suite
-new EnterpriseManagementSuite();
+// Note: Class instantiation moved to main plugin file for proper admin menu ordering

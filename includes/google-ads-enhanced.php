@@ -966,5 +966,4 @@ class GoogleAdsEnhancedConversions {
     }
 }
 
-// Initialize the Google Ads Enhanced Conversions manager
-new GoogleAdsEnhancedConversions();
+// Note: Class instantiation moved to main plugin file for proper admin menu ordering
