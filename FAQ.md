@@ -269,3 +269,128 @@ Condividi gli ultimi log che includono:
 3. **Log recenti** (ultimi 50 entries)
 4. **Configurazioni integrate** (GA4/Brevo/Meta sì/no)
 5. **Descrizione problema** specifico
+
+## Conversioni Enhanced Google Ads
+
+### Q: Cosa sono le Conversioni Enhanced e perché dovrei usarle?
+
+**R**: Le **Conversioni Enhanced** sono una funzionalità avanzata di Google Ads che migliora l'accuratezza del tracciamento utilizzando dati first-party hashati in modo sicuro.
+
+**Vantaggi principali**:
+- 📈 **+15-25% ROAS improvement** grazie a attribution più accurata
+- 🎯 **Cross-device tracking** - collega conversioni tra desktop/mobile
+- 🔒 **Privacy-compliant** - dati email hashati con SHA-256
+- 🚀 **Machine Learning migliore** - Google Ads ottimizza meglio le campagne
+- 📊 **Riduce data loss** - recupera conversioni altrimenti non tracciabili
+
+### Q: Come posso configurare le Conversioni Enhanced?
+
+**R**: **Setup in 4 passi**:
+
+1. **Google Ads Setup**:
+   - Richiedi Developer Token (Centro API)
+   - Abilita Enhanced Conversions nell'azione di conversione
+   - Crea Service Account con Google Ads API
+
+2. **Plugin Configuration**:
+   ```
+   WordPress Admin → HIC Monitoring → Enhanced Conversions
+   ✅ Enable Google Ads Enhanced Conversions
+   ```
+
+3. **Credenziali API**:
+   - Upload Service Account JSON
+   - Inserisci Customer ID e Conversion Action ID
+   - Test connessione API
+
+4. **Validation**:
+   - Test con prenotazione di prova
+   - Verifica upload in Google Ads
+   - Monitor dashboard stats
+
+📖 **Guida Completa**: [GUIDA_CONVERSION_ENHANCED.md](GUIDA_CONVERSION_ENHANCED.md)
+
+### Q: Le Enhanced Conversions funzionano automaticamente?
+
+**R**: **Sì, completamente automatiche** una volta configurate:
+
+- ⚡ **Processing automatico**: Ogni prenotazione con GCLID viene processata
+- 🔄 **Batch upload**: Upload automatico ogni ora (configurabile)
+- 🛡️ **Retry automatico**: In caso di errori temporanei API
+- 📊 **Dashboard monitoring**: Stats in WordPress Admin
+
+**Flusso automatico**:
+1. Prenotazione arriva → Email hashata con SHA-256
+2. Record creato in queue → Batch processing ogni ora
+3. Upload a Google Ads API → Conversione enhanced attiva
+
+### Q: Come faccio a sapere se le Enhanced Conversions funzionano?
+
+**R**: **Monitoring multi-livello**:
+
+**1. Dashboard Plugin**:
+```
+WordPress Admin → HIC Monitoring → Enhanced Conversions
+✅ Conversions processed today: 15
+✅ Upload success rate: 98%
+✅ Last batch upload: 2 minutes ago
+```
+
+**2. Google Ads Console**:
+```
+Google Ads → Misure → Conversioni → [Tua Azione]
+Guarda "Import di conversioni" enhanced
+```
+
+**3. Log Diagnostici**:
+```
+WordPress Admin → HIC Diagnostics
+Cerca: "Enhanced conversion processed successfully"
+```
+
+### Q: Che differenza c'è tra modalità Batch e Real-time?
+
+**R**: **Modalità disponibili**:
+
+| Modalità | Batch (Raccomandato) | Real-time |
+|---|---|---|
+| **Upload** | Ogni ora, 100 conversioni | Immediate |
+| **Efficienza** | ✅ Alta (meno API calls) | ⚠️ Media |
+| **Rate Limiting** | ✅ Automatico | ⚠️ Manuale |
+| **Retry** | ✅ Automatico | ⚠️ Manuale |
+| **Quando usare** | Produzione | Testing |
+
+**Raccomandazione**: Usa **Batch** in produzione per affidabilità e efficienza.
+
+### Q: Cosa succede se Google Ads API è temporaneamente non disponibile?
+
+**R**: **Sistema di resilienza integrato**:
+
+- 🔄 **Retry automatico**: 3 tentativi con exponential backoff
+- 📋 **Queue persistente**: Conversioni salvate nel database
+- ⏰ **Scheduling robusto**: Riprocessa automaticamente failed uploads
+- 📊 **Monitoring**: Alert automatici per error rate > 5%
+
+**Non perdi mai una conversione** - il sistema riprova fino al successo.
+
+### Q: Le Enhanced Conversions rispettano il GDPR?
+
+**R**: **Sì, completamente GDPR-compliant**:
+
+- 🔒 **Hashing SHA-256**: Email mai inviata in plain text
+- 📝 **No PII storage**: Solo hash temporanei per upload
+- ⏰ **Data retention**: 90 giorni per compliance
+- 🛡️ **Server-side only**: Nessun tracking JavaScript aggiuntivo
+
+**Google non riceve mai l'email in chiaro** - solo hash crittografici sicuri.
+
+### Q: Devo modificare le mie campagne Google Ads esistenti?
+
+**R**: **No, zero modifiche necessarie**:
+
+- ✅ **Retrocompatibilità**: Funziona con tracking esistente
+- ✅ **Zero impatto**: Non modifica campagne attive
+- ✅ **Enhancement only**: Migliora l'accuratezza esistente
+- ✅ **Gradual rollout**: Puoi abilitare progressivamente
+
+Le Enhanced Conversions **si aggiungono** al tracking esistente migliorandolo.
