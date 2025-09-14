@@ -88,6 +88,7 @@ Nell'esempio sopra vengono escluse dal tracciamento le prenotazioni che contengo
 - [Architettura Tecnica](ARCHITETTURA_TECNICA.md) - Diagrammi e flussi
 - [Guida Configurazione](GUIDA_CONFIGURAZIONE.md) - Setup passo-passo
 - [Integrazione Google Tag Manager](GUIDA_GTM_INTEGRAZIONE.md) - GTM vs GA4, prevenzione doppia misurazione
+- [Setup Conversioni Enhanced](GUIDA_CONVERSION_ENHANCED.md) - Configurazione Google Ads Enhanced Conversions
 - [FAQ - Domande Frequenti](FAQ.md) - Risposte alle domande comuni
 
 ## Installazione
@@ -509,6 +510,27 @@ add_filter('hic_ga4_payload', function ($payload, $data, $gclid, $fbclid) {
 ```
 
 Questo consente di adattare il payload GA4 a esigenze specifiche, come l'aggiunta di campi personalizzati o la modifica dei parametri inviati.
+
+## Conversioni Enhanced Google Ads
+
+Il plugin include supporto completo per **Google Ads Enhanced Conversions**, che migliorano significativamente l'accuratezza del tracciamento delle conversioni utilizzando dati first-party hashati in modo sicuro.
+
+### Caratteristiche Conversioni Enhanced
+
+- 🔒 **Privacy-Safe**: Email e dati personali hashati con SHA-256
+- 📈 **Migliore ROAS**: Attribution più accurata delle conversioni
+- 🎯 **Cross-Device Tracking**: Collega conversioni tra dispositivi diversi
+- 🚀 **Machine Learning**: Google Ads può ottimizzare meglio le campagne
+- ⚡ **Upload Automatico**: Batch processing con retry automatico
+
+### Setup Rapido
+
+1. **Configura Google Ads API** con Developer Token e Service Account
+2. **Abilita Enhanced Conversions** nell'azione di conversione Google Ads
+3. **Attiva nel Plugin**: WordPress Admin → HIC Monitoring → Enhanced Conversions
+4. **Test**: Usa la funzione di test integrata per verificare il funzionamento
+
+📖 **Guida Completa**: [Setup Conversioni Enhanced](GUIDA_CONVERSION_ENHANCED.md) - Configurazione dettagliata passo-passo
 
 ## Bucket Attribution Normalization
 
