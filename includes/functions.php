@@ -119,7 +119,13 @@ function hic_get_brevo_event_endpoint() {
 function hic_reliable_polling_enabled() { return hic_get_option('reliable_polling_enabled', '1') === '1'; }
 
 // Admin and General Settings
-function hic_get_admin_email() { return hic_get_option('admin_email', get_option('admin_email')); }
+function hic_get_admin_email() {
+    $email = sanitize_email(hic_get_option('admin_email', ''));
+    if ($email === '') {
+        $email = sanitize_email(get_option('admin_email'));
+    }
+    return $email;
+}
 
 // GTM Settings
 function hic_is_gtm_enabled() { return hic_get_option('gtm_enabled', '0') === '1'; }
