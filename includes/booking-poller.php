@@ -572,6 +572,9 @@ class HIC_Booking_Poller {
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         $polling_lag = $current_time - $last_continuous;
         
+        // Get context about the current web request
+        $context = $this->get_current_request_context();
+        
         // ENHANCED: Be more aggressive about restarting dormant schedulers
         // If polling hasn't run in over 1 hour (3600 seconds), it's likely dormant regardless of WP-Cron status
         $dormancy_threshold = 3600; // 1 hour - indicates system has been dormant
@@ -582,18 +585,18 @@ class HIC_Booking_Poller {
         
         if ($polling_lag > $dormancy_threshold) {
             $should_restart = true;
-            $restart_reason = "Polling dormant for " . round($polling_lag / 60, 1) . " minutes - likely no recent traffic";
+            $restart_reason = "Polling dormant for " . round($polling_lag / 60, 1) . " minutes - reactivated by {$context['type']} traffic";
         } elseif (!$this->is_wp_cron_working() && $polling_lag > $critical_threshold) {
             $should_restart = true;
-            $restart_reason = "WP-Cron not working and polling delayed for " . round($polling_lag / 60, 1) . " minutes";
+            $restart_reason = "WP-Cron not working and polling delayed for " . round($polling_lag / 60, 1) . " minutes - triggered by {$context['type']} traffic";
         } elseif ($polling_lag > $critical_threshold) {
             // Even if WP-Cron appears to be working, if polling is severely delayed, restart it
             $should_restart = true;
-            $restart_reason = "Polling severely delayed for " . round($polling_lag / 60, 1) . " minutes despite WP-Cron appearing active";
+            $restart_reason = "Polling severely delayed for " . round($polling_lag / 60, 1) . " minutes despite WP-Cron appearing active - triggered by {$context['type']} traffic";
         }
         
         if ($should_restart) {
-            hic_log("Fallback: $restart_reason - attempting scheduler restart");
+            hic_log("Fallback: $restart_reason - attempting scheduler restart via web traffic from {$context['path']}");
             
             // Use a transient to prevent multiple simultaneous executions
             $fallback_lock = get_transient('hic_fallback_polling_lock');
@@ -607,10 +610,16 @@ class HIC_Booking_Poller {
                 wp_schedule_single_event(time() + 5, 'hic_fallback_poll_event');
                 add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
                 
-                hic_log("Fallback: Restarted scheduler and scheduled immediate fallback polling");
+                hic_log("Fallback: Restarted scheduler and scheduled immediate fallback polling via {$context['type']} traffic");
+                
+                // Update recovery statistics
+                $this->update_web_traffic_recovery_stats($context, $polling_lag);
             } else {
-                hic_log("Fallback: Recovery already in progress (lock active)");
+                hic_log("Fallback: Recovery already in progress (lock active) for {$context['type']} traffic");
             }
+        } else {
+            // Log non-recovery traffic for monitoring
+            hic_log("Fallback: Monitoring {$context['type']} traffic to {$context['path']}, polling lag: " . round($polling_lag / 60, 1) . " minutes - system healthy");
         }
     }
     
@@ -634,18 +643,27 @@ class HIC_Booking_Poller {
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         $polling_lag = $current_time - $last_continuous;
         
+        // Enhanced logging for web traffic monitoring
+        $context = $this->get_current_request_context();
+        hic_log("Proactive Check: Web traffic detected - {$context['type']} request to {$context['path']}, polling lag: " . round($polling_lag / 60, 1) . " minutes");
+        
         // Set the transient to prevent too frequent checks
         set_transient('hic_last_proactive_check', $current_time, 300); // 5 minutes
         
+        // Track web traffic polling statistics
+        $this->update_web_traffic_stats($context, $polling_lag);
+        
         // If polling hasn't run in 30 minutes, proactively restart scheduler
         if ($polling_lag > 1800) { // 30 minutes
-            hic_log("Proactive: Polling inactive for " . round($polling_lag / 60, 1) . " minutes - restarting scheduler");
+            hic_log("Proactive: Polling inactive for " . round($polling_lag / 60, 1) . " minutes via {$context['type']} traffic - restarting scheduler");
             $this->ensure_scheduler_is_active();
         }
         // If events aren't scheduled at all, restart
         else if (!$this->is_wp_cron_working()) {
-            hic_log("Proactive: WP-Cron events not properly scheduled - restarting scheduler");
+            hic_log("Proactive: WP-Cron events not properly scheduled via {$context['type']} traffic - restarting scheduler");
             $this->ensure_scheduler_is_active();
+        } else {
+            hic_log("Proactive: Polling system healthy via {$context['type']} traffic - no action needed");
         }
     }
     
@@ -663,8 +681,90 @@ class HIC_Booking_Poller {
         $last_continuous = get_option('hic_last_continuous_poll', 0);
         
         if ($current_time - $last_continuous > 1800) { // 30 minutes lag
-            hic_log("Shutdown Check: Severe polling lag detected ({$current_time} - {$last_continuous} = " . ($current_time - $last_continuous) . "s)");
+            $context = $this->get_current_request_context();
+            hic_log("Shutdown Check: Severe polling lag detected during {$context['type']} request ({$current_time} - {$last_continuous} = " . ($current_time - $last_continuous) . "s)");
         }
+    }
+    
+    /**
+     * Get context information about the current web request
+     * Helps identify whether polling is being triggered by frontend or backend traffic
+     */
+    private function get_current_request_context() {
+        $context = array(
+            'type' => 'unknown',
+            'path' => isset($_SERVER['REQUEST_URI']) ? sanitize_text_field($_SERVER['REQUEST_URI']) : 'unknown',
+            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? substr(sanitize_text_field($_SERVER['HTTP_USER_AGENT']), 0, 100) : 'unknown',
+            'is_admin' => is_admin(),
+            'is_ajax' => defined('DOING_AJAX') && DOING_AJAX,
+            'is_cron' => defined('DOING_CRON') && DOING_CRON,
+            'timestamp' => time()
+        );
+        
+        // Determine request type
+        if ($context['is_cron']) {
+            $context['type'] = 'wp-cron';
+        } elseif ($context['is_ajax']) {
+            $context['type'] = 'ajax';
+        } elseif ($context['is_admin']) {
+            $context['type'] = 'admin';
+        } elseif (wp_doing_ajax()) {
+            $context['type'] = 'ajax';
+        } elseif (is_admin()) {
+            $context['type'] = 'admin';
+        } else {
+            $context['type'] = 'frontend';
+        }
+        
+        return $context;
+    }
+    
+    /**
+     * Update web traffic monitoring statistics
+     */
+    private function update_web_traffic_stats($context, $polling_lag) {
+        $stats = get_option('hic_web_traffic_stats', array());
+        
+        // Initialize stats if empty
+        if (empty($stats)) {
+            $stats = array(
+                'total_checks' => 0,
+                'frontend_checks' => 0,
+                'admin_checks' => 0,
+                'ajax_checks' => 0,
+                'last_frontend_check' => 0,
+                'last_admin_check' => 0,
+                'average_polling_lag' => 0,
+                'max_polling_lag' => 0,
+                'recoveries_triggered' => 0
+            );
+        }
+        
+        // Update counters
+        $stats['total_checks']++;
+        $stats[$context['type'] . '_checks'] = ($stats[$context['type'] . '_checks'] ?? 0) + 1;
+        $stats['last_' . $context['type'] . '_check'] = $context['timestamp'];
+        
+        // Update lag statistics
+        $stats['average_polling_lag'] = (($stats['average_polling_lag'] * ($stats['total_checks'] - 1)) + $polling_lag) / $stats['total_checks'];
+        $stats['max_polling_lag'] = max($stats['max_polling_lag'], $polling_lag);
+        
+        update_option('hic_web_traffic_stats', $stats, false);
+    }
+    
+    /**
+     * Update web traffic recovery statistics
+     */
+    private function update_web_traffic_recovery_stats($context, $polling_lag) {
+        $stats = get_option('hic_web_traffic_stats', array());
+        $stats['recoveries_triggered'] = ($stats['recoveries_triggered'] ?? 0) + 1;
+        $stats['last_recovery_via'] = $context['type'];
+        $stats['last_recovery_lag'] = $polling_lag;
+        $stats['last_recovery_time'] = $context['timestamp'];
+        
+        update_option('hic_web_traffic_stats', $stats, false);
+        
+        hic_log("Web Traffic Recovery: Recovery #{$stats['recoveries_triggered']} triggered via {$context['type']} traffic with {$polling_lag}s lag");
     }
     
     /**
@@ -1090,6 +1190,52 @@ class HIC_Booking_Poller {
         ));
         
         return $diagnostics;
+    }
+    
+    /**
+     * Get web traffic monitoring statistics
+     */
+    public function get_web_traffic_stats() {
+        $stats = get_option('hic_web_traffic_stats', array());
+        
+        // Provide defaults if stats don't exist
+        $default_stats = array(
+            'total_checks' => 0,
+            'frontend_checks' => 0,
+            'admin_checks' => 0,
+            'ajax_checks' => 0,
+            'last_frontend_check' => 0,
+            'last_admin_check' => 0,
+            'average_polling_lag' => 0,
+            'max_polling_lag' => 0,
+            'recoveries_triggered' => 0,
+            'last_recovery_via' => 'none',
+            'last_recovery_lag' => 0,
+            'last_recovery_time' => 0
+        );
+        
+        $stats = array_merge($default_stats, $stats);
+        
+        // Add formatted versions for display
+        $stats['last_frontend_check_formatted'] = $stats['last_frontend_check'] > 0 ? 
+            wp_date('Y-m-d H:i:s', $stats['last_frontend_check']) : 'Never';
+        $stats['last_admin_check_formatted'] = $stats['last_admin_check'] > 0 ? 
+            wp_date('Y-m-d H:i:s', $stats['last_admin_check']) : 'Never';
+        $stats['last_recovery_time_formatted'] = $stats['last_recovery_time'] > 0 ? 
+            wp_date('Y-m-d H:i:s', $stats['last_recovery_time']) : 'Never';
+        $stats['average_polling_lag_formatted'] = round($stats['average_polling_lag'] / 60, 1) . ' minutes';
+        $stats['max_polling_lag_formatted'] = round($stats['max_polling_lag'] / 60, 1) . ' minutes';
+        
+        return $stats;
+    }
+    
+    /**
+     * Reset web traffic monitoring statistics
+     */
+    public function reset_web_traffic_stats() {
+        delete_option('hic_web_traffic_stats');
+        hic_log("Web Traffic Stats: Statistics reset");
+        return true;
     }
     
     /**

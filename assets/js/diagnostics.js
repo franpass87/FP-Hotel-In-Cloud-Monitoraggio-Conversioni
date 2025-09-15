@@ -577,6 +577,65 @@ jQuery(document).ready(function($) {
             });
         });
         
+        // Test Web Traffic Monitoring handler
+        $('#test-web-traffic').click(function() {
+            var $btn = $(this);
+            var buttonController = enhanceButton($btn, 'Testando...');
+            var $status = $('#quick-status');
+            var $results = $('#quick-results');
+            var $resultsContent = $('#quick-results-content');
+            
+            buttonController.setLoading();
+            $status.text('Test monitoraggio traffico web in corso...').css('color', '#0073aa');
+            $results.hide();
+            
+            $.post(ajaxurl, {
+                action: 'hic_test_web_traffic_monitoring',
+                nonce: hicDiagnostics.admin_nonce
+            }).done(function(response) {
+                if (response.success) {
+                    buttonController.setSuccess('Test traffico web completato!');
+                    $status.text('✓ Test traffico web completato').css('color', '#00a32a');
+
+                    var stats = response.data.web_traffic_stats;
+                    var html = '<div class="notice notice-success inline"><p><strong>Test Traffico Web Completato:</strong><br>';
+                    html += response.data.message + '<br><br>';
+                    html += '<strong>Statistiche:</strong><br>';
+                    html += '• Controlli totali: ' + stats.total_checks + '<br>';
+                    html += '• Controlli frontend: ' + stats.frontend_checks + '<br>';
+                    html += '• Controlli admin: ' + stats.admin_checks + '<br>';
+                    html += '• Recovery attivati: ' + stats.recoveries_triggered + '<br>';
+                    html += '• Lag polling attuale: ' + response.data.polling_lag_formatted + '<br>';
+                    if (stats.last_recovery_via !== 'none') {
+                        html += '• Ultimo recovery via: ' + stats.last_recovery_via + '<br>';
+                    }
+                    html += '</p></div>';
+
+                    $resultsContent.html(html);
+                    $results.show();
+                } else {
+                    buttonController.setError('Test traffico web fallito: ' + (response.data.message || 'Errore sconosciuto'));
+                    $status.text('✗ Test traffico web fallito').css('color', '#d63638');
+
+                    var html = '<div class="notice notice-warning inline"><p><strong>Test Traffico Web Fallito:</strong><br>';
+                    html += response.data.message || 'Errore sconosciuto';
+                    html += '</p></div>';
+
+                    $resultsContent.html(html);
+                    $results.show();
+                }
+                
+                setTimeout(function() {
+                    showToast('Aggiornamento dati...', 'info', 2000);
+                    location.reload();
+                }, 3000);
+                
+            }).fail(function() {
+                buttonController.setError('Errore di comunicazione con il server');
+                $status.text('✗ Errore comunicazione').css('color', '#d63638');
+            });
+        });
+        
         // Trigger Watchdog handler (enhanced with better UX)
         $('#trigger-watchdog').click(function() {
             var $btn = $(this);
