@@ -68,6 +68,10 @@ function hic_add_failed_request_schedule($schedules) {
 }
 
 function hic_schedule_failed_request_retry() {
+    if (!hic_should_schedule_retry_event()) {
+        return;
+    }
+
     if (!hic_safe_wp_next_scheduled('hic_retry_failed_requests')) {
         hic_safe_wp_schedule_event(time(), 'hic_every_fifteen_minutes', 'hic_retry_failed_requests');
     }
