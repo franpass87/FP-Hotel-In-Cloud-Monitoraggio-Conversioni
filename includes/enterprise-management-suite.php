@@ -41,27 +41,63 @@ class EnterpriseManagementSuite {
      * Initialize management suite
      */
     public function initialize_management_suite() {
+        static $initialized = false;
+
+        if ($initialized || did_action('hic_ems_initialized')) {
+            return;
+        }
+
+        $initialized = true;
+
         $this->log('Initializing Enterprise Management Suite');
-        
-        // Create reconciliation tracking table
-        $this->create_reconciliation_table();
-        
-        // Create health check results table
-        $this->create_health_check_table();
-        
+
+        self::maybe_install_tables();
+
         // Initialize setup wizard if needed
         $this->check_setup_wizard_needed();
+
+        do_action('hic_ems_initialized');
     }
-    
+
+    /**
+     * Ensure database tables exist for the management suite.
+     */
+    public static function maybe_install_tables(): void {
+        static $installing = false;
+
+        if ($installing) {
+            return;
+        }
+
+        $installing = true;
+
+        $tables_installed = (bool) get_option('hic_ems_tables_installed', false);
+
+        if (!$tables_installed) {
+            self::create_reconciliation_table();
+            self::create_health_check_table();
+
+            update_option('hic_ems_tables_installed', 1);
+
+            if (function_exists('\\FpHic\\Helpers\\hic_log')) {
+                \FpHic\Helpers\hic_log('[Enterprise Management] Database tables installed');
+            }
+
+            do_action('hic_ems_tables_installed');
+        }
+
+        $installing = false;
+    }
+
     /**
      * Create reconciliation tracking table
      */
-    private function create_reconciliation_table() {
+    private static function create_reconciliation_table(): void {
         global $wpdb;
-        
+
         $table_name = $wpdb->prefix . 'hic_reconciliation';
         $charset = $wpdb->get_charset_collate();
-        
+
         $sql = "CREATE TABLE IF NOT EXISTS {$table_name} (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             check_date DATE NOT NULL,
@@ -86,7 +122,7 @@ class EnterpriseManagementSuite {
     /**
      * Create health check results table
      */
-    private function create_health_check_table() {
+    private static function create_health_check_table(): void {
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'hic_health_checks';

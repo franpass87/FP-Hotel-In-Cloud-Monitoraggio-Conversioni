@@ -69,6 +69,7 @@ function hic_activate($network_wide)
         foreach ($sites as $site) {
             \switch_to_blog($site->blog_id);
             \hic_maybe_upgrade_db();
+            \FpHic\ReconAndSetup\EnterpriseManagementSuite::maybe_install_tables();
             \FpHic\CircuitBreaker\CircuitBreakerManager::activate();
             $role = \get_role('administrator');
             if ($role) {
@@ -83,6 +84,7 @@ function hic_activate($network_wide)
         }
     } else {
         \hic_maybe_upgrade_db();
+        \FpHic\ReconAndSetup\EnterpriseManagementSuite::maybe_install_tables();
         \FpHic\CircuitBreaker\CircuitBreakerManager::activate();
         $role = \get_role('administrator');
         if ($role) {
@@ -238,7 +240,10 @@ if (\is_admin()) {
     // This ensures the parent menu exists before submenus are added
     new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
     \FpHic\CircuitBreaker\hic_get_circuit_breaker_manager();
-    new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
+    if (!did_action('hic_enterprise_management_suite_loaded')) {
+        $GLOBALS['hic_enterprise_management_suite'] = new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
+        do_action('hic_enterprise_management_suite_loaded', $GLOBALS['hic_enterprise_management_suite']);
+    }
     new \FpHic\AutomatedReporting\AutomatedReportingManager();
 
     if (!\wp_doing_cron()) {
