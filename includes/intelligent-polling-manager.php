@@ -32,7 +32,6 @@ class IntelligentPollingManager {
         add_action('init', [$this, 'initialize_intelligent_polling'], 15);
         add_action('hic_intelligent_poll_event', [$this, 'execute_intelligent_polling']);
         add_action('wp_ajax_hic_get_polling_metrics', [$this, 'ajax_get_polling_metrics']);
-        add_action('wp_ajax_nopriv_hic_get_polling_metrics', [$this, 'ajax_get_polling_metrics']);
         
         // Cleanup connection pool periodically
         add_action('hic_cleanup_connection_pool', [$this, 'cleanup_connection_pool']);
@@ -505,14 +504,18 @@ class IntelligentPollingManager {
      * AJAX handler for polling metrics (for dashboard)
      */
     public function ajax_get_polling_metrics() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!check_ajax_referer('hic_polling_metrics', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
         }
-        
+
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+
         $metrics = get_option('hic_polling_metrics', []);
         $activity_metrics = get_option('hic_activity_metrics', []);
         $consecutive_failures = get_option('hic_intelligent_consecutive_failures', 0);
-        
+
         wp_send_json_success([
             'polling_metrics' => $metrics,
             'activity_metrics' => $activity_metrics,

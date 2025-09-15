@@ -281,6 +281,7 @@ function hic_admin_enqueue_scripts($hook) {
             'diagnostics_nonce' => wp_create_nonce('hic_diagnostics_nonce'),
             'admin_nonce' => wp_create_nonce('hic_admin_action'),
             'monitor_nonce' => wp_create_nonce('hic_monitor_nonce'),
+            'polling_metrics_nonce' => wp_create_nonce('hic_polling_metrics'),
             'is_api_connection' => (\FpHic\Helpers\hic_get_connection_type() === 'api'),
             'has_basic_auth' => \FpHic\Helpers\hic_has_basic_auth_credentials(),
             'has_property_id' => (bool) \FpHic\Helpers\hic_get_property_id(),
