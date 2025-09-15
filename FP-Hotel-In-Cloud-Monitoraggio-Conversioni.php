@@ -153,7 +153,7 @@ function hic_activate($network_wide)
 
 // Plugin activation hook
 \register_activation_hook(__FILE__, __NAMESPACE__ . '\\hic_activate');
-\register_deactivation_hook(__FILE__, 'hic_deactivate');
+\register_deactivation_hook(__FILE__, __NAMESPACE__ . '\\hic_deactivate');
 \add_action('plugins_loaded', '\\hic_maybe_upgrade_db');
 
 // Add settings link in plugin list
