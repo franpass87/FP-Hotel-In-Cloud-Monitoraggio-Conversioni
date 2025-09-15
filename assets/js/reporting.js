@@ -31,7 +31,7 @@
         generateManualReport() {
             const formData = new FormData(document.getElementById('hic-manual-report-form'));
             formData.append('action', 'hic_generate_manual_report');
-            formData.append('nonce', hicReporting.nonce);
+            formData.append('nonce', hicReporting.hic_reporting_nonce);
             
             const submitButton = $('#hic-manual-report-form button[type="submit"]');
             const originalText = submitButton.text();
@@ -78,7 +78,7 @@
                 data: {
                     action: action,
                     period: period,
-                    nonce: hicReporting.nonce
+                    nonce: hicReporting.hic_reporting_nonce
                 },
                 success: (response) => {
                     if (response.success) {
@@ -107,7 +107,7 @@
                 type: 'POST',
                 data: {
                     action: 'hic_get_report_history',
-                    nonce: hicReporting.nonce
+                    nonce: hicReporting.hic_reporting_nonce
                 },
                 success: (response) => {
                     if (response.success) {
