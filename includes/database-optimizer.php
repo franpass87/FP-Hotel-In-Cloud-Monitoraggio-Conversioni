@@ -67,36 +67,92 @@ class DatabaseOptimizer {
         
         // Composite indexes for main table (frequent query patterns)
         $indexes = [
-            // Index for date-range queries with UTM parameters
-            "CREATE INDEX IF NOT EXISTS idx_created_utm_source ON {$main_table} (created_at, utm_source)",
-            "CREATE INDEX IF NOT EXISTS idx_created_utm_medium ON {$main_table} (created_at, utm_medium)",
-            "CREATE INDEX IF NOT EXISTS idx_created_utm_campaign ON {$main_table} (created_at, utm_campaign)",
-            
+            [
+                'table'   => $main_table,
+                'name'    => 'idx_created_utm_source',
+                'columns' => 'created_at, utm_source',
+            ],
+            [
+                'table'   => $main_table,
+                'name'    => 'idx_created_utm_medium',
+                'columns' => 'created_at, utm_medium',
+            ],
+            [
+                'table'   => $main_table,
+                'name'    => 'idx_created_utm_campaign',
+                'columns' => 'created_at, utm_campaign',
+            ],
+
             // Index for conversion tracking queries
-            "CREATE INDEX IF NOT EXISTS idx_sid_created ON {$main_table} (sid, created_at)",
-            "CREATE INDEX IF NOT EXISTS idx_gclid_created ON {$main_table} (gclid, created_at)",
-            "CREATE INDEX IF NOT EXISTS idx_fbclid_created ON {$main_table} (fbclid, created_at)",
-            
+            [
+                'table'   => $main_table,
+                'name'    => 'idx_sid_created',
+                'columns' => 'sid, created_at',
+            ],
+            [
+                'table'   => $main_table,
+                'name'    => 'idx_gclid_created',
+                'columns' => 'gclid, created_at',
+            ],
+            [
+                'table'   => $main_table,
+                'name'    => 'idx_fbclid_created',
+                'columns' => 'fbclid, created_at',
+            ],
+
             // Composite index for dashboard queries (source + medium + date)
-            "CREATE INDEX IF NOT EXISTS idx_source_medium_date ON {$main_table} (utm_source, utm_medium, created_at)",
-            
+            [
+                'table'   => $main_table,
+                'name'    => 'idx_source_medium_date',
+                'columns' => 'utm_source, utm_medium, created_at',
+            ],
+
             // Index for cleanup and archiving operations
-            "CREATE INDEX IF NOT EXISTS idx_created_id ON {$main_table} (created_at, id)",
+            [
+                'table'   => $main_table,
+                'name'    => 'idx_created_id',
+                'columns' => 'created_at, id',
+            ],
         ];
-        
+
         // Indexes for sync table
         $sync_indexes = [
-            "CREATE INDEX IF NOT EXISTS idx_reservation_status ON {$sync_table} (reservation_id, sync_status)",
-            "CREATE INDEX IF NOT EXISTS idx_status_attempt ON {$sync_table} (sync_status, last_attempt)",
-            "CREATE INDEX IF NOT EXISTS idx_first_seen ON {$sync_table} (first_seen)",
+            [
+                'table'   => $sync_table,
+                'name'    => 'idx_reservation_status',
+                'columns' => 'reservation_id, sync_status',
+            ],
+            [
+                'table'   => $sync_table,
+                'name'    => 'idx_status_attempt',
+                'columns' => 'sync_status, last_attempt',
+            ],
+            [
+                'table'   => $sync_table,
+                'name'    => 'idx_first_seen',
+                'columns' => 'first_seen',
+            ],
         ];
-        
-        $indexes = array_merge($indexes, $sync_indexes);
-        
-        foreach ($indexes as $index_sql) {
-            $result = $wpdb->query($index_sql);
-            if ($result === false) {
-                $this->log("Failed to create index: " . $wpdb->last_error);
+
+        $indexes = array_merge( $indexes, $sync_indexes );
+
+        foreach ( $indexes as $index ) {
+            $table   = $index['table'];
+            $name    = $index['name'];
+            $columns = $index['columns'];
+
+            $index_exists = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SHOW INDEX FROM {$table} WHERE Key_name = %s",
+                    $name
+                )
+            );
+
+            if ( ! $index_exists ) {
+                $result = $wpdb->query( "CREATE INDEX {$name} ON {$table} ({$columns})" );
+                if ( $result === false ) {
+                    $this->log( 'Failed to create index: ' . $wpdb->last_error );
+                }
             }
         }
         
