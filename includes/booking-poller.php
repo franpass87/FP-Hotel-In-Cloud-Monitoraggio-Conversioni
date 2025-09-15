@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace {
+namespace FpHic;
 
 /**
  * Internal Booking Scheduler - WP-Cron System
@@ -1001,7 +1001,7 @@ function hic_init_booking_poller() {
 /**
  * Clean up scheduled events and temporary data on plugin deactivation
  */
-function hic_deactivate() {
+function hic_deactivate(): void {
     $hooks = array(
         'hic_continuous_poll_event',
         'hic_deep_check_event',
@@ -1043,12 +1043,4 @@ function hic_deactivate() {
 }
 
 // Initialize booking poller when WordPress is ready (safe hook registration)
-\FpHic\Helpers\hic_safe_add_hook('action', 'init', 'hic_init_booking_poller');
-
-}
-
-namespace FpHic {
-    function hic_deactivate(): void {
-        \hic_deactivate();
-    }
-}
+\FpHic\Helpers\hic_safe_add_hook('action', 'init', __NAMESPACE__ . '\\hic_init_booking_poller');
