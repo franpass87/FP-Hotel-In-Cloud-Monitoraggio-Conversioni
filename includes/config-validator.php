@@ -78,8 +78,8 @@ class HIC_Config_Validator {
         }
         
         // Validate polling interval
-        $interval = Helpers\hic_get_option('polling_interval', 'two_minutes');
-        $valid_intervals = ['one_minute', 'two_minutes', 'five_minutes'];
+        $interval = Helpers\hic_get_option('polling_interval', 'every_two_minutes');
+        $valid_intervals = ['every_minute', 'every_two_minutes', 'hic_poll_interval', 'hic_reliable_interval'];
         if (!in_array($interval, $valid_intervals)) {
             $this->warnings[] = 'Invalid polling interval, using default';
         }
