@@ -8,6 +8,8 @@
 
 namespace FpHic;
 
+use function FpHic\Helpers\hic_log;
+
 if (!defined('ABSPATH')) exit;
 
 class HIC_HTTP_Security {
