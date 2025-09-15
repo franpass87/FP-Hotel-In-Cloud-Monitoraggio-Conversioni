@@ -83,18 +83,63 @@ function hic_activate($network_wide)
     }
 
     $log_dir = WP_CONTENT_DIR . '/uploads/hic-logs';
+    $dir_ok  = true;
     if (!file_exists($log_dir)) {
         if (function_exists('wp_mkdir_p')) {
-            wp_mkdir_p($log_dir);
+            $dir_ok = \wp_mkdir_p($log_dir);
         } else {
-            @mkdir($log_dir, 0755, true);
+            $dir_ok = \mkdir($log_dir, 0755, true);
         }
+        if (!$dir_ok) {
+            $error = \error_get_last();
+            \hic_log(
+                \sprintf(
+                    'Impossibile creare la cartella dei log %s: %s',
+                    $log_dir,
+                    $error['message'] ?? 'errore sconosciuto'
+                ),
+                HIC_LOG_LEVEL_ERROR
+            );
+            \add_action('admin_notices', function () use ($log_dir) {
+                echo '<div class="notice notice-error"><p>' .
+                    \esc_html(
+                        \sprintf(
+                            \__('Impossibile creare la cartella dei log %s. Verifica i permessi.', 'hotel-in-cloud'),
+                            $log_dir
+                        )
+                    ) .
+                    '</p></div>';
+            });
+        }
+    } else {
+        $dir_ok = \is_dir($log_dir);
     }
 
-    $htaccess = $log_dir . '/.htaccess';
-    if (!file_exists($htaccess)) {
-        if (false === @file_put_contents($htaccess, "Order allow,deny\nDeny from all\n")) {
-            \hic_log('Impossibile creare .htaccess nella cartella dei log');
+    if ($dir_ok) {
+        $htaccess = $log_dir . '/.htaccess';
+        if (!file_exists($htaccess)) {
+            $content = "Order allow,deny\nDeny from all\n";
+            if (false === \file_put_contents($htaccess, $content)) {
+                $error = \error_get_last();
+                \hic_log(
+                    \sprintf(
+                        'Impossibile creare il file %s: %s',
+                        $htaccess,
+                        $error['message'] ?? 'errore sconosciuto'
+                    ),
+                    HIC_LOG_LEVEL_ERROR
+                );
+                \add_action('admin_notices', function () use ($htaccess) {
+                    echo '<div class="notice notice-error"><p>' .
+                        \esc_html(
+                            \sprintf(
+                                \__('Impossibile creare il file %s. Verifica i permessi.', 'hotel-in-cloud'),
+                                $htaccess
+                            )
+                        ) .
+                        '</p></div>';
+                });
+            }
         }
     }
 }
