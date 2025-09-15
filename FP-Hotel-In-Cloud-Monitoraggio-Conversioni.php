@@ -18,6 +18,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+\add_action('plugins_loaded', function () {
+    \load_plugin_textdomain('hotel-in-cloud', false, \dirname(\plugin_basename(__FILE__)) . '/languages');
+});
+
 // Load Composer autoloader or fallback to manual loading
 $vendor_available = false;
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
