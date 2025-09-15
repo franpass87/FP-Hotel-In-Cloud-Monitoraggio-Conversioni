@@ -986,10 +986,14 @@ class EnterpriseManagementSuite {
      * AJAX: Run reconciliation
      */
     public function ajax_run_reconciliation() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
         }
-        
+
+        if (!check_ajax_referer('hic_management_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
+        }
+
         $this->run_daily_reconciliation();
         wp_send_json_success(['message' => 'Reconciliation completed']);
     }
@@ -998,10 +1002,14 @@ class EnterpriseManagementSuite {
      * AJAX: Get health status
      */
     public function ajax_get_health_status() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
         }
-        
+
+        if (!check_ajax_referer('hic_management_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
+        }
+
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'hic_health_checks';

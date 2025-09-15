@@ -37,6 +37,20 @@ jQuery(document).ready(function($) {
         }, callback, 'json');
     };
 
+    window.hicRunReconciliation = function(callback) {
+        $.post(ajaxurl, {
+            action: 'hic_run_reconciliation',
+            nonce: hicDiagnostics.management_nonce
+        }, callback, 'json');
+    };
+
+    window.hicGetHealthStatus = function(callback) {
+        $.post(ajaxurl, {
+            action: 'hic_get_health_status',
+            nonce: hicDiagnostics.management_nonce
+        }, callback, 'json');
+    };
+
         // Enhanced UI functionality
 
         // Toast notification system
