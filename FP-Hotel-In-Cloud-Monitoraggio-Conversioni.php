@@ -93,6 +93,11 @@ function hic_activate($network_wide)
         }
     }
 
+    // Clear potential orphaned scheduled events
+    \wp_clear_scheduled_hook('hic_db_database_optimization');
+    \wp_clear_scheduled_hook('hic_reconciliation');
+    \wp_clear_scheduled_hook('hic_capture_tracking_params');
+
     $log_dir = WP_CONTENT_DIR . '/uploads/hic-logs';
     $dir_ok  = true;
     if (!file_exists($log_dir)) {
