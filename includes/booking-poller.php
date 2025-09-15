@@ -617,10 +617,8 @@ class HIC_Booking_Poller {
             hic_log('Continuous polling error: ' . $e->getMessage(), HIC_LOG_LEVEL_ERROR);
             $this->increment_failure_counter('hic_continuous_poll_failures');
         } finally {
-            if ($result === true) {
-                update_option('hic_last_continuous_poll', time(), false);
-                \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
-            }
+            update_option('hic_last_continuous_poll', time(), false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
         }
         return $result;
     }
