@@ -86,8 +86,11 @@ function hic_init_helper_hooks() {
         add_filter('wp_privacy_personal_data_exporters', __NAMESPACE__ . '\\hic_register_exporter');
         add_filter('wp_privacy_personal_data_erasers', __NAMESPACE__ . '\\hic_register_eraser');
         add_filter('cron_schedules', __NAMESPACE__ . '\\hic_add_failed_request_schedule');
-        add_action('init', __NAMESPACE__ . '\\hic_schedule_failed_request_retry');
-        add_action('init', __NAMESPACE__ . '\\hic_schedule_failed_request_cleanup');
+
+        // Schedule cron events immediately
+        hic_schedule_failed_request_retry();
+        hic_schedule_failed_request_cleanup();
+
         add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
         add_action('hic_cleanup_failed_requests', __NAMESPACE__ . '\\hic_cleanup_failed_requests');
     }

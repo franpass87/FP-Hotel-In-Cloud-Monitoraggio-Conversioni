@@ -40,11 +40,15 @@ require_once __DIR__ . '/includes/automated-reporting.php';
 require_once __DIR__ . '/includes/google-ads-enhanced.php';
 require_once __DIR__ . '/includes/circuit-breaker.php';
 require_once __DIR__ . '/includes/enterprise-management-suite.php';
+require_once __DIR__ . '/includes/helpers-scheduling.php';
 
 // Log vendor autoloader status after all includes are loaded
 if (!$vendor_available) {
     Helpers\hic_log('HIC Plugin: vendor/autoload.php non trovato, utilizzando caricamento manuale.', HIC_LOG_LEVEL_WARNING);
 }
+
+// Initialize helper hooks immediately after loading core files
+Helpers\hic_init_helper_hooks();
 
 // Plugin activation handler
 function hic_activate($network_wide)
@@ -178,9 +182,6 @@ function hic_activate($network_wide)
     require_once __DIR__ . '/includes/performance-monitor.php';
     require_once __DIR__ . '/includes/health-monitor.php';
 
-    // Initialize helper action hooks
-    Helpers\hic_init_helper_hooks();
-    
     // Initialize log manager
     \hic_get_log_manager();
 
