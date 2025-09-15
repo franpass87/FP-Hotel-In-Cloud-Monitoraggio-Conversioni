@@ -40,7 +40,10 @@ require_once __DIR__ . '/includes/automated-reporting.php';
 require_once __DIR__ . '/includes/google-ads-enhanced.php';
 require_once __DIR__ . '/includes/circuit-breaker.php';
 require_once __DIR__ . '/includes/enterprise-management-suite.php';
+require_once __DIR__ . '/includes/helpers-logging.php';
+require_once __DIR__ . '/includes/helpers-tracking.php';
 require_once __DIR__ . '/includes/helpers-scheduling.php';
+require_once __DIR__ . '/includes/database.php';
 
 // Log vendor autoloader status after all includes are loaded
 if (!$vendor_available) {
