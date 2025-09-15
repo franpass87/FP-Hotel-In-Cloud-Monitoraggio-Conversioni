@@ -510,8 +510,8 @@ class HIC_Booking_Poller {
      * Shutdown polling check - very lightweight check on page end
      */
     public function shutdown_polling_check() {
-        // Only run if polling should be active and we're not in admin
-        if (!$this->should_poll() || is_admin()) {
+        // Only run if polling should be active
+        if (!$this->should_poll()) {
             return;
         }
         
