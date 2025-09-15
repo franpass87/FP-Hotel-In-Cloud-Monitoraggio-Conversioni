@@ -237,6 +237,7 @@ if (\is_admin()) {
     new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
     new \FpHic\CircuitBreaker\CircuitBreakerManager();
     new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
+    new \FpHic\AutomatedReporting\AutomatedReportingManager();
 
     if (!\wp_doing_cron()) {
         new \FpHic\RealtimeDashboard\RealtimeDashboard();
