@@ -595,12 +595,15 @@ function hic_brevo_event_endpoint_render() {
 function hic_validate_admin_email($input) {
     // Allow empty value (will fall back to WordPress admin email)
     if (empty($input)) {
+        delete_option('hic_admin_email');
+        \FpHic\Helpers\hic_clear_option_cache('admin_email');
+        add_filter('pre_update_option_hic_admin_email', '__return_false');
         return '';
     }
-    
+
     // Sanitize the email
     $sanitized_email = sanitize_email($input);
-    
+
     // Validate email format
     if (!is_email($sanitized_email)) {
         add_settings_error(
@@ -612,12 +615,12 @@ function hic_validate_admin_email($input) {
         // Return the original value from database
         return \FpHic\Helpers\hic_get_option('admin_email', '');
     }
-    
+
     // Log the email change for transparency
     $old_email = \FpHic\Helpers\hic_get_option('admin_email', '');
     if ($old_email !== $sanitized_email) {
         hic_log('Admin email changed from "' . $old_email . '" to "' . $sanitized_email . '"');
-        
+
         // Show success message
         add_settings_error(
             'hic_admin_email',
@@ -626,6 +629,6 @@ function hic_validate_admin_email($input) {
             'updated'
         );
     }
-    
+
     return $sanitized_email;
 }
