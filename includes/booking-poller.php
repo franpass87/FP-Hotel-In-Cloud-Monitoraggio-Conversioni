@@ -722,10 +722,27 @@ class HIC_Booking_Poller {
      * Check if polling should be active based on configuration
      */
     private function should_poll() {
-        return \FpHic\Helpers\hic_reliable_polling_enabled() && 
-               \FpHic\Helpers\hic_get_connection_type() === 'api' && 
-               \FpHic\Helpers\hic_get_api_url() && 
-               \FpHic\Helpers\hic_has_basic_auth_credentials();
+        if (!\FpHic\Helpers\hic_reliable_polling_enabled()) {
+            hic_log('Reliable polling disabled');
+            return false;
+        }
+
+        if (\FpHic\Helpers\hic_get_connection_type() !== 'api') {
+            hic_log('Connection type is not API');
+            return false;
+        }
+
+        if (!\FpHic\Helpers\hic_get_api_url()) {
+            hic_log('API URL not set');
+            return false;
+        }
+
+        if (!\FpHic\Helpers\hic_has_basic_auth_credentials()) {
+            hic_log('Missing basic auth credentials');
+            return false;
+        }
+
+        return true;
     }
     
     /**
@@ -755,7 +772,7 @@ class HIC_Booking_Poller {
         hic_log('Manual polling execution started');
         
         if (!$this->should_poll()) {
-            $error = 'Polling conditions not met. Check credentials and connection type.';
+            $error = 'Polling conditions not met. See logs for details.';
             hic_log('Manual polling failed: ' . $error);
             return array('success' => false, 'message' => $error);
         }
@@ -794,7 +811,7 @@ class HIC_Booking_Poller {
         hic_log('Force manual polling execution started');
         
         if (!$this->should_poll()) {
-            $error = 'Polling conditions not met. Check credentials and connection type.';
+            $error = 'Polling conditions not met. See logs for details.';
             hic_log('Force manual polling failed: ' . $error);
             return array('success' => false, 'message' => $error);
         }
