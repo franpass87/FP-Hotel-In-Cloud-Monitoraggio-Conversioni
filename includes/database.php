@@ -715,6 +715,14 @@ function hic_cleanup_old_gclids($days = 90) {
   }
 
   $table = $wpdb->prefix . 'hic_gclids';
+  $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+  if ($exists !== $table) {
+    $created = hic_create_database_table();
+    if ($created === false) {
+      hic_log('hic_cleanup_old_gclids: Failed to ensure table exists: ' . $table);
+    }
+    return 0;
+  }
   $cutoff = gmdate('Y-m-d H:i:s', strtotime("-{$days} days"));
 
   // Delete records older than cutoff
@@ -746,6 +754,14 @@ function hic_cleanup_booking_events($days = 30) {
   }
 
   $table = $wpdb->prefix . 'hic_booking_events';
+  $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+  if ($exists !== $table) {
+    $created = hic_create_booking_events_table();
+    if ($created === false) {
+      hic_log('hic_cleanup_booking_events: Failed to ensure table exists: ' . $table);
+    }
+    return 0;
+  }
   $cutoff = gmdate('Y-m-d H:i:s', strtotime("-{$days} days"));
 
   // Delete processed records older than cutoff
