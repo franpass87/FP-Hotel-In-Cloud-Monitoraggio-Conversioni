@@ -9,6 +9,9 @@ namespace FpHic;
 if (!defined('ABSPATH')) exit;
 
 class HIC_Booking_Poller {
+
+    const SCHEDULER_RESTART_LOCK_KEY = 'hic_scheduler_restart_lock';
+    const SCHEDULER_RESTART_LOCK_TTL = 120; // 2 minutes
     
     public function __construct() {
         // Only initialize if WordPress functions are available
@@ -136,6 +139,10 @@ class HIC_Booking_Poller {
         
         // Log current scheduling status
         $this->log_scheduler_status();
+
+        if ($this->are_scheduler_events_scheduled()) {
+            $this->clear_scheduler_restart_lock();
+        }
     }
     
     /**
@@ -173,6 +180,79 @@ class HIC_Booking_Poller {
             if (!wp_next_scheduled('hic_scheduler_restart')) {
                 wp_schedule_single_event(time() + 1, 'hic_scheduler_restart');
             }
+        }
+    }
+
+    /**
+     * Determine if all core scheduler events are scheduled
+     */
+    private function are_scheduler_events_scheduled() {
+        $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
+        $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
+
+        return ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false);
+    }
+
+    /**
+     * Set a lock to prevent repeated scheduler restarts
+     */
+    private function set_scheduler_restart_lock($timestamp) {
+        if (function_exists('set_transient')) {
+            set_transient(self::SCHEDULER_RESTART_LOCK_KEY, $timestamp, self::SCHEDULER_RESTART_LOCK_TTL);
+        }
+
+        if (function_exists('update_option')) {
+            update_option(self::SCHEDULER_RESTART_LOCK_KEY, $timestamp, false);
+            \FpHic\Helpers\hic_clear_option_cache(self::SCHEDULER_RESTART_LOCK_KEY);
+        }
+    }
+
+    /**
+     * Retrieve the current restart lock age in seconds
+     */
+    private function get_scheduler_restart_lock_age() {
+        $lock_timestamp = 0;
+
+        if (function_exists('get_transient')) {
+            $transient_value = get_transient(self::SCHEDULER_RESTART_LOCK_KEY);
+            if ($transient_value !== false) {
+                $lock_timestamp = (int) $transient_value;
+            }
+        }
+
+        if ($lock_timestamp <= 0 && function_exists('get_option')) {
+            $option_value = (int) get_option(self::SCHEDULER_RESTART_LOCK_KEY, 0);
+            if ($option_value > 0) {
+                $lock_timestamp = $option_value;
+            }
+        }
+
+        if ($lock_timestamp > 0) {
+            $age = time() - $lock_timestamp;
+
+            if ($age < self::SCHEDULER_RESTART_LOCK_TTL) {
+                return $age;
+            }
+
+            $this->clear_scheduler_restart_lock();
+        }
+
+        return null;
+    }
+
+    /**
+     * Clear the scheduler restart lock
+     */
+    private function clear_scheduler_restart_lock() {
+        if (function_exists('delete_transient')) {
+            delete_transient(self::SCHEDULER_RESTART_LOCK_KEY);
+        }
+
+        if (function_exists('delete_option')) {
+            delete_option(self::SCHEDULER_RESTART_LOCK_KEY);
+            \FpHic\Helpers\hic_clear_option_cache(self::SCHEDULER_RESTART_LOCK_KEY);
         }
     }
     
@@ -352,6 +432,15 @@ class HIC_Booking_Poller {
                 break;
                 
             case 'scheduling':
+                $lock_age = $this->get_scheduler_restart_lock_age();
+
+                if (null !== $lock_age) {
+                    hic_log('Recovery: Scheduler restart skipped due to active lock (' . $lock_age . 's old)');
+                    break;
+                }
+
+                $this->set_scheduler_restart_lock(time());
+
                 // Full scheduler restart
                 $this->clear_all_scheduled_events();
                 $this->schedule_scheduler_restart();
