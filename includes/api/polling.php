@@ -78,11 +78,41 @@ function hic_handle_api_response($response, $context = 'API call') {
     // Provide more specific error messages for common HTTP codes
     switch ($code) {
       case 400:
-        // Check for specific timestamp error
-        if (strpos($body, 'timestamp can\'t be older than seven days') !== false || 
-            strpos($body, 'the timestamp can\'t be older than seven days') !== false) {
+        // Check for specific timestamp error patterns (multiple languages and variations)
+        $timestamp_error_patterns = [
+          'timestamp can\'t be older than seven days',
+          'the timestamp can\'t be older than seven days',
+          'timestamp cannot be older than seven days',
+          'the timestamp cannot be older than seven days',
+          'timestamp troppo vecchio',
+          'timestamp too old',
+          'updated_after',
+          'invalid timestamp',
+          'timestamp non valido'
+        ];
+        
+        $is_timestamp_error = false;
+        $body_lower = strtolower($body);
+        
+        foreach ($timestamp_error_patterns as $pattern) {
+          if (strpos($body_lower, strtolower($pattern)) !== false) {
+            $is_timestamp_error = true;
+            break;
+          }
+        }
+        
+        // For reservations_updates endpoint, be more aggressive about timestamp error detection
+        // If we get a 400 error on this endpoint, it's very likely a timestamp issue
+        $request_url = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+        if (!$is_timestamp_error && strpos($context, 'updates') !== false) {
+          hic_log("$context: HTTP 400 on updates endpoint - treating as potential timestamp error. Body: " . substr($body, 0, 200));
+          $is_timestamp_error = true;
+        }
+        
+        if ($is_timestamp_error) {
           return new WP_Error('hic_timestamp_too_old', "HTTP 400 - Il timestamp è troppo vecchio (oltre 7 giorni). Il sistema resetterà automaticamente il timestamp per la prossima richiesta.");
         }
+        
         return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Verifica i parametri: date_type deve essere checkin, checkout o presence per /reservations. Usa /reservations_updates con updated_after per modifiche recenti.");
       case 401:
         return new WP_Error('hic_http', "HTTP 401 - Credenziali non valide. Verifica email e password API.");
@@ -1038,10 +1068,21 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
         hic_log("HIC updates fetch: Timestamp adjusted from " . wp_date('Y-m-d H:i:s', $since) . " to " . wp_date('Y-m-d H:i:s', $validated_since));
     }
     
+    // Additional safety check for reservations_updates endpoint
+    $current_time = time();
+    $max_lookback = $current_time - (6 * DAY_IN_SECONDS); // 6 days max for safety
+    if ($validated_since < $max_lookback) {
+        hic_log("HIC updates fetch: Timestamp too old for updates endpoint (" . wp_date('Y-m-d H:i:s', $validated_since) . "), resetting to 6 days ago");
+        $validated_since = $max_lookback;
+    }
+    
     $endpoint = $base.'/reservations_updates/'.rawurlencode($prop_id);
     $args = array('updated_after' => $validated_since);
     if ($limit) $args['limit'] = $limit;
     $url = add_query_arg($args, $endpoint);
+    
+    // Log the actual API call for debugging
+    hic_log("Reservations Updates API Call: $url");
     
     $res = \FpHic\HIC_HTTP_Security::secure_get($url, array(
       'timeout'=>HIC_API_TIMEOUT,
@@ -1561,6 +1602,14 @@ function hic_api_poll_bookings_continuous() {
     $start_time = microtime(true);
     hic_log('Continuous Polling: Starting 30-second interval check');
     
+    // Check circuit breaker
+    $circuit_breaker_until = (int) get_option('hic_circuit_breaker_until', 0);
+    if ($circuit_breaker_until > time()) {
+        $wait_time = $circuit_breaker_until - time();
+        hic_log("Continuous Polling: Circuit breaker active, waiting $wait_time more seconds");
+        return false;
+    }
+    
     // Try to acquire lock to prevent overlapping executions
     if (!Helpers\hic_acquire_polling_lock(120)) { // 2-minute timeout for continuous polling
         hic_log('Continuous Polling: Another polling process is running, skipping execution');
@@ -1628,14 +1677,24 @@ function hic_api_poll_bookings_continuous() {
             // Update the last check timestamp
             update_option('hic_last_continuous_check', $current_time, false);
             Helpers\hic_clear_option_cache('hic_last_continuous_check');
+            
+            // Reset consecutive error counter on successful polling
+            update_option('hic_consecutive_update_errors', 0, false);
         } else {
             $error_message = $updated_reservations->get_error_message();
             hic_log("Continuous Polling: Error checking for updates: " . $error_message);
             $polling_errors[] = 'updates polling: ' . $error_message;
             $total_errors++;
             
+            // Track consecutive errors to prevent infinite loops
+            $consecutive_errors = (int) get_option('hic_consecutive_update_errors', 0);
+            $consecutive_errors++;
+            update_option('hic_consecutive_update_errors', $consecutive_errors, false);
+            
             // Check if this is a timestamp too old error and reset if necessary
             if ($updated_reservations->get_error_code() === 'hic_timestamp_too_old') {
+                hic_log("Continuous Polling: Timestamp error detected (consecutive errors: $consecutive_errors)");
+                
                 // Use more conservative reset - go back 3 days to ensure we're well within limits
                 $reset_timestamp = $current_time - (3 * DAY_IN_SECONDS); // Reset to 3 days ago for continuous polling
                 
@@ -1655,6 +1714,35 @@ function hic_api_poll_bookings_continuous() {
                 update_option('hic_last_deep_check', $validated_recent, false);
                 Helpers\hic_clear_option_cache('hic_last_deep_check');
                 hic_log('Continuous Polling: Reset scheduler timestamps to restart polling: ' . wp_date('Y-m-d H:i:s', $validated_recent));
+                
+                // Reset error counter after successful timestamp reset
+                update_option('hic_consecutive_update_errors', 0, false);
+            } else if ($consecutive_errors >= 3) {
+                // Circuit breaker: after 3 consecutive errors, force a more aggressive recovery
+                hic_log("Continuous Polling: Circuit breaker triggered after $consecutive_errors consecutive errors - forcing full timestamp reset");
+                
+                $safe_reset = $current_time - (4 * DAY_IN_SECONDS); // 4 days ago for extra safety
+                $validated_safe = hic_validate_api_timestamp($safe_reset, 'Continuous Polling circuit breaker reset');
+                
+                // Reset all related timestamps
+                $options_to_reset = [
+                    'hic_last_continuous_check',
+                    'hic_last_continuous_poll', 
+                    'hic_last_update_check',
+                    'hic_last_deep_check',
+                    'hic_last_updates_since'
+                ];
+                
+                foreach ($options_to_reset as $option) {
+                    update_option($option, $validated_safe, false);
+                    Helpers\hic_clear_option_cache($option);
+                }
+                
+                hic_log("Continuous Polling: Circuit breaker reset all timestamps to: " . wp_date('Y-m-d H:i:s', $validated_safe));
+                
+                // Reset error counter and add a temporary delay
+                update_option('hic_consecutive_update_errors', 0, false);
+                update_option('hic_circuit_breaker_until', $current_time + 300, false); // 5 minute delay
             }
         }
         
