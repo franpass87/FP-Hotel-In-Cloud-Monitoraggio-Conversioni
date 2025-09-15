@@ -23,7 +23,7 @@ class DatabaseOptimizer {
     private const QUERY_CACHE_DURATION = 300; // 5 minutes
     
     public function __construct() {
-        add_action('init', [$this, 'initialize_optimizer'], 20);
+        add_action('init', [$this, 'maybe_initialize_optimizer'], 20);
         add_action('hic_daily_database_maintenance', [$this, 'execute_daily_maintenance']);
         add_action('hic_weekly_database_optimization', [$this, 'execute_weekly_optimization']);
         add_filter('hic_optimize_query', [$this, 'optimize_query'], 10, 2);
@@ -36,7 +36,17 @@ class DatabaseOptimizer {
         // Schedule optimization tasks
         add_action('wp', [$this, 'schedule_optimization_tasks']);
     }
-    
+
+    /**
+     * Initialize optimizer once.
+     */
+    public function maybe_initialize_optimizer() {
+        if (!get_option('hic_db_optimizer_initialized')) {
+            $this->initialize_optimizer();
+            update_option('hic_db_optimizer_initialized', 1);
+        }
+    }
+
     /**
      * Initialize database optimizer
      */
