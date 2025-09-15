@@ -36,44 +36,60 @@ class CircuitBreakerManager {
         'LOW' => 3       // Historical data, cleanup operations
     ];
     
-    public function __construct() {
+    public function __construct(bool $register_hooks = true) {
+        if (!$register_hooks) {
+            return;
+        }
+
         add_action('init', [$this, 'initialize_circuit_breaker'], 40);
         add_action('hic_process_retry_queue', [$this, 'process_retry_queue']);
         add_action('hic_check_circuit_breaker_recovery', [$this, 'check_circuit_recovery']);
-        
+
         // API integration hooks
         add_filter('pre_http_request', [$this, 'intercept_api_requests'], 10, 3);
         add_action('http_api_debug', [$this, 'track_api_response'], 10, 5);
-        
+
         // Admin integration
         add_action('admin_menu', [$this, 'add_circuit_breaker_menu']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_circuit_breaker_assets']);
-        
+
         // AJAX handlers
         add_action('wp_ajax_hic_get_circuit_status', [$this, 'ajax_get_circuit_status']);
         add_action('wp_ajax_hic_reset_circuit_breaker', [$this, 'ajax_reset_circuit_breaker']);
         add_action('wp_ajax_hic_get_retry_queue_status', [$this, 'ajax_get_retry_queue_status']);
         add_action('wp_ajax_hic_process_retry_queue_manual', [$this, 'ajax_process_retry_queue_manual']);
-        
+
         // Schedule periodic tasks
         add_action('wp', [$this, 'schedule_circuit_breaker_tasks']);
+    }
+
+    /**
+     * Perform one-time setup tasks during plugin activation.
+     */
+    public static function activate() {
+        $manager = new self(false);
+
+        $manager->create_circuit_breaker_table();
+        $manager->create_retry_queue_table();
+        $manager->initialize_service_circuit_breakers();
+
+        $manager->log('Circuit breaker activation tasks completed');
     }
     
     /**
      * Initialize circuit breaker system
      */
     public function initialize_circuit_breaker() {
+        static $initialized = false;
+
+        if ($initialized) {
+            return;
+        }
+
+        $initialized = true;
+
         $this->log('Initializing Circuit Breaker Manager');
-        
-        // Create circuit breaker status table
-        $this->create_circuit_breaker_table();
-        
-        // Create retry queue table
-        $this->create_retry_queue_table();
-        
-        // Initialize circuit breakers for each service
-        $this->initialize_service_circuit_breakers();
-        
+
         // Set up fallback mechanisms
         $this->setup_fallback_mechanisms();
     }
@@ -987,4 +1003,17 @@ class CircuitBreakerManager {
     }
 }
 
-// Note: Class instantiation moved to main plugin file for proper admin menu ordering
+/**
+ * Retrieve the CircuitBreakerManager instance, instantiating it only once per request.
+ */
+function hic_get_circuit_breaker_manager(): CircuitBreakerManager {
+    static $instance = null;
+
+    if (!$instance instanceof CircuitBreakerManager) {
+        $instance = new CircuitBreakerManager();
+    }
+
+    return $instance;
+}
+
+// Note: Class instantiation handled via hic_get_circuit_breaker_manager() helper
