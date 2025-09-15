@@ -135,6 +135,7 @@ class DatabaseOptimizer {
         ];
 
         $indexes = array_merge( $indexes, $sync_indexes );
+        $had_errors = false;
 
         foreach ( $indexes as $index ) {
             $table   = $index['table'];
@@ -151,12 +152,17 @@ class DatabaseOptimizer {
             if ( ! $index_exists ) {
                 $result = $wpdb->query( "CREATE INDEX {$name} ON {$table} ({$columns})" );
                 if ( $result === false ) {
+                    $had_errors = true;
                     $this->log( 'Failed to create index: ' . $wpdb->last_error );
                 }
             }
         }
-        
-        $this->log('Optimized database indexes created/verified');
+
+        $this->log(
+            $had_errors
+                ? 'Failed to create some database indexes'
+                : 'Optimized database indexes created/verified'
+        );
     }
     
     /**
