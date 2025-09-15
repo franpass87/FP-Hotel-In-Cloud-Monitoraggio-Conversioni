@@ -77,7 +77,7 @@ class HIC_Booking_Poller {
         // Check and schedule continuous polling event
         $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         if (!$continuous_next) {
-            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled continuous polling every 30 seconds (near real-time) with 30-minute deep check');
             } else {
@@ -89,7 +89,7 @@ class HIC_Booking_Poller {
             if ($continuous_next < (time() - $overdue_threshold)) {
                 hic_log('WP-Cron Scheduler: Continuous polling event is overdue, rescheduling');
                 \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
             }
         }
         
@@ -142,7 +142,7 @@ class HIC_Booking_Poller {
      * Add custom WP-Cron intervals
      */
     public function add_custom_cron_intervals($schedules) {
-        $schedules['hic_every_minute'] = array(
+        $schedules['hic_every_thirty_seconds'] = array(
             'interval' => HIC_CONTINUOUS_POLLING_INTERVAL,
             'display' => 'Every 30 Seconds (HIC Near Real-Time Polling)'
         );
@@ -300,7 +300,7 @@ class HIC_Booking_Poller {
             case 'continuous':
                 // Force reschedule continuous polling
                 \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_minute', 'hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
                 // Trigger immediate execution
                 $this->execute_continuous_polling();
                 break;

@@ -93,7 +93,7 @@ class RealtimeDashboard {
      */
     private function schedule_dashboard_refresh() {
         if (!wp_next_scheduled('hic_refresh_dashboard_data')) {
-            wp_schedule_event(time(), 'hic_every_minute', 'hic_refresh_dashboard_data');
+            wp_schedule_event(time(), 'hic_every_thirty_seconds', 'hic_refresh_dashboard_data');
             add_action('hic_refresh_dashboard_data', [$this, 'refresh_dashboard_cache']);
         }
     }
