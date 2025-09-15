@@ -52,16 +52,26 @@ class RealtimeDashboard {
      * Initialize real-time dashboard
      */
     public function initialize_dashboard() {
+        static $initialized = false;
+
+        if ($initialized || did_action('hic_realtime_dashboard_initialized')) {
+            return;
+        }
+
+        $initialized = true;
+
         $this->log('Initializing Real-Time Dashboard');
-        
+
         // Create dashboard cache table
         $this->create_dashboard_cache_table();
-        
+
         // Schedule dashboard data refresh
         $this->schedule_dashboard_refresh();
-        
+
         // Initialize booking heatmap data
         $this->initialize_heatmap_data();
+
+        do_action('hic_realtime_dashboard_initialized');
     }
     
     /**
@@ -802,7 +812,3 @@ class RealtimeDashboard {
     }
 }
 
-// Initialize the real-time dashboard
-if ( ! wp_doing_cron() ) {
-    new RealtimeDashboard();
-}
