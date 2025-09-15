@@ -19,7 +19,7 @@ function hic_should_schedule_retry_event() {
     }
 
     $schedules = wp_get_schedules();
-    return isset($schedules['hic_retry_interval']);
+    return isset($schedules['hic_every_fifteen_minutes']);
 }
 
 /* ================= SAFE WORDPRESS CRON HELPERS ================= */
