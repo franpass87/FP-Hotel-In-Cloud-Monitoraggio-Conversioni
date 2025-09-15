@@ -839,7 +839,7 @@ class AutomatedReportingManager {
         
         wp_localize_script('hic-reporting', 'hicReporting', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('hic_reporting_nonce')
+            'hic_reporting_nonce' => wp_create_nonce('hic_reporting_nonce')
         ]);
     }
     
@@ -918,12 +918,12 @@ class AutomatedReportingManager {
      * AJAX: Generate manual report
      */
     public function ajax_generate_manual_report() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
-        }
-        
         if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
+        }
+
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
         }
         
         $report_type = sanitize_text_field($_POST['report_type'] ?? 'weekly');
@@ -969,10 +969,14 @@ class AutomatedReportingManager {
      * AJAX: Export data as CSV
      */
     public function ajax_export_data_csv() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
         }
-        
+
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+
         $period = sanitize_text_field($_POST['period'] ?? 'last_7_days');
         
         try {
@@ -1076,7 +1080,7 @@ class AutomatedReportingManager {
         }
 
         if (!current_user_can('hic_manage')) {
-            wp_die('Insufficient permissions');
+            wp_send_json_error('Insufficient permissions');
         }
 
         $filepath = realpath($this->export_dir . $filename);
