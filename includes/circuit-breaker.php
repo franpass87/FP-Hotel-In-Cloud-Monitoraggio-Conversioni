@@ -875,10 +875,14 @@ class CircuitBreakerManager {
      * AJAX: Get circuit status
      */
     public function ajax_get_circuit_status() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
         }
-        
+
+        if (!check_ajax_referer('hic_circuit_breaker_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
+        }
+
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
@@ -931,10 +935,14 @@ class CircuitBreakerManager {
      * AJAX: Get retry queue status
      */
     public function ajax_get_retry_queue_status() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
         }
-        
+
+        if (!check_ajax_referer('hic_circuit_breaker_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
+        }
+
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'hic_retry_queue';
