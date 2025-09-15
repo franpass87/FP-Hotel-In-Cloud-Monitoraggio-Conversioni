@@ -69,6 +69,7 @@ function hic_activate($network_wide)
         foreach ($sites as $site) {
             \switch_to_blog($site->blog_id);
             \hic_maybe_upgrade_db();
+            \FpHic\CircuitBreaker\CircuitBreakerManager::activate();
             $role = \get_role('administrator');
             if ($role) {
                 if (!$role->has_cap('hic_manage')) {
@@ -82,6 +83,7 @@ function hic_activate($network_wide)
         }
     } else {
         \hic_maybe_upgrade_db();
+        \FpHic\CircuitBreaker\CircuitBreakerManager::activate();
         $role = \get_role('administrator');
         if ($role) {
             if (!$role->has_cap('hic_manage')) {
@@ -235,7 +237,7 @@ if (\is_admin()) {
     // Initialize admin-only classes that create submenus
     // This ensures the parent menu exists before submenus are added
     new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
-    new \FpHic\CircuitBreaker\CircuitBreakerManager();
+    \FpHic\CircuitBreaker\hic_get_circuit_breaker_manager();
     new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
     new \FpHic\AutomatedReporting\AutomatedReportingManager();
 
