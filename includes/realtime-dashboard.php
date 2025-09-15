@@ -640,8 +640,12 @@ class RealtimeDashboard {
      * AJAX: Get real-time statistics
      */
     public function ajax_get_realtime_stats() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if ( ! check_ajax_referer( 'hic_dashboard_nonce', 'nonce', false ) ) {
+            wp_send_json_error( 'Invalid nonce' );
+        }
+
+        if ( ! current_user_can( 'hic_manage' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
         }
         
         $cached_stats = $this->get_dashboard_cache('realtime_stats');
@@ -658,11 +662,15 @@ class RealtimeDashboard {
      * AJAX: Get revenue by channel
      */
     public function ajax_get_revenue_by_channel() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if ( ! check_ajax_referer( 'hic_dashboard_nonce', 'nonce', false ) ) {
+            wp_send_json_error( 'Invalid nonce' );
         }
-        
-        $period = sanitize_text_field($_POST['period'] ?? '7days');
+
+        if ( ! current_user_can( 'hic_manage' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
+        }
+
+        $period = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '7days';
         $cached_data = $this->get_dashboard_cache('revenue_by_channel');
         
         if (!$cached_data) {
@@ -677,8 +685,12 @@ class RealtimeDashboard {
      * AJAX: Get booking heatmap
      */
     public function ajax_get_booking_heatmap() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if ( ! check_ajax_referer( 'hic_dashboard_nonce', 'nonce', false ) ) {
+            wp_send_json_error( 'Invalid nonce' );
+        }
+
+        if ( ! current_user_can( 'hic_manage' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
         }
         
         global $wpdb;
@@ -698,8 +710,12 @@ class RealtimeDashboard {
      * AJAX: Get conversion funnel
      */
     public function ajax_get_conversion_funnel() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if ( ! check_ajax_referer( 'hic_dashboard_nonce', 'nonce', false ) ) {
+            wp_send_json_error( 'Invalid nonce' );
+        }
+
+        if ( ! current_user_can( 'hic_manage' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
         }
         
         $cached_data = $this->get_dashboard_cache('conversion_funnel');
@@ -716,8 +732,12 @@ class RealtimeDashboard {
      * AJAX: Get performance metrics
      */
     public function ajax_get_performance_metrics() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if ( ! check_ajax_referer( 'hic_dashboard_nonce', 'nonce', false ) ) {
+            wp_send_json_error( 'Invalid nonce' );
+        }
+
+        if ( ! current_user_can( 'hic_manage' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
         }
         
         global $wpdb;
@@ -744,8 +764,12 @@ class RealtimeDashboard {
      * AJAX: Dashboard heartbeat for auto-refresh
      */
     public function ajax_dashboard_heartbeat() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if ( ! check_ajax_referer( 'hic_dashboard_nonce', 'nonce', false ) ) {
+            wp_send_json_error( 'Invalid nonce' );
+        }
+
+        if ( ! current_user_can( 'hic_manage' ) ) {
+            wp_send_json_error( 'Insufficient permissions' );
         }
         
         $last_update = get_option('hic_dashboard_last_heartbeat', 0);
