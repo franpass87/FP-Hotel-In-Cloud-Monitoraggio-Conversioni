@@ -950,10 +950,10 @@ class GoogleAdsEnhancedConversions {
      * AJAX: Test Google Ads connection
      */
     public function ajax_test_google_ads_connection() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
         }
-        
+
         if (!check_ajax_referer('hic_enhanced_conversions_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
         }
@@ -976,16 +976,20 @@ class GoogleAdsEnhancedConversions {
      * AJAX: Get enhanced conversion statistics
      */
     public function ajax_get_enhanced_conversion_stats() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
         }
-        
+
+        if (!check_ajax_referer('hic_enhanced_conversions_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
+        }
+
         global $wpdb;
-        
+
         $table_name = $wpdb->prefix . 'hic_enhanced_conversions';
-        
+
         $stats = $wpdb->get_row("
-            SELECT 
+            SELECT
                 COUNT(*) as total_conversions,
                 SUM(CASE WHEN upload_status = 'uploaded' THEN 1 ELSE 0 END) as uploaded_conversions,
                 SUM(CASE WHEN upload_status = 'pending' THEN 1 ELSE 0 END) as pending_conversions,
@@ -993,7 +997,7 @@ class GoogleAdsEnhancedConversions {
                 SUM(conversion_value) as total_value
             FROM {$table_name}
         ", ARRAY_A);
-        
+
         wp_send_json_success($stats);
     }
     
@@ -1001,10 +1005,10 @@ class GoogleAdsEnhancedConversions {
      * AJAX: Upload enhanced conversions
      */
     public function ajax_upload_enhanced_conversions() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
         }
-        
+
         if (!check_ajax_referer('hic_enhanced_conversions_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
         }
