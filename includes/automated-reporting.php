@@ -49,6 +49,7 @@ class AutomatedReportingManager {
         add_action('wp_ajax_hic_export_data_excel', [$this, 'ajax_export_data_excel']);
         add_action('wp_ajax_hic_schedule_report', [$this, 'ajax_schedule_report']);
         add_action('wp_ajax_hic_get_report_history', [$this, 'ajax_get_report_history']);
+        add_action('wp_ajax_hic_download_export', [$this, 'handle_download_export']);
         
         // Admin menu integration
         add_action('admin_menu', [$this, 'add_reports_menu'], 99);
@@ -987,6 +988,109 @@ class AutomatedReportingManager {
             wp_send_json_error('Export failed: ' . $e->getMessage());
         }
     }
+
+    /**
+     * AJAX: Export data as Excel
+     */
+    public function ajax_export_data_excel() {
+        if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
+        }
+
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+
+        $period = sanitize_text_field($_POST['period'] ?? 'last_7_days');
+
+        try {
+            $data = $this->get_raw_data_for_period($period);
+            $file = $this->generate_raw_excel_export($data, $period);
+
+            wp_send_json_success([
+                'download_url' => $this->get_secure_download_url($file),
+                'filename' => basename($file)
+            ]);
+
+        } catch (\Exception $e) {
+            wp_send_json_error('Export failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * AJAX: Schedule report generation
+     */
+    public function ajax_schedule_report() {
+        if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
+        }
+
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+
+        $report_type = sanitize_text_field($_POST['report_type'] ?? '');
+
+        if (empty(self::REPORT_TYPES[$report_type])) {
+            wp_send_json_error('Invalid report type');
+        }
+
+        $hook = self::REPORT_TYPES[$report_type]['hook'];
+        wp_schedule_single_event(time(), $hook);
+
+        wp_send_json_success(['message' => 'Report scheduled']);
+    }
+
+    /**
+     * AJAX: Get report history
+     */
+    public function ajax_get_report_history() {
+        if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
+        }
+
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'hic_reports_history';
+
+        $history = $wpdb->get_results("SELECT id, report_type, report_period, generated_at, status, file_path, file_size FROM {$table} ORDER BY generated_at DESC LIMIT 50", ARRAY_A);
+
+        wp_send_json_success($history);
+    }
+
+    /**
+     * Handle secure export downloads
+     */
+    public function handle_download_export() {
+        $filename = sanitize_file_name($_GET['file'] ?? '');
+
+        if (empty($filename)) {
+            wp_die('Invalid file');
+        }
+
+        if (!check_ajax_referer('hic_download_' . $filename, 'nonce', false)) {
+            wp_die('Invalid nonce');
+        }
+
+        if (!current_user_can('hic_manage')) {
+            wp_die('Insufficient permissions');
+        }
+
+        $filepath = realpath($this->export_dir . $filename);
+
+        if (!$filepath || strpos($filepath, realpath($this->export_dir)) !== 0 || !file_exists($filepath)) {
+            wp_die('File not found');
+        }
+
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename($filepath) . '"');
+        header('Content-Length: ' . filesize($filepath));
+        readfile($filepath);
+        exit;
+    }
     
     /**
      * Get raw data for period
@@ -1055,10 +1159,35 @@ class AutomatedReportingManager {
         }
         
         fclose($file);
-        
+
         return $filepath;
     }
-    
+
+    /**
+     * Generate raw Excel export
+     */
+    private function generate_raw_excel_export($data, $period) {
+        if (!class_exists('PhpOffice\\PhpSpreadsheet\\Spreadsheet')) {
+            return $this->generate_raw_csv_export($data, $period);
+        }
+
+        $filename = sprintf('hic-raw-export-%s-%s.xlsx', $period, date('Y-m-d-H-i-s'));
+        $filepath = $this->export_dir . $filename;
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        if (!empty($data)) {
+            $sheet->fromArray(array_keys($data[0]), null, 'A1');
+            $sheet->fromArray($data, null, 'A2');
+        }
+
+        $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $writer->save($filepath);
+
+        return $filepath;
+    }
+
     /**
      * Get secure download URL
      */
