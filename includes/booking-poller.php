@@ -297,8 +297,19 @@ class HIC_Booking_Poller {
         
         // Check for completely stuck polling - no successful polls for 1+ hours
         if ($last_successful > 0 && $success_lag > 3600) { // 1 hour without success
-            hic_log("Watchdog: No successful polling for {$success_lag}s - likely timestamp error, triggering timestamp recovery");
-            $this->recover_from_failure('timestamp_error');
+            $cooldown_default = (defined('MINUTE_IN_SECONDS') ? MINUTE_IN_SECONDS : 60) * 10;
+            $cooldown = (int) apply_filters('hic_timestamp_recovery_cooldown', $cooldown_default);
+            $last_timestamp_recovery = (int) get_option('hic_last_timestamp_recovery', 0);
+            $time_since_last_recovery = $current_time - $last_timestamp_recovery;
+
+            if ($last_timestamp_recovery <= 0 || $time_since_last_recovery >= $cooldown) {
+                hic_log("Watchdog: No successful polling for {$success_lag}s - likely timestamp error, triggering timestamp recovery");
+                update_option('hic_last_timestamp_recovery', $current_time, false);
+                \FpHic\Helpers\hic_clear_option_cache('hic_last_timestamp_recovery');
+                $this->recover_from_failure('timestamp_error');
+            } else {
+                hic_log("Watchdog: Timestamp recovery skipped due to cooldown ({$time_since_last_recovery}s since last attempt)");
+            }
         }
         
         // Check if WP-Cron events are properly scheduled
