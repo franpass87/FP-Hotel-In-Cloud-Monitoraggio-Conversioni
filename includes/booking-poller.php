@@ -710,7 +710,43 @@ class HIC_Booking_Poller {
                 $result = null;
             }
             if (is_wp_error($result)) {
-                hic_log('Continuous polling error: ' . $result->get_error_message(), HIC_LOG_LEVEL_ERROR);
+                $error_message = $result->get_error_message();
+                $error_code    = $result->get_error_code();
+                $error_data    = $result->get_error_data($error_code);
+
+                if (null === $error_data) {
+                    $error_data = $result->get_error_data();
+                }
+
+                $error_details = '';
+
+                if (!empty($error_data)) {
+                    if (is_array($error_data)) {
+                        $normalized_details = array();
+
+                        foreach ($error_data as $detail) {
+                            if (is_scalar($detail)) {
+                                $normalized_details[] = (string) $detail;
+                            } elseif (is_array($detail) || is_object($detail)) {
+                                $normalized_details[] = function_exists('wp_json_encode') ? wp_json_encode($detail) : json_encode($detail);
+                            }
+                        }
+
+                        if (!empty($normalized_details)) {
+                            $error_details = implode('; ', $normalized_details);
+                        }
+                    } elseif (is_scalar($error_data)) {
+                        $error_details = (string) $error_data;
+                    } else {
+                        $error_details = function_exists('wp_json_encode') ? wp_json_encode($error_data) : json_encode($error_data);
+                    }
+                }
+
+                if ($error_details !== '' && false === strpos($error_message, $error_details)) {
+                    $error_message .= ' | Details: ' . $error_details;
+                }
+
+                hic_log('Continuous polling error: ' . $error_message, HIC_LOG_LEVEL_ERROR);
                 $this->increment_failure_counter('hic_continuous_poll_failures');
             }
         } catch (\Throwable $e) {

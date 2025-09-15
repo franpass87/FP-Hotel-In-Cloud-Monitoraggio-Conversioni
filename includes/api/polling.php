@@ -1591,6 +1591,7 @@ function hic_api_poll_bookings_continuous() {
         $total_new = 0;
         $total_skipped = 0;
         $total_errors = 0;
+        $polling_errors = array();
         
         // Check for new and updated reservations using /reservations_updates endpoint
         // This is the most effective way to catch recently created/modified reservations
@@ -1630,6 +1631,7 @@ function hic_api_poll_bookings_continuous() {
         } else {
             $error_message = $updated_reservations->get_error_message();
             hic_log("Continuous Polling: Error checking for updates: " . $error_message);
+            $polling_errors[] = 'updates polling: ' . $error_message;
             $total_errors++;
             
             // Check if this is a timestamp too old error and reset if necessary
@@ -1672,7 +1674,9 @@ function hic_api_poll_bookings_continuous() {
                 $total_errors += $process_result['errors'];
             }
         } else {
-            hic_log("Continuous Polling: Error fetching reservations by checkin date: " . $checkin_reservations->get_error_message());
+            $error_message = $checkin_reservations->get_error_message();
+            hic_log("Continuous Polling: Error fetching reservations by checkin date: " . $error_message);
+            $polling_errors[] = 'checkin date polling: ' . $error_message;
             $total_errors++;
         }
         
@@ -1693,7 +1697,14 @@ function hic_api_poll_bookings_continuous() {
         hic_log("Continuous Polling: Completed in {$execution_time}ms - New: $total_new, Skipped: $total_skipped, Errors: $total_errors");
 
         if ($total_errors > 0) {
-            return new WP_Error('hic_polling_errors', 'Errors occurred during continuous polling');
+            $error_message = 'Errors occurred during continuous polling';
+
+            if (!empty($polling_errors)) {
+                $error_message .= ': ' . implode('; ', $polling_errors);
+                return new WP_Error('hic_polling_errors', $error_message, $polling_errors);
+            }
+
+            return new WP_Error('hic_polling_errors', $error_message);
         }
 
         return true;
