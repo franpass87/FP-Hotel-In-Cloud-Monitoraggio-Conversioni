@@ -23,6 +23,7 @@ class HIC_Booking_Poller {
         add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
         add_action('hic_cleanup_event', 'hic_cleanup_old_gclids');
         add_action('hic_booking_events_cleanup', 'hic_cleanup_booking_events');
+        add_action('hic_scheduler_restart', array($this, 'ensure_scheduler_is_active'));
         
         // ENHANCED: Multiple scheduler activation points for better reliability
         add_action('init', array($this, 'ensure_scheduler_is_active'), 20);
@@ -65,8 +66,9 @@ class HIC_Booking_Poller {
             hic_log("Scheduler: Detected dormant scheduler (polling lag: {$polling_lag}s) - forcing complete restart");
             // Clear all events and reschedule fresh
             $this->clear_all_scheduled_events();
-            // Add a small delay to ensure cleanup completes
-            sleep(1);
+            // Schedule asynchronous restart instead of blocking sleep
+            $this->schedule_scheduler_restart();
+            return;
         }
         
         // Check and schedule continuous polling event
@@ -154,10 +156,21 @@ class HIC_Booking_Poller {
      */
     public function clear_all_scheduled_events() {
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event'); 
+        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_cleanup_event');
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_booking_events_cleanup');
         hic_log('WP-Cron Scheduler: Cleared all scheduled events (including re-enabled deep check)');
+    }
+
+    /**
+     * Schedule a non-blocking restart of the scheduler
+     */
+    private function schedule_scheduler_restart() {
+        if (function_exists('wp_next_scheduled') && function_exists('wp_schedule_single_event')) {
+            if (!wp_next_scheduled('hic_scheduler_restart')) {
+                wp_schedule_single_event(time() + 1, 'hic_scheduler_restart');
+            }
+        }
     }
     
     /**
@@ -298,8 +311,7 @@ class HIC_Booking_Poller {
             case 'scheduling':
                 // Full scheduler restart
                 $this->clear_all_scheduled_events();
-                sleep(1);
-                $this->ensure_scheduler_is_active();
+                $this->schedule_scheduler_restart();
                 break;
                 
             case 'timestamp_error':
@@ -329,10 +341,9 @@ class HIC_Booking_Poller {
                 
                 // Also restart the scheduler to ensure clean state
                 $this->clear_all_scheduled_events();
-                sleep(1);
-                $this->ensure_scheduler_is_active();
-                
-                hic_log("Recovery: All timestamps reset - data timestamps to " . wp_date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . wp_date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restarted with 30-minute deep check");
+                $this->schedule_scheduler_restart();
+
+                hic_log("Recovery: All timestamps reset - data timestamps to " . wp_date('Y-m-d H:i:s', $safe_timestamp) . ", polling timestamps to " . wp_date('Y-m-d H:i:s', $recent_timestamp) . ", scheduler restart scheduled with 30-minute deep check");
                 break;
         }
         

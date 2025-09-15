@@ -44,6 +44,12 @@ if (!function_exists('wp_next_scheduled')) { function wp_next_scheduled(...$args
 if (!function_exists('wp_schedule_event')) { function wp_schedule_event(...$args) { return true; } }
 if (!function_exists('wp_unschedule_event')) { function wp_unschedule_event(...$args) { return true; } }
 if (!function_exists('wp_clear_scheduled_hook')) { function wp_clear_scheduled_hook(...$args) { return true; } }
+if (!function_exists('wp_schedule_single_event')) {
+    function wp_schedule_single_event(...$args) {
+        $GLOBALS['wp_scheduled_events'][] = $args;
+        return true;
+    }
+}
 if (!function_exists('is_admin')) { function is_admin() { return false; } }
 if (!function_exists('admin_url')) { function admin_url($path = '') { return $path; } }
 if (!function_exists('wp_enqueue_script')) { function wp_enqueue_script(...$args) {} }
