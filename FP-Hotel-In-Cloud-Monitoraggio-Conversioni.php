@@ -178,7 +178,7 @@ function hic_activate($network_wide)
         ! \is_admin()
         && ! \wp_doing_cron()
         && ! \wp_doing_ajax()
-        && ! ( \defined('REST_REQUEST') && REST_REQUEST )
+        && ! ( \defined('REST_REQUEST') && \REST_REQUEST )
         && ( ! \defined('WP_CLI') || ! \WP_CLI )
     ) {
         \hic_capture_tracking_params();
