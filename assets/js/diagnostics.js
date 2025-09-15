@@ -23,6 +23,13 @@ jQuery(document).ready(function($) {
         }, callback, 'json');
     };
 
+    window.hicGetPollingMetrics = function(callback) {
+        $.post(ajaxurl, {
+            action: 'hic_get_polling_metrics',
+            nonce: hicDiagnostics.polling_metrics_nonce
+        }, callback, 'json');
+    };
+
         // Enhanced UI functionality
 
         // Toast notification system
