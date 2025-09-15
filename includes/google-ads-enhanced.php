@@ -28,6 +28,7 @@ class GoogleAdsEnhancedConversions {
             // Only add admin menu to allow enabling/configuration
             add_action('admin_menu', [$this, 'add_enhanced_conversions_menu']);
             add_action('admin_init', [$this, 'handle_enhanced_conversions_form']);
+            add_action('admin_init', [$this, 'register_settings']);
             return;
         }
         
@@ -39,6 +40,7 @@ class GoogleAdsEnhancedConversions {
         add_action('admin_menu', [$this, 'add_enhanced_conversions_menu']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_enhanced_conversions_assets']);
         add_action('admin_init', [$this, 'handle_enhanced_conversions_form']);
+        add_action('admin_init', [$this, 'register_settings']);
         
         // AJAX handlers
         add_action('wp_ajax_hic_test_google_ads_connection', [$this, 'ajax_test_google_ads_connection']);
@@ -1017,7 +1019,52 @@ class GoogleAdsEnhancedConversions {
             wp_send_json_error(['message' => 'Upload failed: ' . $e->getMessage()]);
         }
     }
-    
+
+    /**
+     * Register settings for Enhanced Conversions
+     */
+    public function register_settings() {
+        register_setting(
+            'hic_google_ads_enhanced_settings',
+            'hic_google_ads_enhanced_settings',
+            [
+                'sanitize_callback' => [$this, 'sanitize_settings'],
+            ]
+        );
+    }
+
+    /**
+     * Sanitize settings before saving to the database
+     *
+     * @param array $settings
+     * @return array
+     */
+    public function sanitize_settings($settings) {
+        if (!is_array($settings)) {
+            return [];
+        }
+        // Example: sanitize expected fields. Adjust field names/types as needed.
+        $sanitized = [];
+        foreach ($settings as $key => $value) {
+            switch ($key) {
+                case 'some_checkbox_field':
+                    $sanitized[$key] = !empty($value) ? 1 : 0;
+                    break;
+                case 'some_text_field':
+                    $sanitized[$key] = sanitize_text_field($value);
+                    break;
+                case 'some_email_field':
+                    $sanitized[$key] = sanitize_email($value);
+                    break;
+                default:
+                    // Default to text field sanitization
+                    $sanitized[$key] = sanitize_text_field($value);
+                    break;
+            }
+        }
+        return $sanitized;
+    }
+
     /**
      * Handle Enhanced Conversions form submission
      */
