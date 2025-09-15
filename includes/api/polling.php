@@ -4,7 +4,7 @@ namespace FpHic;
 use \WP_Error;
 /**
  * API Polling Handler - Core API Functions Only
- * Note: WP-Cron scheduling removed in favor of internal scheduler (booking-poller.php)
+ * Note: Scheduling is handled by booking-poller.php via WP-Cron; this file focuses on API polling logic
  */
 
 if (!defined('ABSPATH')) exit;
@@ -117,7 +117,7 @@ function hic_handle_api_response($response, $context = 'API call') {
 }
 
 /* ============ Core API Functions ============ */
-// Note: WP-Cron scheduling has been removed in favor of the internal scheduler 
+// Note: WP-Cron scheduling is managed by the booking-poller
 // in booking-poller.php. This file now contains only core API functions.
 
 /**

@@ -499,7 +499,7 @@ function hic_polling_interval_render() {
     echo '<option value="hic_poll_interval"' . selected($interval, 'hic_poll_interval', false) . '>Ogni 5 minuti (compatibilità)</option>';
     echo '<option value="hic_reliable_interval"' . selected($interval, 'hic_reliable_interval', false) . '>Ogni 5 minuti (affidabile)</option>';
     echo '</select>';
-    echo '<p class="description">Frequenza del polling API per prenotazioni quasi real-time. "Affidabile" non dipende da WP-Cron.</p>';
+    echo '<p class="description">Frequenza del polling API per prenotazioni quasi real-time. "Affidabile" utilizza WP-Cron con watchdog.</p>';
 }
 
 function hic_reliable_polling_enabled_render() {
@@ -508,7 +508,7 @@ function hic_reliable_polling_enabled_render() {
     echo '<input type="checkbox" name="hic_reliable_polling_enabled" value="1"' . checked($enabled, true, false) . ' />';
     echo ' Attiva sistema polling affidabile';
     echo '</label>';
-    echo '<p class="description">Sistema interno con watchdog e recupero automatico, indipendente da WP-Cron. <strong>Raccomandato per hosting condiviso.</strong></p>';
+    echo '<p class="description">Sistema interno con watchdog e recupero automatico basato su WP-Cron. <strong>Raccomandato per hosting condiviso.</strong></p>';
 }
 
 // Extended HIC Integration render functions

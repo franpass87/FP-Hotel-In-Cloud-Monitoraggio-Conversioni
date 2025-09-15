@@ -69,7 +69,7 @@ Il nuovo sistema è **già ottimizzato** e non richiede configurazioni aggiuntiv
 
 - ✅ **Polling Continuo**: Ogni minuto controlla prenotazioni recenti e manuali
 - ✅ **Deep Check**: Ogni 30 minuti controlla le ultime 5 prenotazioni per verificare che nulla venga perso  
-- ✅ **Non dipende da WP-Cron**: Utilizza WordPress Heartbeat API (più affidabile)
+- ✅ **Basato su WP-Cron** con watchdog e fallback per maggiore affidabilità
 - ✅ **Cattura prenotazioni manuali**: Include automaticamente le prenotazioni inserite manualmente dallo staff
 
 **Non sono più necessarie** le configurazioni cron esterne!

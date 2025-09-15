@@ -40,8 +40,8 @@
 **R**: **Sì, esatto!** Il plugin include un sistema di scheduling interno ottimizzato (`HIC_Booking_Poller`) che:
 
 - ⏰ **Polling continuo ogni 30 secondi** per prenotazioni recenti e manuali (quasi real-time)
-- 🚀 **Deep check disabilitato** - il polling continuo ogni 30 secondi è sufficiente per la copertura totale
-- 🔒 **Non dipende da WordPress cron** (più affidabile)
+- 🚀 **Deep check attivo ogni 30 minuti** per verificare le ultime prenotazioni
+- 🔒 **Basato su WP-Cron** con meccanismi di watchdog e fallback
 - 🛡️ **Ha protezioni anti-overlap** (lock e watchdog)
 - 📋 **Cattura TUTTE le prenotazioni** (online + manuali dello staff)
 - 🎯 **È completamente automatico** una volta configurato

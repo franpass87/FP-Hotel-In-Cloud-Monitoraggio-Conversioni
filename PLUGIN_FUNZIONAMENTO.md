@@ -18,7 +18,7 @@ Quando arriva una nuova prenotazione su Hotel in Cloud, il plugin può intercett
 
 #### Modalità B: API Polling (Raccomandato)
 - WordPress controlla autonomamente HIC ogni 1-5 minuti
-- Sistema di polling interno **indipendente da WordPress cron**
+- Sistema di polling interno basato su **WP-Cron** con controlli di watchdog
 - **Vantaggio**: Più affidabile, cattura anche prenotazioni manuali
 - **Svantaggio**: Leggero ritardo (1-5 minuti)
 
@@ -39,7 +39,7 @@ Il plugin include un **sistema di scheduling interno** (`HIC_Booking_Poller`) ch
 - 🔒 **Lock anti-overlap**: Previene esecuzioni sovrapposte
 - 🐕 **Watchdog**: Monitora e riavvia automaticamente se necessario
 - 📊 **Logging strutturato**: Traccia tutte le operazioni
-- 🚫 **Indipendente da WP-Cron**: Funziona anche se WP-Cron è disabilitato
+- 🕒 **Basato su WP-Cron** con fallback automatico in caso di malfunzionamenti
 
 ### 3. Elaborazione della Prenotazione
 
@@ -165,13 +165,13 @@ Pannello admin completo per:
 
 ✅ **Corretto!** Il plugin ha un **sistema di scheduling interno** che:
 - Controlla HIC ogni 1-5 minuti per nuove prenotazioni
-- Non dipende da WordPress cron
+- Utilizza WP-Cron con meccanismi di watchdog
 - È più affidabile del webhook
 - Cattura anche prenotazioni inserite manualmente in HIC
 
 ## Vantaggi del Sistema
 
-1. **Affidabilità**: Sistema interno indipendente da WordPress
+1. **Affidabilità**: Sistema interno integrato in WordPress con controlli dedicati
 2. **Completezza**: Cattura tutte le prenotazioni (anche manuali)
 3. **Multi-canale**: Invia contemporaneamente a GA4, Meta e Brevo
 4. **Attribution**: Traccia fonte della conversione (Google Ads, Facebook, organico)

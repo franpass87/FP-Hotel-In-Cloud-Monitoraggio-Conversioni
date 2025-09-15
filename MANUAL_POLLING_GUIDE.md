@@ -72,9 +72,9 @@ Each condition must be ✅ (green checkmark) for automatic polling to work:
 **Solution**: Use "Forza Polling Ora" to clear the lock and restart polling
 
 ### Issue: "Il timestamp è troppo vecchio (oltre 7 giorni)" - Polling Stops
-**Symptoms**: 
+**Symptoms**:
 - Logs show "HTTP 400 - Il timestamp è troppo vecchio (oltre 7 giorni)"
-- Diagnostics show "Polling Continuo (1 min): Mai" and "Deep Check (10 min): Mai"
+- Diagnostics show "Polling Continuo (1 min): Mai" and "Deep Check (30 min): Mai"
 - Status shows "Prossimo continuo: In attesa di avvio"
 
 **Automatic Solution**: 

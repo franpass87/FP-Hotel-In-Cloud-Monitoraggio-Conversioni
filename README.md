@@ -11,7 +11,7 @@ Plugin WordPress per il monitoraggio avanzato delle conversioni da Hotel in Clou
 4. 📱 **La invia a Meta** (evento Purchase per Facebook Ads)
 5. ♻️ **Traccia eventuali rimborsi** (evento refund con valore negativo, attivabile dalle impostazioni)
 
-Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling** indipendente da WordPress cron.
+Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling** basato su WP-Cron con meccanismi di watchdog e fallback.
 
 ### Modalità di Funzionamento
 

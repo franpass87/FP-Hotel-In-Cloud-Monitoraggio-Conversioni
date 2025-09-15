@@ -26,7 +26,7 @@
 │  │ v1/conversion   │    │  • Controlla ogni 1-5 minuti                │   │
 │  └─────────┬───────┘    │  • Lock anti-overlap                        │   │
 │            │            │  • Watchdog system                          │   │
-│            │            │  • Indipendente da WP-Cron                  │   │
+│            │            │  • Basato su WP-Cron con watchdog           │   │
 │            │            └──────────────────┬───────────────────────────┘   │
 │            │                               │                               │
 │            └───────────┬───────────────────┘                               │
