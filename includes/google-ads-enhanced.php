@@ -1026,8 +1026,43 @@ class GoogleAdsEnhancedConversions {
     public function register_settings() {
         register_setting(
             'hic_google_ads_enhanced_settings',
-            'hic_google_ads_enhanced_settings'
+            'hic_google_ads_enhanced_settings',
+            [
+                'sanitize_callback' => [$this, 'sanitize_settings'],
+            ]
         );
+    }
+
+    /**
+     * Sanitize settings before saving to the database
+     *
+     * @param array $settings
+     * @return array
+     */
+    public function sanitize_settings($settings) {
+        if (!is_array($settings)) {
+            return [];
+        }
+        // Example: sanitize expected fields. Adjust field names/types as needed.
+        $sanitized = [];
+        foreach ($settings as $key => $value) {
+            switch ($key) {
+                case 'some_checkbox_field':
+                    $sanitized[$key] = !empty($value) ? 1 : 0;
+                    break;
+                case 'some_text_field':
+                    $sanitized[$key] = sanitize_text_field($value);
+                    break;
+                case 'some_email_field':
+                    $sanitized[$key] = sanitize_email($value);
+                    break;
+                default:
+                    // Default to text field sanitization
+                    $sanitized[$key] = sanitize_text_field($value);
+                    break;
+            }
+        }
+        return $sanitized;
     }
 
     /**
