@@ -779,4 +779,6 @@ class RealtimeDashboard {
 }
 
 // Initialize the real-time dashboard
-new RealtimeDashboard();
+if ( ! wp_doing_cron() ) {
+    new RealtimeDashboard();
+}

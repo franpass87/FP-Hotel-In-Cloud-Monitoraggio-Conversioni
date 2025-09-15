@@ -1078,4 +1078,6 @@ class AutomatedReportingManager {
 }
 
 // Initialize the automated reporting manager
-new AutomatedReportingManager();
+if ( ! wp_doing_cron() ) {
+    new AutomatedReportingManager();
+}
