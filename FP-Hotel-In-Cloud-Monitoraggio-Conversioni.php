@@ -174,7 +174,13 @@ function hic_activate($network_wide)
 
 // Initialize tracking parameters capture
 \add_action('init', function () {
-    if ( ! \is_admin() && ! \wp_doing_cron() && ( ! \defined('WP_CLI') || ! \WP_CLI ) ) {
+    if (
+        ! \is_admin()
+        && ! \wp_doing_cron()
+        && ! \wp_doing_ajax()
+        && ! ( \defined('REST_REQUEST') && REST_REQUEST )
+        && ( ! \defined('WP_CLI') || ! \WP_CLI )
+    ) {
         \hic_capture_tracking_params();
     }
 });
