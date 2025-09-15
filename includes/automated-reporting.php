@@ -66,19 +66,26 @@ class AutomatedReportingManager {
      * Initialize reporting system
      */
     public function initialize_reporting() {
+        if (did_action('hic_automated_reporting_initialized')) {
+            $this->log('Automated Reporting Manager already initialized, skipping duplicate setup');
+            return;
+        }
+
         $this->log('Initializing Automated Reporting Manager');
-        
+
         // Create exports directory
         $this->ensure_export_directory();
-        
+
         // Create reports history table
         $this->create_reports_history_table();
-        
+
         // Schedule automatic reports
         $this->schedule_automatic_reports();
-        
+
         // Clean up old exports periodically
         $this->schedule_export_cleanup();
+
+        do_action('hic_automated_reporting_initialized', $this);
     }
     
     /**
@@ -1208,9 +1215,4 @@ class AutomatedReportingManager {
             \FpHic\Helpers\hic_log("[Automated Reporting] {$message}");
         }
     }
-}
-
-// Initialize the automated reporting manager
-if ( ! wp_doing_cron() ) {
-    new AutomatedReportingManager();
 }
