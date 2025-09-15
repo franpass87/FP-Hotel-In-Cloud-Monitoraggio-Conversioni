@@ -30,6 +30,13 @@ jQuery(document).ready(function($) {
         }, callback, 'json');
     };
 
+    window.hicGetDatabaseStats = function(callback) {
+        $.post(ajaxurl, {
+            action: 'hic_get_database_stats',
+            nonce: hicDiagnostics.optimize_db_nonce
+        }, callback, 'json');
+    };
+
         // Enhanced UI functionality
 
         // Toast notification system

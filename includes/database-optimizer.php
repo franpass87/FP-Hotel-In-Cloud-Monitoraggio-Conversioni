@@ -662,8 +662,12 @@ class DatabaseOptimizer {
      * AJAX: Get database statistics
      */
     public function ajax_get_database_stats() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+        if (!current_user_can('hic_manage')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+
+        if (!check_ajax_referer('hic_optimize_db', 'nonce', false)) {
+            wp_send_json_error('Invalid nonce');
         }
         
         global $wpdb;
