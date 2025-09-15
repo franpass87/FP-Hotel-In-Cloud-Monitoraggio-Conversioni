@@ -238,13 +238,13 @@ class CircuitBreakerManager {
     public function schedule_circuit_breaker_tasks() {
         // Schedule retry queue processing
         if (!wp_next_scheduled('hic_process_retry_queue')) {
-            wp_schedule_event(time(), 'hic_every_minute', 'hic_process_retry_queue');
+            wp_schedule_event(time(), 'hic_every_thirty_seconds', 'hic_process_retry_queue');
             $this->log('Scheduled retry queue processing');
         }
         
         // Schedule circuit breaker recovery checks
         if (!wp_next_scheduled('hic_check_circuit_breaker_recovery')) {
-            wp_schedule_event(time(), 'hic_every_minute', 'hic_check_circuit_breaker_recovery');
+            wp_schedule_event(time(), 'hic_every_thirty_seconds', 'hic_check_circuit_breaker_recovery');
             $this->log('Scheduled circuit breaker recovery checks');
         }
     }
