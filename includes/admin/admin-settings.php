@@ -71,7 +71,11 @@ function hic_ajax_test_api_connection() {
     // Get credentials from AJAX request or settings
     $prop_id = sanitize_text_field( wp_unslash( $_POST['prop_id'] ?? '' ) );
     $email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
-    $password = sanitize_text_field( wp_unslash( $_POST['password'] ?? '' ) );
+    // Allow special characters in password; only unslash without sanitization.
+    $password = wp_unslash( $_POST['password'] ?? '' );
+    if ( strlen( $password ) === 0 ) {
+        $password = '';
+    }
     
     // Test the API connection
     $result = \FpHic\hic_test_api_connection($prop_id, $email, $password);
