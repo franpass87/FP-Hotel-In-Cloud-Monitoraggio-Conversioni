@@ -236,7 +236,35 @@ class HIC_Booking_Poller {
             $has_auth ? 'YES' : 'NO'
         );
 
-        hic_log($status_msg);
+        $default_interval = (defined('MINUTE_IN_SECONDS') ? MINUTE_IN_SECONDS : 60) * 5;
+        $log_interval = $default_interval;
+
+        if (function_exists('apply_filters')) {
+            $log_interval = apply_filters('hic_scheduler_status_log_interval', $default_interval);
+        }
+
+        $log_interval = max(0, (int) $log_interval);
+        $current_time = time();
+        $last_log_time = (int) get_option('hic_last_scheduler_status_log_time', 0);
+        $last_status_message = (string) get_option('hic_last_scheduler_status_message', '');
+
+        $should_log_status = false;
+
+        if ($status_msg !== $last_status_message) {
+            $should_log_status = true;
+        } elseif (0 === $log_interval) {
+            $should_log_status = true;
+        } elseif (($current_time - $last_log_time) >= $log_interval) {
+            $should_log_status = true;
+        }
+
+        if ($should_log_status) {
+            hic_log($status_msg);
+            update_option('hic_last_scheduler_status_log_time', $current_time, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_last_scheduler_status_log_time');
+            update_option('hic_last_scheduler_status_message', $status_msg, false);
+            \FpHic\Helpers\hic_clear_option_cache('hic_last_scheduler_status_message');
+        }
     }
     
     /**
