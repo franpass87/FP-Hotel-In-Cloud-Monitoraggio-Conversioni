@@ -664,6 +664,8 @@ function hic_format_bookings_as_csv($bookings) {
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_reset_timestamps', 'hic_ajax_reset_timestamps');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_test_brevo_connectivity', 'hic_ajax_test_brevo_connectivity');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_get_system_status', 'hic_ajax_get_system_status');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_test_web_traffic_monitoring', 'hic_ajax_test_web_traffic_monitoring');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_get_web_traffic_stats', 'hic_ajax_get_web_traffic_stats');
 
 
 
@@ -1260,6 +1262,59 @@ function hic_diagnostics_page() {
                             </tr>
                         </table>
                     </div>
+                    
+                    <div class="hic-overview-section">
+                        <h3>🌐 Monitoraggio Traffico Web</h3>
+                        <?php
+                        // Get web traffic monitoring statistics 
+                        $poller = new \FpHic\HIC_Booking_Poller();
+                        $web_stats = $poller->get_web_traffic_stats();
+                        ?>
+                        <table class="hic-status-table">
+                            <tr>
+                                <td>Controlli Totali</td>
+                                <td><strong><?php echo esc_html(number_format($web_stats['total_checks'])); ?></strong></td>
+                                <td>Verifiche automatiche via traffico web</td>
+                            </tr>
+                            <tr>
+                                <td>Ultimo Frontend</td>
+                                <td>
+                                    <?php if ($web_stats['last_frontend_check'] > 0): ?>
+                                        <?php 
+                                        $time_diff = current_time('timestamp') - $web_stats['last_frontend_check'];
+                                        if ($time_diff < 3600): // Less than 1 hour
+                                        ?>
+                                            <span class="status ok"><?php echo esc_html(human_time_diff($web_stats['last_frontend_check'], current_time('timestamp'))); ?> fa</span>
+                                        <?php else: ?>
+                                            <span class="status warning"><?php echo esc_html(human_time_diff($web_stats['last_frontend_check'], current_time('timestamp'))); ?> fa</span>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <span class="status error">Mai</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>Traffico frontend (visitatori)</td>
+                            </tr>
+                            <tr>
+                                <td>Recovery Attivati</td>
+                                <td>
+                                    <?php if ($web_stats['recoveries_triggered'] > 0): ?>
+                                        <span class="status <?php echo $web_stats['recoveries_triggered'] > 5 ? 'warning' : 'ok'; ?>">
+                                            <?php echo esc_html(number_format($web_stats['recoveries_triggered'])); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="status ok">0</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($web_stats['last_recovery_via'] !== 'none'): ?>
+                                        Ultimo: <?php echo esc_html($web_stats['last_recovery_via']); ?>
+                                    <?php else: ?>
+                                        Nessun recovery necessario
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
                 </div>
             </div>
             
@@ -1277,6 +1332,10 @@ function hic_diagnostics_page() {
                         <button class="hic-button hic-button--secondary hic-button--block" id="test-connectivity">
                             <span class="dashicons dashicons-cloud"></span>
                             Test Connessione
+                        </button>
+                        <button class="hic-button hic-button--secondary hic-button--block" id="test-web-traffic">
+                            <span class="dashicons dashicons-networking"></span>
+                            Test Traffico Web
                         </button>
                     </div>
                     
@@ -1702,5 +1761,86 @@ function hic_ajax_test_brevo_connectivity() {
         'contact_api' => $contact_test,
         'event_api'   => $event_test,
     ) );
+}
+
+/**
+ * AJAX handler for testing web traffic monitoring
+ */
+function hic_ajax_test_web_traffic_monitoring() {
+    if ( ! current_user_can('hic_manage') ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
+    }
+
+    if ( ! check_ajax_referer( 'hic_admin_action', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
+    }
+
+    try {
+        hic_log('Manual Web Traffic Test: Starting manual web traffic monitoring test');
+        
+        // Simulate web traffic polling checks
+        $poller = new \FpHic\HIC_Booking_Poller();
+        
+        // Record current state
+        $current_time = time();
+        $last_continuous = get_option('hic_last_continuous_poll', 0);
+        $polling_lag = $current_time - $last_continuous;
+        
+        // Manually trigger proactive check
+        $poller->proactive_scheduler_check();
+        
+        // Manually trigger fallback check
+        $poller->fallback_polling_check();
+        
+        // Get updated stats
+        $web_stats = $poller->get_web_traffic_stats();
+        
+        $response = array(
+            'message' => __( 'Test monitoraggio traffico web completato', 'hotel-in-cloud' ),
+            'polling_lag_seconds' => $polling_lag,
+            'polling_lag_formatted' => round($polling_lag / 60, 1) . ' minuti',
+            'web_traffic_stats' => $web_stats,
+            'test_timestamp' => $current_time,
+            'checks_executed' => array(
+                'proactive_check' => 'completed',
+                'fallback_check' => 'completed'
+            )
+        );
+
+        hic_log('Manual Web Traffic Test: Test completed successfully');
+        wp_send_json_success($response);
+    } catch (Exception $e) {
+        hic_log('Manual Web Traffic Test Error: ' . $e->getMessage());
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante test traffico web: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
+    } catch (Error $e) {
+        hic_log('Manual Web Traffic Test Fatal Error: ' . $e->getMessage());
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore fatale durante test traffico web: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
+    }
+}
+
+/**
+ * AJAX handler for getting web traffic monitoring statistics
+ */
+function hic_ajax_get_web_traffic_stats() {
+    if ( ! current_user_can('hic_manage') ) {
+        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
+    }
+
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
+    }
+
+    try {
+        $poller = new \FpHic\HIC_Booking_Poller();
+        $web_stats = $poller->get_web_traffic_stats();
+        
+        wp_send_json_success( array(
+            'message' => __( 'Statistiche traffico web recuperate', 'hotel-in-cloud' ),
+            'web_traffic_stats' => $web_stats
+        ) );
+    } catch (Exception $e) {
+        hic_log('Get Web Traffic Stats Error: ' . $e->getMessage());
+        wp_send_json_error( [ 'message' => sprintf( __( 'Errore durante recupero statistiche: %s', 'hotel-in-cloud' ), $e->getMessage() ) ] );
+    }
 }
 
