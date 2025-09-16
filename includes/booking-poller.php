@@ -746,8 +746,8 @@ class HIC_Booking_Poller {
         $stats['last_' . $context['type'] . '_check'] = $context['timestamp'];
         
         // Update lag statistics
-        $stats['average_polling_lag'] = (($stats['average_polling_lag'] * ($stats['total_checks'] - 1)) + $polling_lag) / $stats['total_checks'];
-        $stats['max_polling_lag'] = max($stats['max_polling_lag'], $polling_lag);
+        $stats['average_polling_lag'] = ((($stats['average_polling_lag'] ?? 0) * ($stats['total_checks'] - 1)) + $polling_lag) / $stats['total_checks'];
+        $stats['max_polling_lag'] = max($stats['max_polling_lag'] ?? 0, $polling_lag);
         
         update_option('hic_web_traffic_stats', $stats, false);
     }
@@ -764,7 +764,7 @@ class HIC_Booking_Poller {
         
         update_option('hic_web_traffic_stats', $stats, false);
         
-        hic_log("Web Traffic Recovery: Recovery #{$stats['recoveries_triggered']} triggered via {$context['type']} traffic with {$polling_lag}s lag");
+        \FpHic\Helpers\hic_log("Web Traffic Recovery: Recovery #{$stats['recoveries_triggered']} triggered via {$context['type']} traffic with {$polling_lag}s lag");
     }
     
     /**
@@ -1223,8 +1223,8 @@ class HIC_Booking_Poller {
             wp_date('Y-m-d H:i:s', $stats['last_admin_check']) : 'Never';
         $stats['last_recovery_time_formatted'] = $stats['last_recovery_time'] > 0 ? 
             wp_date('Y-m-d H:i:s', $stats['last_recovery_time']) : 'Never';
-        $stats['average_polling_lag_formatted'] = round($stats['average_polling_lag'] / 60, 1) . ' minutes';
-        $stats['max_polling_lag_formatted'] = round($stats['max_polling_lag'] / 60, 1) . ' minutes';
+        $stats['average_polling_lag_formatted'] = number_format($stats['average_polling_lag'] / 60, 1) . ' minutes';
+        $stats['max_polling_lag_formatted'] = number_format($stats['max_polling_lag'] / 60, 1) . ' minutes';
         
         return $stats;
     }
@@ -1234,7 +1234,7 @@ class HIC_Booking_Poller {
      */
     public function reset_web_traffic_stats() {
         delete_option('hic_web_traffic_stats');
-        hic_log("Web Traffic Stats: Statistics reset");
+        \FpHic\Helpers\hic_log("Web Traffic Stats: Statistics reset");
         return true;
     }
     
