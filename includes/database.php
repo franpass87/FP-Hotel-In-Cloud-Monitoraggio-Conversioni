@@ -219,6 +219,50 @@ function hic_create_failed_requests_table(){
   return true;
 }
 
+/**
+ * Ensure UTM columns exist in the gclids table
+ * This function checks and adds missing UTM columns dynamically
+ */
+function hic_ensure_utm_columns_exist() {
+  global $wpdb;
+
+  if (!$wpdb) {
+    hic_log('hic_ensure_utm_columns_exist: wpdb is not available');
+    return false;
+  }
+
+  $table = $wpdb->prefix . 'hic_gclids';
+  
+  // Check if table exists first
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+  if (!$table_exists) {
+    hic_log('hic_ensure_utm_columns_exist: Table does not exist, creating: ' . $table);
+    if (!hic_create_database_table()) {
+      return false;
+    }
+  }
+
+  // List of UTM columns that should exist
+  $utm_columns = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+  
+  foreach ($utm_columns as $column) {
+    $column_exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", $column));
+    if (empty($column_exists)) {
+      $alter_sql = "ALTER TABLE $table ADD COLUMN $column VARCHAR(255)";
+      $result = $wpdb->query($alter_sql);
+      
+      if ($result === false) {
+        hic_log("hic_ensure_utm_columns_exist: Failed to add column $column: " . $wpdb->last_error);
+        return false;
+      } else {
+        hic_log("hic_ensure_utm_columns_exist: Successfully added column $column to $table");
+      }
+    }
+  }
+
+  return true;
+}
+
 /* ============ DB: migrations ============ */
 function hic_maybe_upgrade_db() {
   global $wpdb;
@@ -471,6 +515,12 @@ function hic_capture_tracking_params(){
   }
 
   if (!empty($utm_params)) {
+    // Ensure UTM columns exist before trying to store data
+    if (!hic_ensure_utm_columns_exist()) {
+      hic_log('hic_capture_tracking_params: Failed to ensure UTM columns exist');
+      return false;
+    }
+
     if (!$sid_for_utm) {
       $sid_for_utm = (string) wp_generate_uuid4();
       $cookie_args = apply_filters('hic_sid_cookie_args', [
