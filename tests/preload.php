@@ -41,7 +41,26 @@ if (!function_exists('apply_filters')) {
 if (!function_exists('register_activation_hook')) { function register_activation_hook(...$args) {} }
 if (!function_exists('register_deactivation_hook')) { function register_deactivation_hook(...$args) {} }
 if (!function_exists('wp_next_scheduled')) { function wp_next_scheduled(...$args) { return false; } }
-if (!function_exists('wp_schedule_event')) { function wp_schedule_event(...$args) { return true; } }
+if (!function_exists('wp_schedule_event')) {
+    function wp_schedule_event($timestamp, $recurrence, $hook, $args = array()) {
+        if (!empty($GLOBALS['wp_schedule_event_invalid'][$recurrence])) {
+            return new WP_Error('invalid_schedule', 'Invalid schedule');
+        }
+
+        if (!isset($GLOBALS['wp_scheduled_events'])) {
+            $GLOBALS['wp_scheduled_events'] = [];
+        }
+
+        $GLOBALS['wp_scheduled_events'][] = [
+            'timestamp' => $timestamp,
+            'recurrence' => $recurrence,
+            'hook' => $hook,
+            'args' => $args,
+        ];
+
+        return true;
+    }
+}
 if (!function_exists('wp_unschedule_event')) { function wp_unschedule_event(...$args) { return true; } }
 if (!function_exists('wp_clear_scheduled_hook')) { function wp_clear_scheduled_hook(...$args) { return true; } }
 if (!function_exists('wp_schedule_single_event')) {
