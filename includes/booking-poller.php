@@ -31,6 +31,9 @@ class HIC_Booking_Poller {
         add_action('hic_booking_events_cleanup', 'hic_cleanup_booking_events');
         add_action('hic_scheduler_restart', array($this, 'ensure_scheduler_is_active'));
         
+        // CRITICAL FIX: Add independent self-healing recovery mechanism
+        add_action('hic_self_healing_recovery', array($this, 'execute_self_healing_recovery'));
+        
         // ENHANCED: Multiple scheduler activation points for better reliability
         add_action('init', array($this, 'ensure_scheduler_is_active'), 20);
         add_action('wp', array($this, 'proactive_scheduler_check'), 5); // Runs on frontend AND backend
@@ -137,6 +140,17 @@ class HIC_Booking_Poller {
             }
         }
         
+        // CRITICAL FIX: Schedule self-healing recovery mechanism
+        $recovery_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_self_healing_recovery');
+        if (!$recovery_next) {
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time() + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
+            if ($scheduled) {
+                hic_log('WP-Cron Scheduler: Scheduled self-healing recovery every 15 minutes');
+            } else {
+                hic_log('WP-Cron Scheduler: FAILED to schedule self-healing recovery event');
+            }
+        }
+        
         // Log current scheduling status
         $this->log_scheduler_status();
 
@@ -158,6 +172,11 @@ class HIC_Booking_Poller {
             'interval' => HIC_DEEP_CHECK_INTERVAL,
             'display' => 'Every 30 Minutes (HIC Deep Check)'
         );
+        // CRITICAL FIX: Add 15-minute interval for self-healing recovery
+        $schedules['hic_every_fifteen_minutes'] = array(
+            'interval' => 900, // 15 minutes
+            'display' => 'Every 15 Minutes (HIC Self-Healing Recovery)'
+        );
         return $schedules;
     }
     
@@ -169,7 +188,8 @@ class HIC_Booking_Poller {
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_cleanup_event');
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_booking_events_cleanup');
-        hic_log('WP-Cron Scheduler: Cleared all scheduled events (including re-enabled deep check)');
+        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_self_healing_recovery');
+        hic_log('WP-Cron Scheduler: Cleared all scheduled events (including self-healing recovery)');
     }
 
     /**
@@ -266,21 +286,23 @@ class HIC_Booking_Poller {
             return false;
         }
         
-        // Check if events are scheduled (including re-enabled deep check)
+        // Check if events are scheduled (including self-healing recovery)
         $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
+        $recovery_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_self_healing_recovery');
 
-        $is_working = ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false);
+        $is_working = ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false && $recovery_next !== false);
 
         if (!$is_working) {
             $debug_info = sprintf(
-                'WP-Cron events check: continuous=%s, deep=%s, cleanup=%s, booking_cleanup=%s',
+                'WP-Cron events check: continuous=%s, deep=%s, cleanup=%s, booking_cleanup=%s, recovery=%s',
                 $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
                 $deep_next ? wp_date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
                 $cleanup_next ? wp_date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
-                $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED'
+                $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED',
+                $recovery_next ? wp_date('Y-m-d H:i:s', $recovery_next) : 'NOT_SCHEDULED'
             );
             hic_log('WP-Cron not working: ' . $debug_info);
         }
@@ -533,10 +555,15 @@ class HIC_Booking_Poller {
      * Admin watchdog check - runs when admin pages are loaded
      */
     public function admin_watchdog_check() {
-        // Only run on HIC admin pages to avoid unnecessary overhead
-        if (!isset($_GET['page']) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), 'hic' ) === false) {
-            return;
+        // CRITICAL FIX: Run on all admin pages but with throttling to reduce overhead
+        // Use a transient to limit frequency (every 10 minutes max)
+        $last_admin_check = get_transient('hic_last_admin_watchdog_check');
+        if ($last_admin_check) {
+            return; // Don't run too frequently
         }
+        
+        // Set transient to throttle future checks
+        set_transient('hic_last_admin_watchdog_check', time(), 600); // 10 minutes
         
         // Run a lightweight watchdog check
         if ($this->should_poll()) {
@@ -799,6 +826,10 @@ class HIC_Booking_Poller {
      */
     public function execute_continuous_polling() {
         hic_log("Scheduler: Executing continuous polling (30-second interval)");
+        
+        // CRITICAL FIX: Self-healing check at the start of each execution
+        $this->perform_self_healing_check();
+        
         $result = false;
         try {
             if (function_exists('\FpHic\hic_api_poll_bookings_continuous')) {
@@ -866,6 +897,9 @@ class HIC_Booking_Poller {
      */
     public function execute_deep_check() {
         hic_log("Scheduler: Executing deep check (30-minute interval, focusing on last 5 bookings)");
+        
+        // CRITICAL FIX: Self-healing check for deep check as well
+        $this->perform_self_healing_check();
         
         $result = null;
         $success = false;
@@ -1295,6 +1329,185 @@ class HIC_Booking_Poller {
         update_option($option_name, $failures + 1, false);
         \FpHic\Helpers\hic_clear_option_cache($option_name);
     }
+    
+    /**
+     * CRITICAL FIX: Perform self-healing check to ensure scheduler stays active
+     * This runs on every polling execution to detect and fix dormant schedulers
+     * without relying on page visits
+     */
+    private function perform_self_healing_check() {
+        // Skip if polling shouldn't be active
+        if (!$this->should_poll()) {
+            return;
+        }
+        
+        // Prevent recursive calls during recovery operations
+        static $in_recovery = false;
+        if ($in_recovery) {
+            return;
+        }
+        
+        $current_time = time();
+        
+        // Check if all required events are scheduled
+        $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        $recovery_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_self_healing_recovery');
+        
+        $missing_events = array();
+        if (!$continuous_next) $missing_events[] = 'continuous_poll';
+        if (!$deep_next) $missing_events[] = 'deep_check';
+        if (!$recovery_next) $missing_events[] = 'self_healing_recovery';
+        
+        // If any critical events are missing, schedule them immediately
+        if (!empty($missing_events)) {
+            // Set recovery flag to prevent recursion
+            $in_recovery = true;
+            
+            try {
+                hic_log("Self-Healing: Missing critical events: " . implode(', ', $missing_events) . " - rescheduling immediately");
+                
+                if (!$continuous_next) {
+                    \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
+                }
+                if (!$deep_next) {
+                    \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
+                }
+                if (!$recovery_next) {
+                    \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
+                }
+            } finally {
+                // Always reset recovery flag
+                $in_recovery = false;
+            }
+        }
+        
+        // Check for overdue events (beyond reasonable execution window)
+        $max_delay = 300; // 5 minutes - anything older indicates a problem
+        $recovery_needed = false;
+        
+        if ($continuous_next && $continuous_next < ($current_time - $max_delay)) {
+            hic_log("Self-Healing: Continuous polling event overdue by " . ($current_time - $continuous_next) . " seconds");
+            $recovery_needed = true;
+        }
+        
+        if ($deep_next && $deep_next < ($current_time - $max_delay)) {
+            hic_log("Self-Healing: Deep check event overdue by " . ($current_time - $deep_next) . " seconds");
+            $recovery_needed = true;
+        }
+        
+        // If events are severely overdue, force immediate rescheduling
+        if ($recovery_needed) {
+            // Set recovery flag to prevent recursion
+            $in_recovery = true;
+            
+            try {
+                hic_log("Self-Healing: Force rescheduling overdue events");
+                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+                
+                \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
+            } finally {
+                // Always reset recovery flag
+                $in_recovery = false;
+            }
+        }
+    }
+    
+    /**
+     * CRITICAL FIX: Execute self-healing recovery mechanism
+     * Independent recovery process that runs via WP-Cron every 15 minutes
+     * Ensures the polling system stays active without relying on page visits
+     */
+    public function execute_self_healing_recovery() {
+        hic_log("Self-Healing Recovery: Executing independent recovery check");
+        
+        // Prevent overlapping recovery attempts
+        static $recovery_in_progress = false;
+        if ($recovery_in_progress) {
+            hic_log("Self-Healing Recovery: Recovery already in progress, skipping");
+            return;
+        }
+        
+        // Skip if polling shouldn't be active
+        if (!$this->should_poll()) {
+            hic_log("Self-Healing Recovery: Polling conditions not met, clearing recovery event");
+            \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_self_healing_recovery');
+            return;
+        }
+        
+        $recovery_in_progress = true;
+        
+        try {
+            $current_time = time();
+            $last_continuous = get_option('hic_last_continuous_poll', 0);
+            $last_deep = get_option('hic_last_deep_check', 0);
+            
+            $continuous_lag = $current_time - $last_continuous;
+            $deep_lag = $current_time - $last_deep;
+        
+        // Critical thresholds for recovery
+        $continuous_critical = 600; // 10 minutes without continuous polling
+        $deep_critical = 2700; // 45 minutes without deep check
+        
+        $needs_recovery = false;
+        $recovery_reason = array();
+        
+        // Check if continuous polling is stuck
+        if ($continuous_lag > $continuous_critical) {
+            $needs_recovery = true;
+            $recovery_reason[] = "continuous polling lag: " . round($continuous_lag / 60, 1) . " minutes";
+        }
+        
+        // Check if deep check is stuck
+        if ($deep_lag > $deep_critical) {
+            $needs_recovery = true;
+            $recovery_reason[] = "deep check lag: " . round($deep_lag / 60, 1) . " minutes";
+        }
+        
+        // Check if events are scheduled but not executing
+        $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
+        $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
+        
+        if (!$continuous_next || !$deep_next) {
+            $needs_recovery = true;
+            $recovery_reason[] = "missing scheduled events";
+        }
+        
+        // Execute recovery if needed
+        if ($needs_recovery) {
+            hic_log("Self-Healing Recovery: Recovery needed - " . implode(', ', $recovery_reason));
+            
+            // Clear all events and reschedule fresh
+            $this->clear_all_scheduled_events();
+            
+            // Reschedule all events immediately (no delay needed for WP-Cron)
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 3600, 'hic_daily', 'hic_cleanup_event');
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 7200, 'hic_daily', 'hic_booking_events_cleanup');
+            
+            // Reschedule self-healing recovery for next cycle
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
+            
+            hic_log("Self-Healing Recovery: Emergency recovery completed - all events rescheduled, continuous polling will resume automatically");
+        } else {
+            hic_log("Self-Healing Recovery: System healthy - continuous lag: " . round($continuous_lag / 60, 1) . "m, deep lag: " . round($deep_lag / 60, 1) . "m");
+        }
+        
+        // Ensure the self-healing recovery keeps running
+        $recovery_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_self_healing_recovery');
+        if (!$recovery_next) {
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
+            hic_log("Self-Healing Recovery: Rescheduled next recovery check");
+        }
+        
+        } finally {
+            // Always reset recovery flag, even if an exception occurs
+            $recovery_in_progress = false;
+        }
+    }
 }
 
 /**
@@ -1314,6 +1527,7 @@ function hic_deactivate(): void {
         'hic_continuous_poll_event',
         'hic_deep_check_event',
         'hic_fallback_poll_event',
+        'hic_self_healing_recovery',
         'hic_health_monitor_event',
         'hic_performance_cleanup',
         'hic_reliable_poll_event',
