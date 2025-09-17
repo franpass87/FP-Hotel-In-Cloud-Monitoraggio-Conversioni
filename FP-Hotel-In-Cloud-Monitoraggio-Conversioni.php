@@ -219,7 +219,9 @@ function hic_activate($network_wide)
 
 // Enqueue frontend JavaScript
 \add_action('wp_enqueue_scripts', function() {
-    if (Helpers\hic_get_tracking_mode() === 'gtm_only') {
+    $tracking_mode = Helpers\hic_get_tracking_mode();
+
+    if (\in_array($tracking_mode, ['gtm_only', 'ga4_only', 'hybrid'], true)) {
         \wp_enqueue_script(
             'hic-frontend',
             \plugin_dir_url(__FILE__) . 'assets/js/frontend.js',
