@@ -1,6 +1,23 @@
 # FAQ - Domande Frequenti
 
-## 🔥 DOMANDA PRINCIPALE
+## 🎯 DOMANDA PRINCIPALE: WEBHOOK E TRACCIAMENTO SENZA REDIRECT
+
+### Q: Il booking system non permette redirect al sito, quindi dopo che loro prenotano la thank you page rimane nel dominio esterno di HIC. Loro però hanno una impostazione webhook - potrebbe aiutarci a tracciare le conversioni?
+
+**R: SÌ! Il webhook è LA SOLUZIONE PERFETTA per questo problema!** 🎉
+
+✅ **Il webhook risolve completamente il problema del mancato redirect perché**:
+- **Tracciamento automatico**: Ogni conversione viene tracciata senza bisogno che l'utente torni sul tuo sito
+- **Server-to-server**: Funziona indipendentemente da dove si trova l'utente
+- **Tempo reale**: Tracciamento immediato appena completata la prenotazione
+- **Multi-platform**: Invia automaticamente a GA4, Meta e Brevo
+- **Affidabile**: Non dipende da JavaScript, cookies o comportamento dell'utente
+
+**Come configurare**: Segui la [Guida Webhook Completa](GUIDA_WEBHOOK_CONVERSIONI.md)
+
+---
+
+## 🔥 DOMANDA FREQUENTE
 
 ### Il sistema funziona anche senza Google Ads Enhanced?
 

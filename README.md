@@ -54,6 +54,18 @@ Schema campi principali:
 - `language` *(stringa)* – lingua dell'utente
 - `sid` *(stringa)* – identificatore utente opzionale per il tracciamento
 
+#### 🎯 Webhook: La Soluzione per il Tracciamento Senza Redirect
+
+**Problema comune:** Il sistema di prenotazione di Hotel in Cloud non permette redirect al sito dopo la prenotazione, quindi la thank you page rimane nel dominio esterno di HIC.
+
+**✅ Soluzione:** Il **webhook risolve completamente questo problema** perché:
+- Traccia le conversioni automaticamente **senza bisogno di redirect**
+- Funziona **server-to-server** indipendentemente da dove si trova l'utente  
+- Invia **immediatamente** i dati a GA4, Meta e Brevo
+- **Non dipende** dal comportamento dell'utente o dal browser
+
+📖 **Guida Completa**: [Setup Webhook per Conversioni Senza Redirect](GUIDA_WEBHOOK_CONVERSIONI.md)
+
 ### Caricamento dello script frontend
 
 Il file JavaScript che aggiunge il parametro SID ai link di prenotazione viene caricato solo quando la modalità di tracciamento è impostata su `gtm_only`. Per disabilitarlo è sufficiente selezionare una modalità differente nelle impostazioni del plugin; per riattivarlo ripristinare `gtm_only`.

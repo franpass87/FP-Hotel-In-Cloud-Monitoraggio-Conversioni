@@ -10,11 +10,12 @@
 
 Quando arriva una nuova prenotazione su Hotel in Cloud, il plugin può intercettarla in **due modi**:
 
-#### Modalità A: Webhook (Tempo Reale)
+#### Modalità A: Webhook (Tempo Reale) - ⭐ SOLUZIONE PER TRACCIAMENTO SENZA REDIRECT
 - Hotel in Cloud invia immediatamente un webhook a WordPress
 - URL webhook: `https://tuosito.com/wp-json/hic/v1/conversion?token=tuotoken`
-- **Vantaggio**: Immediato (tempo reale)
-- **Svantaggio**: Dipende da HIC per inviare il webhook per TUTTE le prenotazioni
+- **Vantaggio**: Immediato (tempo reale), **risolve il problema del mancato redirect**
+- **Ideale quando**: HIC non permette redirect al sito dopo prenotazione
+- **Tracciamento**: Automatico server-to-server, indipendente dal comportamento utente
 
 #### Modalità B: API Polling (Raccomandato)
 - WordPress controlla autonomamente HIC ogni 1-5 minuti
@@ -177,4 +178,36 @@ Pannello admin completo per:
 4. **Attribution**: Traccia fonte della conversione (Google Ads, Facebook, organico)
 5. **Monitoraggio**: Diagnostici completi e logging strutturato
 
-Il plugin è quindi una soluzione completa per tracciare automaticamente tutte le conversioni di Hotel in Cloud verso le principali piattaforme di analytics e marketing.
+## Risposta alla Domanda: "Il webhook può aiutarci a tracciare le conversioni?"
+
+> **"Il booking sistem non permette redirect al sito quindi dopo che loro prenotano la thank you page rimane nel dominio esterno di HIC loro però hanno una impostazione webhook potrebbe aiutarci a tracciare le conversioni?"**
+
+### ✅ SÌ! Il webhook è LA SOLUZIONE PERFETTA per questo problema!
+
+**Ecco perché il webhook risolve completamente il problema del mancato redirect:**
+
+1. 🎯 **Tracciamento Automatico**: Il webhook traccia automaticamente ogni conversione senza bisogno che l'utente torni sul tuo sito
+2. ⚡ **Tempo Reale**: Appena viene completata la prenotazione su HIC, il webhook invia immediatamente i dati al tuo WordPress
+3. 🔒 **Affidabile**: Funziona server-to-server, non dipende dal browser dell'utente o da JavaScript
+4. 📊 **Completo**: Invia automaticamente i dati a GA4, Meta/Facebook e Brevo
+5. 🛡️ **Sicuro**: Autenticazione con token e validazione dei dati
+
+### Come Funziona il Webhook per Risolvere il Problema
+
+```
+1. Cliente completa prenotazione su HIC
+   ↓ (thank you page rimane su HIC - NESSUN PROBLEMA!)
+   ↓
+2. HIC invia automaticamente webhook al tuo WordPress
+   ↓
+3. WordPress riceve i dati e traccia la conversione
+   ↓  
+4. Invio automatico a:
+   ├── Google Analytics 4 (evento purchase)
+   ├── Meta/Facebook (evento Purchase)
+   └── Brevo (contatto + evento)
+```
+
+**Il fatto che l'utente rimanga sulla thank you page di HIC non è più un problema** perché il tracciamento avviene automaticamente in background tramite webhook!
+
+📖 **Guida Setup Completa**: [GUIDA_WEBHOOK_CONVERSIONI.md](GUIDA_WEBHOOK_CONVERSIONI.md)
