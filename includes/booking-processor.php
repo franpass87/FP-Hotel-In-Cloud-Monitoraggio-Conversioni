@@ -66,6 +66,18 @@ function hic_process_booking_data(array $data): bool {
     $data['amount'] = Helpers\hic_normalize_price($data['amount']);
   }
 
+  $filtered_data = apply_filters('hic_booking_data', $data, [
+    'gclid' => $gclid,
+    'fbclid' => $fbclid,
+    'sid' => $sid,
+  ]);
+
+  if (is_array($filtered_data)) {
+    $data = $filtered_data;
+  } else {
+    hic_log('hic_process_booking_data: hic_booking_data filter must return an array');
+  }
+
   $status = strtolower($data['status'] ?? ($data['presence'] ?? ''));
   $is_refund = in_array($status, ['cancelled', 'canceled', 'refunded'], true);
 
