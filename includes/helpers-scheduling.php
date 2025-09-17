@@ -61,23 +61,19 @@ function hic_safe_wp_clear_scheduled_hook($hook, $args = array()) {
 
 function hic_add_failed_request_schedule($schedules) {
     $schedules['hic_every_fifteen_minutes'] = array(
-        'interval' => 15 * 60,
+        'interval' => 15 * MINUTE_IN_SECONDS,
         'display'  => 'Every 15 Minutes (HIC Failed Requests)'
     );
 
-    if (!isset($schedules['weekly'])) {
-        $schedules['weekly'] = array(
-            'interval' => 7 * 24 * 60 * 60,
-            'display'  => 'Once Weekly (Hotel in Cloud)'
-        );
-    }
+    $schedules['weekly'] = array(
+        'interval' => 7 * DAY_IN_SECONDS,
+        'display'  => 'Once Weekly (Hotel in Cloud)'
+    );
 
-    if (!isset($schedules['monthly'])) {
-        $schedules['monthly'] = array(
-            'interval' => 30 * 24 * 60 * 60,
-            'display'  => 'Once Monthly (Hotel in Cloud)'
-        );
-    }
+    $schedules['monthly'] = array(
+        'interval' => 30 * DAY_IN_SECONDS,
+        'display'  => 'Once Monthly (Hotel in Cloud)'
+    );
 
     return $schedules;
 }
