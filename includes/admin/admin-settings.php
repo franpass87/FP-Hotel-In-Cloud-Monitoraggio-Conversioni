@@ -442,7 +442,9 @@ function hic_connection_type_render() {
     echo '<select name="hic_connection_type">';
     echo '<option value="webhook"' . selected($type, 'webhook', false) . '>Webhook</option>';
     echo '<option value="api"' . selected($type, 'api', false) . '>API Polling</option>';
+    echo '<option value="hybrid"' . selected($type, 'hybrid', false) . '>Hybrid (Webhook + API)</option>';
     echo '</select>';
+    echo '<p class="description">Hybrid: combina webhook in tempo reale con API polling di backup per massima affidabilità</p>';
 }
 
 function hic_webhook_token_render() {

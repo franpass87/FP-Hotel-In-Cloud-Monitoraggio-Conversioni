@@ -15,8 +15,9 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 
 ### Modalità di Funzionamento
 
-- **API Polling (Raccomandato)**: WordPress controlla HIC ogni 1-5 minuti per nuove prenotazioni
+- **API Polling**: WordPress controlla HIC ogni 1-5 minuti per nuove prenotazioni
 - **Webhook**: HIC invia immediatamente le prenotazioni a WordPress (richiede configurazione su HIC). Il payload è limitato a 1 MB (valore predefinito modificabile tramite la costante `HIC_WEBHOOK_MAX_PAYLOAD_SIZE`).
+- **Hybrid (Consigliato)**: Combina webhook in tempo reale con API polling di backup per massima affidabilità
 
 #### Esempio payload Webhook
 
@@ -53,6 +54,18 @@ Schema campi principali:
 - `guests` *(intero)* – numero di ospiti
 - `language` *(stringa)* – lingua dell'utente
 - `sid` *(stringa)* – identificatore utente opzionale per il tracciamento
+
+#### 🎯 Webhook: La Soluzione per il Tracciamento Senza Redirect
+
+**Problema comune:** Il sistema di prenotazione di Hotel in Cloud non permette redirect al sito dopo la prenotazione, quindi la thank you page rimane nel dominio esterno di HIC.
+
+**✅ Soluzione:** Il **webhook risolve completamente questo problema** perché:
+- Traccia le conversioni automaticamente **senza bisogno di redirect**
+- Funziona **server-to-server** indipendentemente da dove si trova l'utente  
+- Invia **immediatamente** i dati a GA4, Meta e Brevo
+- **Non dipende** dal comportamento dell'utente o dal browser
+
+📖 **Guida Completa**: [Setup Webhook per Conversioni Senza Redirect](GUIDA_WEBHOOK_CONVERSIONI.md)
 
 ### Caricamento dello script frontend
 
