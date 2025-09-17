@@ -62,7 +62,7 @@ function hic_get_internal_scheduler_status() {
     // Check if internal scheduler conditions are met
     $status['internal_scheduler']['conditions_met'] = 
         hic_reliable_polling_enabled() && 
-        hic_get_connection_type() === 'api' && 
+        in_array(hic_get_connection_type(), ['api', 'hybrid']) && 
         hic_get_api_url() && 
         hic_has_basic_auth_credentials();
     
@@ -152,7 +152,7 @@ function hic_get_internal_scheduler_status() {
  * Check if main polling should be scheduled based on conditions
  */
 function hic_should_schedule_poll_event() {
-    if (hic_get_connection_type() !== 'api') {
+    if (!in_array(hic_get_connection_type(), ['api', 'hybrid'])) {
         return false;
     }
     
@@ -168,7 +168,7 @@ function hic_should_schedule_poll_event() {
  * Check if updates polling should be scheduled based on conditions
  */
 function hic_should_schedule_updates_event() {
-    if (hic_get_connection_type() !== 'api') {
+    if (!in_array(hic_get_connection_type(), ['api', 'hybrid'])) {
         return false;
     }
     
@@ -327,7 +327,7 @@ function hic_force_restart_internal_scheduler() {
     
     // Check if internal scheduler should be active
     $should_activate = hic_reliable_polling_enabled() && 
-                      hic_get_connection_type() === 'api' && 
+                      in_array(hic_get_connection_type(), ['api', 'hybrid']) && 
                       hic_get_api_url() && 
                       hic_has_basic_auth_credentials();
     
@@ -534,8 +534,8 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     }
     
     // Check API connection type
-    if (hic_get_connection_type() !== 'api') {
-        return new \WP_Error('wrong_connection', 'Sistema configurato per webhook, non API');
+    if (!in_array(hic_get_connection_type(), ['api', 'hybrid'])) {
+        return new \WP_Error('wrong_connection', 'Sistema non configurato per API (modalità: ' . hic_get_connection_type() . ')');
     }
     
     // Validate credentials
@@ -1195,8 +1195,10 @@ function hic_diagnostics_page() {
                                 <td>
                                     <?php if (hic_get_connection_type() === 'api'): ?>
                                         <span class="status ok">✓ Polling Attivo</span>
+                                    <?php elseif (hic_get_connection_type() === 'hybrid'): ?>
+                                        <span class="status ok">✓ Hybrid (Webhook + API)</span>
                                     <?php else: ?>
-                                        <span class="status warning">⚠ Webhook</span>
+                                        <span class="status warning">⚠ Solo Webhook</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>

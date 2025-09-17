@@ -39,9 +39,12 @@ Il sistema funziona in questo modo:
 ### 1. Configurazione in WordPress
 
 1. **Accedi a:** WordPress Admin → Impostazioni → HIC Monitoring
-2. **Imposta Modalità:** `Webhook` (invece di `API Polling`)
+2. **Imposta Modalità:** 
+   - `Webhook` per solo webhook
+   - `Hybrid` per webhook + API polling (CONSIGLIATO per massima affidabilità)
 3. **Configura Token:** Inserisci un token sicuro (es. `hic2025ga4_TUOSITO`)
-4. **Salva configurazione**
+4. **Se modalità Hybrid:** Configura anche credenziali API (URL, email, password, property ID)
+5. **Salva configurazione**
 
 ### 2. URL Webhook per Hotel in Cloud
 
@@ -218,15 +221,16 @@ Il plugin previene automaticamente duplicati tramite:
 - Lock transactionali durante processing
 - Timestamp ultimo processing per debugging
 
-## Confronto: Webhook vs API Polling
+## Confronto: Webhook vs API Polling vs Hybrid
 
-| Caratteristica | Webhook | API Polling |
-|---------------|---------|-------------|
-| **Velocità** | ⚡ Immediato | 🐌 1-5 minuti |
-| **Affidabilità** | 🔧 Dipende da HIC | ✅ Controllo completo |
-| **Setup** | 🔧 Richiede configurazione HIC | ✅ Solo WordPress |
-| **Manutenzione** | 🔧 Dipende da HIC | ✅ Autogestito |
-| **Copertura** | 🔧 Solo nuove prenotazioni | ✅ Anche modifiche manuali |
+| Caratteristica | Webhook | API Polling | Hybrid |
+|---------------|---------|-------------|---------|
+| **Velocità** | ⚡ Immediato | 🐌 1-5 minuti | ⚡ Immediato + backup |
+| **Affidabilità** | 🔧 Dipende da HIC | ✅ Controllo completo | ✅ Doppia sicurezza |
+| **Setup** | 🔧 Richiede configurazione HIC | ✅ Solo WordPress | 🔧 Entrambi |
+| **Manutenzione** | 🔧 Dipende da HIC | ✅ Autogestito | ✅ Resiliente |
+| **Copertura** | 🔧 Solo nuove prenotazioni | ✅ Anche modifiche manuali | ✅ Completa |
+| **Ridondanza** | ❌ Nessuna | ❌ Nessuna | ✅ Webhook + API |
 
 ## Conclusione
 

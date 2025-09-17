@@ -13,8 +13,8 @@ if (!defined('ABSPATH')) exit;
    https://www.villadianella.it/wp-json/hic/v1/conversion?token=hic2025ga4
 */
 add_action('rest_api_init', function () {
-  // Solo se siamo in modalità webhook
-  if (hic_get_connection_type() === 'webhook') {
+  // Registra webhook se siamo in modalità webhook O hybrid
+  if (in_array(hic_get_connection_type(), ['webhook', 'hybrid'])) {
     register_rest_route('hic/v1', '/conversion', [
       'methods'             => 'POST',
       'callback'            => 'hic_webhook_handler',

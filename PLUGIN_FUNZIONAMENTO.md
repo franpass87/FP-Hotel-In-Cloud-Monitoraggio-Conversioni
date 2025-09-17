@@ -17,11 +17,16 @@ Quando arriva una nuova prenotazione su Hotel in Cloud, il plugin può intercett
 - **Ideale quando**: HIC non permette redirect al sito dopo prenotazione
 - **Tracciamento**: Automatico server-to-server, indipendente dal comportamento utente
 
-#### Modalità B: API Polling (Raccomandato)
+#### Modalità B: API Polling (Controllo Completo)
 - WordPress controlla autonomamente HIC ogni 1-5 minuti
 - Sistema di polling interno basato su **WP-Cron** con controlli di watchdog
 - **Vantaggio**: Più affidabile, cattura anche prenotazioni manuali
 - **Svantaggio**: Leggero ritardo (1-5 minuti)
+
+#### Modalità C: Hybrid (Migliore di Entrambi) - ⭐ CONSIGLIATO
+- Combina webhook in tempo reale con API polling di backup
+- **Vantaggi**: Tracciamento immediato + backup affidabile + copertura completa
+- **Ideale per**: Massima affidabilità e zero perdite di conversioni
 
 ### 2. Sistema Interno di Scheduling
 
