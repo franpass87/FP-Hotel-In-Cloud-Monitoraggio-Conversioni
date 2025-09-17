@@ -226,7 +226,7 @@ function hic_init_gtm_hooks() {
  * GTM dispatcher for HIC reservation schema
  * Similar to GA4 dispatcher but for GTM DataLayer
  */
-function hic_dispatch_gtm_reservation($data) {
+function hic_dispatch_gtm_reservation($data, $sid = '') {
     // Only proceed if GTM is enabled
     if (!Helpers\hic_is_gtm_enabled()) {
         return false;
@@ -251,11 +251,20 @@ function hic_dispatch_gtm_reservation($data) {
     $value = Helpers\hic_normalize_price($data['value']);
     $currency = sanitize_text_field($data['currency']);
 
+    $sid = !empty($sid) ? \sanitize_text_field((string) $sid) : '';
+    if ($sid === '' && !empty($data['sid']) && is_scalar($data['sid'])) {
+        $sid = \sanitize_text_field((string) $data['sid']);
+    }
+    if ($sid !== '') {
+        $transaction_id = $sid;
+    }
+
     // Get gclid/fbclid for bucket normalization if available
     $gclid = '';
     $fbclid = '';
-    if (!empty($data['transaction_id'])) {
-        $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
+    $lookup_id = $sid !== '' ? $sid : $transaction_id;
+    if (!empty($lookup_id)) {
+        $tracking = Helpers\hic_get_tracking_ids_by_sid($lookup_id);
         $gclid = $tracking['gclid'] ?? '';
         $fbclid = $tracking['fbclid'] ?? '';
     }
@@ -295,6 +304,14 @@ function hic_dispatch_gtm_reservation($data) {
     if (!empty($fbclid)) {
         $gtm_data['fbclid'] = sanitize_text_field($fbclid);
     }
+
+    $utm_lookup = $sid !== '' ? $sid : $transaction_id;
+    $utm = Helpers\hic_get_utm_params_by_sid($utm_lookup);
+    if (!empty($utm['utm_source']))   { $gtm_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
+    if (!empty($utm['utm_medium']))   { $gtm_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
+    if (!empty($utm['utm_campaign'])) { $gtm_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
+    if (!empty($utm['utm_content']))  { $gtm_data['utm_content']  = sanitize_text_field($utm['utm_content']); }
+    if (!empty($utm['utm_term']))     { $gtm_data['utm_term']     = sanitize_text_field($utm['utm_term']); }
 
     // Queue the event
     hic_queue_gtm_event($gtm_data);

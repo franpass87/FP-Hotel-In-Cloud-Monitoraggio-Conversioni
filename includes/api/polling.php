@@ -505,6 +505,86 @@ function hic_transform_reservation($reservation) {
         $email = '';
     }
 
+    $sid_keys = ['sid', 'sessionid', 'hicsid', 'hicsessionid'];
+    $extract_sid = static function ($source) use (&$extract_sid, $sid_keys) {
+        if (is_array($source)) {
+            foreach ($source as $key => $value) {
+                $normalized_key = '';
+                if (is_string($key) || is_int($key)) {
+                    $normalized_key = strtolower(preg_replace('/[^a-z0-9]/', '', (string) $key));
+                }
+
+                if ($normalized_key !== '' && in_array($normalized_key, $sid_keys, true)) {
+                    if (is_scalar($value)) {
+                        $candidate = \sanitize_text_field((string) $value);
+                        if ($candidate !== '') {
+                            return $candidate;
+                        }
+                    } elseif (is_array($value) || is_object($value)) {
+                        $candidate = $extract_sid($value);
+                        if ($candidate !== '') {
+                            return $candidate;
+                        }
+                    }
+                }
+
+                if (is_array($value) || is_object($value)) {
+                    $candidate = $extract_sid(is_object($value) ? get_object_vars($value) : $value);
+                    if ($candidate !== '') {
+                        return $candidate;
+                    }
+                } elseif (is_string($value) && stripos($value, 'sid') !== false) {
+                    $candidate = $extract_sid($value);
+                    if ($candidate !== '') {
+                        return $candidate;
+                    }
+                }
+            }
+
+            return '';
+        }
+
+        if (is_object($source)) {
+            return $extract_sid(get_object_vars($source));
+        }
+
+        if (is_string($source)) {
+            $trimmed = trim($source);
+            if ($trimmed === '' || stripos($trimmed, 'sid') === false) {
+                return '';
+            }
+
+            $decoded = json_decode($trimmed, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $candidate = $extract_sid($decoded);
+                if ($candidate !== '') {
+                    return $candidate;
+                }
+            }
+
+            if (strpos($trimmed, '=') !== false) {
+                parse_str($trimmed, $parsed);
+                if (!empty($parsed)) {
+                    $candidate = $extract_sid($parsed);
+                    if ($candidate !== '') {
+                        return $candidate;
+                    }
+                }
+            }
+
+            if (preg_match('/\bsid\s*[:=]\s*([^&\s]+)/i', $trimmed, $matches)) {
+                $candidate = \sanitize_text_field($matches[1]);
+                if ($candidate !== '') {
+                    return $candidate;
+                }
+            }
+        }
+
+        return '';
+    };
+
+    $sid = $extract_sid($reservation);
+
     $from = $reservation['from_date'] ?? $reservation['checkin'] ?? '';
     $to   = $reservation['to_date']   ?? $reservation['checkout'] ?? '';
 
@@ -526,7 +606,8 @@ function hic_transform_reservation($reservation) {
         'email' => $email,
         'phone' => $reservation['phone'] ?? $reservation['whatsapp'] ?? '',
         'language' => $language,
-        'original_price' => $price
+        'original_price' => $price,
+        'sid' => $sid
     );
 }
 
@@ -553,46 +634,41 @@ function hic_dispatch_reservation($transformed, $original) {
     try {
         // Get tracking mode to determine which integrations to use
         $tracking_mode = Helpers\hic_get_tracking_mode();
-        
+        $sid = '';
+        if (!empty($transformed['sid']) && is_scalar($transformed['sid'])) {
+            $sid = \sanitize_text_field((string) $transformed['sid']);
+        }
+
         // GA4 - only send once unless it's a status update we want to track
         if (!$is_status_update) {
             if ($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') {
-                hic_dispatch_ga4_reservation($transformed);
+                hic_dispatch_ga4_reservation($transformed, $sid);
             }
-            
+
             // GTM - send to dataLayer for client-side processing
             if ($tracking_mode === 'gtm_only' || $tracking_mode === 'hybrid') {
-                hic_dispatch_gtm_reservation($transformed);
+                hic_dispatch_gtm_reservation($transformed, $sid);
             }
         }
-        
+
         // Meta Pixel - only send once unless it's a status update we want to track
         if (!$is_status_update) {
-            hic_dispatch_pixel_reservation($transformed);
+            hic_dispatch_pixel_reservation($transformed, $sid);
         }
 
-        // Retrieve tracking IDs using reservation ID
+        // Retrieve tracking IDs using SID (fallback to transaction ID when missing)
+        $lookup_id = $sid !== '' ? $sid : ($transformed['transaction_id'] ?? '');
         $gclid = '';
         $fbclid = '';
         $msclkid = '';
         $ttclid = '';
-        if (!empty($transformed['transaction_id'])) {
-            global $wpdb;
-            $table = $wpdb->prefix . 'hic_gclids';
-            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-            if ($table_exists) {
-                $row = $wpdb->get_row(
-                    $wpdb->prepare(
-                        "SELECT gclid, fbclid, msclkid, ttclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1",
-                        $transformed['transaction_id']
-                    )
-                );
-                if ($row) {
-                    $gclid = $row->gclid ? $row->gclid : '';
-                    $fbclid = $row->fbclid ? $row->fbclid : '';
-                    $msclkid = $row->msclkid ? $row->msclkid : '';
-                    $ttclid = $row->ttclid ? $row->ttclid : '';
-                }
+        if (!empty($lookup_id) && is_scalar($lookup_id)) {
+            $tracking = Helpers\hic_get_tracking_ids_by_sid((string) $lookup_id);
+            if (is_array($tracking)) {
+                $gclid = $tracking['gclid'] ?? '';
+                $fbclid = $tracking['fbclid'] ?? '';
+                $msclkid = $tracking['msclkid'] ?? '';
+                $ttclid = $tracking['ttclid'] ?? '';
             }
         }
 
@@ -600,13 +676,13 @@ function hic_dispatch_reservation($transformed, $original) {
         if ($connection_type === 'webhook') {
             // In webhook mode, only update contact info but don't send events
             // (events are handled by webhook processor)
-            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid);
+            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $sid);
             if (!$brevo_success) {
                 hic_log('Brevo contact dispatch failed for reservation ' . $uid);
             }
         } else {
             // In polling mode, handle both contact and events
-            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid);
+            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $sid);
             if (!$brevo_success) {
                 hic_log('Brevo contact dispatch failed for reservation ' . $uid);
             }
@@ -636,7 +712,8 @@ function hic_dispatch_reservation($transformed, $original) {
                 'checkout'      => isset($transformed['to_date']) ? $transformed['to_date'] : ''
             );
 
-            $email_result = Helpers\hic_send_admin_email($admin_data, $gclid, $fbclid, $transformed['transaction_id']);
+            $email_identifier = $sid !== '' ? $sid : ($transformed['transaction_id'] ?? '');
+            $email_result = Helpers\hic_send_admin_email($admin_data, $gclid, $fbclid, (string) $email_identifier);
             hic_log('Admin email dispatch result for reservation ' . $uid . ': ' . ($email_result ? 'success' : 'failure'));
         }
 
@@ -1240,7 +1317,8 @@ function hic_process_update(array $u){
         // upsert Brevo con vera email + liste by language
         $t = hic_transform_reservation($u); // riusa normalizzazioni
         if ($t !== false && is_array($t)) {
-            hic_dispatch_brevo_reservation($t, true, '', '', '', ''); // aggiorna contatto with enrichment flag
+            $update_sid = !empty($t['sid']) && is_scalar($t['sid']) ? \sanitize_text_field((string) $t['sid']) : '';
+            hic_dispatch_brevo_reservation($t, true, '', '', '', '', $update_sid); // aggiorna contatto with enrichment flag
             // aggiorna store locale per id -> true_email
             Helpers\hic_mark_email_enriched($id, $email);
             hic_log("Enriched email for reservation $id");
@@ -1279,28 +1357,22 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
         return;
     }
 
+    $sid = !empty($transformed['sid']) && is_scalar($transformed['sid']) ? \sanitize_text_field((string) $transformed['sid']) : '';
+    $transformed['sid'] = $sid;
+
     // Retrieve tracking IDs for tracking
+    $lookup_id = $sid !== '' ? $sid : ($transformed['transaction_id'] ?? '');
     $gclid = '';
     $fbclid = '';
     $msclkid = '';
     $ttclid = '';
-    if (!empty($transformed['transaction_id'])) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'hic_gclids';
-        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-        if ($table_exists) {
-            $row = $wpdb->get_row(
-                $wpdb->prepare(
-                    "SELECT gclid, fbclid, msclkid, ttclid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1",
-                    $transformed['transaction_id']
-                )
-            );
-            if ($row) {
-                $gclid = $row->gclid ? $row->gclid : '';
-                $fbclid = $row->fbclid ? $row->fbclid : '';
-                $msclkid = $row->msclkid ? $row->msclkid : '';
-                $ttclid = $row->ttclid ? $row->ttclid : '';
-            }
+    if (!empty($lookup_id) && is_scalar($lookup_id)) {
+        $tracking = Helpers\hic_get_tracking_ids_by_sid((string) $lookup_id);
+        if (is_array($tracking)) {
+            $gclid = $tracking['gclid'] ?? '';
+            $fbclid = $tracking['fbclid'] ?? '';
+            $msclkid = $tracking['msclkid'] ?? '';
+            $ttclid = $tracking['ttclid'] ?? '';
         }
     }
 
@@ -1309,7 +1381,7 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
 
     // Also send/update contact information regardless of event result
     if (Helpers\hic_is_valid_email($transformed['email']) && !Helpers\hic_is_ota_alias_email($transformed['email'])) {
-        if (!hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid)) {
+        if (!hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $sid)) {
             hic_log("Failed to update Brevo contact for reservation $reservation_id");
         }
     }

@@ -225,7 +225,7 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
 /**
  * Brevo dispatcher for HIC reservation schema
  */
-function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '') {
+function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '', $sid = '') {
   if (!Helpers\hic_get_brevo_api_key()) {
     hic_log('Brevo disabilitato (API key vuota).');
     return false;
@@ -282,10 +282,19 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     }
   }
 
+  $sid = !empty($sid) ? \sanitize_text_field((string) $sid) : '';
+  if ($sid === '' && !empty($data['sid']) && is_scalar($data['sid'])) {
+    $sid = \sanitize_text_field((string) $data['sid']);
+  }
+  if ($sid !== '') {
+    $data['sid'] = $sid;
+  }
+
   // Get tracking IDs for legacy compatibility
   // Use provided values when available before querying the database
-  if (!empty($data['transaction_id']) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid))) {
-    $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
+  $lookup_id = $sid !== '' ? $sid : ($data['transaction_id'] ?? '');
+  if (!empty($lookup_id) && is_scalar($lookup_id) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid))) {
+    $tracking = Helpers\hic_get_tracking_ids_by_sid((string) $lookup_id);
     if (empty($gclid))   { $gclid   = $tracking['gclid'] ?? ''; }
     if (empty($fbclid))  { $fbclid  = $tracking['fbclid'] ?? ''; }
     if (empty($msclkid)) { $msclkid = $tracking['msclkid'] ?? ''; }
@@ -334,8 +343,8 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   }
 
   // Populate UTM attributes if available
-  if (!empty($data['transaction_id'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($data['transaction_id']);
+  if (!empty($lookup_id) && is_scalar($lookup_id)) {
+    $utm = Helpers\hic_get_utm_params_by_sid((string) $lookup_id);
     if (!empty($utm['utm_source']))   { $attributes['UTM_SOURCE']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $attributes['UTM_MEDIUM']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $attributes['UTM_CAMPAIGN'] = $utm['utm_campaign']; }
@@ -460,9 +469,12 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     );
   }
 
+  $sid = !empty($data['sid']) && is_scalar($data['sid']) ? \sanitize_text_field((string) $data['sid']) : '';
+
   // Get tracking IDs for bucket normalization if available
-  if (!empty($data['transaction_id']) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid))) {
-    $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
+  $lookup_id = $sid !== '' ? $sid : ($data['transaction_id'] ?? '');
+  if (!empty($lookup_id) && is_scalar($lookup_id) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid))) {
+    $tracking = Helpers\hic_get_tracking_ids_by_sid((string) $lookup_id);
     if (empty($gclid))   { $gclid   = $tracking['gclid'] ?? ''; }
     if (empty($fbclid))  { $fbclid  = $tracking['fbclid'] ?? ''; }
     if (empty($msclkid)) { $msclkid = $tracking['msclkid'] ?? ''; }
@@ -514,8 +526,8 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   }
 
   // Add UTM parameters if available
-  if (!empty($data['transaction_id'])) {
-    $utm = Helpers\hic_get_utm_params_by_sid($data['transaction_id']);
+  if (!empty($lookup_id) && is_scalar($lookup_id)) {
+    $utm = Helpers\hic_get_utm_params_by_sid((string) $lookup_id);
     if (!empty($utm['utm_source']))   { $body['properties']['utm_source']   = $utm['utm_source']; }
     if (!empty($utm['utm_medium']))   { $body['properties']['utm_medium']   = $utm['utm_medium']; }
     if (!empty($utm['utm_campaign'])) { $body['properties']['utm_campaign'] = $utm['utm_campaign']; }
@@ -766,7 +778,10 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
   $transformed_data = hic_transform_webhook_data_for_brevo($data);
 
   // Use the modern dispatcher for contact management and capture result
-  $contact_updated = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid, $msclkid, $ttclid);
+  $transformed_sid = !empty($transformed_data['sid']) && is_scalar($transformed_data['sid'])
+    ? \sanitize_text_field((string) $transformed_data['sid'])
+    : (!empty($data['sid']) && is_scalar($data['sid']) ? \sanitize_text_field((string) $data['sid']) : '');
+  $contact_updated = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid, $msclkid, $ttclid, $transformed_sid);
   hic_log(
     $contact_updated
       ? 'Unified Brevo: contact update succeeded'
