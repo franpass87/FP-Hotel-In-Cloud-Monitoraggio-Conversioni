@@ -12,6 +12,9 @@ if (!defined('ABSPATH')) exit;
  */
 
 class AutomatedReportingManager {
+
+    /** @var self|null */
+    private static ?self $instance = null;
     
     /** @var array Report types configuration */
     private const REPORT_TYPES = [
@@ -35,14 +38,30 @@ class AutomatedReportingManager {
     /** @var string Export directory */
     private $export_dir;
     
-    public function __construct() {
-        add_action('init', [$this, 'initialize_reporting'], 30);
-        
-        // Schedule report generation
-        foreach (self::REPORT_TYPES as $type => $config) {
-            add_action($config['hook'], [$this, 'generate_' . $type . '_report']);
+    public static function instance(): self
+    {
+        if (null === self::$instance) {
+            self::$instance = new self();
         }
-        
+
+        return self::$instance;
+    }
+
+    public static function register_cron_hooks(): void
+    {
+        add_action('hic_daily_report', [self::class, 'handle_daily_report']);
+        add_action('hic_weekly_report', [self::class, 'handle_weekly_report']);
+        add_action('hic_monthly_report', [self::class, 'handle_monthly_report']);
+        add_action('hic_cleanup_exports', [self::class, 'handle_cleanup_exports']);
+    }
+
+    public function __construct() {
+        if (null === self::$instance) {
+            self::$instance = $this;
+        }
+
+        add_action('init', [$this, 'initialize_reporting'], 30);
+
         // AJAX handlers for manual reports and exports
         add_action('wp_ajax_hic_generate_manual_report', [$this, 'ajax_generate_manual_report']);
         add_action('wp_ajax_hic_export_data_csv', [$this, 'ajax_export_data_csv']);
@@ -189,7 +208,6 @@ class AutomatedReportingManager {
     private function schedule_export_cleanup() {
         if (!wp_next_scheduled('hic_cleanup_exports')) {
             wp_schedule_event(time(), 'weekly', 'hic_cleanup_exports');
-            add_action('hic_cleanup_exports', [$this, 'cleanup_old_exports']);
         }
     }
     
@@ -805,12 +823,42 @@ class AutomatedReportingManager {
     public function cleanup_old_exports() {
         $files = glob($this->export_dir . '*');
         $cutoff_time = time() - (30 * 24 * 3600); // 30 days ago
-        
+
         foreach ($files as $file) {
             if (is_file($file) && filemtime($file) < $cutoff_time) {
                 unlink($file);
                 $this->log('Cleaned up old export file: ' . basename($file));
             }
+        }
+    }
+
+    public static function handle_daily_report(): void
+    {
+        self::run_report('daily');
+    }
+
+    public static function handle_weekly_report(): void
+    {
+        self::run_report('weekly');
+    }
+
+    public static function handle_monthly_report(): void
+    {
+        self::run_report('monthly');
+    }
+
+    public static function handle_cleanup_exports(): void
+    {
+        self::instance()->cleanup_old_exports();
+    }
+
+    private static function run_report(string $type): void
+    {
+        $instance = self::instance();
+        $method = 'generate_' . $type . '_report';
+
+        if (method_exists($instance, $method)) {
+            $instance->{$method}();
         }
     }
     
@@ -1216,3 +1264,5 @@ class AutomatedReportingManager {
         }
     }
 }
+
+AutomatedReportingManager::register_cron_hooks();

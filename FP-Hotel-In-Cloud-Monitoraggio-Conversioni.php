@@ -244,9 +244,9 @@ if (\is_admin()) {
         $GLOBALS['hic_enterprise_management_suite'] = new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
         do_action('hic_enterprise_management_suite_loaded', $GLOBALS['hic_enterprise_management_suite']);
     }
-    new \FpHic\AutomatedReporting\AutomatedReportingManager();
-
 }
+
+\FpHic\AutomatedReporting\AutomatedReportingManager::instance();
 
 // Initialize the real-time dashboard in all contexts (admin, frontend, cron)
 new \FpHic\RealtimeDashboard\RealtimeDashboard();
