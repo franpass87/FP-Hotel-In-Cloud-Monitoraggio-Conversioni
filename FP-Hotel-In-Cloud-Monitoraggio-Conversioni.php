@@ -230,20 +230,22 @@ function hic_activate($network_wide)
     }
 });
 
+// Ensure the Enterprise Management Suite hooks are available in every context
+if (!did_action('hic_enterprise_management_suite_loaded')) {
+    $GLOBALS['hic_enterprise_management_suite'] = new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
+    do_action('hic_enterprise_management_suite_loaded', $GLOBALS['hic_enterprise_management_suite']);
+}
+
 // Load admin functionality only in dashboard
 if (\is_admin()) {
     require_once __DIR__ . '/includes/admin/admin-settings.php';
     require_once __DIR__ . '/includes/admin/diagnostics.php';
     require_once __DIR__ . '/includes/site-health.php';
-    
+
     // Initialize admin-only classes that create submenus
     // This ensures the parent menu exists before submenus are added
     new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
     \FpHic\CircuitBreaker\hic_get_circuit_breaker_manager();
-    if (!did_action('hic_enterprise_management_suite_loaded')) {
-        $GLOBALS['hic_enterprise_management_suite'] = new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
-        do_action('hic_enterprise_management_suite_loaded', $GLOBALS['hic_enterprise_management_suite']);
-    }
 }
 
 \FpHic\AutomatedReporting\AutomatedReportingManager::instance();
