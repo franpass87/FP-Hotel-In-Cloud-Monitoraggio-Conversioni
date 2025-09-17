@@ -33,6 +33,7 @@ class RealtimeDashboard {
         add_action('init', [$this, 'initialize_dashboard'], 25);
         add_action('wp_dashboard_setup', [$this, 'add_dashboard_widgets']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_dashboard_assets']);
+        add_action('hic_refresh_dashboard_data', [$this, 'refresh_dashboard_cache']);
         
         // AJAX handlers for real-time data
         add_action('wp_ajax_hic_get_realtime_stats', [$this, 'ajax_get_realtime_stats']);
@@ -104,7 +105,6 @@ class RealtimeDashboard {
     private function schedule_dashboard_refresh() {
         if (!wp_next_scheduled('hic_refresh_dashboard_data')) {
             wp_schedule_event(time(), 'hic_every_thirty_seconds', 'hic_refresh_dashboard_data');
-            add_action('hic_refresh_dashboard_data', [$this, 'refresh_dashboard_cache']);
         }
     }
     
