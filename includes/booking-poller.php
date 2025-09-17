@@ -12,6 +12,7 @@ class HIC_Booking_Poller {
 
     const SCHEDULER_RESTART_LOCK_KEY = 'hic_scheduler_restart_lock';
     const SCHEDULER_RESTART_LOCK_TTL = 120; // 2 minutes
+    const CLEANUP_RECURRENCE = 'daily';
     
     public function __construct() {
         // Only initialize if WordPress functions are available
@@ -121,7 +122,7 @@ class HIC_Booking_Poller {
         // Schedule daily cleanup event
         $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         if (!$cleanup_next) {
-            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'daily', 'hic_cleanup_event');
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), self::CLEANUP_RECURRENCE, 'hic_cleanup_event');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled daily cleanup event');
             } else {
@@ -132,7 +133,7 @@ class HIC_Booking_Poller {
         // Schedule booking events cleanup
         $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
         if (!$booking_cleanup_next) {
-            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'daily', 'hic_booking_events_cleanup');
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), self::CLEANUP_RECURRENCE, 'hic_booking_events_cleanup');
             if ($scheduled) {
                 hic_log('WP-Cron Scheduler: Scheduled booking events cleanup event');
             } else {
@@ -1485,8 +1486,8 @@ class HIC_Booking_Poller {
             // Reschedule all events immediately (no delay needed for WP-Cron)
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
-            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 3600, 'daily', 'hic_cleanup_event');
-            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 7200, 'daily', 'hic_booking_events_cleanup');
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 3600, self::CLEANUP_RECURRENCE, 'hic_cleanup_event');
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 7200, self::CLEANUP_RECURRENCE, 'hic_booking_events_cleanup');
             
             // Reschedule self-healing recovery for next cycle
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
