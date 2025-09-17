@@ -1361,16 +1361,24 @@ class HIC_Booking_Poller {
         
         // If any critical events are missing, schedule them immediately
         if (!empty($missing_events)) {
-            hic_log("Self-Healing: Missing critical events: " . implode(', ', $missing_events) . " - rescheduling immediately");
+            // Set recovery flag to prevent recursion
+            $in_recovery = true;
             
-            if (!$continuous_next) {
-                \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
-            }
-            if (!$deep_next) {
-                \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
-            }
-            if (!$recovery_next) {
-                \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
+            try {
+                hic_log("Self-Healing: Missing critical events: " . implode(', ', $missing_events) . " - rescheduling immediately");
+                
+                if (!$continuous_next) {
+                    \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
+                }
+                if (!$deep_next) {
+                    \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
+                }
+                if (!$recovery_next) {
+                    \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
+                }
+            } finally {
+                // Always reset recovery flag
+                $in_recovery = false;
             }
         }
         
@@ -1390,12 +1398,20 @@ class HIC_Booking_Poller {
         
         // If events are severely overdue, force immediate rescheduling
         if ($recovery_needed) {
-            hic_log("Self-Healing: Force rescheduling overdue events");
-            \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
-            \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+            // Set recovery flag to prevent recursion
+            $in_recovery = true;
             
-            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
-            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
+            try {
+                hic_log("Self-Healing: Force rescheduling overdue events");
+                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_deep_check_event');
+                
+                \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
+                \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
+            } finally {
+                // Always reset recovery flag
+                $in_recovery = false;
+            }
         }
     }
     
@@ -1423,12 +1439,13 @@ class HIC_Booking_Poller {
         
         $recovery_in_progress = true;
         
-        $current_time = time();
-        $last_continuous = get_option('hic_last_continuous_poll', 0);
-        $last_deep = get_option('hic_last_deep_check', 0);
-        
-        $continuous_lag = $current_time - $last_continuous;
-        $deep_lag = $current_time - $last_deep;
+        try {
+            $current_time = time();
+            $last_continuous = get_option('hic_last_continuous_poll', 0);
+            $last_deep = get_option('hic_last_deep_check', 0);
+            
+            $continuous_lag = $current_time - $last_continuous;
+            $deep_lag = $current_time - $last_deep;
         
         // Critical thresholds for recovery
         $continuous_critical = 600; // 10 minutes without continuous polling
@@ -1486,8 +1503,10 @@ class HIC_Booking_Poller {
             hic_log("Self-Healing Recovery: Rescheduled next recovery check");
         }
         
-        // Reset recovery flag
-        $recovery_in_progress = false;
+        } finally {
+            // Always reset recovery flag, even if an exception occurs
+            $recovery_in_progress = false;
+        }
     }
 }
 
