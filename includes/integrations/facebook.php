@@ -291,7 +291,7 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
 /**
  * Meta Pixel dispatcher for HIC reservation schema
  */
-function hic_dispatch_pixel_reservation($data) {
+function hic_dispatch_pixel_reservation($data, $sid = '') {
   if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
     hic_log('FB HIC dispatch SKIPPED: Pixel ID o Access Token mancanti');
     return false;
@@ -322,13 +322,22 @@ function hic_dispatch_pixel_reservation($data) {
   $value = Helpers\hic_normalize_price($data['value']);
   $currency = sanitize_text_field($data['currency']);
 
+  $sid = !empty($sid) ? \sanitize_text_field((string) $sid) : '';
+  if ($sid === '' && !empty($data['sid']) && is_scalar($data['sid'])) {
+    $sid = \sanitize_text_field((string) $data['sid']);
+  }
+  if ($sid !== '') {
+    $transaction_id = $sid;
+  }
+
   // Get tracking IDs for bucket normalization if available
   $gclid = '';
   $fbclid = '';
   $msclkid = '';
   $ttclid = '';
-  if (!empty($data['transaction_id'])) {
-    $tracking = Helpers\hic_get_tracking_ids_by_sid($data['transaction_id']);
+  $lookup_id = $sid !== '' ? $sid : $transaction_id;
+  if (!empty($lookup_id)) {
+    $tracking = Helpers\hic_get_tracking_ids_by_sid($lookup_id);
     $gclid = $tracking['gclid'] ?? '';
     $fbclid = $tracking['fbclid'] ?? '';
     $msclkid = $tracking['msclkid'] ?? '';
@@ -375,7 +384,8 @@ function hic_dispatch_pixel_reservation($data) {
   if (!empty($ttclid))  { $custom_data['ttclid']  = sanitize_text_field($ttclid); }
 
   // Add UTM parameters if available
-  $utm = Helpers\hic_get_utm_params_by_sid($transaction_id);
+  $utm_lookup = $sid !== '' ? $sid : $transaction_id;
+  $utm = Helpers\hic_get_utm_params_by_sid($utm_lookup);
   if (!empty($utm['utm_source']))   { $custom_data['utm_source']   = sanitize_text_field($utm['utm_source']); }
   if (!empty($utm['utm_medium']))   { $custom_data['utm_medium']   = sanitize_text_field($utm['utm_medium']); }
   if (!empty($utm['utm_campaign'])) { $custom_data['utm_campaign'] = sanitize_text_field($utm['utm_campaign']); }
