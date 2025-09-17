@@ -246,7 +246,7 @@ if (\is_admin()) {
     }
     new \FpHic\AutomatedReporting\AutomatedReportingManager();
 
-    if (!\wp_doing_cron()) {
-        new \FpHic\RealtimeDashboard\RealtimeDashboard();
-    }
 }
+
+// Initialize the real-time dashboard in all contexts (admin, frontend, cron)
+new \FpHic\RealtimeDashboard\RealtimeDashboard();
