@@ -236,15 +236,14 @@ if (!did_action('hic_enterprise_management_suite_loaded')) {
     do_action('hic_enterprise_management_suite_loaded', $GLOBALS['hic_enterprise_management_suite']);
 }
 
+// Ensure Google Ads Enhanced Conversions hooks are available in all request contexts
+new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
+
 // Load admin functionality only in dashboard
 if (\is_admin()) {
     require_once __DIR__ . '/includes/admin/admin-settings.php';
     require_once __DIR__ . '/includes/admin/diagnostics.php';
     require_once __DIR__ . '/includes/site-health.php';
-
-    // Initialize admin-only classes that create submenus
-    // This ensures the parent menu exists before submenus are added
-    new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
 }
 
 // Ensure the circuit breaker manager is initialized in every context

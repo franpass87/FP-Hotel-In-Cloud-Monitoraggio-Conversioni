@@ -23,36 +23,44 @@ class GoogleAdsEnhancedConversions {
     private const BATCH_SIZE = 100;
     
     public function __construct() {
-        // Check if Enhanced Conversions is explicitly disabled
         if (!$this->is_enhanced_conversions_enabled()) {
-            // Only add admin menu to allow enabling/configuration
-            add_action('admin_menu', [$this, 'add_enhanced_conversions_menu']);
-            add_action('admin_init', [$this, 'handle_enhanced_conversions_form']);
-            add_action('admin_init', [$this, 'register_settings']);
+            if (\is_admin()) {
+                $this->register_basic_admin_hooks();
+            }
             return;
         }
-        
+
         add_action('init', [$this, 'initialize_enhanced_conversions'], 35);
         add_action('hic_process_booking', [$this, 'process_enhanced_conversion'], 10, 2);
         add_action('hic_enhanced_conversions_batch_upload', [$this, 'batch_upload_enhanced_conversions']);
-        
-        // Admin integration
+        add_action('hic_booking_processed', [$this, 'queue_enhanced_conversion'], 10, 3);
+        add_filter('hic_booking_data', [$this, 'enrich_booking_data_for_enhanced_conversions'], 10, 2);
+        add_action('wp', [$this, 'schedule_batch_processing']);
+
+        if (\is_admin()) {
+            $this->register_full_admin_hooks();
+        }
+    }
+
+    /**
+     * Register admin hooks that are required even when Enhanced Conversions is disabled.
+     */
+    private function register_basic_admin_hooks(): void {
         add_action('admin_menu', [$this, 'add_enhanced_conversions_menu']);
-        add_action('admin_enqueue_scripts', [$this, 'enqueue_enhanced_conversions_assets']);
         add_action('admin_init', [$this, 'handle_enhanced_conversions_form']);
         add_action('admin_init', [$this, 'register_settings']);
-        
-        // AJAX handlers
+    }
+
+    /**
+     * Register the complete set of admin-only hooks.
+     */
+    private function register_full_admin_hooks(): void {
+        $this->register_basic_admin_hooks();
+
+        add_action('admin_enqueue_scripts', [$this, 'enqueue_enhanced_conversions_assets']);
         add_action('wp_ajax_hic_test_google_ads_connection', [$this, 'ajax_test_google_ads_connection']);
         add_action('wp_ajax_hic_upload_enhanced_conversions', [$this, 'ajax_upload_enhanced_conversions']);
         add_action('wp_ajax_hic_get_enhanced_conversion_stats', [$this, 'ajax_get_enhanced_conversion_stats']);
-        
-        // Hooks for booking processing
-        add_action('hic_booking_processed', [$this, 'queue_enhanced_conversion'], 10, 3);
-        add_filter('hic_booking_data', [$this, 'enrich_booking_data_for_enhanced_conversions'], 10, 2);
-
-        // Schedule batch processing
-        add_action('wp', [$this, 'schedule_batch_processing']);
     }
 
     /**
