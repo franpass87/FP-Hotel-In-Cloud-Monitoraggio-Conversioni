@@ -50,8 +50,10 @@ class CircuitBreakerManager {
         add_action('http_api_debug', [$this, 'track_api_response'], 10, 5);
 
         // Admin integration
-        add_action('admin_menu', [$this, 'add_circuit_breaker_menu']);
-        add_action('admin_enqueue_scripts', [$this, 'enqueue_circuit_breaker_assets']);
+        if (\is_admin()) {
+            add_action('admin_menu', [$this, 'add_circuit_breaker_menu']);
+            add_action('admin_enqueue_scripts', [$this, 'enqueue_circuit_breaker_assets']);
+        }
 
         // AJAX handlers
         add_action('wp_ajax_hic_get_circuit_status', [$this, 'ajax_get_circuit_status']);

@@ -245,8 +245,10 @@ if (\is_admin()) {
     // Initialize admin-only classes that create submenus
     // This ensures the parent menu exists before submenus are added
     new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
-    \FpHic\CircuitBreaker\hic_get_circuit_breaker_manager();
 }
+
+// Ensure the circuit breaker manager is initialized in every context
+\FpHic\CircuitBreaker\hic_get_circuit_breaker_manager();
 
 \FpHic\AutomatedReporting\AutomatedReportingManager::instance();
 
