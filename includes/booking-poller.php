@@ -1485,8 +1485,8 @@ class HIC_Booking_Poller {
             // Reschedule all events immediately (no delay needed for WP-Cron)
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
-            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 3600, 'hic_daily', 'hic_cleanup_event');
-            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 7200, 'hic_daily', 'hic_booking_events_cleanup');
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 3600, 'daily', 'hic_cleanup_event');
+            \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 7200, 'daily', 'hic_booking_events_cleanup');
             
             // Reschedule self-healing recovery for next cycle
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
