@@ -50,11 +50,193 @@ class GoogleAdsEnhancedConversions {
         // Hooks for booking processing
         add_action('hic_booking_processed', [$this, 'queue_enhanced_conversion'], 10, 3);
         add_filter('hic_booking_data', [$this, 'enrich_booking_data_for_enhanced_conversions'], 10, 2);
-        
+
         // Schedule batch processing
         add_action('wp', [$this, 'schedule_batch_processing']);
     }
-    
+
+    /**
+     * Normalize booking metadata for enhanced conversion processing.
+     *
+     * @param array $booking  Raw booking data provided by the processor.
+     * @param array $context  Tracking context such as gclid and sid values.
+     *
+     * @return array Enriched booking payload ready for downstream hooks.
+     */
+    public function enrich_booking_data_for_enhanced_conversions(array $booking, array $context = []): array {
+        $enriched = $booking;
+
+        $booking_id = '';
+        if (isset($enriched['booking_id']) && is_scalar($enriched['booking_id']) && $enriched['booking_id'] !== '') {
+            $booking_id = (string) $enriched['booking_id'];
+        } elseif (isset($enriched['reservation_id']) && is_scalar($enriched['reservation_id']) && $enriched['reservation_id'] !== '') {
+            $booking_id = (string) $enriched['reservation_id'];
+        } else {
+            $reservation_helper = '\\FpHic\\Helpers\\hic_extract_reservation_id';
+            if (\function_exists($reservation_helper)) {
+                $extracted_id = $reservation_helper($booking);
+                if (!empty($extracted_id)) {
+                    $booking_id = (string) $extracted_id;
+                }
+            }
+        }
+
+        if ($booking_id !== '') {
+            $enriched['booking_id'] = $booking_id;
+            if (empty($enriched['reservation_id'])) {
+                $enriched['reservation_id'] = $booking_id;
+            }
+        }
+
+        $gclid = null;
+        if (isset($context['gclid']) && is_scalar($context['gclid']) && $context['gclid'] !== '') {
+            $gclid = (string) $context['gclid'];
+        } elseif (isset($enriched['gclid']) && is_scalar($enriched['gclid']) && $enriched['gclid'] !== '') {
+            $gclid = (string) $enriched['gclid'];
+        }
+        if ($gclid !== null && $gclid !== '') {
+            $enriched['gclid'] = \sanitize_text_field($gclid);
+        }
+
+        $amount_value = null;
+        foreach (['total_amount', 'revenue', 'amount', 'value'] as $amount_key) {
+            if (isset($booking[$amount_key]) && is_scalar($booking[$amount_key]) && $booking[$amount_key] !== '') {
+                $amount_value = $booking[$amount_key];
+                break;
+            }
+        }
+        if ($amount_value !== null) {
+            $normalizer = '\\FpHic\\Helpers\\hic_normalize_price';
+            if (\function_exists($normalizer)) {
+                $normalized_amount = (float) $normalizer($amount_value);
+            } else {
+                $normalized_amount = (float) preg_replace('/[^0-9.]/', '', (string) $amount_value);
+            }
+
+            $enriched['amount'] = $normalized_amount;
+            $enriched['total_amount'] = $normalized_amount;
+            $enriched['revenue'] = $normalized_amount;
+        }
+
+        if (isset($booking['currency']) && is_scalar($booking['currency'])) {
+            $currency = strtoupper(\sanitize_text_field((string) $booking['currency']));
+            if ($currency !== '') {
+                $enriched['currency'] = $currency;
+            }
+        }
+
+        $email = '';
+        foreach (['customer_email', 'email', 'guest_email'] as $email_field) {
+            if (!empty($booking[$email_field]) && is_scalar($booking[$email_field])) {
+                $email_candidate = \sanitize_email((string) $booking[$email_field]);
+                if ($email_candidate !== '') {
+                    $email = $email_candidate;
+                    break;
+                }
+            }
+        }
+        if ($email !== '') {
+            $enriched['email'] = $email;
+            $enriched['customer_email'] = $email;
+        }
+
+        $first_name = '';
+        foreach (['customer_first_name', 'customer_firstname', 'first_name', 'firstname', 'guest_first_name', 'guest_firstname'] as $field) {
+            if (!empty($booking[$field]) && is_scalar($booking[$field])) {
+                $first_name = \sanitize_text_field((string) $booking[$field]);
+                break;
+            }
+        }
+
+        $last_name = '';
+        foreach (['customer_last_name', 'customer_lastname', 'last_name', 'lastname', 'guest_last_name', 'guest_lastname'] as $field) {
+            if (!empty($booking[$field]) && is_scalar($booking[$field])) {
+                $last_name = \sanitize_text_field((string) $booking[$field]);
+                break;
+            }
+        }
+
+        if (($first_name === '' || $last_name === '') && !empty($booking['guest_name']) && is_scalar($booking['guest_name'])) {
+            $parts = preg_split('/\s+/', trim((string) $booking['guest_name']), 2);
+            if ($first_name === '' && !empty($parts[0])) {
+                $first_name = \sanitize_text_field($parts[0]);
+            }
+            if ($last_name === '' && !empty($parts[1])) {
+                $last_name = \sanitize_text_field($parts[1]);
+            }
+        }
+
+        if (($first_name === '' || $last_name === '') && !empty($booking['name']) && is_scalar($booking['name'])) {
+            $parts = preg_split('/\s+/', trim((string) $booking['name']), 2);
+            if ($first_name === '' && !empty($parts[0])) {
+                $first_name = \sanitize_text_field($parts[0]);
+            }
+            if ($last_name === '' && !empty($parts[1])) {
+                $last_name = \sanitize_text_field($parts[1]);
+            }
+        }
+
+        if ($first_name !== '') {
+            $enriched['first_name'] = $first_name;
+            $enriched['customer_first_name'] = $first_name;
+        }
+
+        if ($last_name !== '') {
+            $enriched['last_name'] = $last_name;
+            $enriched['customer_last_name'] = $last_name;
+        }
+
+        $raw_phone = '';
+        foreach (['customer_phone', 'phone', 'client_phone', 'whatsapp'] as $phone_field) {
+            if (!empty($booking[$phone_field]) && is_scalar($booking[$phone_field])) {
+                $raw_phone = (string) $booking[$phone_field];
+                break;
+            }
+        }
+
+        if ($raw_phone !== '') {
+            $phone_helper = '\\FpHic\\Helpers\\hic_detect_phone_language';
+            $normalized_phone = '';
+            $phone_language = null;
+
+            if (\function_exists($phone_helper)) {
+                $details = $phone_helper($raw_phone);
+                if (is_array($details)) {
+                    $normalized_phone = $details['phone'] ?? '';
+                    $phone_language = $details['language'] ?? null;
+                }
+            } else {
+                $normalized_phone = preg_replace('/[^0-9+]/', '', $raw_phone);
+            }
+
+            if (!empty($normalized_phone)) {
+                $enriched['phone'] = $normalized_phone;
+                $enriched['customer_phone'] = $normalized_phone;
+            }
+
+            if (!empty($phone_language)) {
+                $enriched['phone_language'] = $phone_language;
+            }
+        }
+
+        $address_fields = ['address', 'address_line1', 'address_line_1', 'street', 'city', 'province', 'state', 'postal_code', 'zip', 'country'];
+        $address_parts = [];
+        foreach ($address_fields as $field) {
+            if (!empty($booking[$field]) && is_scalar($booking[$field])) {
+                $address_parts[] = \sanitize_text_field((string) $booking[$field]);
+            }
+        }
+
+        $address_parts = array_values(array_filter(array_unique($address_parts)));
+        if (!empty($address_parts)) {
+            $address_string = implode(', ', $address_parts);
+            $enriched['address'] = $address_string;
+            $enriched['customer_address'] = $address_string;
+        }
+
+        return $enriched;
+    }
+
     /**
      * Check if Enhanced Conversions is enabled
      */
