@@ -64,6 +64,21 @@ function hic_add_failed_request_schedule($schedules) {
         'interval' => 15 * 60,
         'display'  => 'Every 15 Minutes (HIC Failed Requests)'
     );
+
+    if (!isset($schedules['weekly'])) {
+        $schedules['weekly'] = array(
+            'interval' => 7 * 24 * 60 * 60,
+            'display'  => 'Once Weekly (Hotel in Cloud)'
+        );
+    }
+
+    if (!isset($schedules['monthly'])) {
+        $schedules['monthly'] = array(
+            'interval' => 30 * 24 * 60 * 60,
+            'display'  => 'Once Monthly (Hotel in Cloud)'
+        );
+    }
+
     return $schedules;
 }
 
