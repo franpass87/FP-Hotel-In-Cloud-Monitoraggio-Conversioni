@@ -1341,6 +1341,12 @@ class HIC_Booking_Poller {
             return;
         }
         
+        // Prevent recursive calls during recovery operations
+        static $in_recovery = false;
+        if ($in_recovery) {
+            return;
+        }
+        
         $current_time = time();
         
         // Check if all required events are scheduled
@@ -1401,12 +1407,21 @@ class HIC_Booking_Poller {
     public function execute_self_healing_recovery() {
         hic_log("Self-Healing Recovery: Executing independent recovery check");
         
+        // Prevent overlapping recovery attempts
+        static $recovery_in_progress = false;
+        if ($recovery_in_progress) {
+            hic_log("Self-Healing Recovery: Recovery already in progress, skipping");
+            return;
+        }
+        
         // Skip if polling shouldn't be active
         if (!$this->should_poll()) {
             hic_log("Self-Healing Recovery: Polling conditions not met, clearing recovery event");
             \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_self_healing_recovery');
             return;
         }
+        
+        $recovery_in_progress = true;
         
         $current_time = time();
         $last_continuous = get_option('hic_last_continuous_poll', 0);
@@ -1450,10 +1465,7 @@ class HIC_Booking_Poller {
             // Clear all events and reschedule fresh
             $this->clear_all_scheduled_events();
             
-            // Wait a moment to ensure clean slate
-            sleep(1);
-            
-            // Reschedule all events
+            // Reschedule all events immediately (no delay needed for WP-Cron)
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 30, 'hic_every_thirty_seconds', 'hic_continuous_poll_event');
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 300, 'hic_every_thirty_minutes', 'hic_deep_check_event');
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 3600, 'hic_daily', 'hic_cleanup_event');
@@ -1462,10 +1474,7 @@ class HIC_Booking_Poller {
             // Reschedule self-healing recovery for next cycle
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
             
-            // Force immediate execution of continuous polling
-            $this->execute_continuous_polling();
-            
-            hic_log("Self-Healing Recovery: Emergency recovery completed - all events rescheduled");
+            hic_log("Self-Healing Recovery: Emergency recovery completed - all events rescheduled, continuous polling will resume automatically");
         } else {
             hic_log("Self-Healing Recovery: System healthy - continuous lag: " . round($continuous_lag / 60, 1) . "m, deep lag: " . round($deep_lag / 60, 1) . "m");
         }
@@ -1476,6 +1485,9 @@ class HIC_Booking_Poller {
             \FpHic\Helpers\hic_safe_wp_schedule_event($current_time + 900, 'hic_every_fifteen_minutes', 'hic_self_healing_recovery');
             hic_log("Self-Healing Recovery: Rescheduled next recovery check");
         }
+        
+        // Reset recovery flag
+        $recovery_in_progress = false;
     }
 }
 
