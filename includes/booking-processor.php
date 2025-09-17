@@ -437,10 +437,10 @@ function hic_process_booking_data(array $data): bool {
 
     return $processing_success;
 
-  } catch (Exception $e) {
+  } catch (\Exception $e) {
     hic_log('Errore critico processando prenotazione: ' . $e->getMessage());
     return false;
-  } catch (Throwable $e) {
+  } catch (\Throwable $e) {
     hic_log('Errore fatale processando prenotazione: ' . $e->getMessage());
     return false;
   }
