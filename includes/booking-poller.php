@@ -1045,8 +1045,10 @@ class HIC_Booking_Poller {
             return false;
         }
 
-        if (\FpHic\Helpers\hic_get_connection_type() !== 'api' && \FpHic\Helpers\hic_get_connection_type() !== 'hybrid') {
-            hic_log('Connection type is not API or hybrid');
+        $connection_type = \FpHic\Helpers\hic_get_connection_type();
+
+        if (!\FpHic\Helpers\hic_connection_uses_api($connection_type)) {
+            hic_log('Connection type does not support API polling: ' . ($connection_type !== '' ? $connection_type : 'none'));
             return false;
         }
 
@@ -1223,7 +1225,7 @@ class HIC_Booking_Poller {
         $diagnostics = array_merge($base_stats, array(
             'conditions' => array(
                 'reliable_polling_enabled' => \FpHic\Helpers\hic_reliable_polling_enabled(),
-                'connection_type_api' => in_array(\FpHic\Helpers\hic_get_connection_type(), ['api', 'hybrid']),
+                'connection_type_api' => \FpHic\Helpers\hic_connection_uses_api(),
                 'api_url_configured' => !empty(\FpHic\Helpers\hic_get_api_url()),
                 'has_credentials' => \FpHic\Helpers\hic_has_basic_auth_credentials(),
                 'basic_auth_complete' => \FpHic\Helpers\hic_has_basic_auth_credentials(),
