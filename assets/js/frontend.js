@@ -62,6 +62,10 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }
 
+  if (sid) {
+    fetchQueuedGtmEvents(sid);
+  }
+
   // Capture gclid/fbclid from URL and persist in cookies for redirect preservation
   safeExecute(function() {
     var params = new URLSearchParams(window.location.search);
@@ -109,6 +113,73 @@ document.addEventListener('DOMContentLoaded', function(){
     } catch(e) {
       return false;
     }
+  }
+
+  var gtmEventsRequestedForSid = null;
+
+  function fetchQueuedGtmEvents(currentSid) {
+    safeExecute(function() {
+      if (!currentSid || !isValidSid(currentSid)) {
+        return;
+      }
+
+      if (!window.hicFrontend || !window.hicFrontend.gtmEnabled) {
+        return;
+      }
+
+      var endpoint = window.hicFrontend.gtmEventsEndpoint;
+      if (!endpoint || typeof endpoint !== 'string') {
+        return;
+      }
+
+      if (gtmEventsRequestedForSid === currentSid) {
+        return;
+      }
+
+      if (!window.fetch) {
+        console.warn('HIC: fetch API non disponibile per eventi GTM');
+        return;
+      }
+
+      if (!isValidUrl(endpoint)) {
+        console.warn('HIC: endpoint eventi GTM non valido:', endpoint);
+        return;
+      }
+
+      var url = endpoint + (endpoint.indexOf('?') === -1 ? '?' : '&') + 'sid=' + encodeURIComponent(currentSid);
+      gtmEventsRequestedForSid = currentSid;
+
+      fetch(url, {
+        method: 'GET',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          'Accept': 'application/json'
+        }
+      })
+        .then(function(response) {
+          if (!response || !response.ok) {
+            throw new Error('HTTP ' + (response ? response.status : '0'));
+          }
+          return response.json();
+        })
+        .then(function(payload) {
+          if (!payload || !Array.isArray(payload.events) || payload.events.length === 0) {
+            return;
+          }
+
+          window.dataLayer = window.dataLayer || [];
+          payload.events.forEach(function(event) {
+            if (event && typeof event === 'object') {
+              window.dataLayer.push(event);
+            }
+          });
+        })
+        .catch(function(err) {
+          console.warn('HIC: errore nel recupero degli eventi GTM:', err);
+          gtmEventsRequestedForSid = null;
+        });
+    }, 'fetchQueuedGtmEvents');
   }
 
   // Helper function to add SID and tracking IDs to a link on click
@@ -212,6 +283,7 @@ document.addEventListener('DOMContentLoaded', function(){
           if (setCookie('hic_sid', event.data.sid, 90)) {
             // Re-applica SID ai link esistenti con il nuovo SID
             appendSidToLinks();
+            fetchQueuedGtmEvents(event.data.sid);
           }
         }
       }

@@ -83,7 +83,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
     }
 
     // Store the data to be pushed to dataLayer on next page load
-    hic_queue_gtm_event($gtm_data);
+    hic_queue_gtm_event($gtm_data, $sid);
 
     hic_log("GTM DataLayer: queued purchase event for transaction_id=$transaction_id, bucket=$bucket, value=$amount");
     return true;
@@ -93,30 +93,87 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
  * Queue GTM event for client-side processing
  * Events are stored in wp_options and pushed on next page load
  */
-function hic_queue_gtm_event($event_data) {
-    $queued_events = get_option('hic_gtm_queued_events', []);
-    
+function hic_queue_gtm_event($event_data, $sid = '') {
+    if (!is_array($event_data)) {
+        return;
+    }
+
+    $sid = !empty($sid) ? sanitize_text_field((string) $sid) : '';
+    if ($sid === '') {
+        hic_log('GTM queue: evento ignorato perché SID mancante o non valido', HIC_LOG_LEVEL_DEBUG);
+        return;
+    }
+
+    $option_key = hic_get_gtm_queue_option_key($sid);
+    if ($option_key === '') {
+        return;
+    }
+
+    $queued_events = get_option($option_key, []);
+    if (!is_array($queued_events)) {
+        $queued_events = [];
+    }
+
     // Add timestamp to avoid conflicts
     $event_data['event_timestamp'] = current_time('timestamp');
-    
+
     $queued_events[] = $event_data;
-    
+
     // Keep only last 10 events to avoid database bloat
     if (count($queued_events) > 10) {
         $queued_events = array_slice($queued_events, -10);
     }
-    
-    update_option('hic_gtm_queued_events', $queued_events);
-    Helpers\hic_clear_option_cache('hic_gtm_queued_events');
+
+    update_option($option_key, $queued_events, false);
+    Helpers\hic_clear_option_cache($option_key);
 }
 
 /**
- * Get and clear queued GTM events
+ * Build the option key used to store GTM events for a specific SID
+ */
+function hic_get_gtm_queue_option_key(string $sid): string {
+    $sid = sanitize_text_field($sid);
+    if ($sid === '') {
+        return '';
+    }
+
+    return 'hic_gtm_queue_' . hash('sha256', $sid);
+}
+
+/**
+ * Get and clear queued GTM events for a specific SID
+ */
+function hic_get_and_clear_gtm_events_for_sid($sid) {
+    $sid = !empty($sid) ? sanitize_text_field((string) $sid) : '';
+    if ($sid === '') {
+        return [];
+    }
+
+    $option_key = hic_get_gtm_queue_option_key($sid);
+    if ($option_key === '') {
+        return [];
+    }
+
+    $events = get_option($option_key, []);
+    if (!is_array($events)) {
+        $events = [];
+    }
+
+    if (!empty($events)) {
+        delete_option($option_key);
+        Helpers\hic_clear_option_cache($option_key);
+    }
+
+    return $events;
+}
+
+/**
+ * Legacy helper maintained for backward compatibility
  */
 function hic_get_and_clear_gtm_events() {
-    $events = get_option('hic_gtm_queued_events', []);
     delete_option('hic_gtm_queued_events');
-    return $events;
+    Helpers\hic_clear_option_cache('hic_gtm_queued_events');
+    return [];
 }
 
 /**
@@ -174,23 +231,7 @@ function hic_output_gtm_body_code() {
  * Output queued GTM events to dataLayer
  */
 function hic_output_gtm_events() {
-    if (!Helpers\hic_is_gtm_enabled()) {
-        return;
-    }
-    
-    $events = hic_get_and_clear_gtm_events();
-    if (empty($events)) {
-        return;
-    }
-    
-    ?>
-    <script>
-    window.dataLayer = window.dataLayer || [];
-    <?php foreach ($events as $event): ?>
-    dataLayer.push(<?php echo wp_json_encode($event); ?>);
-    <?php endforeach; ?>
-    </script>
-    <?php
+    // Gli eventi GTM vengono ora consegnati tramite endpoint REST dedicato.
 }
 
 /**
@@ -214,12 +255,58 @@ function hic_init_gtm_hooks() {
         }
     }, 1);
     
-    // Output queued events
-    add_action('wp_footer', 'hic_output_gtm_events', 20);
+}
+
+/**
+ * Register REST endpoint used to deliver queued GTM events
+ */
+function hic_register_gtm_rest_routes() {
+    if (!Helpers\hic_is_gtm_enabled()) {
+        return;
+    }
+
+    register_rest_route('hic/v1', '/gtm-events', [
+        'methods'             => \WP_REST_Server::READABLE,
+        'callback'            => __NAMESPACE__ . '\hic_handle_gtm_events_request',
+        'permission_callback' => '__return_true',
+        'args'                => [
+            'sid' => [
+                'required'          => true,
+                'sanitize_callback' => 'sanitize_text_field',
+                'description'       => 'Session ID associato alla prenotazione',
+            ],
+        ],
+    ]);
+}
+
+/**
+ * Handle REST request returning queued GTM events for a SID
+ */
+function hic_handle_gtm_events_request(\WP_REST_Request $request) {
+    if (!Helpers\hic_is_gtm_enabled()) {
+        return new \WP_REST_Response(['events' => []], 200);
+    }
+
+    $sid = $request->get_param('sid');
+    if (empty($sid)) {
+        return new \WP_Error('missing_sid', 'SID mancante', ['status' => 400]);
+    }
+
+    $validated_sid = HIC_Input_Validator::validate_sid($sid);
+    if (is_wp_error($validated_sid)) {
+        return $validated_sid;
+    }
+
+    $events = hic_get_and_clear_gtm_events_for_sid($validated_sid);
+
+    return new \WP_REST_Response([
+        'events' => array_values($events),
+    ], 200);
 }
 
 // Initialize GTM hooks when WordPress is ready (safe hook registration)
 \FpHic\Helpers\hic_safe_add_hook('action', 'init', 'hic_init_gtm_hooks');
+\FpHic\Helpers\hic_safe_add_hook('action', 'rest_api_init', 'hic_register_gtm_rest_routes');
 
 /**
  * GTM dispatcher for HIC reservation schema
@@ -315,7 +402,7 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
     if (!empty($utm['utm_term']))     { $gtm_data['utm_term']     = sanitize_text_field($utm['utm_term']); }
 
     // Queue the event
-    hic_queue_gtm_event($gtm_data);
+    hic_queue_gtm_event($gtm_data, $sid);
 
     hic_log("GTM dispatch: queued purchase event for bucket=$bucket vertical=hotel transaction_id=$transaction_id value=$value $currency");
     return true;
