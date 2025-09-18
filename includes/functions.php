@@ -375,7 +375,7 @@ function hic_booking_uid($reservation) {
 }
 
 /* ============ Helpers ============ */
-function hic_http_request($url, $args = []) {
+function hic_http_request($url, $args = [], bool $suppress_failed_storage = false) {
     $validated_url = wp_http_validate_url($url);
     if (!$validated_url) {
         hic_log('HTTP request rifiutata: URL non valido ' . $url, HIC_LOG_LEVEL_ERROR);
@@ -409,13 +409,17 @@ function hic_http_request($url, $args = []) {
     if (is_wp_error($response)) {
         $error_message = $response->get_error_message();
         hic_log('HTTP request error: ' . $error_message, HIC_LOG_LEVEL_ERROR);
-        hic_store_failed_request($url, $args, $error_message);
+        if (!$suppress_failed_storage) {
+            hic_store_failed_request($url, $args, $error_message);
+        }
     } else {
         $code = wp_remote_retrieve_response_code($response);
         if ($code >= 400) {
             $error_message = 'HTTP ' . $code;
             hic_log('HTTP request to ' . $url . ' failed with status ' . $code, HIC_LOG_LEVEL_ERROR);
-            hic_store_failed_request($url, $args, $error_message);
+            if (!$suppress_failed_storage) {
+                hic_store_failed_request($url, $args, $error_message);
+            }
         }
     }
 
@@ -948,7 +952,7 @@ function hic_get_processing_statistics() {
 
 // Global wrappers for backward compatibility
 namespace {
-    function hic_http_request($url, $args = array()) { return \FpHic\Helpers\hic_http_request($url, $args); }
+    function hic_http_request($url, $args = array(), $suppress_failed_storage = false) { return \FpHic\Helpers\hic_http_request($url, $args, $suppress_failed_storage); }
     function hic_get_option($key, $default = '') { return \FpHic\Helpers\hic_get_option($key, $default); }
     function hic_clear_option_cache($key = null) { return \FpHic\Helpers\hic_clear_option_cache($key); }
     function hic_get_measurement_id() { return \FpHic\Helpers\hic_get_measurement_id(); }

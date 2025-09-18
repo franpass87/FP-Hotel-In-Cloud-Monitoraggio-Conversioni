@@ -194,8 +194,15 @@ if (!function_exists('wp_json_encode')) {
 
 if (!function_exists('wp_safe_remote_request')) {
     function wp_safe_remote_request($url, $args = array()) {
-        global $hic_last_request, $hic_test_http_error, $hic_test_http_error_urls;
+        global $hic_last_request, $hic_test_http_error, $hic_test_http_error_urls, $hic_test_http_mock;
         $hic_last_request = ['url' => $url, 'args' => $args];
+
+        if (isset($hic_test_http_mock) && is_callable($hic_test_http_mock)) {
+            $mock_response = call_user_func($hic_test_http_mock, $url, $args);
+            if ($mock_response !== null) {
+                return $mock_response;
+            }
+        }
 
         $should_fail = false;
         if (!empty($hic_test_http_error)) {

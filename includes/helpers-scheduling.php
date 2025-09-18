@@ -142,7 +142,7 @@ function hic_retry_failed_requests() {
             $wpdb->delete($table, array('id' => $row->id));
             continue;
         }
-        $response = hic_http_request($row->endpoint, is_array($args) ? $args : array());
+        $response = hic_http_request($row->endpoint, is_array($args) ? $args : array(), true);
 
         if (is_wp_error($response) || wp_remote_retrieve_response_code($response) >= 400) {
             $error_message = is_wp_error($response) ? $response->get_error_message() : 'HTTP ' . wp_remote_retrieve_response_code($response);
