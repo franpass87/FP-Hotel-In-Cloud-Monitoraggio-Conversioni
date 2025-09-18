@@ -34,6 +34,10 @@ if (!function_exists('update_option')) {
     }
 }
 
+if (!class_exists('WP_UnitTestCase')) {
+    class WP_UnitTestCase extends \PHPUnit\Framework\TestCase {}
+}
+
 if (!function_exists('current_time')) {
     function current_time($type, $gmt = 0) {
         // Allow tests to override the time
