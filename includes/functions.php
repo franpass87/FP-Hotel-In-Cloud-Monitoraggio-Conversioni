@@ -163,6 +163,30 @@ function hic_get_fb_access_token() { return hic_get_option('fb_access_token', ''
 
 // Hotel in Cloud Connection Settings (with wp-config.php constants support)
 function hic_get_connection_type() { return hic_get_option('connection_type', 'webhook'); }
+
+function hic_normalize_connection_type($type = null) {
+    if ($type === null) {
+        $type = hic_get_connection_type();
+    }
+
+    if (!is_string($type)) {
+        return '';
+    }
+
+    $normalized = strtolower(trim($type));
+
+    if ($normalized === 'polling') {
+        $normalized = 'api';
+    }
+
+    return $normalized;
+}
+
+function hic_connection_uses_api($type = null) {
+    $normalized = hic_normalize_connection_type($type);
+
+    return in_array($normalized, ['api', 'hybrid'], true);
+}
 function hic_get_webhook_token() { return hic_get_option('webhook_token', ''); }
 function hic_get_api_url() { return hic_get_option('api_url', ''); }
 function hic_get_api_key() { return hic_get_option('api_key', ''); }
@@ -978,6 +1002,8 @@ namespace {
     function hic_get_fb_pixel_id() { return \FpHic\Helpers\hic_get_fb_pixel_id(); }
     function hic_get_fb_access_token() { return \FpHic\Helpers\hic_get_fb_access_token(); }
     function hic_get_connection_type() { return \FpHic\Helpers\hic_get_connection_type(); }
+    function hic_normalize_connection_type($type = null) { return \FpHic\Helpers\hic_normalize_connection_type($type); }
+    function hic_connection_uses_api($type = null) { return \FpHic\Helpers\hic_connection_uses_api($type); }
     function hic_get_webhook_token() { return \FpHic\Helpers\hic_get_webhook_token(); }
     function hic_get_api_url() { return \FpHic\Helpers\hic_get_api_url(); }
     function hic_get_api_key() { return \FpHic\Helpers\hic_get_api_key(); }

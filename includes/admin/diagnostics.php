@@ -60,10 +60,12 @@ function hic_get_internal_scheduler_status() {
     );
     
     // Check if internal scheduler conditions are met
-    $status['internal_scheduler']['conditions_met'] = 
-        hic_reliable_polling_enabled() && 
-        in_array(hic_get_connection_type(), ['api', 'hybrid']) && 
-        hic_get_api_url() && 
+    $connection_type = hic_get_connection_type();
+
+    $status['internal_scheduler']['conditions_met'] =
+        hic_reliable_polling_enabled() &&
+        hic_connection_uses_api($connection_type) &&
+        hic_get_api_url() &&
         hic_has_basic_auth_credentials();
     
     // Get stats from WP-Cron scheduler if available
@@ -152,7 +154,7 @@ function hic_get_internal_scheduler_status() {
  * Check if main polling should be scheduled based on conditions
  */
 function hic_should_schedule_poll_event() {
-    if (!in_array(hic_get_connection_type(), ['api', 'hybrid'])) {
+    if (!hic_connection_uses_api()) {
         return false;
     }
     
@@ -168,7 +170,7 @@ function hic_should_schedule_poll_event() {
  * Check if updates polling should be scheduled based on conditions
  */
 function hic_should_schedule_updates_event() {
-    if (!in_array(hic_get_connection_type(), ['api', 'hybrid'])) {
+    if (!hic_connection_uses_api()) {
         return false;
     }
     
@@ -326,9 +328,9 @@ function hic_force_restart_internal_scheduler() {
     }
     
     // Check if internal scheduler should be active
-    $should_activate = hic_reliable_polling_enabled() && 
-                      in_array(hic_get_connection_type(), ['api', 'hybrid']) && 
-                      hic_get_api_url() && 
+    $should_activate = hic_reliable_polling_enabled() &&
+                      hic_connection_uses_api() &&
+                      hic_get_api_url() &&
                       hic_has_basic_auth_credentials();
     
     if ($should_activate) {
@@ -534,7 +536,7 @@ function hic_get_latest_bookings($limit = 5, $skip_downloaded = true) {
     }
     
     // Check API connection type
-    if (!in_array(hic_get_connection_type(), ['api', 'hybrid'])) {
+    if (!hic_connection_uses_api()) {
         return new \WP_Error('wrong_connection', 'Sistema non configurato per API (modalità: ' . hic_get_connection_type() . ')');
     }
     
@@ -1166,6 +1168,8 @@ function hic_diagnostics_page() {
     // Get initial data
     $scheduler_status = hic_get_internal_scheduler_status();
     $credentials_status = hic_get_credentials_status();
+    $connection_type_raw = hic_get_connection_type();
+    $connection_type_normalized = hic_normalize_connection_type($connection_type_raw);
     $execution_stats = hic_get_execution_stats();
     $recent_logs = current_user_can('hic_view_logs') ? hic_get_log_manager()->get_recent_logs(20) : array();
     $schedules = wp_get_schedules();
@@ -1191,11 +1195,11 @@ function hic_diagnostics_page() {
                         <table class="hic-status-table">
                             <tr>
                                 <td>Modalità</td>
-                                <td><strong><?php echo esc_html(hic_get_connection_type()); ?></strong></td>
+                                <td><strong><?php echo esc_html($connection_type_raw); ?></strong></td>
                                 <td>
-                                    <?php if (hic_get_connection_type() === 'api'): ?>
+                                    <?php if ($connection_type_normalized === 'api'): ?>
                                         <span class="status ok">✓ Polling Attivo</span>
-                                    <?php elseif (hic_get_connection_type() === 'hybrid'): ?>
+                                    <?php elseif ($connection_type_normalized === 'hybrid'): ?>
                                         <span class="status ok">✓ Hybrid (Webhook + API)</span>
                                     <?php else: ?>
                                         <span class="status warning">⚠ Solo Webhook</span>

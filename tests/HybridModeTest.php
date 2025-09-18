@@ -54,7 +54,7 @@ class HybridModeTest extends WP_UnitTestCase {
     public function test_booking_poller_accepts_hybrid_mode() {
         // Simula le condizioni del booking poller
         $reliable_polling = \FpHic\Helpers\hic_reliable_polling_enabled();
-        $connection_type_ok = in_array(\FpHic\Helpers\hic_get_connection_type(), ['api', 'hybrid']);
+        $connection_type_ok = \FpHic\Helpers\hic_connection_uses_api();
         $has_api_url = !empty(\FpHic\Helpers\hic_get_api_url());
         $has_credentials = \FpHic\Helpers\hic_has_basic_auth_credentials();
         
@@ -69,9 +69,9 @@ class HybridModeTest extends WP_UnitTestCase {
      */
     public function test_diagnostics_recognize_hybrid_mode() {
         // Simula controllo diagnostico
-        $should_activate_scheduler = hic_reliable_polling_enabled() && 
-                                    in_array(hic_get_connection_type(), ['api', 'hybrid']) && 
-                                    hic_get_api_url() && 
+        $should_activate_scheduler = hic_reliable_polling_enabled() &&
+                                    hic_connection_uses_api() &&
+                                    hic_get_api_url() &&
                                     hic_has_basic_auth_credentials();
         
         $this->assertTrue($should_activate_scheduler);

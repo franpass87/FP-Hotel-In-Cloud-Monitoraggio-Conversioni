@@ -284,7 +284,7 @@ function hic_admin_enqueue_scripts($hook) {
             'polling_metrics_nonce' => wp_create_nonce('hic_polling_metrics'),
             'optimize_db_nonce' => wp_create_nonce('hic_optimize_db'),
             'management_nonce' => wp_create_nonce('hic_management_nonce'),
-            'is_api_connection' => (\FpHic\Helpers\hic_get_connection_type() === 'api'),
+            'is_api_connection' => (\FpHic\Helpers\hic_connection_uses_api()),
             'has_basic_auth' => \FpHic\Helpers\hic_has_basic_auth_credentials(),
             'has_property_id' => (bool) \FpHic\Helpers\hic_get_property_id(),
         ));
@@ -305,7 +305,7 @@ function hic_options_page() {
         </form>
         
         <!-- API Connection Test Section -->
-        <?php if (\FpHic\Helpers\hic_get_connection_type() === 'api'): ?>
+        <?php if (\FpHic\Helpers\hic_connection_uses_api()): ?>
         <div class="hic-api-test-section" style="margin-top: 30px; padding: 20px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
             <h2>Test Connessione API</h2>
             <p>Testa la connessione alle API Hotel in Cloud con le credenziali Basic Auth configurate.</p>
@@ -439,10 +439,11 @@ function hic_fb_access_token_render() {
 
 function hic_connection_type_render() {
     $type = \FpHic\Helpers\hic_get_connection_type();
+    $normalized = \FpHic\Helpers\hic_normalize_connection_type($type);
     echo '<select name="hic_connection_type">';
-    echo '<option value="webhook"' . selected($type, 'webhook', false) . '>Webhook</option>';
-    echo '<option value="api"' . selected($type, 'api', false) . '>API Polling</option>';
-    echo '<option value="hybrid"' . selected($type, 'hybrid', false) . '>Hybrid (Webhook + API)</option>';
+    echo '<option value="webhook"' . selected($normalized, 'webhook', false) . '>Webhook</option>';
+    echo '<option value="api"' . selected($normalized, 'api', false) . '>API Polling</option>';
+    echo '<option value="hybrid"' . selected($normalized, 'hybrid', false) . '>Hybrid (Webhook + API)</option>';
     echo '</select>';
     echo '<p class="description">Hybrid: combina webhook in tempo reale con API polling di backup per massima affidabilità</p>';
 }

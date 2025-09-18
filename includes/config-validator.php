@@ -39,15 +39,20 @@ class HIC_Config_Validator {
      * Validate API settings
      */
     private function validate_api_settings() {
-        $connection_type = Helpers\hic_get_connection_type();
-        
-        if (!in_array($connection_type, ['webhook', 'polling'])) {
-            $this->errors[] = 'Invalid connection type: ' . $connection_type;
+        $raw_connection_type = Helpers\hic_get_connection_type();
+        $connection_type = Helpers\hic_normalize_connection_type($raw_connection_type);
+
+        if (!in_array($connection_type, ['webhook', 'api', 'hybrid'], true)) {
+            $this->errors[] = 'Invalid connection type: ' . $raw_connection_type;
+            return;
         }
-        
-        if ($connection_type === 'polling') {
+
+        if ($connection_type === 'api') {
             $this->validate_polling_config();
-        } elseif ($connection_type === 'webhook') {
+        } elseif ($connection_type === 'hybrid') {
+            $this->validate_polling_config();
+            $this->validate_webhook_config();
+        } else { // webhook
             $this->validate_webhook_config();
         }
     }
@@ -258,9 +263,12 @@ class HIC_Config_Validator {
         }
         
         // Check file permissions
-        $plugin_dir = plugin_dir_path(__DIR__);
-        if (is_writable($plugin_dir)) {
-            $this->warnings[] = 'Plugin directory is writable, consider restricting permissions';
+        if (function_exists('plugin_dir_path')) {
+            $plugin_dir = plugin_dir_path(__DIR__);
+
+            if ($plugin_dir && is_writable($plugin_dir)) {
+                $this->warnings[] = 'Plugin directory is writable, consider restricting permissions';
+            }
         }
     }
     
