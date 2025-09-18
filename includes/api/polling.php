@@ -1341,41 +1341,111 @@ function hic_retry_failed_brevo_notifications() {
         return;
     }
 
+    $max_attempts = 3;
+    $retry_delay_minutes = 30;
+
     hic_log('Internal Scheduler: hic_retry_failed_brevo_notifications execution started');
-    
-    // Get failed reservations that need retry
-    $failed_reservations = hic_get_failed_reservations_for_retry(3, 30); // max 3 attempts, 30 min delay
-    
+
+    $failed_reservations = hic_get_failed_reservations_for_retry($max_attempts, $retry_delay_minutes);
+
     if (empty($failed_reservations)) {
         hic_log('No failed reservations to retry');
         return;
     }
-    
-    $retry_count = 0;
+
+    $attempted = 0;
     $success_count = 0;
-    
+    $requeued_count = 0;
+    $permanent_count = 0;
+
     foreach ($failed_reservations as $failed) {
+        $attempted++;
         $reservation_id = $failed->reservation_id;
-        $retry_count++;
-        
-        hic_log("Retrying failed notification for reservation $reservation_id (attempt " . ($failed->attempt_count + 1) . ")");
-        
-        // Try to get reservation data from API for retry
-        // For now, we'll use a simplified approach and just mark as failed after max attempts
-        // In a real implementation, you might want to store the original reservation data
-        
-        // For this implementation, we'll mark as permanently failed after max attempts
-        if ($failed->attempt_count >= 2) { // 3rd attempt
-            hic_mark_reservation_notification_failed($reservation_id, 'Max retry attempts reached');
-            hic_log("Reservation $reservation_id marked as permanently failed after max retry attempts");
-        } else {
-            // Increment attempt count but keep in failed state for next retry
-            hic_mark_reservation_notification_failed($reservation_id, 'Retry attempt failed');
-            hic_log("Reservation $reservation_id retry failed, will try again later");
+        $current_attempt = isset($failed->attempt_count) ? (int) $failed->attempt_count : 0;
+        $next_attempt = $current_attempt + 1;
+
+        hic_log("Retrying failed notification for reservation $reservation_id (attempt $next_attempt)");
+
+        if ($current_attempt >= $max_attempts) {
+            hic_log("Reservation $reservation_id already reached max retry attempts ($current_attempt), marking as permanent failure");
+            hic_mark_reservation_notification_permanent_failure($reservation_id, 'Max retry attempts reached');
+            $permanent_count++;
+            continue;
         }
+
+        $payload_data = array();
+        if (!empty($failed->payload_json)) {
+            $decoded_payload = json_decode($failed->payload_json, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_payload)) {
+                $payload_data = $decoded_payload;
+            } else {
+                $json_error = function_exists('json_last_error_msg') ? json_last_error_msg() : 'JSON decode error';
+                hic_log("Reservation $reservation_id has invalid retry payload: $json_error");
+            }
+        }
+
+        if (empty($payload_data) || empty($payload_data['data']) || !is_array($payload_data['data'])) {
+            hic_log("Reservation $reservation_id missing retry payload, marking as permanent failure to avoid infinite loop");
+            hic_mark_reservation_notification_permanent_failure($reservation_id, 'Missing retry payload');
+            $permanent_count++;
+            continue;
+        }
+
+        $transformed = $payload_data['data'];
+        $gclid = isset($payload_data['gclid']) ? $payload_data['gclid'] : '';
+        $fbclid = isset($payload_data['fbclid']) ? $payload_data['fbclid'] : '';
+        $msclkid = isset($payload_data['msclkid']) ? $payload_data['msclkid'] : '';
+        $ttclid = isset($payload_data['ttclid']) ? $payload_data['ttclid'] : '';
+
+        $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid);
+
+        if (is_array($event_result) && $event_result['success']) {
+            hic_mark_reservation_notified_to_brevo($reservation_id);
+            hic_log("Reservation $reservation_id Brevo notification sent successfully on retry");
+            $success_count++;
+            continue;
+        }
+
+        $error_message = 'Unknown error during retry';
+        $retryable = false;
+        $skipped = false;
+
+        if (is_array($event_result)) {
+            $error_message = !empty($event_result['error']) ? $event_result['error'] : $error_message;
+            $retryable = !empty($event_result['retryable']);
+            $skipped = !empty($event_result['skipped']);
+        } elseif (is_wp_error($event_result)) {
+            $error_message = $event_result->get_error_message();
+        }
+
+        if ($skipped) {
+            hic_log("Reservation $reservation_id Brevo retry skipped: $error_message");
+            hic_mark_reservation_notification_permanent_failure($reservation_id, 'Event skipped during retry: ' . $error_message);
+            $permanent_count++;
+            continue;
+        }
+
+        if (!$retryable) {
+            hic_log("Reservation $reservation_id Brevo notification failed with non-retryable error: $error_message");
+            hic_mark_reservation_notification_permanent_failure($reservation_id, $error_message);
+            $permanent_count++;
+            continue;
+        }
+
+        hic_mark_reservation_notification_failed($reservation_id, $error_message, $payload_data);
+
+        if ($next_attempt >= $max_attempts) {
+            hic_log("Reservation $reservation_id reached max retry attempts ($max_attempts), marking as permanent failure");
+            hic_mark_reservation_notification_permanent_failure($reservation_id, $error_message);
+            $permanent_count++;
+            continue;
+        }
+
+        $requeued_count++;
+        hic_log("Reservation $reservation_id retry failed (attempt $next_attempt), will retry after {$retry_delay_minutes} minutes");
     }
-    
-    hic_log("Retry process completed: $retry_count attempted, $success_count succeeded");
+
+    hic_log("Retry process completed: $attempted attempted, $success_count succeeded, $requeued_count queued for retry, $permanent_count marked as permanent failure");
 }
 
 /**
@@ -1551,6 +1621,14 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
         }
     }
 
+    $retry_payload = array(
+        'data' => $transformed,
+        'gclid' => $gclid,
+        'fbclid' => $fbclid,
+        'msclkid' => $msclkid,
+        'ttclid' => $ttclid,
+    );
+
     // Send reservation_created event to Brevo
     $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid);
 
@@ -1571,7 +1649,7 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
             hic_log("Brevo reservation_created event skipped for reservation $reservation_id: " . $event_result['error']);
         } elseif ($event_result['retryable']) {
             // Mark as failed for retry
-            hic_mark_reservation_notification_failed($reservation_id, 'Failed to send Brevo event: ' . $event_result['error']);
+            hic_mark_reservation_notification_failed($reservation_id, 'Failed to send Brevo event: ' . $event_result['error'], $retry_payload);
             hic_log("Failed to send reservation_created event to Brevo for reservation $reservation_id (retryable error)");
         } else {
             // Already marked as permanent failure in hic_send_brevo_reservation_created_event

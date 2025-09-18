@@ -801,6 +801,13 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
       $send_event = apply_filters('hic_brevo_send_event', true, $data);
       hic_mark_reservation_new_for_realtime($reservation_id);
       if ($send_event) {
+        $retry_payload = array(
+          'data' => $transformed_data,
+          'gclid' => $gclid,
+          'fbclid' => $fbclid,
+          'msclkid' => $msclkid,
+          'ttclid' => $ttclid,
+        );
         $event_result = hic_send_brevo_reservation_created_event($transformed_data, $gclid, $fbclid, $msclkid, $ttclid);
         if ($event_result['success']) {
           hic_log('Unified Brevo: reservation_created event sent');
@@ -809,7 +816,7 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
         } else {
           hic_log('Unified Brevo: reservation_created event failed', HIC_LOG_LEVEL_WARNING);
           if ($event_result['retryable']) {
-            hic_mark_reservation_notification_failed($reservation_id, 'Failed to send reservation_created event: ' . $event_result['error']);
+            hic_mark_reservation_notification_failed($reservation_id, 'Failed to send reservation_created event: ' . $event_result['error'], $retry_payload);
           }
           // Non-retryable errors are already handled in hic_send_brevo_reservation_created_event
         }

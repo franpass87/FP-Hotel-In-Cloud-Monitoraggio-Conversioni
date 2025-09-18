@@ -31,6 +31,7 @@ class HIC_Booking_Poller {
         add_action('hic_cleanup_event', 'hic_cleanup_old_gclids');
         add_action('hic_booking_events_cleanup', 'hic_cleanup_booking_events');
         add_action('hic_scheduler_restart', array($this, 'ensure_scheduler_is_active'));
+        add_action('hic_retry_failed_brevo_notifications', __NAMESPACE__ . '\\hic_retry_failed_brevo_notifications');
         
         // CRITICAL FIX: Add independent self-healing recovery mechanism
         add_action('hic_self_healing_recovery', array($this, 'execute_self_healing_recovery'));
@@ -151,6 +152,17 @@ class HIC_Booking_Poller {
                 hic_log('WP-Cron Scheduler: FAILED to schedule self-healing recovery event');
             }
         }
+
+        // Schedule Brevo retry job for failed notifications
+        $brevo_retry_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_retry_failed_brevo_notifications');
+        if (!$brevo_retry_next) {
+            $scheduled = \FpHic\Helpers\hic_safe_wp_schedule_event(time(), 'hic_every_fifteen_minutes', 'hic_retry_failed_brevo_notifications');
+            if ($scheduled) {
+                hic_log('WP-Cron Scheduler: Scheduled Brevo notification retry every 15 minutes');
+            } else {
+                hic_log('WP-Cron Scheduler: FAILED to schedule Brevo notification retry event');
+            }
+        }
         
         // Log current scheduling status
         $this->log_scheduler_status();
@@ -190,7 +202,8 @@ class HIC_Booking_Poller {
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_cleanup_event');
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_booking_events_cleanup');
         \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_self_healing_recovery');
-        hic_log('WP-Cron Scheduler: Cleared all scheduled events (including self-healing recovery)');
+        \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook('hic_retry_failed_brevo_notifications');
+        hic_log('WP-Cron Scheduler: Cleared all scheduled events (including self-healing recovery and Brevo retries)');
     }
 
     /**
@@ -212,8 +225,9 @@ class HIC_Booking_Poller {
         $deep_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_deep_check_event');
         $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
+        $brevo_retry_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_retry_failed_brevo_notifications');
 
-        return ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false);
+        return ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false && $brevo_retry_next !== false);
     }
 
     /**
@@ -293,17 +307,19 @@ class HIC_Booking_Poller {
         $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
         $recovery_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_self_healing_recovery');
+        $brevo_retry_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_retry_failed_brevo_notifications');
 
-        $is_working = ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false && $recovery_next !== false);
+        $is_working = ($continuous_next !== false && $deep_next !== false && $cleanup_next !== false && $booking_cleanup_next !== false && $recovery_next !== false && $brevo_retry_next !== false);
 
         if (!$is_working) {
             $debug_info = sprintf(
-                'WP-Cron events check: continuous=%s, deep=%s, cleanup=%s, booking_cleanup=%s, recovery=%s',
+                'WP-Cron events check: continuous=%s, deep=%s, cleanup=%s, booking_cleanup=%s, recovery=%s, brevo_retry=%s',
                 $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
                 $deep_next ? wp_date('Y-m-d H:i:s', $deep_next) : 'NOT_SCHEDULED',
                 $cleanup_next ? wp_date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
                 $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED',
-                $recovery_next ? wp_date('Y-m-d H:i:s', $recovery_next) : 'NOT_SCHEDULED'
+                $recovery_next ? wp_date('Y-m-d H:i:s', $recovery_next) : 'NOT_SCHEDULED',
+                $brevo_retry_next ? wp_date('Y-m-d H:i:s', $brevo_retry_next) : 'NOT_SCHEDULED'
             );
             hic_log('WP-Cron not working: ' . $debug_info);
         }
@@ -318,6 +334,7 @@ class HIC_Booking_Poller {
         $continuous_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         $cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_cleanup_event');
         $booking_cleanup_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_booking_events_cleanup');
+        $brevo_retry_next = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_retry_failed_brevo_notifications');
 
         // Check polling conditions
         $should_poll = $this->should_poll();
@@ -327,10 +344,11 @@ class HIC_Booking_Poller {
         $has_auth = \FpHic\Helpers\hic_has_basic_auth_credentials();
 
         $status_msg = sprintf(
-            'WP-Cron Status: Continuous next=%s, Cleanup next=%s, Booking cleanup next=%s, WP-Cron disabled=%s, Should poll=%s (reliable=%s, type=%s, url=%s, auth=%s) - Deep check ACTIVE (30-minute interval)',
+            'WP-Cron Status: Continuous next=%s, Cleanup next=%s, Booking cleanup next=%s, Brevo retry next=%s, WP-Cron disabled=%s, Should poll=%s (reliable=%s, type=%s, url=%s, auth=%s) - Deep check ACTIVE (30-minute interval)',
             $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'NOT_SCHEDULED',
             $cleanup_next ? wp_date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
             $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED',
+            $brevo_retry_next ? wp_date('Y-m-d H:i:s', $brevo_retry_next) : 'NOT_SCHEDULED',
             (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) ? 'YES' : 'NO',
             $should_poll ? 'YES' : 'NO',
             $reliable_polling ? 'YES' : 'NO',
