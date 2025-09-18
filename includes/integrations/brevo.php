@@ -781,6 +781,9 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
   $transformed_sid = !empty($transformed_data['sid']) && is_scalar($transformed_data['sid'])
     ? \sanitize_text_field((string) $transformed_data['sid'])
     : (!empty($data['sid']) && is_scalar($data['sid']) ? \sanitize_text_field((string) $data['sid']) : '');
+  if ($transformed_sid !== '') {
+    $transformed_data['sid'] = $transformed_sid;
+  }
   $contact_updated = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid, $msclkid, $ttclid, $transformed_sid);
   hic_log(
     $contact_updated
@@ -866,6 +869,17 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
       }
   }
 
+  $sid = '';
+  foreach (['sid', 'session_id', 'sessionId', 'sessionid', 'hic_sid'] as $sid_key) {
+    if (!empty($webhook_data[$sid_key]) && is_scalar($webhook_data[$sid_key])) {
+      $candidate = \sanitize_text_field((string) $webhook_data[$sid_key]);
+      if ($candidate !== '') {
+        $sid = $candidate;
+        break;
+      }
+    }
+  }
+
   $transformed = array(
     'transaction_id' => Helpers\hic_extract_reservation_id($webhook_data),
     'reservation_code' => isset($webhook_data['reservation_code']) ? $webhook_data['reservation_code'] : '',
@@ -879,7 +893,8 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
     'to_date'   => $webhook_data['to_date'] ?? $webhook_data['checkout'] ?? '',
     'accommodation_name' => isset($webhook_data['room']) ? $webhook_data['room'] : '',
     'guests' => isset($webhook_data['guests']) ? $webhook_data['guests'] : 1,
-    'language' => isset($webhook_data['lingua']) ? $webhook_data['lingua'] : (isset($webhook_data['lang']) ? $webhook_data['lang'] : '')
+    'language' => isset($webhook_data['lingua']) ? $webhook_data['lingua'] : (isset($webhook_data['lang']) ? $webhook_data['lang'] : ''),
+    'sid' => $sid
   );
   
   // Remove empty values but keep numeric zeros
