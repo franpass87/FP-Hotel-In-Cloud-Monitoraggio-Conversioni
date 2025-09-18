@@ -335,36 +335,35 @@ function hic_process_booking_data(array $data): bool {
 
     if ($is_refund) {
       if (!Helpers\hic_refund_tracking_enabled()) {
-        hic_log('hic_process_booking_data: refund detected but tracking disabled');
-        return false;
-      }
-
-      // GA4 refund event
-      if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') &&
-          Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
-        if (hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid, $ttclid, $sid)) {
-          $success_count++;
-        } else {
-          $error_count++;
+        hic_log('hic_process_booking_data: refund detected but tracking disabled, skipping refund events');
+      } else {
+        // GA4 refund event
+        if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') &&
+            Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
+          if (hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid, $ttclid, $sid)) {
+            $success_count++;
+          } else {
+            $error_count++;
+          }
         }
-      }
 
-      // Facebook refund event
-      if (Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token()) {
-        if (hic_send_fb_refund($data, $gclid, $fbclid, $msclkid, $ttclid)) {
-          $success_count++;
-        } else {
-          $error_count++;
+        // Facebook refund event
+        if (Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token()) {
+          if (hic_send_fb_refund($data, $gclid, $fbclid, $msclkid, $ttclid)) {
+            $success_count++;
+          } else {
+            $error_count++;
+          }
         }
-      }
 
-      // Brevo refund event
-      if (Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key()) {
-        $brevo_success = hic_send_brevo_refund_event($data, $gclid, $fbclid, $msclkid, $ttclid);
-        if ($brevo_success) {
-          $success_count++;
-        } else {
-          $error_count++;
+        // Brevo refund event
+        if (Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key()) {
+          $brevo_success = hic_send_brevo_refund_event($data, $gclid, $fbclid, $msclkid, $ttclid);
+          if ($brevo_success) {
+            $success_count++;
+          } else {
+            $error_count++;
+          }
         }
       }
     } else {
