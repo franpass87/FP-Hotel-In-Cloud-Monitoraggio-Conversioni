@@ -11,6 +11,13 @@ namespace FpHic;
 if (!defined('ABSPATH')) exit;
 
 class HIC_Input_Validator {
+
+    /**
+     * Cached ISO 4217 currency codes list.
+     *
+     * @var string[]|null
+     */
+    private static $iso4217Currencies = null;
     
     /**
      * Validate email with enhanced security checks
@@ -143,18 +150,64 @@ class HIC_Input_Validator {
      * Validate currency code
      */
     public static function validate_currency($currency) {
-        $currency = strtoupper(sanitize_text_field($currency));
-        
-        // ISO 4217 common currency codes
-        $valid_currencies = [
-            'EUR', 'USD', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'CNY', 'SEK', 'NOK', 'DKK'
-        ];
-        
+        if (!is_scalar($currency)) {
+            return new \WP_Error('invalid_currency', 'Codice valuta non valido');
+        }
+
+        $currency = strtoupper(sanitize_text_field((string) $currency));
+
+        if ($currency === '' || !preg_match('/^[A-Z]{3}$/', $currency)) {
+            return new \WP_Error('invalid_currency', 'Codice valuta non valido');
+        }
+
+        $valid_currencies = self::get_iso_4217_currency_codes();
+
         if (!in_array($currency, $valid_currencies, true)) {
             return new \WP_Error('invalid_currency', 'Codice valuta non valido');
         }
-        
+
         return $currency;
+    }
+
+    /**
+     * Retrieve the ISO 4217 currency codes list.
+     *
+     * @return string[]
+     */
+    private static function get_iso_4217_currency_codes() {
+        if (is_array(self::$iso4217Currencies)) {
+            return self::$iso4217Currencies;
+        }
+
+        if (function_exists('get_woocommerce_currencies')) {
+            $currencies = array_keys((array) get_woocommerce_currencies());
+            self::$iso4217Currencies = array_map('strtoupper', $currencies);
+
+            return self::$iso4217Currencies;
+        }
+
+        self::$iso4217Currencies = [
+            'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN',
+            'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BOV',
+            'BRL', 'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHE', 'CHF',
+            'CHW', 'CLF', 'CLP', 'CNY', 'COP', 'COU', 'CRC', 'CUC', 'CUP', 'CVE',
+            'CZK', 'DJF', 'DKK', 'DOP', 'DZD', 'EGP', 'ERN', 'ETB', 'EUR', 'FJD',
+            'FKP', 'GBP', 'GEL', 'GHS', 'GIP', 'GMD', 'GNF', 'GTQ', 'GYD', 'HKD',
+            'HNL', 'HRK', 'HTG', 'HUF', 'IDR', 'ILS', 'INR', 'IQD', 'IRR', 'ISK',
+            'JMD', 'JOD', 'JPY', 'KES', 'KGS', 'KHR', 'KMF', 'KPW', 'KRW', 'KWD',
+            'KYD', 'KZT', 'LAK', 'LBP', 'LKR', 'LRD', 'LSL', 'LYD', 'MAD', 'MDL',
+            'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRU', 'MUR', 'MVR', 'MWK', 'MXN',
+            'MXV', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'OMR',
+            'PAB', 'PEN', 'PGK', 'PHP', 'PKR', 'PLN', 'PYG', 'QAR', 'RON', 'RSD',
+            'RUB', 'RWF', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP', 'SLE',
+            'SLL', 'SOS', 'SRD', 'SSP', 'STN', 'SVC', 'SYP', 'SZL', 'THB', 'TJS', 'TMT',
+            'TND', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH', 'UGX', 'USD', 'USN',
+            'UYI', 'UYU', 'UYW', 'UZS', 'VED', 'VES', 'VND', 'VUV', 'WST', 'XAF',
+            'XAG', 'XAU', 'XBA', 'XBB', 'XBC', 'XBD', 'XCD', 'XDR', 'XOF', 'XPD',
+            'XPF', 'XPT', 'XSU', 'XTS', 'XUA', 'XXX', 'YER', 'ZAR', 'ZMW', 'ZWL',
+        ];
+
+        return self::$iso4217Currencies;
     }
     
     /**

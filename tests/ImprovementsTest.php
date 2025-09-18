@@ -50,9 +50,21 @@ class HIC_Improvements_Test {
         // Test currency validation
         $valid_currency = \FpHic\HIC_Input_Validator::validate_currency('eur');
         assert($valid_currency === 'EUR', 'Currency should be normalized to uppercase');
-        
+
+        $valid_brl_currency = \FpHic\HIC_Input_Validator::validate_currency('brl');
+        assert($valid_brl_currency === 'BRL', 'BRL currency should now be accepted');
+
+        $valid_aed_currency = \FpHic\HIC_Input_Validator::validate_currency('aed');
+        assert($valid_aed_currency === 'AED', 'AED currency should now be accepted');
+
         $invalid_currency = \FpHic\HIC_Input_Validator::validate_currency('XYZ');
-        assert(is_wp_error($invalid_currency), 'Invalid currency should fail');
+        assert(is_wp_error($invalid_currency), 'Unknown currency should fail');
+
+        $non_alpha_currency = \FpHic\HIC_Input_Validator::validate_currency('12$');
+        assert(is_wp_error($non_alpha_currency), 'Currency codes must be alphabetic');
+
+        $wrong_length_currency = \FpHic\HIC_Input_Validator::validate_currency('EURO');
+        assert(is_wp_error($wrong_length_currency), 'Currency codes must be 3 letters long');
         
         echo "  ✅ Input validation tests passed\n";
     }

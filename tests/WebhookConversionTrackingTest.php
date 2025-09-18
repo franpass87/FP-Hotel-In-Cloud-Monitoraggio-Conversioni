@@ -136,6 +136,33 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
     }
 
     /**
+     * @dataProvider extendedIsoCurrencyProvider
+     */
+    public function test_webhook_payload_accepts_extended_iso_currencies(string $currency) {
+        $booking_data = [
+            'email' => 'extended@example.com',
+            'reservation_id' => 'EXTENDED_' . strtoupper($currency),
+            'amount' => 180.50,
+            'currency' => strtolower($currency),
+        ];
+
+        $validated = \FpHic\HIC_Input_Validator::validate_webhook_payload($booking_data);
+
+        $this->assertFalse(is_wp_error($validated));
+        $this->assertSame(strtoupper($currency), $validated['currency']);
+
+        $result = \FpHic\hic_process_booking_data($validated);
+        $this->assertIsBool($result);
+    }
+
+    public static function extendedIsoCurrencyProvider(): array {
+        return [
+            ['BRL'],
+            ['AED'],
+        ];
+    }
+
+    /**
      * Test validazione payload webhook
      */
     public function test_webhook_payload_validation() {
