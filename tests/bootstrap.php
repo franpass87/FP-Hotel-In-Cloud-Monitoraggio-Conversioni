@@ -64,7 +64,18 @@ if (!function_exists('current_time')) {
 
 if (!function_exists('sanitize_text_field')) {
     function sanitize_text_field($str) {
-        return filter_var($str, FILTER_SANITIZE_STRING);
+        if (!is_scalar($str)) {
+            return '';
+        }
+
+        $value = (string) $str;
+        $value = strip_tags($value);
+        $value = preg_replace('/[\r\n\t\0\x0B]+/', '', $value);
+        if ($value === null) {
+            $value = '';
+        }
+
+        return trim($value);
     }
 }
 

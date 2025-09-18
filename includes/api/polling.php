@@ -17,43 +17,45 @@ if (!defined('ABSPATH')) exit;
  * @param string $context Context for logging (e.g., 'continuous_polling', 'deep_check')
  * @return int Validated and potentially adjusted timestamp
  */
-function hic_validate_api_timestamp($timestamp, $context = 'api_request') {
-    $current_time = time();
-    $day_in_seconds = 86400; // 24 * 60 * 60
-    $max_lookback_seconds = 6 * $day_in_seconds; // 6 days for safety margin from 7-day API limit
-    $max_lookahead_seconds = 1 * $day_in_seconds; // 1 day in future for safety
-    $earliest_allowed = $current_time - $max_lookback_seconds;
-    $latest_allowed = $current_time + $max_lookahead_seconds;
-    
-    $original_timestamp = $timestamp;
-    $adjusted = false;
-    
-    // Handle invalid/unset timestamps
-    if (empty($timestamp) || !is_numeric($timestamp)) {
-        $timestamp = $current_time - 7200; // Default to 2 hours ago
-        $adjusted = true;
-        hic_log("$context: Invalid timestamp, using default: " . wp_date('Y-m-d H:i:s', $timestamp));
+if (!function_exists(__NAMESPACE__ . '\\hic_validate_api_timestamp')) {
+    function hic_validate_api_timestamp($timestamp, $context = 'api_request') {
+        $current_time = time();
+        $day_in_seconds = 86400; // 24 * 60 * 60
+        $max_lookback_seconds = 6 * $day_in_seconds; // 6 days for safety margin from 7-day API limit
+        $max_lookahead_seconds = 1 * $day_in_seconds; // 1 day in future for safety
+        $earliest_allowed = $current_time - $max_lookback_seconds;
+        $latest_allowed = $current_time + $max_lookahead_seconds;
+
+        $original_timestamp = $timestamp;
+        $adjusted = false;
+
+        // Handle invalid/unset timestamps
+        if (empty($timestamp) || !is_numeric($timestamp)) {
+            $timestamp = $current_time - 7200; // Default to 2 hours ago
+            $adjusted = true;
+            hic_log("$context: Invalid timestamp, using default: " . wp_date('Y-m-d H:i:s', $timestamp));
+        }
+        // Handle timestamps that are too old
+        elseif ($timestamp < $earliest_allowed) {
+            $timestamp = $earliest_allowed;
+            $adjusted = true;
+            hic_log("$context: Timestamp too old (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
+        }
+        // Handle timestamps that are too far in the future
+        elseif ($timestamp > $latest_allowed) {
+            $timestamp = $current_time - 3600; // Set to 1 hour ago
+            $adjusted = true;
+            hic_log("$context: Timestamp too far in future (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
+        }
+        // Additional safety check for unreasonable timestamps
+        elseif ($timestamp < 0 || $timestamp < ($current_time - (365 * $day_in_seconds))) {
+            $timestamp = $earliest_allowed;
+            $adjusted = true;
+            hic_log("$context: Unreasonable timestamp (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to safe value: " . wp_date('Y-m-d H:i:s', $timestamp));
+        }
+
+        return $timestamp;
     }
-    // Handle timestamps that are too old
-    elseif ($timestamp < $earliest_allowed) {
-        $timestamp = $earliest_allowed;
-        $adjusted = true;
-        hic_log("$context: Timestamp too old (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
-    }
-    // Handle timestamps that are too far in the future
-    elseif ($timestamp > $latest_allowed) {
-        $timestamp = $current_time - 3600; // Set to 1 hour ago
-        $adjusted = true;
-        hic_log("$context: Timestamp too far in future (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to: " . wp_date('Y-m-d H:i:s', $timestamp));
-    }
-    // Additional safety check for unreasonable timestamps
-    elseif ($timestamp < 0 || $timestamp < ($current_time - (365 * $day_in_seconds))) {
-        $timestamp = $earliest_allowed;
-        $adjusted = true;
-        hic_log("$context: Unreasonable timestamp (" . wp_date('Y-m-d H:i:s', $original_timestamp) . "), reset to safe value: " . wp_date('Y-m-d H:i:s', $timestamp));
-    }
-    
-    return $timestamp;
 }
 
 /**
@@ -415,7 +417,75 @@ function hic_should_process_reservation($reservation) {
  * Transform reservation data to standardized format
  */
 function hic_transform_reservation($reservation) {
-    $currency = Helpers\hic_get_currency();
+    $extract_currency = static function ($source) use (&$extract_currency) {
+        if (is_string($source) || is_numeric($source)) {
+            $normalized = strtoupper(\sanitize_text_field((string) $source));
+            if (preg_match('/([A-Z]{3})/', $normalized, $matches)) {
+                return $matches[1];
+            }
+
+            return '';
+        }
+
+        if (is_array($source)) {
+            foreach ($source as $value) {
+                $candidate = $extract_currency($value);
+                if ($candidate !== '') {
+                    return $candidate;
+                }
+            }
+
+            return '';
+        }
+
+        if (is_object($source)) {
+            return $extract_currency(get_object_vars($source));
+        }
+
+        return '';
+    };
+
+    $currency = '';
+    if (is_array($reservation)) {
+        $currency_fields = [
+            'currency',
+            'booking_currency',
+            'bookingCurrency',
+            'reservation_currency',
+            'currency_code',
+            'currencyCode',
+            'payment_currency',
+            'paymentCurrency'
+        ];
+
+        foreach ($currency_fields as $field) {
+            if (array_key_exists($field, $reservation)) {
+                $candidate = $extract_currency($reservation[$field]);
+                if ($candidate !== '') {
+                    $currency = $candidate;
+                    break;
+                }
+            }
+        }
+
+        if ($currency === '') {
+            foreach ($reservation as $key => $value) {
+                if (is_string($key) && stripos($key, 'currency') !== false) {
+                    $candidate = $extract_currency($value);
+                    if ($candidate !== '') {
+                        $currency = $candidate;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if ($currency === '') {
+        $fallback = $extract_currency(Helpers\hic_get_currency());
+        $currency = $fallback !== '' ? $fallback : 'EUR';
+    }
+
     $price = Helpers\hic_normalize_price(isset($reservation['price']) ? $reservation['price'] : 0);
     $unpaid_balance = Helpers\hic_normalize_price(isset($reservation['unpaid_balance']) ? $reservation['unpaid_balance'] : 0);
     
@@ -747,19 +817,21 @@ function hic_mark_reservation_processed($reservation) {
 }
 
 // Wrapper function - now simplified to use continuous polling by default
-function hic_api_poll_bookings(){
-    $start_time = microtime(true);
-    hic_log('Internal Scheduler: hic_api_poll_bookings execution started');
-    $log_manager = hic_get_log_manager();
-    if ($log_manager) {
-        $log_manager->rotate_if_needed();
+if (!function_exists(__NAMESPACE__ . '\\hic_api_poll_bookings')) {
+    function hic_api_poll_bookings(){
+        $start_time = microtime(true);
+        hic_log('Internal Scheduler: hic_api_poll_bookings execution started');
+        $log_manager = hic_get_log_manager();
+        if ($log_manager) {
+            $log_manager->rotate_if_needed();
+        }
+
+        // Use the new simplified continuous polling
+        hic_api_poll_bookings_continuous();
+
+        $execution_time = round((microtime(true) - $start_time) * 1000, 2);
+        hic_log("Internal Scheduler: hic_api_poll_bookings completed in {$execution_time}ms");
     }
-
-    // Use the new simplified continuous polling
-    hic_api_poll_bookings_continuous();
-
-    $execution_time = round((microtime(true) - $start_time) * 1000, 2);
-    hic_log("Internal Scheduler: hic_api_poll_bookings completed in {$execution_time}ms");
 }
 
 /**
@@ -1410,143 +1482,145 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
 /**
  * Test API connection with Basic Auth credentials
  */
-function hic_test_api_connection($prop_id = null, $email = null, $password = null) {
-    // Use provided credentials or fall back to settings
-    $prop_id = $prop_id ?: Helpers\hic_get_property_id();
-    $email = $email ?: Helpers\hic_get_api_email();
-    $password = $password ?: Helpers\hic_get_api_password();
-    $base_url = Helpers\hic_get_api_url();
-    
-    // Validate required parameters
-    if (empty($base_url)) {
-        return array(
-            'success' => false,
-            'message' => 'API URL mancante. Configura l\'URL delle API Hotel in Cloud.'
+if (!function_exists(__NAMESPACE__ . '\\hic_test_api_connection')) {
+    function hic_test_api_connection($prop_id = null, $email = null, $password = null) {
+        // Use provided credentials or fall back to settings
+        $prop_id = $prop_id ?: Helpers\hic_get_property_id();
+        $email = $email ?: Helpers\hic_get_api_email();
+        $password = $password ?: Helpers\hic_get_api_password();
+        $base_url = Helpers\hic_get_api_url();
+
+        // Validate required parameters
+        if (empty($base_url)) {
+            return array(
+                'success' => false,
+                'message' => 'API URL mancante. Configura l\'URL delle API Hotel in Cloud.'
+            );
+        }
+
+        if (empty($prop_id)) {
+            return array(
+                'success' => false,
+                'message' => 'ID Struttura (propId) mancante. Inserisci l\'ID della tua struttura.'
+            );
+        }
+
+        if (empty($email)) {
+            return array(
+                'success' => false,
+                'message' => 'API Email mancante. Inserisci l\'email del tuo account Hotel in Cloud.'
+            );
+        }
+
+        if (empty($password)) {
+            return array(
+                'success' => false,
+                'message' => 'API Password mancante. Inserisci la password del tuo account Hotel in Cloud.'
+            );
+        }
+
+        // Build test endpoint URL
+        $base = rtrim($base_url, '/');
+        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+
+        // Use a small date range to minimize data transfer
+        $test_args = array(
+            'date_type' => 'checkin',
+            'from_date' => wp_date('Y-m-d', strtotime('-7 days', time())),
+            'to_date' => wp_date('Y-m-d'),
+            'limit' => 1
         );
-    }
-    
-    if (empty($prop_id)) {
-        return array(
-            'success' => false,
-            'message' => 'ID Struttura (propId) mancante. Inserisci l\'ID della tua struttura.'
-        );
-    }
-    
-    if (empty($email)) {
-        return array(
-            'success' => false,
-            'message' => 'API Email mancante. Inserisci l\'email del tuo account Hotel in Cloud.'
-        );
-    }
-    
-    if (empty($password)) {
-        return array(
-            'success' => false,
-            'message' => 'API Password mancante. Inserisci la password del tuo account Hotel in Cloud.'
-        );
-    }
-    
-    // Build test endpoint URL
-    $base = rtrim($base_url, '/');
-    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
-    
-    // Use a small date range to minimize data transfer
-    $test_args = array(
-        'date_type' => 'checkin',
-        'from_date' => wp_date('Y-m-d', strtotime('-7 days', time())),
-        'to_date' => wp_date('Y-m-d'),
-        'limit' => 1
-    );
-    $test_url = add_query_arg($test_args, $endpoint);
-    
-    // Check for cached response first (for test connections, cache for 5 minutes)
-    $cache_key = "api_test_$endpoint" . md5($email . $password);
-    $cached_response = \FpHic\HIC_Cache_Manager::get($cache_key);
-    
-    if ($cached_response !== null) {
-        hic_log('Using cached API test response');
-        return $cached_response;
-    }
-    
-    // Make the API request using secure HTTP
-    $response = \FpHic\HIC_HTTP_Security::secure_get($test_url, array(
-        'timeout' => 15,
-        'headers' => array(
-            'Authorization' => 'Basic ' . base64_encode("$email:$password"),
-            'Accept' => 'application/json'
-        )
-    ));
-    
-    // Check for connection errors
-    if (is_wp_error($response)) {
-        return array(
-            'success' => false,
-            'message' => 'Errore di connessione: ' . $response->get_error_message()
-        );
-    }
-    
-    $http_code = wp_remote_retrieve_response_code($response);
-    $response_body = wp_remote_retrieve_body($response);
-    
-    // Handle different HTTP response codes
-    switch ($http_code) {
-        case 200:
-            // Validate JSON response
-            $data = json_decode($response_body, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                $result = array(
+        $test_url = add_query_arg($test_args, $endpoint);
+
+        // Check for cached response first (for test connections, cache for 5 minutes)
+        $cache_key = "api_test_$endpoint" . md5($email . $password);
+        $cached_response = \FpHic\HIC_Cache_Manager::get($cache_key);
+
+        if ($cached_response !== null) {
+            hic_log('Using cached API test response');
+            return $cached_response;
+        }
+
+        // Make the API request using secure HTTP
+        $response = \FpHic\HIC_HTTP_Security::secure_get($test_url, array(
+            'timeout' => 15,
+            'headers' => array(
+                'Authorization' => 'Basic ' . base64_encode("$email:$password"),
+                'Accept' => 'application/json'
+            )
+        ));
+
+        // Check for connection errors
+        if (is_wp_error($response)) {
+            return array(
+                'success' => false,
+                'message' => 'Errore di connessione: ' . $response->get_error_message()
+            );
+        }
+
+        $http_code = wp_remote_retrieve_response_code($response);
+        $response_body = wp_remote_retrieve_body($response);
+
+        // Handle different HTTP response codes
+        switch ($http_code) {
+            case 200:
+                // Validate JSON response
+                $data = json_decode($response_body, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $result = array(
+                        'success' => false,
+                        'message' => 'Risposta API non valida (JSON malformato)'
+                    );
+                } else {
+                    $result = array(
+                        'success' => true,
+                        'message' => 'Connessione API riuscita! Credenziali valide.',
+                        'data_count' => is_array($data) ? count($data) : 0
+                    );
+                }
+
+                // Cache successful result for 5 minutes
+                \FpHic\HIC_Cache_Manager::set($cache_key, $result, 300);
+                return $result;
+
+            case 401:
+                return array(
                     'success' => false,
-                    'message' => 'Risposta API non valida (JSON malformato)'
+                    'message' => 'Credenziali non valide. Verifica email e password.'
                 );
-            } else {
-                $result = array(
-                    'success' => true,
-                    'message' => 'Connessione API riuscita! Credenziali valide.',
-                    'data_count' => is_array($data) ? count($data) : 0
+
+            case 403:
+                return array(
+                    'success' => false,
+                    'message' => 'Accesso negato. L\'account potrebbe non avere permessi per questa struttura.'
                 );
-            }
-            
-            // Cache successful result for 5 minutes
-            \FpHic\HIC_Cache_Manager::set($cache_key, $result, 300);
-            return $result;
-            
-        case 401:
-            return array(
-                'success' => false,
-                'message' => 'Credenziali non valide. Verifica email e password.'
-            );
-            
-        case 403:
-            return array(
-                'success' => false,
-                'message' => 'Accesso negato. L\'account potrebbe non avere permessi per questa struttura.'
-            );
-            
-        case 404:
-            return array(
-                'success' => false,
-                'message' => 'Struttura non trovata. Verifica l\'ID Struttura (propId).'
-            );
-            
-        case 429:
-            return array(
-                'success' => false,
-                'message' => 'Troppe richieste. Riprova tra qualche minuto.'
-            );
-            
-        case 500:
-        case 502:
-        case 503:
-            return array(
-                'success' => false,
-                'message' => 'Errore del server Hotel in Cloud. Riprova più tardi.'
-            );
-            
-        default:
-            return array(
-                'success' => false,
-                'message' => "Errore HTTP $http_code. Verifica la configurazione."
-            );
+
+            case 404:
+                return array(
+                    'success' => false,
+                    'message' => 'Struttura non trovata. Verifica l\'ID Struttura (propId).'
+                );
+
+            case 429:
+                return array(
+                    'success' => false,
+                    'message' => 'Troppe richieste. Riprova tra qualche minuto.'
+                );
+
+            case 500:
+            case 502:
+            case 503:
+                return array(
+                    'success' => false,
+                    'message' => 'Errore del server Hotel in Cloud. Riprova più tardi.'
+                );
+
+            default:
+                return array(
+                    'success' => false,
+                    'message' => "Errore HTTP $http_code. Verifica la configurazione."
+                );
+        }
     }
 }
 
@@ -1561,191 +1635,196 @@ function hic_test_api_connection($prop_id = null, $email = null, $password = nul
  * @param int $limit Optional limit for number of reservations to fetch
  * @return array Result with success status, message, and statistics
  */
-function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin', $limit = null) {
-    $start_time = microtime(true);
-    
-    hic_log("Backfill: Starting backfill from $from_date to $to_date (date_type: $date_type, limit: " . ($limit ?: 'none') . ")");
-    
-    // Validate date_type (based on API documentation: checkin, checkout, presence for /reservations)
-    // Note: For recent updates, use hic_fetch_reservations_updates() instead
-    if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
-        return array(
-            'success' => false,
-            'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence". Per aggiornamenti recenti usa la funzione updates.',
-            'stats' => array()
-        );
-    }
-    
-    // Validate dates
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to_date)) {
-        return array(
-            'success' => false,
-            'message' => 'Formato date non valido. Usa YYYY-MM-DD.',
-            'stats' => array()
-        );
-    }
-    
-    // Validate date range
-    if (strtotime($from_date) > strtotime($to_date)) {
-        return array(
-            'success' => false,
-            'message' => 'La data di inizio deve essere precedente alla data di fine.',
-            'stats' => array()
-        );
-    }
-    
-    // Check for reasonable date range (max 6 months)
-    $date_diff = (strtotime($to_date) - strtotime($from_date)) / 86400;
-    if ($date_diff > 180) {
-        return array(
-            'success' => false,
-            'message' => 'Intervallo di date troppo ampio. Massimo 6 mesi.',
-            'stats' => array()
-        );
-    }
-    
-    // Get API credentials
-    $prop_id = Helpers\hic_get_property_id();
-    $email = Helpers\hic_get_api_email();
-    $password = Helpers\hic_get_api_password();
-    
-    if (!$prop_id || !$email || !$password) {
-        return array(
-            'success' => false,
-            'message' => 'Credenziali API mancanti. Configura Property ID, Email e Password.',
-            'stats' => array()
-        );
-    }
-    
-    // Initialize statistics
-    $stats = array(
-        'total_found' => 0,
-        'total_processed' => 0,
-        'total_skipped' => 0,
-        'total_errors' => 0,
-        'execution_time' => 0,
-        'date_range' => "$from_date to $to_date",
-        'date_type' => $date_type
-    );
-    
-    try {
-        // Fetch reservations from API using raw fetch to avoid double processing
-        $reservations = hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, $limit);
+if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
+    function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin', $limit = null) {
+        $start_time = microtime(true);
         
-        if (is_wp_error($reservations)) {
+        hic_log("Backfill: Starting backfill from $from_date to $to_date (date_type: $date_type, limit: " . ($limit ?: 'none') . ")");
+        
+        // Validate date_type (based on API documentation: checkin, checkout, presence for /reservations)
+        // Note: For recent updates, use hic_fetch_reservations_updates() instead
+        if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
             return array(
                 'success' => false,
-                'message' => 'Errore API: ' . $reservations->get_error_message(),
-                'stats' => $stats
+                'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence". Per aggiornamenti recenti usa la funzione updates.',
+                'stats' => array()
             );
         }
         
-        if (!is_array($reservations)) {
+        // Validate dates
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to_date)) {
             return array(
                 'success' => false,
-                'message' => 'Risposta API non valida.',
-                'stats' => $stats
+                'message' => 'Formato date non valido. Usa YYYY-MM-DD.',
+                'stats' => array()
             );
         }
         
-        $stats['total_found'] = count($reservations);
-        hic_log("Backfill: Found {$stats['total_found']} reservations");
+        // Validate date range
+        if (strtotime($from_date) > strtotime($to_date)) {
+            return array(
+                'success' => false,
+                'message' => 'La data di inizio deve essere precedente alla data di fine.',
+                'stats' => array()
+            );
+        }
         
-        // Process each reservation
-        foreach ($reservations as $reservation) {
-            try {
-                // Check if should process (deduplication, validation)
-                if (!hic_should_process_reservation($reservation)) {
-                    $stats['total_skipped']++;
-                    continue;
-                }
-                
-                // Transform and process the reservation
-                $transformed = hic_transform_reservation($reservation);
-                if ($transformed !== false) {
-                    hic_dispatch_reservation($transformed, $reservation);
-                    $stats['total_processed']++;
-                } else {
-                    $stats['total_errors']++;
-                    hic_log("Backfill: Failed to transform reservation: " . json_encode($reservation));
-                }
-                
-            } catch (\Exception $e) {
-                $stats['total_errors']++;
-                hic_log("Backfill: Error processing reservation: " . $e->getMessage());
+        // Check for reasonable date range (max 6 months)
+        $date_diff = (strtotime($to_date) - strtotime($from_date)) / 86400;
+        if ($date_diff > 180) {
+            return array(
+                'success' => false,
+                'message' => 'Intervallo di date troppo ampio. Massimo 6 mesi.',
+                'stats' => array()
+            );
+        }
+        
+        // Get API credentials
+        $prop_id = Helpers\hic_get_property_id();
+        $email = Helpers\hic_get_api_email();
+        $password = Helpers\hic_get_api_password();
+        
+        if (!$prop_id || !$email || !$password) {
+            return array(
+                'success' => false,
+                'message' => 'Credenziali API mancanti. Configura Property ID, Email e Password.',
+                'stats' => array()
+            );
+        }
+        
+        // Initialize statistics
+        $stats = array(
+            'total_found' => 0,
+            'total_processed' => 0,
+            'total_skipped' => 0,
+            'total_errors' => 0,
+            'execution_time' => 0,
+            'date_range' => "$from_date to $to_date",
+            'date_type' => $date_type
+        );
+        
+        try {
+            // Fetch reservations from API using raw fetch to avoid double processing
+            $reservations = hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, $limit);
+            
+            if (is_wp_error($reservations)) {
+                return array(
+                    'success' => false,
+                    'message' => 'Errore API: ' . $reservations->get_error_message(),
+                    'stats' => $stats
+                );
             }
+            
+            if (!is_array($reservations)) {
+                return array(
+                    'success' => false,
+                    'message' => 'Risposta API non valida.',
+                    'stats' => $stats
+                );
+            }
+            
+            $stats['total_found'] = count($reservations);
+            hic_log("Backfill: Found {$stats['total_found']} reservations");
+            
+            // Process each reservation
+            foreach ($reservations as $reservation) {
+                try {
+                    // Check if should process (deduplication, validation)
+                    if (!hic_should_process_reservation($reservation)) {
+                        $stats['total_skipped']++;
+                        continue;
+                    }
+                    
+                    // Transform and process the reservation
+                    $transformed = hic_transform_reservation($reservation);
+                    if ($transformed !== false) {
+                        hic_dispatch_reservation($transformed, $reservation);
+                        $stats['total_processed']++;
+                    } else {
+                        $stats['total_errors']++;
+                        hic_log("Backfill: Failed to transform reservation: " . json_encode($reservation));
+                    }
+                    
+                } catch (\Exception $e) {
+                    $stats['total_errors']++;
+                    hic_log("Backfill: Error processing reservation: " . $e->getMessage());
+                }
+            }
+            
+            $stats['execution_time'] = round(microtime(true) - $start_time, 2);
+            
+            $message = "Backfill completato: {$stats['total_found']} trovate, {$stats['total_processed']} processate, {$stats['total_skipped']} saltate, {$stats['total_errors']} errori in {$stats['execution_time']}s";
+            hic_log("Backfill: $message");
+            
+            return array(
+                'success' => true,
+                'message' => $message,
+                'stats' => $stats
+            );
+            
+        } catch (\Exception $e) {
+            $stats['execution_time'] = round(microtime(true) - $start_time, 2);
+            $error_message = "Errore durante il backfill: " . $e->getMessage();
+            hic_log("Backfill: $error_message");
+            
+            return array(
+                'success' => false,
+                'message' => $error_message,
+                'stats' => $stats
+            );
         }
-        
-        $stats['execution_time'] = round(microtime(true) - $start_time, 2);
-        
-        $message = "Backfill completato: {$stats['total_found']} trovate, {$stats['total_processed']} processate, {$stats['total_skipped']} saltate, {$stats['total_errors']} errori in {$stats['execution_time']}s";
-        hic_log("Backfill: $message");
-        
-        return array(
-            'success' => true,
-            'message' => $message,
-            'stats' => $stats
-        );
-        
-    } catch (\Exception $e) {
-        $stats['execution_time'] = round(microtime(true) - $start_time, 2);
-        $error_message = "Errore durante il backfill: " . $e->getMessage();
-        hic_log("Backfill: $error_message");
-        
-        return array(
-            'success' => false,
-            'message' => $error_message,
-            'stats' => $stats
-        );
     }
 }
 
 /**
  * Raw fetch function that doesn't process reservations (for backfill use)
  */
-function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, $limit = null) {
-    $base = rtrim(Helpers\hic_get_api_url(), '/');
-    $email = Helpers\hic_get_api_email();
-    $pass = Helpers\hic_get_api_password();
-    
-    if (!$base || !$email || !$pass || !$prop_id) {
-        return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
-    }
-    
-    // Use standard /reservations/ endpoint - only valid date_type values supported
-    $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
-    $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
-    if ($limit) $args['limit'] = (int)$limit;
-    $url = add_query_arg($args, $endpoint);
-    
-    hic_log("Backfill Raw API Call (Reservations endpoint): $url");
+if (!function_exists(__NAMESPACE__ . '\\hic_fetch_reservations_raw')) {
+    function hic_fetch_reservations_raw($prop_id, $date_type, $from_date, $to_date, $limit = null) {
+        $base = rtrim(Helpers\hic_get_api_url(), '/');
+        $email = Helpers\hic_get_api_email();
+        $pass = Helpers\hic_get_api_password();
 
-    $request_args = array(
-        'headers' => array(
-            'Authorization' => 'Basic ' . base64_encode("$email:$pass"),
-        ),
-    );
+        if (!$base || !$email || !$pass || !$prop_id) {
+            return new WP_Error('hic_missing_conf', 'URL/credenziali/propId mancanti');
+        }
 
-    $res = Helpers\hic_http_request($url, $request_args);
+        // Use standard /reservations/ endpoint - only valid date_type values supported
+        $endpoint = $base . '/reservations/' . rawurlencode($prop_id);
+        $args = array('date_type' => $date_type, 'from_date' => $from_date, 'to_date' => $to_date);
+        if ($limit) $args['limit'] = (int)$limit;
+        $url = add_query_arg($args, $endpoint);
 
-    $data = hic_handle_api_response($res, 'Backfill Raw API call');
-    if (is_wp_error($data)) {
-        return $data;
-    }
+        hic_log("Backfill Raw API Call (Reservations endpoint): $url");
 
-    // Handle new API response format with success/error structure
-    $reservations = hic_extract_reservations_from_response($data);
-    if (is_wp_error($reservations)) {
+        $request_args = array(
+            'headers' => array(
+                'Authorization' => 'Basic ' . base64_encode("$email:$pass"),
+            ),
+        );
+
+        $res = Helpers\hic_http_request($url, $request_args);
+
+        $data = hic_handle_api_response($res, 'Backfill Raw API call');
+        if (is_wp_error($data)) {
+            return $data;
+        }
+
+        // Handle new API response format with success/error structure
+        $reservations = hic_extract_reservations_from_response($data);
+        if (is_wp_error($reservations)) {
+            return $reservations;
+        }
+
         return $reservations;
     }
-
-    return $reservations;
 }
 
 /**
  * Continuous polling function - runs every 30 seconds
  * Focuses on recent reservations and manual bookings
  */
+if (!function_exists(__NAMESPACE__ . '\\hic_api_poll_bookings_continuous')) {
 function hic_api_poll_bookings_continuous() {
     $start_time = microtime(true);
     hic_log('Continuous Polling: Starting 30-second interval check');
@@ -1957,11 +2036,13 @@ function hic_api_poll_bookings_continuous() {
         Helpers\hic_release_polling_lock();
     }
 }
+}
 
 /**
  * Deep check polling function - runs every 30 minutes
  * Looks back 5 days to catch any missed reservations
  */
+if (!function_exists(__NAMESPACE__ . '\\hic_api_poll_bookings_deep_check')) {
 function hic_api_poll_bookings_deep_check() {
     $start_time = microtime(true);
     hic_log('Deep Check: Starting 30-minute interval deep check (5-day lookback)');
@@ -2089,5 +2170,6 @@ function hic_api_poll_bookings_deep_check() {
     } finally {
         Helpers\hic_release_polling_lock();
     }
+}
 }
 
