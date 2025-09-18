@@ -326,9 +326,6 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
   if ($sid === '' && !empty($data['sid']) && is_scalar($data['sid'])) {
     $sid = \sanitize_text_field((string) $data['sid']);
   }
-  if ($sid !== '') {
-    $transaction_id = $sid;
-  }
 
   // Get tracking IDs for bucket normalization if available
   $gclid = '';
@@ -377,6 +374,10 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
     'bucket' => $bucket,             // Bucket attribution for custom conversions
     'vertical' => 'hotel'
   ];
+
+  if ($sid !== '') {
+    $custom_data['reservation_sid'] = $sid;
+  }
 
   if (!empty($gclid))   { $custom_data['gclid']   = sanitize_text_field($gclid); }
   if (!empty($fbclid))  { $custom_data['fbclid']  = sanitize_text_field($fbclid); }
