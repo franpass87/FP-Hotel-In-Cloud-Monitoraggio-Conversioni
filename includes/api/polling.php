@@ -275,6 +275,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
 
     // Processa singole prenotazioni con la nuova pipeline
     $processed_count = 0;
+    $dispatch_failures = 0;
     if (is_array($reservations)) {
         foreach ($reservations as $reservation) {
             try {
@@ -290,9 +291,18 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
                     try {
                         $transformed = hic_transform_reservation($reservation);
                         if ($transformed !== false) {
-                            hic_dispatch_reservation($transformed, $reservation);
-                            hic_mark_reservation_processed($reservation);
-                            $processed_count++;
+                            $dispatch_success = hic_dispatch_reservation($transformed, $reservation);
+                            if ($dispatch_success) {
+                                hic_mark_reservation_processed($reservation);
+                                $processed_count++;
+                            } else {
+                                $dispatch_failures++;
+                                if (!empty($uid)) {
+                                    hic_log("Reservation $uid: dispatch failed during fetch, will retry");
+                                } else {
+                                    hic_log('Reservation dispatch failed during fetch, will retry');
+                                }
+                            }
                         }
                     } finally {
                         // Always release the lock
@@ -306,7 +316,11 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
             }
         }
         if (count($reservations) > 0) {
-            hic_log("Processed $processed_count out of " . count($reservations) . " reservations (duplicates/invalid skipped)");
+            $log_message = "Processed $processed_count out of " . count($reservations) . " reservations (duplicates/invalid skipped)";
+            if ($dispatch_failures > 0) {
+                $log_message .= " - Dispatch failures: $dispatch_failures";
+            }
+            hic_log($log_message);
         }
     }
     return $reservations;
@@ -687,7 +701,7 @@ function hic_transform_reservation($reservation) {
 function hic_dispatch_reservation($transformed, $original) {
     $uid = Helpers\hic_booking_uid($original);
     $is_status_update = Helpers\hic_is_reservation_already_processed($uid);
-    
+
     // Debug log to verify fixes are in place
     $realtime_enabled = Helpers\hic_realtime_brevo_sync_enabled();
     $connection_type = Helpers\hic_get_connection_type();
@@ -700,7 +714,7 @@ function hic_dispatch_reservation($transformed, $original) {
         'currency' => $transformed['currency'] ?? 'missing',
         'email' => !empty($transformed['email']) ? 'present' : 'missing'
     )));
-    
+
     try {
         // Get tracking mode to determine which integrations to use
         $tracking_mode = Helpers\hic_get_tracking_mode();
@@ -709,21 +723,49 @@ function hic_dispatch_reservation($transformed, $original) {
             $sid = \sanitize_text_field((string) $transformed['sid']);
         }
 
+        $integration_results = array();
+        $failed_integrations = array();
+        $skipped_integrations = array();
+
+        $record_result = static function (string $integration, string $status) use (&$integration_results, &$failed_integrations, &$skipped_integrations): void {
+            $integration_results[$integration] = $status;
+            if ($status === 'failed') {
+                $failed_integrations[] = $integration;
+            } elseif ($status === 'skipped') {
+                $skipped_integrations[] = $integration;
+            }
+        };
+
         // GA4 - only send once unless it's a status update we want to track
         if (!$is_status_update) {
             if ($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') {
-                hic_dispatch_ga4_reservation($transformed, $sid);
+                if (Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
+                    $ga4_success = hic_dispatch_ga4_reservation($transformed, $sid);
+                    $record_result('GA4', $ga4_success ? 'success' : 'failed');
+                } else {
+                    $record_result('GA4', 'skipped');
+                }
             }
 
             // GTM - send to dataLayer for client-side processing
             if ($tracking_mode === 'gtm_only' || $tracking_mode === 'hybrid') {
-                hic_dispatch_gtm_reservation($transformed, $sid);
+                if (Helpers\hic_is_gtm_enabled()) {
+                    $gtm_success = hic_dispatch_gtm_reservation($transformed, $sid);
+                    $record_result('GTM', $gtm_success ? 'success' : 'failed');
+                } else {
+                    $record_result('GTM', 'skipped');
+                }
             }
         }
 
         // Meta Pixel - only send once unless it's a status update we want to track
         if (!$is_status_update) {
-            hic_dispatch_pixel_reservation($transformed, $sid);
+            if (Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token()) {
+                $pixel_success = hic_dispatch_pixel_reservation($transformed, $sid);
+                $record_result('Meta Pixel', $pixel_success ? 'success' : 'failed');
+            } else {
+                $record_result('Meta Pixel', 'skipped');
+            }
         }
 
         // Retrieve tracking IDs using SID (fallback to transaction ID when missing)
@@ -742,27 +784,40 @@ function hic_dispatch_reservation($transformed, $original) {
             }
         }
 
-        // Brevo - handle differently based on connection type to prevent duplication
-        if ($connection_type === 'webhook') {
-            // In webhook mode, only update contact info but don't send events
-            // (events are handled by webhook processor)
-            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $sid);
-            if (!$brevo_success) {
-                hic_log('Brevo contact dispatch failed for reservation ' . $uid);
-            }
-        } else {
-            // In polling mode, handle both contact and events
-            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $sid);
-            if (!$brevo_success) {
-                hic_log('Brevo contact dispatch failed for reservation ' . $uid);
-            }
+        $brevo_enabled = Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key();
 
-            // Brevo real-time events - send reservation_created event for new reservations
-            if (!$is_status_update && Helpers\hic_realtime_brevo_sync_enabled()) {
+        // Brevo - handle differently based on connection type to prevent duplication
+        if ($brevo_enabled) {
+            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $sid);
+            if (!$brevo_success) {
+                hic_log('Brevo contact dispatch failed for reservation ' . $uid);
+            }
+            $record_result('Brevo contact', $brevo_success ? 'success' : 'failed');
+        } else {
+            $record_result('Brevo contact', 'skipped');
+        }
+
+        $should_send_brevo_event = !$is_status_update
+            && $connection_type !== 'webhook'
+            && Helpers\hic_realtime_brevo_sync_enabled();
+
+        if ($should_send_brevo_event) {
+            if ($brevo_enabled) {
                 $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid);
-                if (is_array($event_result) && !$event_result['success']) {
-                    hic_log('Failed to send Brevo reservation_created event in dispatch: ' . $event_result['error']);
+                if (is_array($event_result)) {
+                    if (!$event_result['success'] && !$event_result['skipped']) {
+                        hic_log('Failed to send Brevo reservation_created event in dispatch: ' . $event_result['error']);
+                        $record_result('Brevo event', 'failed');
+                    } elseif (!empty($event_result['skipped'])) {
+                        $record_result('Brevo event', 'skipped');
+                    } else {
+                        $record_result('Brevo event', 'success');
+                    }
+                } else {
+                    $record_result('Brevo event', 'failed');
                 }
+            } else {
+                $record_result('Brevo event', 'skipped');
             }
         }
 
@@ -783,11 +838,45 @@ function hic_dispatch_reservation($transformed, $original) {
             );
 
             $email_identifier = $sid !== '' ? $sid : ($transformed['transaction_id'] ?? '');
-            $email_result = Helpers\hic_send_admin_email($admin_data, $gclid, $fbclid, (string) $email_identifier);
-            hic_log('Admin email dispatch result for reservation ' . $uid . ': ' . ($email_result ? 'success' : 'failure'));
+            $admin_email = Helpers\hic_get_admin_email();
+            if (!empty($admin_email) && Helpers\hic_is_valid_email($admin_email)) {
+                $email_result = Helpers\hic_send_admin_email($admin_data, $gclid, $fbclid, (string) $email_identifier);
+                hic_log('Admin email dispatch result for reservation ' . $uid . ': ' . ($email_result ? 'success' : 'failure'));
+                $record_result('Admin email', $email_result ? 'success' : 'failed');
+            } else {
+                $record_result('Admin email', 'skipped');
+            }
         }
 
-        hic_log("Reservation $uid dispatched successfully (mode: $connection_type)");
+        if (!empty($integration_results)) {
+            $summary_parts = array();
+            foreach ($integration_results as $integration => $status) {
+                $summary_parts[] = $integration . '=' . $status;
+            }
+            $summary = implode(', ', $summary_parts);
+        } else {
+            $summary = '';
+        }
+
+        if (!empty($failed_integrations)) {
+            $message = "Reservation $uid dispatch failed (mode: $connection_type) - Failed integrations: " . implode(', ', $failed_integrations);
+            if ($summary !== '') {
+                $message .= " - Summary: $summary";
+            }
+            hic_log($message);
+            return false;
+        }
+
+        $message = "Reservation $uid dispatched successfully (mode: $connection_type)";
+        if ($summary !== '') {
+            $message .= " - Summary: $summary";
+        }
+        if (!empty($skipped_integrations)) {
+            $message .= " - Skipped: " . implode(', ', $skipped_integrations);
+        }
+        hic_log($message);
+
+        return true;
     } catch (\Exception $e) {
         hic_log("Error dispatching reservation $uid: " . $e->getMessage());
         throw $e;
@@ -1060,8 +1149,8 @@ function hic_process_reservations_batch($reservations) {
                     $new_count++;
                     hic_log("Reservation $uid: processed");
                 } else {
-                    $skipped_count++;
-                    hic_log("Reservation $uid: processing failed");
+                    $error_count++;
+                    hic_log("Reservation $uid: dispatch failed, will retry");
                 }
             } finally {
                 Helpers\hic_release_reservation_lock($uid);
@@ -1109,13 +1198,27 @@ function hic_should_process_reservation_with_email($reservation) {
  */
 function hic_process_single_reservation($reservation): bool {
     $transformed = hic_transform_reservation($reservation);
+    $uid = Helpers\hic_booking_uid($reservation);
+
     if ($transformed !== false && is_array($transformed)) {
-        hic_dispatch_reservation($transformed, $reservation);
-        return true;
+        $dispatch_success = hic_dispatch_reservation($transformed, $reservation);
+        if ($dispatch_success) {
+            return true;
+        }
+
+        if (!empty($uid)) {
+            hic_log("Reservation $uid: dispatch failed, keeping reservation for retry");
+        } else {
+            hic_log('Reservation dispatch failed, keeping reservation for retry');
+        }
+        return false;
     }
 
-    $uid = Helpers\hic_booking_uid($reservation);
-    hic_log("Reservation $uid: transformation failed");
+    if (!empty($uid)) {
+        hic_log("Reservation $uid: transformation failed");
+    } else {
+        hic_log('Reservation transformation failed: missing UID');
+    }
     return false;
 }
 
@@ -1738,13 +1841,23 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
                     // Transform and process the reservation
                     $transformed = hic_transform_reservation($reservation);
                     if ($transformed !== false) {
-                        hic_dispatch_reservation($transformed, $reservation);
-                        $stats['total_processed']++;
+                        $dispatch_success = hic_dispatch_reservation($transformed, $reservation);
+                        if ($dispatch_success) {
+                            $stats['total_processed']++;
+                        } else {
+                            $stats['total_errors']++;
+                            $uid = Helpers\hic_booking_uid($reservation);
+                            if (!empty($uid)) {
+                                hic_log("Backfill: Dispatch failed for reservation $uid");
+                            } else {
+                                hic_log('Backfill: Dispatch failed for reservation without UID');
+                            }
+                        }
                     } else {
                         $stats['total_errors']++;
                         hic_log("Backfill: Failed to transform reservation: " . json_encode($reservation));
                     }
-                    
+
                 } catch (\Exception $e) {
                     $stats['total_errors']++;
                     hic_log("Backfill: Error processing reservation: " . $e->getMessage());
