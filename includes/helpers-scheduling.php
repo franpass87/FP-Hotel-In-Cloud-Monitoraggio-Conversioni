@@ -10,16 +10,32 @@ if (!defined('ABSPATH')) {
  * Check if retry event should be scheduled based on conditions
  */
 function hic_should_schedule_retry_event() {
-    if (!hic_realtime_brevo_sync_enabled()) {
-        return false;
-    }
-
-    if (!hic_get_brevo_api_key()) {
+    if (!function_exists(__NAMESPACE__ . '\\wp_get_schedules') && !function_exists('wp_get_schedules')) {
         return false;
     }
 
     $schedules = wp_get_schedules();
     return isset($schedules['hic_every_fifteen_minutes']);
+}
+
+/**
+ * Determine if there are failed requests waiting to be retried
+ */
+function hic_has_failed_requests_to_retry() {
+    global $wpdb;
+
+    if (!$wpdb) {
+        return false;
+    }
+
+    $table = esc_sql($wpdb->prefix . 'hic_failed_requests');
+    $count = $wpdb->get_var("SELECT COUNT(*) FROM $table");
+
+    if ($count === null) {
+        return false;
+    }
+
+    return (int) $count > 0;
 }
 
 /* ================= SAFE WORDPRESS CRON HELPERS ================= */
@@ -83,9 +99,15 @@ function hic_schedule_failed_request_retry() {
         return;
     }
 
-    if (!hic_safe_wp_next_scheduled('hic_retry_failed_requests')) {
-        hic_safe_wp_schedule_event(time(), 'hic_every_fifteen_minutes', 'hic_retry_failed_requests');
+    if (hic_safe_wp_next_scheduled('hic_retry_failed_requests')) {
+        return;
     }
+
+    if (!hic_has_failed_requests_to_retry()) {
+        return;
+    }
+
+    hic_safe_wp_schedule_event(time(), 'hic_every_fifteen_minutes', 'hic_retry_failed_requests');
 }
 
 function hic_retry_failed_requests() {

@@ -21,17 +21,6 @@ namespace FpHic\Helpers {
             return $GLOBALS['next_scheduled'] ?? false;
         }
     }
-    if (!function_exists(__NAMESPACE__ . '\\wp_schedule_event')) {
-        function wp_schedule_event($timestamp, $recurrence, $hook, $args = array(), $wp_error = false) {
-            $GLOBALS['scheduled_events'][] = [
-                'timestamp' => $timestamp,
-                'recurrence' => $recurrence,
-                'hook' => $hook,
-                'args' => $args,
-            ];
-            return true;
-        }
-    }
 }
 
 namespace {
@@ -43,33 +32,53 @@ namespace {
     final class ZZFailedRequestRetrySchedulerTest extends TestCase {
         protected function setUp(): void {
             \FpHic\Helpers\hic_clear_option_cache();
-            update_option('hic_realtime_brevo_sync', '1');
-            update_option('hic_brevo_api_key', 'test-key');
             $GLOBALS['next_scheduled'] = false;
             $GLOBALS['schedule_defined'] = true;
-            $GLOBALS['scheduled_events'] = [];
+            $GLOBALS['wp_scheduled_events'] = [];
+            $GLOBALS['should_schedule_retry_event_schedules'] = [
+                'hic_every_fifteen_minutes' => [
+                    'interval' => 15 * 60,
+                    'display'  => 'Every 15 Minutes (HIC Failed Requests)'
+                ],
+            ];
+            global $wpdb;
+            $wpdb = new class {
+                public $prefix = 'wp_';
+                public $count = 1;
+                public $queries = [];
+                public function get_var($sql) {
+                    $this->queries[] = $sql;
+                    return $this->count;
+                }
+            };
+        }
+
+        protected function tearDown(): void {
+            unset($GLOBALS['should_schedule_retry_event_schedules']);
         }
 
         public function test_schedules_retry_when_conditions_met(): void {
             $this->assertTrue(\FpHic\Helpers\hic_should_schedule_retry_event());
+            $this->assertTrue(\FpHic\Helpers\hic_has_failed_requests_to_retry());
             \FpHic\Helpers\hic_schedule_failed_request_retry();
-            $this->assertNotEmpty($GLOBALS['scheduled_events']);
-            $this->assertSame('hic_retry_failed_requests', $GLOBALS['scheduled_events'][0]['hook']);
+            $this->assertNotEmpty($GLOBALS['wp_scheduled_events']);
+            $this->assertSame('hic_retry_failed_requests', $GLOBALS['wp_scheduled_events'][0]['hook']);
         }
 
-        public function test_does_not_schedule_when_brevo_sync_disabled(): void {
-            update_option('hic_realtime_brevo_sync', '0');
-            \FpHic\Helpers\hic_clear_option_cache();
-            $GLOBALS['scheduled_events'] = [];
+        public function test_does_not_schedule_when_no_failed_requests_are_pending(): void {
+            global $wpdb;
+            $wpdb->count = 0;
+            $GLOBALS['wp_scheduled_events'] = [];
             \FpHic\Helpers\hic_schedule_failed_request_retry();
-            $this->assertEmpty($GLOBALS['scheduled_events']);
+            $this->assertEmpty($GLOBALS['wp_scheduled_events']);
         }
 
         public function test_does_not_schedule_when_schedule_missing(): void {
             $GLOBALS['schedule_defined'] = false;
-            $GLOBALS['scheduled_events'] = [];
+            $GLOBALS['should_schedule_retry_event_schedules'] = [];
+            $GLOBALS['wp_scheduled_events'] = [];
             \FpHic\Helpers\hic_schedule_failed_request_retry();
-            $this->assertEmpty($GLOBALS['scheduled_events']);
+            $this->assertEmpty($GLOBALS['wp_scheduled_events']);
         }
     }
 }
