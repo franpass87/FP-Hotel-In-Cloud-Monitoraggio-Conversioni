@@ -133,7 +133,7 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_api_url', array('sanitize_callback' => 'sanitize_text_field'));
     // New Basic Auth settings
     register_setting('hic_settings', 'hic_api_email', array('sanitize_callback' => 'sanitize_email'));
-    register_setting('hic_settings', 'hic_api_password', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_api_password', array('sanitize_callback' => 'hic_preserve_password_field'));
     register_setting('hic_settings', 'hic_property_id', array('sanitize_callback' => 'absint'));
     register_setting('hic_settings', 'hic_polling_interval', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_reliable_polling_enabled', array('sanitize_callback' => 'rest_sanitize_boolean'));
@@ -602,6 +602,28 @@ function hic_brevo_event_endpoint_render() {
 }
 
 /* ============ Validation Functions ============ */
+/**
+ * Preserve password values without stripping characters that are valid for API authentication.
+ *
+ * WordPress core adds slashes to incoming form values, so we only unslash the
+ * value and cast it to a string. Any other data types are coerced to an empty
+ * string to avoid storing unexpected structures.
+ *
+ * @param mixed $value Raw password value coming from user input.
+ * @return string The password with original characters preserved.
+ */
+function hic_preserve_password_field($value) {
+    if (is_array($value) || is_object($value)) {
+        return '';
+    }
+
+    if ($value === null) {
+        return '';
+    }
+
+    return wp_unslash((string) $value);
+}
+
 function hic_validate_admin_email($input) {
     // Allow empty value (will fall back to WordPress admin email)
     if (empty($input)) {

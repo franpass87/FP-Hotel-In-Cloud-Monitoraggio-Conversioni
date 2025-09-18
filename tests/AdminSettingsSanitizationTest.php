@@ -49,4 +49,12 @@ final class AdminSettingsSanitizationTest extends TestCase {
         update_option('hic_brevo_enabled', $sanitized);
         $this->assertFalse(get_option('hic_brevo_enabled'));
     }
+
+    public function testApiPasswordPreservesSpecialCharacters() {
+        global $hic_registered_settings;
+        $raw = 'p&ssw%rd<secure>';
+        $sanitized = call_user_func($hic_registered_settings['hic_api_password'], $raw);
+        update_option('hic_api_password', $sanitized);
+        $this->assertSame('p&ssw%rd<secure>', get_option('hic_api_password'));
+    }
 }
