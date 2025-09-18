@@ -254,9 +254,6 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
     if ($sid === '' && !empty($data['sid']) && is_scalar($data['sid'])) {
         $sid = \sanitize_text_field((string) $data['sid']);
     }
-    if ($sid !== '') {
-        $transaction_id = $sid;
-    }
 
     // Get gclid/fbclid for bucket normalization if available
     $gclid = '';
@@ -295,6 +292,11 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
         'bucket' => $bucket,
         'vertical' => 'hotel'
     ];
+
+    if ($sid !== '') {
+        $gtm_data['client_id'] = $sid;
+        $gtm_data['hic_sid'] = $sid;
+    }
 
     // Add tracking IDs if available
     if (!empty($gclid)) {

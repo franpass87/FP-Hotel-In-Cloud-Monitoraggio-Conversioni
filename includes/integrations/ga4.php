@@ -276,7 +276,6 @@ function hic_dispatch_ga4_reservation($data, $sid = '') {
   }
   if ($sid !== '') {
     $client_id = $sid;
-    $transaction_id = $sid;
   }
 
   // Get tracking IDs for bucket normalization if available
@@ -313,6 +312,10 @@ function hic_dispatch_ga4_reservation($data, $sid = '') {
     'bucket' => $bucket,             // Use normalized bucket based on attribution
     'vertical' => 'hotel'
   ];
+
+  if ($sid !== '') {
+    $params['hic_sid'] = $sid;
+  }
 
   if (!empty($gclid))   { $params['gclid']   = sanitize_text_field($gclid); }
   if (!empty($fbclid))  { $params['fbclid']  = sanitize_text_field($fbclid); }
