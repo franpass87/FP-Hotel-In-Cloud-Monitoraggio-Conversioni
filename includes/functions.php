@@ -81,7 +81,7 @@ function hic_safe_add_hook($type, $hook, $function, $priority = 10, $accepted_ar
 function hic_init_helper_hooks() {
     // Trigger any deferred hook registrations
     hic_safe_add_hook('action', 'updated_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
-    
+
     if (function_exists('add_action') && function_exists('add_filter')) {
         add_filter('wp_privacy_personal_data_exporters', __NAMESPACE__ . '\\hic_register_exporter');
         add_filter('wp_privacy_personal_data_erasers', __NAMESPACE__ . '\\hic_register_eraser');
@@ -94,6 +94,28 @@ function hic_init_helper_hooks() {
         add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
         add_action('hic_cleanup_failed_requests', __NAMESPACE__ . '\\hic_cleanup_failed_requests');
     }
+}
+
+/**
+ * Generate a sanitized Session ID compliant with configured length limits.
+ */
+function hic_generate_sid(): string {
+    $attempts = 0;
+    $sid = '';
+
+    do {
+        $raw = (string) wp_generate_uuid4();
+        $sanitized = sanitize_text_field($raw);
+        $sanitized = preg_replace('/[^a-zA-Z0-9_-]/', '', $sanitized ?? '');
+        $sid = substr((string) $sanitized, 0, HIC_SID_MAX_LENGTH);
+        $attempts++;
+    } while (($sid === '' || strlen($sid) < HIC_SID_MIN_LENGTH) && $attempts < 5);
+
+    if (strlen($sid) < HIC_SID_MIN_LENGTH) {
+        $sid = str_pad($sid, HIC_SID_MIN_LENGTH, '0');
+    }
+
+    return $sid;
 }
 
 // Helper functions to get configuration values

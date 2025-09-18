@@ -390,26 +390,31 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
     return new \WP_Error('invalid_length', 'Invalid tracking id length');
   }
 
-  // Determine SID to use
-  $sid_to_use = $existing_sid ?: $value;
-
-  // Set cookie if needed
-  if (!$existing_sid || $existing_sid === $value) {
-    $cookie_args = apply_filters('hic_sid_cookie_args', [
-      'expires'  => time() + 60*60*24*90,
-      'path'     => '/',
-      'secure'   => is_ssl(),
-      'httponly' => true,
-      'samesite' => 'Lax',
-    ], $value);
-    $cookie_set = setcookie('hic_sid', $value, $cookie_args);
-    if ($cookie_set) {
-      $_COOKIE['hic_sid'] = $value;
-    } else {
-      hic_log("hic_store_tracking_id: Failed to set $type cookie");
-      // Not a fatal error; proceed
+  $sanitized_existing = '';
+  if (is_string($existing_sid) && $existing_sid !== '') {
+    $candidate = sanitize_text_field((string) $existing_sid);
+    $candidate = substr($candidate, 0, HIC_SID_MAX_LENGTH);
+    if ($candidate !== '' && strlen($candidate) >= HIC_SID_MIN_LENGTH) {
+      $sanitized_existing = $candidate;
     }
   }
+
+  // Determine SID to use
+  $sid_to_use = $sanitized_existing !== '' ? $sanitized_existing : \FpHic\Helpers\hic_generate_sid();
+
+  $cookie_args = apply_filters('hic_sid_cookie_args', [
+    'expires'  => time() + 60*60*24*90,
+    'path'     => '/',
+    'secure'   => is_ssl(),
+    'httponly' => false,
+    'samesite' => 'Lax',
+  ], $sid_to_use);
+
+  $cookie_set = setcookie('hic_sid', $sid_to_use, $cookie_args);
+  if (!$cookie_set) {
+    hic_log("hic_store_tracking_id: Failed to set $type cookie");
+  }
+  $_COOKIE['hic_sid'] = $sid_to_use;
 
   $table = $wpdb->prefix . 'hic_gclids';
 
@@ -425,15 +430,42 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
     return new \WP_Error('db_select_error', 'Database error');
   }
 
-  if (!$existing) {
-    $insert_result = $wpdb->insert(
-      $table,
-      [$type => $value, 'sid' => $sid_to_use],
-      ['%s', '%s']
-    );
-    if ($insert_result === false) {
-      hic_log('hic_store_tracking_id: Failed to insert ' . $type . ': ' . ($wpdb->last_error ?: 'Unknown error'));
-      return new \WP_Error('db_insert_error', 'Failed to insert tracking id');
+  if ($existing) {
+    $sid_record_id = (int) $existing;
+  } else {
+    $sid_record_id = (int) $wpdb->get_var($wpdb->prepare(
+      "SELECT id FROM $table WHERE sid = %s ORDER BY id DESC LIMIT 1",
+      $sid_to_use
+    ));
+
+    if ($wpdb->last_error) {
+      hic_log('hic_store_tracking_id: Database error checking existing SID row: ' . $wpdb->last_error);
+      return new \WP_Error('db_select_error', 'Database error');
+    }
+
+    if ($sid_record_id > 0) {
+      $update_result = $wpdb->update(
+        $table,
+        [$type => $value],
+        ['id' => $sid_record_id],
+        ['%s'],
+        ['%d']
+      );
+
+      if ($update_result === false) {
+        hic_log('hic_store_tracking_id: Failed to update existing SID row for ' . $type . ': ' . ($wpdb->last_error ?: 'Unknown error'));
+        return new \WP_Error('db_update_error', 'Failed to update tracking id');
+      }
+    } else {
+      $insert_result = $wpdb->insert(
+        $table,
+        [$type => $value, 'sid' => $sid_to_use],
+        ['%s', '%s']
+      );
+      if ($insert_result === false) {
+        hic_log('hic_store_tracking_id: Failed to insert ' . $type . ': ' . ($wpdb->last_error ?: 'Unknown error'));
+        return new \WP_Error('db_insert_error', 'Failed to insert tracking id');
+      }
     }
   }
 
@@ -466,8 +498,39 @@ function hic_capture_tracking_params(){
     }
   }
 
+  $normalize_sid = static function ($value) {
+    if (!is_string($value) || $value === '') {
+      return null;
+    }
+
+    $candidate = sanitize_text_field($value);
+    $candidate = substr($candidate, 0, HIC_SID_MAX_LENGTH);
+
+    if ($candidate === '' || strlen($candidate) < HIC_SID_MIN_LENGTH) {
+      return null;
+    }
+
+    return $candidate;
+  };
+
+  $refresh_existing_sid = static function () use (&$existing_sid, $normalize_sid) {
+    if (isset($_COOKIE['hic_sid'])) {
+      $normalized_cookie = $normalize_sid(wp_unslash($_COOKIE['hic_sid']));
+      if ($normalized_cookie !== null) {
+        $existing_sid = $normalized_cookie;
+      }
+    }
+  };
+
   // Get existing SID or create new one if it doesn't exist
-  $existing_sid = isset($_COOKIE['hic_sid']) ? sanitize_text_field( wp_unslash( $_COOKIE['hic_sid'] ) ) : null;
+  $existing_sid = null;
+  if (isset($_COOKIE['hic_sid'])) {
+    $normalized_cookie = $normalize_sid(wp_unslash($_COOKIE['hic_sid']));
+    if ($normalized_cookie !== null) {
+      $existing_sid = $normalized_cookie;
+      $_COOKIE['hic_sid'] = $normalized_cookie;
+    }
+  }
 
   if (!empty($_GET['gclid'])) {
     $gclid = sanitize_text_field( wp_unslash( $_GET['gclid'] ) );
@@ -476,6 +539,7 @@ function hic_capture_tracking_params(){
       hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
     }
+    $refresh_existing_sid();
   }
 
   if (!empty($_GET['fbclid'])) {
@@ -485,6 +549,7 @@ function hic_capture_tracking_params(){
       hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
     }
+    $refresh_existing_sid();
   }
 
   if (!empty($_GET['msclkid'])) {
@@ -494,6 +559,7 @@ function hic_capture_tracking_params(){
       hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
     }
+    $refresh_existing_sid();
   }
 
   if (!empty($_GET['ttclid'])) {
@@ -503,10 +569,18 @@ function hic_capture_tracking_params(){
       hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
     }
+    $refresh_existing_sid();
   }
 
   // Capture UTM parameters if present
-  $sid_for_utm = isset($_COOKIE['hic_sid']) ? sanitize_text_field( wp_unslash( $_COOKIE['hic_sid'] ) ) : $existing_sid;
+  $sid_for_utm = $existing_sid;
+  if (isset($_COOKIE['hic_sid'])) {
+    $normalized_for_utm = $normalize_sid(wp_unslash($_COOKIE['hic_sid']));
+    if ($normalized_for_utm !== null) {
+      $sid_for_utm = $normalized_for_utm;
+      $_COOKIE['hic_sid'] = $normalized_for_utm;
+    }
+  }
   $utm_params = [];
   foreach (['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'] as $utm_key) {
     if (!empty($_GET[$utm_key])) {
@@ -521,18 +595,19 @@ function hic_capture_tracking_params(){
       return false;
     }
 
-    if (!$sid_for_utm) {
-      $sid_for_utm = (string) wp_generate_uuid4();
+    if ($sid_for_utm === null) {
+      $sid_for_utm = \FpHic\Helpers\hic_generate_sid();
       $cookie_args = apply_filters('hic_sid_cookie_args', [
         'expires'  => time() + 60*60*24*90,
         'path'     => '/',
         'secure'   => is_ssl(),
-        'httponly' => true,
+        'httponly' => false,
         'samesite' => 'Lax',
       ], $sid_for_utm);
-      if (setcookie('hic_sid', $sid_for_utm, $cookie_args)) {
-        $_COOKIE['hic_sid'] = $sid_for_utm;
+      if (!setcookie('hic_sid', $sid_for_utm, $cookie_args)) {
+        hic_log('hic_capture_tracking_params: Failed to set SID cookie for UTM parameters');
       }
+      $_COOKIE['hic_sid'] = $sid_for_utm;
     }
 
     $existing_row = $wpdb->get_var($wpdb->prepare(
