@@ -85,6 +85,16 @@ if (!function_exists('sanitize_email')) {
     }
 }
 
+if (!function_exists('wp_unslash')) {
+    function wp_unslash($value) {
+        if (is_array($value)) {
+            return array_map('wp_unslash', $value);
+        }
+
+        return is_string($value) ? stripslashes($value) : $value;
+    }
+}
+
 if (!function_exists('is_email')) {
     function is_email($email) {
         return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : false;
