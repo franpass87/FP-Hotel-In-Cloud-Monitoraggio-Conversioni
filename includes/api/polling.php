@@ -299,7 +299,7 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
                         }
                     }
                 }
-            } catch (Exception $e) { 
+            } catch (\Exception $e) {
                 hic_log('Process reservation error: '.$e->getMessage()); 
             }
         }
@@ -718,7 +718,7 @@ function hic_dispatch_reservation($transformed, $original) {
         }
 
         hic_log("Reservation $uid dispatched successfully (mode: $connection_type)");
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
         hic_log("Error dispatching reservation $uid: " . $e->getMessage());
         throw $e;
     }
@@ -995,7 +995,7 @@ function hic_process_reservations_batch($reservations) {
                 Helpers\hic_release_reservation_lock($uid);
             }
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $error_count++;
             $uid = Helpers\hic_booking_uid($reservation);
             hic_log("Reservation $uid: failed with error - " . $e->getMessage());
@@ -1264,7 +1264,7 @@ function hic_fetch_reservations_updates($prop_id, $since, $limit=null){
         foreach ($updates as $u) {
             try {
                 hic_process_update($u);
-            } catch (Exception $e) { 
+            } catch (\Exception $e) {
                 hic_log('Process update error: '.$e->getMessage()); 
             }
         }
@@ -1670,7 +1670,7 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
                     hic_log("Backfill: Failed to transform reservation: " . json_encode($reservation));
                 }
                 
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 $stats['total_errors']++;
                 hic_log("Backfill: Error processing reservation: " . $e->getMessage());
             }
@@ -1687,7 +1687,7 @@ function hic_backfill_reservations($from_date, $to_date, $date_type = 'checkin',
             'stats' => $stats
         );
         
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
         $stats['execution_time'] = round(microtime(true) - $start_time, 2);
         $error_message = "Errore durante il backfill: " . $e->getMessage();
         hic_log("Backfill: $error_message");
