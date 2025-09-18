@@ -91,6 +91,16 @@ if (!function_exists('is_email')) {
     }
 }
 
+if (!function_exists('wp_generate_uuid4')) {
+    function wp_generate_uuid4() {
+        $data = random_bytes(16);
+        $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+        $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+    }
+}
+
 if (!function_exists('absint')) {
     function absint($maybeint) {
         return abs(intval($maybeint));
@@ -176,10 +186,37 @@ if (!function_exists('wp_remote_post')) {
     }
 }
 
+if (!function_exists('wp_json_encode')) {
+    function wp_json_encode($data, $options = 0, $depth = 512) {
+        return json_encode($data, $options | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, $depth);
+    }
+}
+
 if (!function_exists('wp_safe_remote_request')) {
     function wp_safe_remote_request($url, $args = array()) {
-        global $hic_last_request;
+        global $hic_last_request, $hic_test_http_error, $hic_test_http_error_urls;
         $hic_last_request = ['url' => $url, 'args' => $args];
+
+        $should_fail = false;
+        if (!empty($hic_test_http_error)) {
+            $should_fail = true;
+        } elseif (!empty($hic_test_http_error_urls) && is_array($hic_test_http_error_urls)) {
+            foreach ($hic_test_http_error_urls as $pattern) {
+                if (is_string($pattern) && strpos($url, $pattern) !== false) {
+                    $should_fail = true;
+                    break;
+                }
+                if (is_callable($pattern) && (bool) call_user_func($pattern, $url, $args)) {
+                    $should_fail = true;
+                    break;
+                }
+            }
+        }
+
+        if ($should_fail) {
+            return new WP_Error('hic_test_http_error', 'Simulated HTTP failure');
+        }
+
         return array('body' => '{}', 'response' => array('code' => 200));
     }
 }
@@ -302,4 +339,10 @@ if (!function_exists('register_rest_route')) {
 // Include the plugin files
 require_once dirname(__DIR__) . '/includes/constants.php';
 require_once dirname(__DIR__) . '/includes/functions.php';
+require_once dirname(__DIR__) . '/includes/helpers-logging.php';
+require_once dirname(__DIR__) . '/includes/log-manager.php';
 require_once dirname(__DIR__) . '/includes/booking-processor.php';
+require_once dirname(__DIR__) . '/includes/integrations/ga4.php';
+require_once dirname(__DIR__) . '/includes/integrations/gtm.php';
+require_once dirname(__DIR__) . '/includes/integrations/facebook.php';
+require_once dirname(__DIR__) . '/includes/integrations/brevo.php';
