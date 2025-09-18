@@ -1,9 +1,11 @@
 <?php declare(strict_types=1);
 /**
  * Test file for HIC Plugin improvements
- * 
+ *
  * This file tests the new security, validation, and caching features
  */
+
+use PHPUnit\Framework\TestCase;
 
 // Simulate WordPress environment for testing
 if (!defined('ABSPATH')) {
@@ -101,6 +103,14 @@ class HIC_Improvements_Test {
         assert($get_after_delete === null, 'Cache get after delete should return null');
         
         echo "  ✅ Cache manager tests passed\n";
+    }
+}
+
+final class ImprovementsTest extends TestCase
+{
+    public function testImprovementsManualSuitePlaceholder(): void
+    {
+        $this->markTestSkipped('Manual improvements test suite is executed via HIC_Improvements_Test::run_tests().');
     }
 }
 

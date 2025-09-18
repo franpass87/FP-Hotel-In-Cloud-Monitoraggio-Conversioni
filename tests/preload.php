@@ -93,7 +93,22 @@ if (!function_exists('delete_option')) { function delete_option($option) { globa
 if (!function_exists('delete_transient')) { function delete_transient($transient) { return true; } }
 if (!function_exists('wp_upload_dir')) { function wp_upload_dir($path = null) { return ['basedir' => sys_get_temp_dir(), 'baseurl' => '']; } }
 if (!function_exists('plugin_basename')) { function plugin_basename($file) { return $file; } }
-if (!function_exists('sanitize_text_field')) { function sanitize_text_field($str) { return filter_var($str, FILTER_SANITIZE_STRING); } }
+if (!function_exists('sanitize_text_field')) {
+    function sanitize_text_field($str) {
+        if (!is_scalar($str)) {
+            return '';
+        }
+
+        $value = (string) $str;
+        $value = strip_tags($value);
+        $value = preg_replace('/[\r\n\t\0\x0B]+/', '', $value);
+        if ($value === null) {
+            $value = '';
+        }
+
+        return trim($value);
+    }
+}
 if (!function_exists('wp_date')) {
     function wp_date($format, $timestamp = null, $timezone = null) {
         return date($format, $timestamp ?? time());
