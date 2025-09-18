@@ -243,10 +243,10 @@ function hic_init_gtm_hooks() {
     }
     
     // Add GTM head code
-    add_action('wp_head', 'hic_output_gtm_head_code', 1);
+    add_action('wp_head', __NAMESPACE__ . '\\hic_output_gtm_head_code', 1);
     
     // Add GTM body code (early in body)
-    add_action('wp_body_open', 'hic_output_gtm_body_code', 1);
+    add_action('wp_body_open', __NAMESPACE__ . '\\hic_output_gtm_body_code', 1);
     
     // Fallback for themes that don't support wp_body_open
     add_action('wp_footer', function() {
@@ -305,8 +305,8 @@ function hic_handle_gtm_events_request(\WP_REST_Request $request) {
 }
 
 // Initialize GTM hooks when WordPress is ready (safe hook registration)
-\FpHic\Helpers\hic_safe_add_hook('action', 'init', 'hic_init_gtm_hooks');
-\FpHic\Helpers\hic_safe_add_hook('action', 'rest_api_init', 'hic_register_gtm_rest_routes');
+\FpHic\Helpers\hic_safe_add_hook('action', 'init', __NAMESPACE__ . '\\hic_init_gtm_hooks');
+\FpHic\Helpers\hic_safe_add_hook('action', 'rest_api_init', __NAMESPACE__ . '\\hic_register_gtm_rest_routes');
 
 /**
  * GTM dispatcher for HIC reservation schema
