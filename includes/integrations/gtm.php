@@ -33,9 +33,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
 
     // Generate transaction ID using consistent extraction
     $transaction_id = Helpers\hic_extract_reservation_id($data);
-    if ($sid !== '') {
-        $transaction_id = $sid;
-    } elseif (empty($transaction_id)) {
+    if (empty($transaction_id)) {
         $transaction_id = uniqid('hic_gtm_');
     }
 
@@ -63,6 +61,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
 
     if ($sid !== '') {
         $gtm_data['client_id'] = $sid;
+        $gtm_data['sid'] = $sid;
     }
 
     // Add tracking IDs if available for enhanced attribution

@@ -40,7 +40,6 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
   }
   if ($sid !== '') {
     $client_id = $sid;
-    $transaction_id = $sid;
   }
 
   $params = [
@@ -56,6 +55,10 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
     'method'         => 'HotelInCloud',
     'vertical'       => 'hotel',
   ];
+
+  if ($sid !== '') {
+    $params['hic_sid'] = $sid;
+  }
   
   if (!empty($gclid))   { $params['gclid']   = sanitize_text_field($gclid); }
   if (!empty($fbclid))  { $params['fbclid']  = sanitize_text_field($fbclid); }
@@ -153,7 +156,6 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
   }
   if ($sid !== '') {
     $client_id = $sid;
-    $transaction_id = $sid;
   }
 
   $params = [
@@ -169,6 +171,10 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
     'method'         => 'HotelInCloud',
     'vertical'       => 'hotel',
   ];
+
+  if ($sid !== '') {
+    $params['hic_sid'] = $sid;
+  }
 
   if (!empty($gclid))   { $params['gclid']   = sanitize_text_field($gclid); }
   if (!empty($fbclid))  { $params['fbclid']  = sanitize_text_field($fbclid); }
