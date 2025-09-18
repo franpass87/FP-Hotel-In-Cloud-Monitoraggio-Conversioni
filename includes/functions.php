@@ -430,17 +430,40 @@ function hic_store_failed_request($url, $args, $error) {
 
     $table = $wpdb->prefix . 'hic_failed_requests';
 
-    $wpdb->insert(
+    $insert_result = $wpdb->insert(
         $table,
         [
             'endpoint'   => $url,
             'payload'    => wp_json_encode($args),
             'attempts'   => 1,
             'last_error' => $error,
-        'last_try'   => current_time('mysql'),
+            'last_try'   => current_time('mysql'),
         ],
         ['%s', '%s', '%d', '%s', '%s']
     );
+
+    if (is_wp_error($insert_result)) {
+        $log_result = hic_log(
+            'Failed to store failed request: ' . $insert_result->get_error_message(),
+            HIC_LOG_LEVEL_ERROR,
+            [
+                'endpoint' => $url,
+                'error'    => $error,
+            ]
+        );
+
+        if (is_wp_error($log_result)) {
+            error_log('HIC logging failure: ' . $log_result->get_error_message());
+        }
+    }
+
+    if (function_exists(__NAMESPACE__ . '\\hic_schedule_failed_request_retry')) {
+        \FpHic\Helpers\hic_schedule_failed_request_retry();
+    }
+
+    if (function_exists(__NAMESPACE__ . '\\hic_schedule_failed_request_cleanup')) {
+        \FpHic\Helpers\hic_schedule_failed_request_cleanup();
+    }
 }
 
 /* ============ Email admin (include bucket) ============ */
