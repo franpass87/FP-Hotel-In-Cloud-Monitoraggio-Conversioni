@@ -94,12 +94,13 @@ function hic_create_realtime_sync_table(){
   $sql = "CREATE TABLE IF NOT EXISTS $table (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     reservation_id VARCHAR(255) NOT NULL,
-    sync_status ENUM('new', 'notified', 'failed') DEFAULT 'new',
+    sync_status ENUM('new', 'notified', 'failed', 'permanent_failure') DEFAULT 'new',
     first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_attempt TIMESTAMP NULL,
     attempt_count INT DEFAULT 0,
     last_error TEXT NULL,
     brevo_event_sent TINYINT(1) DEFAULT 0,
+    payload_json LONGTEXT NULL,
     UNIQUE KEY unique_reservation (reservation_id),
     KEY status_idx (sync_status),
     KEY first_seen_idx (first_seen)
@@ -736,10 +737,12 @@ function hic_mark_reservation_notified_to_brevo($reservation_id) {
       'sync_status' => 'notified',
       'brevo_event_sent' => 1,
       'last_attempt' => current_time('mysql'),
-      'last_error' => null
+      'attempt_count' => 0,
+      'last_error' => null,
+      'payload_json' => null
     ),
     array('reservation_id' => $reservation_id),
-    array('%s', '%d', '%s', '%s'),
+    array('%s', '%d', '%s', '%d', '%s', '%s'),
     array('%s')
   );
   
@@ -749,33 +752,51 @@ function hic_mark_reservation_notified_to_brevo($reservation_id) {
 /**
  * Mark reservation notification as failed
  */
-function hic_mark_reservation_notification_failed($reservation_id, $error_message = null) {
+function hic_mark_reservation_notification_failed($reservation_id, $error_message = null, $payload = null) {
   if (empty($reservation_id)) return false;
-  
+
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
-  
+
   // Get current attempt count
   $current = $wpdb->get_row($wpdb->prepare(
-    "SELECT attempt_count FROM $table WHERE reservation_id = %s",
+    "SELECT attempt_count, payload_json FROM $table WHERE reservation_id = %s",
     $reservation_id
   ));
-  
+
   $attempt_count = $current ? ($current->attempt_count + 1) : 1;
-  
+
+  $payload_json = null;
+  if ($payload !== null) {
+    if (is_string($payload)) {
+      $payload_json = $payload;
+    } else {
+      $encoded_payload = wp_json_encode($payload);
+      if ($encoded_payload !== false) {
+        $payload_json = $encoded_payload;
+      } else {
+        hic_log('hic_mark_reservation_notification_failed: Failed to encode payload for reservation ' . $reservation_id);
+      }
+    }
+  } elseif ($current && isset($current->payload_json)) {
+    $payload_json = $current->payload_json;
+  }
+
   $result = $wpdb->update(
     $table,
     array(
       'sync_status' => 'failed',
       'last_attempt' => current_time('mysql'),
       'attempt_count' => $attempt_count,
-      'last_error' => $error_message
+      'last_error' => $error_message,
+      'payload_json' => $payload_json,
+      'brevo_event_sent' => 0
     ),
     array('reservation_id' => $reservation_id),
-    array('%s', '%s', '%d', '%s'),
+    array('%s', '%s', '%d', '%s', '%s', '%d'),
     array('%s')
   );
-  
+
   return $result !== false;
 }
 
@@ -793,10 +814,11 @@ function hic_mark_reservation_notification_permanent_failure($reservation_id, $e
     array(
       'sync_status' => 'permanent_failure',
       'last_attempt' => current_time('mysql'),
-      'last_error' => $error_message
+      'last_error' => $error_message,
+      'brevo_event_sent' => 0
     ),
     array('reservation_id' => $reservation_id),
-    array('%s', '%s', '%s'),
+    array('%s', '%s', '%s', '%d'),
     array('%s')
   );
   
@@ -813,10 +835,10 @@ function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_m
   $retry_time = wp_date('Y-m-d H:i:s', strtotime("-{$retry_delay_minutes} minutes", current_time('timestamp')));
   
   $results = $wpdb->get_results($wpdb->prepare(
-    "SELECT reservation_id, attempt_count, last_error 
-     FROM $table 
-     WHERE sync_status = 'failed' 
-     AND attempt_count < %d 
+    "SELECT reservation_id, attempt_count, last_error, payload_json
+     FROM $table
+     WHERE sync_status = 'failed'
+     AND attempt_count < %d
      AND (last_attempt IS NULL OR last_attempt < %s)
      ORDER BY first_seen ASC
      LIMIT 10",
