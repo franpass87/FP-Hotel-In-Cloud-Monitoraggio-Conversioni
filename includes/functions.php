@@ -483,6 +483,54 @@ function hic_store_failed_request($url, $args, $error) {
         if (is_wp_error($log_result)) {
             error_log('HIC logging failure: ' . $log_result->get_error_message());
         }
+
+        return;
+    }
+
+    if ($insert_result === false) {
+        $db_error_message = trim((string) $wpdb->last_error);
+        if ($db_error_message === '') {
+            $db_error_message = 'Unknown database error';
+        }
+
+        $log_result = hic_log(
+            'Failed to store failed request: ' . $db_error_message,
+            HIC_LOG_LEVEL_ERROR,
+            [
+                'endpoint' => $url,
+                'error'    => $error,
+                'db_error' => $db_error_message,
+                'table'    => $table,
+            ]
+        );
+
+        if (is_wp_error($log_result)) {
+            error_log('HIC logging failure: ' . $log_result->get_error_message());
+        }
+
+        $lower_error = strtolower($db_error_message);
+        $missing_table_indicators = [
+            'no such table',
+            'does not exist',
+            "doesn't exist",
+            'missing table',
+            'unknown table',
+            '1146',
+        ];
+
+        $missing_table_detected = false;
+        foreach ($missing_table_indicators as $indicator) {
+            if ($indicator !== '' && strpos($lower_error, $indicator) !== false) {
+                $missing_table_detected = true;
+                break;
+            }
+        }
+
+        if ($missing_table_detected && function_exists('\hic_create_failed_requests_table')) {
+            \hic_create_failed_requests_table();
+        }
+
+        return;
     }
 
     if (function_exists(__NAMESPACE__ . '\\hic_schedule_failed_request_retry')) {
