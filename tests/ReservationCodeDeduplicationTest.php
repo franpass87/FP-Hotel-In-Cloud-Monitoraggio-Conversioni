@@ -465,6 +465,111 @@ final class ReservationCodeDeduplicationTest extends TestCase
         Helpers\hic_clear_option_cache('tracking_mode');
     }
 
+    public function test_queue_retry_merges_existing_case_insensitive_entry(): void
+    {
+        delete_option('hic_integration_retry_queue');
+        delete_option('hic_integration_retry_queue_normalized');
+        Helpers\hic_clear_option_cache('hic_integration_retry_queue');
+
+        $legacy_entry = [
+            'integrations' => [
+                'GA4' => [
+                    'note' => 'initial failure',
+                    'last_failure' => 123,
+                ],
+            ],
+            'context' => ['source' => 'legacy'],
+            'last_updated' => 123,
+        ];
+
+        update_option('hic_integration_retry_queue', ['MixedId' => $legacy_entry], false);
+        Helpers\hic_clear_option_cache('hic_integration_retry_queue');
+
+        Helpers\hic_queue_integration_retry('mixedid', ['Meta Pixel' => 'new failure'], ['source' => 'current']);
+
+        $queue = get_option('hic_integration_retry_queue', []);
+        $this->assertIsArray($queue);
+        $this->assertCount(1, $queue);
+        $this->assertArrayHasKey('MIXEDID', $queue);
+
+        $entry = $queue['MIXEDID'];
+        $this->assertArrayHasKey('integrations', $entry);
+        $this->assertArrayHasKey('GA4', $entry['integrations']);
+        $this->assertSame('initial failure', $entry['integrations']['GA4']['note']);
+        $this->assertSame(123, $entry['integrations']['GA4']['last_failure']);
+
+        $this->assertArrayHasKey('Meta Pixel', $entry['integrations']);
+        $this->assertSame('new failure', $entry['integrations']['Meta Pixel']['note']);
+        $this->assertGreaterThanOrEqual(123, $entry['integrations']['Meta Pixel']['last_failure']);
+
+        $this->assertSame(['source' => 'current'], $entry['context']);
+        $this->assertArrayHasKey('last_updated', $entry);
+        $this->assertGreaterThanOrEqual($entry['integrations']['Meta Pixel']['last_failure'], $entry['last_updated']);
+
+        delete_option('hic_integration_retry_queue');
+        Helpers\hic_clear_option_cache('hic_integration_retry_queue');
+    }
+
+    public function test_upgrade_integration_retry_queue_normalizes_keys(): void
+    {
+        delete_option('hic_integration_retry_queue');
+        delete_option('hic_integration_retry_queue_normalized');
+        Helpers\hic_clear_option_cache('hic_integration_retry_queue');
+
+        $legacy_queue = [
+            'abc' => [
+                'integrations' => [
+                    'GA4' => [
+                        'note' => 'first',
+                        'last_failure' => 100,
+                    ],
+                ],
+                'context' => ['source' => 'legacy'],
+                'last_updated' => 1000,
+            ],
+            'AbC' => [
+                'integrations' => [
+                    'Meta Pixel' => [
+                        'note' => 'second',
+                        'last_failure' => 200,
+                    ],
+                ],
+                'context' => ['attempt' => 'second'],
+                'last_updated' => 2000,
+            ],
+        ];
+
+        update_option('hic_integration_retry_queue', $legacy_queue, false);
+        Helpers\hic_clear_option_cache('hic_integration_retry_queue');
+
+        Helpers\hic_upgrade_integration_retry_queue();
+
+        $queue = get_option('hic_integration_retry_queue', []);
+        $this->assertIsArray($queue);
+        $this->assertCount(1, $queue);
+        $this->assertArrayHasKey('ABC', $queue);
+
+        $entry = $queue['ABC'];
+        $this->assertArrayHasKey('integrations', $entry);
+        $this->assertArrayHasKey('GA4', $entry['integrations']);
+        $this->assertSame('first', $entry['integrations']['GA4']['note']);
+        $this->assertSame(100, $entry['integrations']['GA4']['last_failure']);
+        $this->assertArrayHasKey('Meta Pixel', $entry['integrations']);
+        $this->assertSame('second', $entry['integrations']['Meta Pixel']['note']);
+        $this->assertSame(200, $entry['integrations']['Meta Pixel']['last_failure']);
+
+        $this->assertArrayHasKey('context', $entry);
+        $this->assertSame('legacy', $entry['context']['source'] ?? null);
+        $this->assertSame('second', $entry['context']['attempt'] ?? null);
+        $this->assertSame(2000, $entry['last_updated']);
+
+        $this->assertSame('1', get_option('hic_integration_retry_queue_normalized'));
+
+        delete_option('hic_integration_retry_queue');
+        delete_option('hic_integration_retry_queue_normalized');
+        Helpers\hic_clear_option_cache('hic_integration_retry_queue');
+    }
+
     /**
      * @param array<string, mixed> $payload
      * @return array|WP_Error|WP_REST_Response

@@ -94,6 +94,7 @@ function hic_init_helper_hooks() {
         add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
         add_action('hic_cleanup_failed_requests', __NAMESPACE__ . '\\hic_cleanup_failed_requests');
         add_action('admin_init', __NAMESPACE__ . '\\hic_upgrade_reservation_email_map');
+        add_action('admin_init', __NAMESPACE__ . '\\hic_upgrade_integration_retry_queue');
     }
 }
 
@@ -790,6 +791,11 @@ function hic_queue_integration_retry($reservation_uid, array $failed_details, ar
     }
 
     $reservation_uid = trim((string) $reservation_uid);
+    if ($reservation_uid === '') {
+        return;
+    }
+
+    $reservation_uid = \FpHic\Helpers\hic_normalize_reservation_id($reservation_uid);
     if ($reservation_uid === '' || empty($failed_details)) {
         return;
     }
@@ -825,13 +831,42 @@ function hic_queue_integration_retry($reservation_uid, array $failed_details, ar
         $queue = [];
     }
 
-    $existing = isset($queue[$reservation_uid]) && is_array($queue[$reservation_uid])
-        ? $queue[$reservation_uid]
-        : [];
+    $integrations = [];
+    $keys_to_remove = [];
 
-    $integrations = isset($existing['integrations']) && is_array($existing['integrations'])
-        ? $existing['integrations']
-        : [];
+    foreach ($queue as $key => $entry) {
+        if (!is_scalar($key) || !is_array($entry)) {
+            continue;
+        }
+
+        $candidate_key = \FpHic\Helpers\hic_normalize_reservation_id((string) $key);
+        if ($candidate_key !== $reservation_uid) {
+            continue;
+        }
+
+        $keys_to_remove[] = $key;
+
+        if (!isset($entry['integrations']) || !is_array($entry['integrations'])) {
+            continue;
+        }
+
+        foreach ($entry['integrations'] as $integration => $payload) {
+            if (!is_scalar($integration) || !is_array($payload)) {
+                continue;
+            }
+
+            $safe_integration = \sanitize_text_field((string) $integration);
+            if ($safe_integration === '') {
+                continue;
+            }
+
+            $integrations[$safe_integration] = $payload;
+        }
+    }
+
+    foreach ($keys_to_remove as $legacy_key) {
+        unset($queue[$legacy_key]);
+    }
 
     foreach ($normalized_details as $integration => $payload) {
         $integrations[$integration] = $payload;
@@ -1300,6 +1335,154 @@ function hic_upgrade_reservation_email_map() {
     }
 
     update_option('hic_res_email_map_normalized', '1', false);
+}
+
+/**
+ * Normalize stored integration retry queue keys once during upgrade.
+ */
+function hic_upgrade_integration_retry_queue(): void {
+    $already_normalized = get_option('hic_integration_retry_queue_normalized');
+    if ($already_normalized === '1') {
+        return;
+    }
+
+    $queue = get_option('hic_integration_retry_queue', []);
+    $changed = false;
+
+    if (!is_array($queue)) {
+        $queue = [];
+        $changed = true;
+    }
+
+    $normalized_queue = [];
+
+    foreach ($queue as $key => $entry) {
+        if (!is_scalar($key) || !is_array($entry)) {
+            $changed = true;
+            continue;
+        }
+
+        $normalized_key = hic_normalize_reservation_id((string) $key);
+        if ($normalized_key === '') {
+            $changed = true;
+            continue;
+        }
+
+        if (!isset($normalized_queue[$normalized_key])) {
+            $normalized_queue[$normalized_key] = [
+                'integrations' => [],
+                'context' => [],
+                'last_updated' => 0,
+            ];
+        }
+
+        $normalized_entry = &$normalized_queue[$normalized_key];
+
+        if (isset($entry['integrations']) && is_array($entry['integrations'])) {
+            foreach ($entry['integrations'] as $integration => $payload) {
+                if (!is_scalar($integration) || !is_array($payload)) {
+                    $changed = true;
+                    continue;
+                }
+
+                $safe_integration = \sanitize_text_field((string) $integration);
+                if ($safe_integration === '') {
+                    $changed = true;
+                    continue;
+                }
+
+                $sanitized_payload = [
+                    'note' => '',
+                    'last_failure' => 0,
+                ];
+
+                if (isset($payload['note']) && is_scalar($payload['note'])) {
+                    $sanitized_payload['note'] = \sanitize_text_field((string) $payload['note']);
+                }
+
+                if (isset($payload['last_failure']) && is_numeric($payload['last_failure'])) {
+                    $sanitized_payload['last_failure'] = max(0, (int) $payload['last_failure']);
+                }
+
+                if (isset($normalized_entry['integrations'][$safe_integration])) {
+                    $existing_payload = $normalized_entry['integrations'][$safe_integration];
+                    if (!is_array($existing_payload)) {
+                        $existing_payload = [
+                            'note' => '',
+                            'last_failure' => 0,
+                        ];
+                    }
+
+                    $existing_last_failure = isset($existing_payload['last_failure']) && is_numeric($existing_payload['last_failure'])
+                        ? (int) $existing_payload['last_failure']
+                        : 0;
+
+                    if ($sanitized_payload['last_failure'] < $existing_last_failure) {
+                        $sanitized_payload['last_failure'] = $existing_last_failure;
+                    }
+
+                    if ($sanitized_payload['note'] === '' && isset($existing_payload['note']) && is_scalar($existing_payload['note'])) {
+                        $sanitized_payload['note'] = \sanitize_text_field((string) $existing_payload['note']);
+                    }
+                }
+
+                if ($safe_integration !== (string) $integration) {
+                    $changed = true;
+                }
+
+                $normalized_entry['integrations'][$safe_integration] = $sanitized_payload;
+            }
+        } else {
+            $changed = true;
+        }
+
+        if (isset($entry['context']) && is_array($entry['context'])) {
+            foreach ($entry['context'] as $context_key => $context_value) {
+                if (!is_scalar($context_key) || !is_scalar($context_value)) {
+                    $changed = true;
+                    continue;
+                }
+
+                $safe_context_key = \sanitize_key((string) $context_key);
+                $normalized_entry['context'][$safe_context_key] = \sanitize_text_field((string) $context_value);
+            }
+        } elseif (isset($entry['context'])) {
+            $changed = true;
+        }
+
+        if (isset($entry['last_updated']) && is_numeric($entry['last_updated'])) {
+            $normalized_entry['last_updated'] = max($normalized_entry['last_updated'], (int) $entry['last_updated']);
+        } else {
+            $changed = true;
+        }
+
+        unset($normalized_entry);
+    }
+
+    foreach ($normalized_queue as $key => &$entry) {
+        if (empty($entry['integrations'])) {
+            unset($normalized_queue[$key]);
+            $changed = true;
+            continue;
+        }
+
+        if (!isset($entry['context']) || !is_array($entry['context'])) {
+            $entry['context'] = [];
+        }
+    }
+    unset($entry);
+
+    if (count($normalized_queue) > 200) {
+        $normalized_queue = array_slice($normalized_queue, -200, null, true);
+        $changed = true;
+    }
+
+    if ($changed || $normalized_queue !== $queue) {
+        update_option('hic_integration_retry_queue', $normalized_queue, false);
+        hic_clear_option_cache('hic_integration_retry_queue');
+    }
+
+    update_option('hic_integration_retry_queue_normalized', '1', false);
 }
 
 /* ================= DEDUPLICATION HELPER FUNCTIONS ================= */
