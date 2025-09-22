@@ -26,7 +26,7 @@ add_action('rest_api_init', function () {
           'description'       => 'Token di sicurezza per autenticare la richiesta',
         ],
         'email' => [
-          'required'          => true,
+          'required'          => false,
           'sanitize_callback' => 'sanitize_email',
           'description'       => 'Email del cliente associata alla prenotazione',
         ],
@@ -77,8 +77,18 @@ function hic_webhook_handler(WP_REST_Request $request) {
     return new WP_REST_Response(['error' => 'no valid data'], 400);
   }
 
-  // Use sanitized email from request params
-  $data['email'] = $request->get_param('email');
+  // Use sanitized email from request params when valid
+  $request_email = $request->get_param('email');
+  if (is_string($request_email)) {
+    $request_email = trim($request_email);
+  }
+
+  if (is_string($request_email) && $request_email !== '') {
+    $validated_request_email = \FpHic\HIC_Input_Validator::validate_email($request_email);
+    if (!is_wp_error($validated_request_email)) {
+      $data['email'] = $validated_request_email;
+    }
+  }
 
   // Validate payload structure and required fields using enhanced validator
   $payload_validation = \FpHic\HIC_Input_Validator::validate_webhook_payload($data);
@@ -110,24 +120,30 @@ function hic_webhook_handler(WP_REST_Request $request) {
 
   try {
     // Process booking data with error handling
+    $email_missing = empty($data['email']);
     $result = hic_process_booking_data($data);
 
     // Mark reservation as processed if successful
     if ($result && !empty($reservation_id)) {
       hic_mark_reservation_processed_by_id($reservation_id);
     }
-    
+
     // Update last webhook processing time for diagnostics
     update_option('hic_last_webhook_processing', current_time('mysql'), false);
     hic_clear_option_cache('hic_last_webhook_processing');
-    
+
     if (!$result) {
+      if ($email_missing) {
+        hic_log('Webhook: dati elaborati senza email, integrazioni limitate');
+        return ['status'=>'ok', 'processed' => false, 'reason' => 'missing_email'];
+      }
+
       hic_log('Webhook: elaborazione fallita per dati ricevuti');
       return new WP_REST_Response(['error'=>'processing failed'], 500);
     }
 
     return ['status'=>'ok', 'processed' => true];
-    
+
   } finally {
     // Always release the lock
     if (!empty($reservation_id)) {
@@ -149,10 +165,27 @@ function hic_validate_webhook_payload($payload) {
     return new \WP_Error('invalid_payload', 'Payload non valido', ['status' => 400]);
   }
 
-  // Required field: email
-  if (empty($payload['email']) || !hic_is_valid_email($payload['email'])) {
-    hic_log('Webhook payload: email mancante o non valida');
-    return new \WP_Error('invalid_email', 'Campo email mancante o non valido', ['status' => 400]);
+  // Email validation (optional field)
+  if (array_key_exists('email', $payload)) {
+    $email_value = $payload['email'];
+
+    if (is_string($email_value)) {
+      $email_value = trim($email_value);
+    }
+
+    if ($email_value !== '' && $email_value !== null) {
+      if (!is_scalar($email_value)) {
+        hic_log('Webhook payload: email non valida');
+        return new \WP_Error('invalid_email', 'Campo email non valido', ['status' => 400]);
+      }
+
+      $sanitized_email = sanitize_email((string) $email_value);
+
+      if ($sanitized_email === '' || !hic_is_valid_email($sanitized_email)) {
+        hic_log('Webhook payload: email non valida');
+        return new \WP_Error('invalid_email', 'Campo email non valido', ['status' => 400]);
+      }
+    }
   }
 
   return true;
