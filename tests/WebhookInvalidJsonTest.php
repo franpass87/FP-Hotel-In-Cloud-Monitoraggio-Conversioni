@@ -111,6 +111,14 @@ final class WebhookInvalidJsonTest extends TestCase {
         \FpHic\Helpers\hic_clear_option_cache('log_file');
         unset($GLOBALS['hic_log_manager']);
 
+        update_option('hic_brevo_enabled', '1');
+        update_option('hic_brevo_api_key', 'test-key');
+        \FpHic\Helpers\hic_clear_option_cache('brevo_enabled');
+        \FpHic\Helpers\hic_clear_option_cache('brevo_api_key');
+
+        update_option('hic_synced_res_ids', []);
+        \FpHic\Helpers\hic_clear_option_cache('synced_res_ids');
+
         $capturedLogs = [];
         $logFilter = function ($message) use (&$capturedLogs) {
             if (is_array($message) || is_object($message)) {
@@ -155,18 +163,36 @@ final class WebhookInvalidJsonTest extends TestCase {
         $this->assertIsArray($response);
         $this->assertSame('ok', $response['status']);
         $this->assertArrayHasKey('processed', $response);
-        $this->assertFalse($response['processed']);
-        $this->assertSame('missing_email', $response['reason']);
+        $this->assertTrue($response['processed']);
+        $this->assertArrayHasKey('result', $response);
+        $this->assertArrayNotHasKey('reason', $response);
+
+        $result = $response['result'];
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertTrue(in_array($result['status'], ['success', 'partial'], true));
+        $this->assertArrayHasKey('should_mark_processed', $result);
+        $this->assertTrue($result['should_mark_processed']);
+
+        $this->assertArrayHasKey('summary', $result);
+        $this->assertStringContainsString('Brevo contact=skipped (missing email)', $result['summary']);
+
+        $synced = get_option('hic_synced_res_ids', []);
+        $this->assertIsArray($synced);
+        $this->assertContains('MISSING_EMAIL_TEST', $synced, 'Reservation should be marked as processed even without email.');
 
         $logFound = false;
         foreach ($capturedLogs as $entry) {
-            if (strpos($entry, 'hic_process_booking_data: campo obbligatorio mancante - email') !== false) {
+            if (strpos($entry, 'Brevo contact dispatch skipped - missing email') !== false) {
                 $logFound = true;
                 break;
             }
         }
 
-        $this->assertTrue($logFound, 'hic_process_booking_data should log missing email when email is absent.');
+        $this->assertTrue($logFound, 'hic_process_booking_data should log the Brevo contact skip when email is absent.');
+
+        update_option('hic_synced_res_ids', []);
+        \FpHic\Helpers\hic_clear_option_cache('synced_res_ids');
     }
 
 }
