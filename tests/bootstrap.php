@@ -289,11 +289,19 @@ if (!class_exists('WP_Error')) {
             }
             return '';
         }
-        
+
         public function get_error_code() {
             $codes = array_keys($this->errors);
             if (empty($codes)) return '';
             return $codes[0];
+        }
+
+        public function get_error_data($code = '') {
+            if (empty($code)) {
+                $code = $this->get_error_code();
+            }
+
+            return $this->error_data[$code] ?? null;
         }
     }
 }

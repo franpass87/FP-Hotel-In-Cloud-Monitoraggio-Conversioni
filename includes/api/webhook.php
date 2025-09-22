@@ -58,6 +58,12 @@ function hic_webhook_handler(WP_REST_Request $request) {
 
   // Get raw body and validate size
   $raw = file_get_contents('php://input');
+
+  if (!is_string($raw)) {
+    hic_log('Webhook body read failed: unable to access php://input');
+    return new \WP_Error('invalid_body', 'Corpo della richiesta non leggibile', ['status' => 400]);
+  }
+
   if (strlen($raw) > HIC_WEBHOOK_MAX_PAYLOAD_SIZE) {
     hic_log('Webhook payload troppo grande');
     return new \WP_Error('payload_too_large', 'Payload troppo grande', ['status' => 413]);
