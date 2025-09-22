@@ -114,11 +114,60 @@ class HIC_Input_Validator {
                 $data[$field] = self::sanitize_string_field($data[$field]);
             }
         }
-        
+
+        // Normalize SID aliases after required field validation
+        $normalize_sid_candidate = static function ($value) {
+            if (!is_scalar($value)) {
+                return null;
+            }
+
+            $candidate = trim((string) $value);
+
+            return $candidate === '' ? null : $candidate;
+        };
+
+        $sid_value = null;
+        if (array_key_exists('sid', $data)) {
+            $sid_value = $normalize_sid_candidate($data['sid']);
+            if ($sid_value === null) {
+                unset($data['sid']);
+            } else {
+                $data['sid'] = $sid_value;
+            }
+        }
+
+        if ($sid_value === null) {
+            $sid_aliases = ['session_id', 'sessionId', 'sessionid', 'hic_sid', 'hicSid'];
+
+            foreach ($sid_aliases as $alias) {
+                if (!array_key_exists($alias, $data)) {
+                    continue;
+                }
+
+                $candidate = $normalize_sid_candidate($data[$alias]);
+                if ($candidate === null) {
+                    continue;
+                }
+
+                $sid_value = $candidate;
+                $data['sid'] = $candidate;
+                break;
+            }
+        }
+
+        if ($sid_value !== null) {
+            $sid_validation = self::validate_sid($sid_value);
+            if (is_wp_error($sid_validation)) {
+                $errors[] = $sid_validation->get_error_message();
+            } else {
+                $data['sid'] = $sid_validation;
+            }
+        }
+
         if (!empty($errors)) {
             return new \WP_Error('validation_failed', implode('; ', $errors));
         }
-        
+
         return $data;
     }
     

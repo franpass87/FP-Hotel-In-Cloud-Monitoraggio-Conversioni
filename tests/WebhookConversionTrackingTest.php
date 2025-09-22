@@ -204,9 +204,9 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         // Scenario: Hotel in Cloud non effettua redirect
         // Thank you page rimane su dominio HIC
         // Ma il webhook permette comunque il tracciamento
-        
+
         $hic_booking = [
-            'email' => 'ospite@hotel.com', 
+            'email' => 'ospite@hotel.com',
             'reservation_id' => 'REDIRECT_PROBLEM_SOLVED',
             'amount' => 250.00,
             'currency' => 'EUR',
@@ -217,22 +217,245 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         // Webhook riceve dati automaticamente da HIC
         $validation = \FpHic\HIC_Input_Validator::validate_webhook_payload($hic_booking);
         $this->assertFalse(is_wp_error($validation));
-        
+
         // Conversione viene tracciata automaticamente
         // SENZA bisogno che l'utente torni sul sito WordPress
         $this->assertTrue(true, 'Webhook tracking works regardless of user location');
-        
+
         // I dati vengono inviati a GA4, Meta, Brevo automaticamente
         // via hic_process_booking_data() chiamata dal webhook handler
         $this->assertTrue(function_exists('\\FpHic\\hic_process_booking_data'));
+    }
+
+    public function test_validate_webhook_payload_normalizes_session_id_alias(): void
+    {
+        $payload = [
+            'reservation_id' => 'ALIAS_SESSION',
+            'amount' => 120.50,
+            'currency' => 'EUR',
+            'session_id' => "  alias-sid-123456  ",
+        ];
+
+        $validated = \FpHic\HIC_Input_Validator::validate_webhook_payload($payload);
+
+        $this->assertFalse(is_wp_error($validated));
+        $this->assertArrayHasKey('sid', $validated);
+        $this->assertSame('alias-sid-123456', $validated['sid']);
+    }
+
+    public function test_validate_webhook_payload_normalizes_hic_sid_alias(): void
+    {
+        $payload = [
+            'reservation_id' => 'HIC_ALIAS',
+            'amount' => 88.00,
+            'hic_sid' => 'hic-sid-987654321',
+        ];
+
+        $validated = \FpHic\HIC_Input_Validator::validate_webhook_payload($payload);
+
+        $this->assertFalse(is_wp_error($validated));
+        $this->assertArrayHasKey('sid', $validated);
+        $this->assertSame('hic-sid-987654321', $validated['sid']);
+    }
+
+    public function test_validate_webhook_payload_rejects_invalid_sid_from_alias(): void
+    {
+        $payload = [
+            'reservation_id' => 'SID_INVALID',
+            'amount' => 75.00,
+            'sessionId' => 'invalid sid ***',
+        ];
+
+        $result = \FpHic\HIC_Input_Validator::validate_webhook_payload($payload);
+
+        $this->assertInstanceOf('WP_Error', $result);
+        $this->assertSame('validation_failed', $result->get_error_code());
+        $this->assertStringContainsString('SID', $result->get_error_message());
+    }
+
+    public function test_session_id_alias_populates_booking_processor_and_logs_tracking_ids(): void
+    {
+        global $wpdb, $hic_test_filters;
+
+        $previous_wpdb = isset($wpdb) ? $wpdb : null;
+
+        $wpdb = new class {
+            public $prefix = 'wp_';
+            public $last_error = '';
+            public $last_sid = null;
+
+            public function prepare($query, ...$args)
+            {
+                if (count($args) === 1 && is_array($args[0])) {
+                    $args = $args[0];
+                }
+
+                foreach ($args as $arg) {
+                    if (is_int($arg)) {
+                        $query = preg_replace('/%d/', (string) $arg, $query, 1);
+                        continue;
+                    }
+
+                    $query = preg_replace('/%s/', "'" . addslashes((string) $arg) . "'", $query, 1);
+                }
+
+                return $query;
+            }
+
+            public function get_var($query)
+            {
+                if (is_array($query)) {
+                    $query = $query['query'] ?? '';
+                }
+
+                if (stripos($query, 'SHOW TABLES LIKE') !== false) {
+                    return 'wp_hic_gclids';
+                }
+
+                return null;
+            }
+
+            public function get_row($query)
+            {
+                if (is_array($query)) {
+                    $query = $query['query'] ?? '';
+                }
+
+                if (preg_match("/WHERE sid='([^']+)'/i", $query, $matches)) {
+                    $this->last_sid = $matches[1];
+                }
+
+                if (stripos($query, 'SELECT gclid') !== false) {
+                    return (object) [
+                        'gclid' => 'test-gclid-alias',
+                        'fbclid' => 'test-fbclid',
+                        'msclkid' => null,
+                        'ttclid' => null,
+                        'gbraid' => null,
+                        'wbraid' => null,
+                    ];
+                }
+
+                return null;
+            }
+        };
+
+        if (!isset($hic_test_filters)) {
+            $hic_test_filters = [];
+        }
+        $previous_filters = $hic_test_filters['hic_booking_data'] ?? null;
+        $hic_test_filters['hic_booking_data'] = [];
+        $previous_log_filters = $hic_test_filters['hic_log_message'] ?? null;
+        $hic_test_filters['hic_log_message'] = $hic_test_filters['hic_log_message'] ?? [];
+
+        $logDir = sys_get_temp_dir() . '/uploads/hic-logs';
+        $logFile = $logDir . '/hic-webhook-sid-alias.log';
+        if (file_exists($logFile)) {
+            unlink($logFile);
+        }
+
+        update_option('hic_log_file', $logFile);
+        update_option('hic_tracking_mode', 'ga4_only');
+        update_option('hic_measurement_id', 'G-ALIAS123');
+        update_option('hic_api_secret', 'test-secret');
+        update_option('hic_brevo_enabled', '0');
+        update_option('hic_brevo_api_key', '');
+        update_option('hic_admin_email', '');
+
+        \FpHic\Helpers\hic_clear_option_cache();
+        unset($GLOBALS['hic_log_manager']);
+
+        $capturedTracking = null;
+        $loggedMessages = [];
+        add_filter('hic_booking_data', function ($payload, $context) use (&$capturedTracking) {
+            if (is_array($context) && array_key_exists('gclid', $context) && array_key_exists('sid', $context)) {
+                $capturedTracking = $context;
+                hic_log(sprintf(
+                    'Tracking IDs for SID %s: gclid=%s',
+                    $context['sid'] ?? 'N/A',
+                    $context['gclid'] ?? 'N/A'
+                ));
+            }
+
+            return $payload;
+        }, 10, 2);
+        add_filter('hic_log_message', function ($message, $level) use (&$loggedMessages) {
+            if (is_array($message) || is_object($message)) {
+                $loggedMessages[] = json_encode($message);
+            } else {
+                $loggedMessages[] = (string) $message;
+            }
+
+            return $message;
+        }, 20, 2);
+
+        $payload = [
+            'email' => 'alias@example.com',
+            'reservation_id' => 'ALIAS-TRACK-123',
+            'amount' => 199.00,
+            'currency' => 'EUR',
+            'session_id' => '  alias-sid-123456  ',
+        ];
+
+        $validated = \FpHic\HIC_Input_Validator::validate_webhook_payload($payload);
+        $this->assertFalse(is_wp_error($validated));
+        $this->assertSame('alias-sid-123456', $validated['sid']);
+
+        $result = \FpHic\hic_process_booking_data($validated);
+        $this->assertTrue(is_bool($result));
+        $this->assertNotNull($capturedTracking);
+        $this->assertSame('alias-sid-123456', $capturedTracking['sid']);
+        $this->assertSame('test-gclid-alias', $capturedTracking['gclid']);
+        $this->assertSame('alias-sid-123456', $wpdb->last_sid);
+        $this->assertNotEmpty($loggedMessages);
+        $logContainsGclid = false;
+        foreach ($loggedMessages as $entry) {
+            if (strpos($entry, 'Tracking IDs for SID alias-sid-123456: gclid=test-gclid-alias') !== false) {
+                $logContainsGclid = true;
+                break;
+            }
+        }
+        $this->assertTrue($logContainsGclid, 'Expected logs to contain gclid from tracking helper');
+
+        if ($previous_filters === null) {
+            unset($hic_test_filters['hic_booking_data']);
+        } else {
+            $hic_test_filters['hic_booking_data'] = $previous_filters;
+        }
+        if ($previous_log_filters === null) {
+            unset($hic_test_filters['hic_log_message']);
+        } else {
+            $hic_test_filters['hic_log_message'] = $previous_log_filters;
+        }
+
+        if (file_exists($logFile)) {
+            unlink($logFile);
+        }
+        unset($GLOBALS['hic_log_manager']);
+
+        if ($previous_wpdb !== null) {
+            $wpdb = $previous_wpdb;
+        } else {
+            unset($GLOBALS['wpdb']);
+        }
+
+        \FpHic\Helpers\hic_clear_option_cache();
     }
 
     public function tearDown(): void {
         // Pulisci impostazioni di test
         delete_option('hic_connection_type');
         delete_option('hic_webhook_token');
+        delete_option('hic_tracking_mode');
+        delete_option('hic_measurement_id');
+        delete_option('hic_api_secret');
+        delete_option('hic_gtm_enabled');
+        delete_option('hic_brevo_enabled');
+        delete_option('hic_brevo_api_key');
+        delete_option('hic_admin_email');
+        delete_option('hic_log_file');
         \FpHic\Helpers\hic_clear_option_cache();
-        
+
         parent::tearDown();
     }
 }
