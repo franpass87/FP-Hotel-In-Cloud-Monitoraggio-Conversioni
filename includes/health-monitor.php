@@ -499,10 +499,28 @@ class HIC_Health_Monitor {
             wp_send_json(['error' => 'Invalid token'], 403);
         }
 
+        $cached_health = get_transient(HIC_TRANSIENT_HEALTH_CHECK);
+
+        if (!is_array($cached_health)) {
+            $cached_health = $this->check_health(HIC_DIAGNOSTIC_BASIC);
+
+            if (is_array($cached_health)) {
+                set_transient(HIC_TRANSIENT_HEALTH_CHECK, $cached_health, 300);
+            }
+        }
+
+        if (!is_array($cached_health)) {
+            $cached_health = [
+                'status' => 'unknown',
+                'timestamp' => 'unknown',
+                'version' => HIC_PLUGIN_VERSION,
+            ];
+        }
+
         $health_data = [
-            'status' => get_transient(HIC_TRANSIENT_HEALTH_CHECK)['status'] ?? 'unknown',
-            'timestamp' => current_time('mysql'),
-            'version' => HIC_PLUGIN_VERSION
+            'status' => $cached_health['status'] ?? 'unknown',
+            'timestamp' => $cached_health['timestamp'] ?? 'unknown',
+            'version' => $cached_health['version'] ?? HIC_PLUGIN_VERSION,
         ];
 
         wp_send_json($health_data);
