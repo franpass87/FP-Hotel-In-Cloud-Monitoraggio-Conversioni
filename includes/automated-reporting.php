@@ -1222,19 +1222,26 @@ class AutomatedReportingManager {
         $filename = sprintf('hic-raw-export-%s-%s.csv', $period, date('Y-m-d-H-i-s'));
         $filepath = $this->export_dir . $filename;
         
-        $file = fopen($filepath, 'w');
-        
-        // Write header
-        if (!empty($data)) {
-            fputcsv($file, array_keys($data[0]));
-            
-            // Write data
-            foreach ($data as $row) {
-                fputcsv($file, $row);
+        $file = @fopen($filepath, 'w');
+
+        if ($file === false) {
+            $this->log('Failed to open export file for writing: ' . $filepath);
+            throw new \RuntimeException('Unable to open export file for writing. Please verify the export directory is writable.');
+        }
+
+        try {
+            if (!empty($data)) {
+                fputcsv($file, array_keys($data[0]));
+
+                foreach ($data as $row) {
+                    fputcsv($file, $row);
+                }
+            }
+        } finally {
+            if (is_resource($file)) {
+                fclose($file);
             }
         }
-        
-        fclose($file);
 
         return $filepath;
     }
