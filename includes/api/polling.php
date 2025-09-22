@@ -727,12 +727,20 @@ function hic_dispatch_reservation($transformed, $original) {
         $failed_integrations = array();
         $skipped_integrations = array();
 
-        $record_result = static function (string $integration, string $status) use (&$integration_results, &$failed_integrations, &$skipped_integrations): void {
-            $integration_results[$integration] = $status;
+        $record_result = static function (string $integration, string $status, string $note = '') use (&$integration_results, &$failed_integrations, &$skipped_integrations): void {
+            $integration_results[$integration] = array(
+                'status' => $status,
+                'note' => $note,
+            );
+
             if ($status === 'failed') {
                 $failed_integrations[] = $integration;
             } elseif ($status === 'skipped') {
-                $skipped_integrations[] = $integration;
+                $entry = $integration;
+                if ($note !== '') {
+                    $entry .= ' (' . $note . ')';
+                }
+                $skipped_integrations[] = $entry;
             }
         };
 
@@ -805,13 +813,39 @@ function hic_dispatch_reservation($transformed, $original) {
             if ($brevo_enabled) {
                 $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid);
                 if (is_array($event_result)) {
-                    if (!$event_result['success'] && !$event_result['skipped']) {
-                        hic_log('Failed to send Brevo reservation_created event in dispatch: ' . $event_result['error']);
-                        $record_result('Brevo event', 'failed');
+                    if (!empty($event_result['success'])) {
+                        $record_result('Brevo event', 'success');
                     } elseif (!empty($event_result['skipped'])) {
                         $record_result('Brevo event', 'skipped');
+                    } elseif (array_key_exists('retryable', $event_result) && $event_result['retryable'] === false) {
+                        $error_message = '';
+                        if (isset($event_result['error']) && is_scalar($event_result['error'])) {
+                            $error_message = trim((string) $event_result['error']);
+                        }
+                        if ($error_message !== '') {
+                            $error_message = \sanitize_text_field($error_message);
+                        }
+                        $warning_message = 'Brevo reservation_created event permanently failed for reservation ' . $uid;
+                        if ($error_message !== '') {
+                            $warning_message .= ': ' . $error_message;
+                        }
+                        hic_log($warning_message, HIC_LOG_LEVEL_WARNING);
+
+                        $note = 'permanent Brevo failure';
+                        if ($error_message !== '') {
+                            $note .= ': ' . $error_message;
+                        }
+                        $record_result('Brevo event', 'skipped', $note);
                     } else {
-                        $record_result('Brevo event', 'success');
+                        $error_message = '';
+                        if (isset($event_result['error']) && is_scalar($event_result['error'])) {
+                            $error_message = trim((string) $event_result['error']);
+                        }
+                        if ($error_message !== '') {
+                            $error_message = \sanitize_text_field($error_message);
+                        }
+                        hic_log('Failed to send Brevo reservation_created event in dispatch: ' . $error_message);
+                        $record_result('Brevo event', 'failed');
                     }
                 } else {
                     $record_result('Brevo event', 'failed');
@@ -850,8 +884,20 @@ function hic_dispatch_reservation($transformed, $original) {
 
         if (!empty($integration_results)) {
             $summary_parts = array();
-            foreach ($integration_results as $integration => $status) {
-                $summary_parts[] = $integration . '=' . $status;
+            foreach ($integration_results as $integration => $result) {
+                if (is_array($result)) {
+                    $status = isset($result['status']) ? (string) $result['status'] : '';
+                    $note = isset($result['note']) ? (string) $result['note'] : '';
+                } else {
+                    $status = (string) $result;
+                    $note = '';
+                }
+
+                $part = $integration . '=' . $status;
+                if ($note !== '') {
+                    $part .= ' (' . $note . ')';
+                }
+                $summary_parts[] = $part;
             }
             $summary = implode(', ', $summary_parts);
         } else {
