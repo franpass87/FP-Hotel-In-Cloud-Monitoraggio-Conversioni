@@ -979,12 +979,24 @@ class EnterpriseManagementSuite {
      * Save HIC credentials
      */
     private function save_hic_credentials() {
+        $raw_password = $_POST['password'] ?? '';
+
+        if (\function_exists('\\hic_preserve_password_field')) {
+            $password = \hic_preserve_password_field($raw_password);
+        } else {
+            if (\is_array($raw_password) || \is_object($raw_password) || $raw_password === null) {
+                $password = '';
+            } else {
+                $password = \wp_unslash((string) $raw_password);
+            }
+        }
+
         $settings = [
             'prop_id' => sanitize_text_field($_POST['prop_id'] ?? ''),
             'email' => sanitize_email($_POST['email'] ?? ''),
-            'password' => sanitize_text_field($_POST['password'] ?? '')
+            'password' => $password
         ];
-        
+
         update_option('hic_settings', $settings);
     }
     
