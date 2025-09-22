@@ -217,7 +217,7 @@ final class WebhookInvalidJsonTest extends TestCase {
 
         $synced = get_option('hic_synced_res_ids', []);
         $this->assertIsArray($synced);
-        $this->assertContains('MISSING_EMAIL_TEST', $synced, 'Reservation should be marked as processed even without email.');
+        $this->assertArrayHasKey('MISSING_EMAIL_TEST', $synced, 'Reservation should be marked as processed even without email.');
 
         $logFound = false;
         foreach ($capturedLogs as $entry) {

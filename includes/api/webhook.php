@@ -109,12 +109,23 @@ function hic_webhook_handler(WP_REST_Request $request) {
   // Log received data (be careful with sensitive information)
   hic_log(['Webhook ricevuto' => array_merge($data, ['email' => !empty($data['email']) ? '***HIDDEN***' : 'missing'])]);
 
-  // Generate unique identifier for deduplication
-  $reservation_id = hic_extract_reservation_id($data);
-  
+  // Generate unique identifiers for deduplication
+  $reservation_ids = \FpHic\Helpers\hic_collect_reservation_ids($data);
+  $reservation_id = '';
+  if (!empty($reservation_ids)) {
+    $reservation_id = reset($reservation_ids);
+  } else {
+    $extracted = hic_extract_reservation_id($data);
+    if (!empty($extracted)) {
+      $reservation_id = $extracted;
+      $reservation_ids = [$extracted];
+    }
+  }
+
   // Check for duplication to prevent double processing
-  if (!empty($reservation_id) && hic_is_reservation_already_processed($reservation_id)) {
-    hic_log("Webhook skipped: reservation $reservation_id already processed");
+  if (!empty($reservation_ids) && hic_is_reservation_already_processed($reservation_ids)) {
+    $log_id = $reservation_id !== '' ? $reservation_id : implode(', ', $reservation_ids);
+    hic_log("Webhook skipped: reservation $log_id already processed");
     return ['status'=>'ok', 'processed' => false, 'reason' => 'already_processed'];
   }
 
@@ -154,8 +165,8 @@ function hic_webhook_handler(WP_REST_Request $request) {
       hic_queue_integration_retry($reservation_id, $result['failed_details'], $retry_context);
     }
 
-    if ($should_mark_processed && !empty($reservation_id)) {
-      hic_mark_reservation_processed_by_id($reservation_id);
+    if ($should_mark_processed && !empty($reservation_ids)) {
+      hic_mark_reservation_processed_by_id($reservation_ids);
     }
 
     // Update last webhook processing time for diagnostics

@@ -187,6 +187,33 @@ final class ReservationCodeDeduplicationTest extends TestCase
         $this->assertLogContains('Reservation RCODE-POLL-1 already processed, skipping');
     }
 
+    public function test_polling_detects_alias_switch_without_duplicate_dispatch(): void
+    {
+        $initialReservation = [
+            'reservation_code' => 'ALIAS-PRIMARY-1',
+            'id' => 'ALIAS-SECONDARY-1',
+            'checkin' => '2024-09-10',
+            'checkout' => '2024-09-12',
+            'valid' => 1,
+        ];
+
+        \FpHic\hic_mark_reservation_processed($initialReservation);
+
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('ALIAS-PRIMARY-1'));
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('ALIAS-SECONDARY-1'));
+
+        $updatedReservation = [
+            'id' => 'ALIAS-SECONDARY-1',
+            'checkin' => '2024-09-10',
+            'checkout' => '2024-09-12',
+            'valid' => 1,
+        ];
+
+        $this->assertFalse(\FpHic\hic_should_process_reservation($updatedReservation));
+
+        $this->assertLogContains('Reservation ALIAS-SECONDARY-1 already processed, skipping');
+    }
+
     public function test_webhook_partial_success_marks_processed_and_queues_retry(): void
     {
         delete_option('hic_integration_retry_queue');
