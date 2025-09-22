@@ -391,7 +391,8 @@ function hic_should_process_reservation($reservation) {
     // Check for any valid ID field (more flexible than requiring specific 'id' field)
     $uid = Helpers\hic_booking_uid($reservation);
     if (empty($uid)) {
-        hic_log("Reservation skipped: no valid ID field found (tried: id, reservation_id, booking_id, transaction_id)");
+        $tried_fields = Helpers\hic_candidate_reservation_id_fields(Helpers\hic_booking_uid_primary_fields());
+        hic_log('Reservation skipped: no valid ID field found (tried: ' . implode(', ', $tried_fields) . ')');
         return false;
     }
     
