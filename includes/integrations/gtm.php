@@ -27,8 +27,14 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttcli
 
     // Validate and normalize amount
     $amount = 0;
+    $amount_source = null;
     if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-        $amount = Helpers\hic_normalize_price($data['amount']);
+        $amount_source = $data['amount'];
+    } elseif (isset($data['value']) && (is_numeric($data['value']) || is_string($data['value']))) {
+        $amount_source = $data['value'];
+    }
+    if ($amount_source !== null) {
+        $amount = Helpers\hic_normalize_price($amount_source);
     }
 
     // Generate transaction ID using consistent extraction

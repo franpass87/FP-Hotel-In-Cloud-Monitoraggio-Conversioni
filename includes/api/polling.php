@@ -676,6 +676,7 @@ function hic_transform_reservation($reservation) {
         'transaction_id' => $transaction_id,
         'reservation_code' => isset($reservation['reservation_code']) ? $reservation['reservation_code'] : '',
         'value' => $value,
+        'amount' => $value,
         'currency' => $currency,
         'accommodation_id' => $accommodation_id,
         'accommodation_name' => $accommodation_name,
