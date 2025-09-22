@@ -280,6 +280,51 @@ final class ReservationCodeDeduplicationTest extends TestCase
         $this->assertLogContains('Reservation ALIAS-FOLLOW-1 already processed, skipping');
     }
 
+    public function test_polling_learns_new_aliases_from_duplicate_payload(): void
+    {
+        $initialReservation = [
+            'reservation_code' => 'PRIMARY-1',
+            'checkin' => '2024-12-01',
+            'checkout' => '2024-12-03',
+            'valid' => 1,
+        ];
+
+        \FpHic\hic_mark_reservation_processed($initialReservation);
+
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('PRIMARY-1'));
+        $this->assertFalse(Helpers\hic_is_reservation_already_processed('ALIAS-NEW'));
+
+        $followUpReservation = [
+            'reservation_code' => 'PRIMARY-1',
+            'id' => 'ALIAS-NEW',
+            'checkin' => '2024-12-01',
+            'checkout' => '2024-12-03',
+            'valid' => 1,
+        ];
+
+        $followUpResult = \FpHic\hic_process_reservations_batch([$followUpReservation]);
+
+        $this->assertIsArray($followUpResult);
+        $this->assertSame(0, $followUpResult['new']);
+        $this->assertSame(1, $followUpResult['skipped']);
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('ALIAS-NEW'));
+        $this->assertLogContains('Reservation PRIMARY-1 already processed, skipping');
+
+        $aliasOnlyReservation = [
+            'reservation_code' => 'ALIAS-NEW',
+            'checkin' => '2024-12-01',
+            'checkout' => '2024-12-03',
+            'valid' => 1,
+        ];
+
+        $aliasOnlyResult = \FpHic\hic_process_reservations_batch([$aliasOnlyReservation]);
+
+        $this->assertIsArray($aliasOnlyResult);
+        $this->assertSame(0, $aliasOnlyResult['new']);
+        $this->assertSame(1, $aliasOnlyResult['skipped']);
+        $this->assertLogContains('Reservation ALIAS-NEW already processed, skipping');
+    }
+
     public function test_webhook_partial_success_marks_processed_and_queues_retry(): void
     {
         delete_option('hic_integration_retry_queue');
