@@ -667,7 +667,7 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
   $response_body = wp_remote_retrieve_body($response);
 
   // Parse response body for additional error information (when provided)
-  $parsed_body = array();
+  $parsed_body = [];
   $response_body_string = is_string($response_body) ? trim($response_body) : '';
   if ($response_body_string !== '') {
     $parsed_body = json_decode($response_body_string, true);
