@@ -124,6 +124,7 @@ function hic_webhook_handler(WP_REST_Request $request) {
 
   // Check for duplication to prevent double processing
   if (!empty($reservation_ids) && hic_is_reservation_already_processed($reservation_ids)) {
+    hic_mark_reservation_processed_by_id($reservation_ids);
     $log_id = $reservation_id !== '' ? $reservation_id : implode(', ', $reservation_ids);
     hic_log("Webhook skipped: reservation $log_id already processed");
     return ['status'=>'ok', 'processed' => false, 'reason' => 'already_processed'];

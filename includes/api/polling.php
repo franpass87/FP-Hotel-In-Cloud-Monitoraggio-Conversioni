@@ -471,6 +471,7 @@ function hic_should_process_reservation($reservation) {
                 return true;
             }
         }
+        Helpers\hic_mark_reservation_processed_by_id($aliases);
         hic_log("Reservation $log_uid already processed, skipping");
         return false;
     }
@@ -1348,6 +1349,7 @@ function hic_process_reservations_batch($reservations) {
                         continue;
                     }
                 }
+                Helpers\hic_mark_reservation_processed_by_id($aliases);
                 $skipped_count++;
                 hic_log("Reservation $dedup_uid: skipped (already processed)");
                 continue;
