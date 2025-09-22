@@ -224,6 +224,8 @@ final class CaptureTrackingParamsTest extends TestCase
             fbclid TEXT,
             msclkid TEXT,
             ttclid TEXT,
+            gbraid TEXT,
+            wbraid TEXT,
             sid TEXT,
             utm_source TEXT,
             utm_medium TEXT,
@@ -255,6 +257,10 @@ final class CaptureTrackingParamsTest extends TestCase
         $_GET = [
             'gclid' => 'test-gclid-12345',
             'fbclid' => 'fbclid-67890',
+            'msclkid' => 'msclkid-1234567890',
+            'ttclid' => 'ttclid-1234567890',
+            'gbraid' => 'GBRAID-abc1234567',
+            'wbraid' => 'WBRAID-def7654321',
             'utm_source' => 'google',
             'utm_medium' => 'cpc',
             'utm_campaign' => 'spring',
@@ -273,6 +279,13 @@ final class CaptureTrackingParamsTest extends TestCase
         $tracking = Helpers\hic_get_tracking_ids_by_sid($sid);
         $this->assertSame('test-gclid-12345', $tracking['gclid']);
         $this->assertSame('fbclid-67890', $tracking['fbclid']);
+        $this->assertSame('msclkid-1234567890', $tracking['msclkid']);
+        $this->assertSame('ttclid-1234567890', $tracking['ttclid']);
+        $this->assertSame('GBRAID-abc1234567', $tracking['gbraid']);
+        $this->assertSame('WBRAID-def7654321', $tracking['wbraid']);
+
+        $this->assertSame('GBRAID-abc1234567', $_COOKIE['hic_gbraid']);
+        $this->assertSame('WBRAID-def7654321', $_COOKIE['hic_wbraid']);
 
         $utm = Helpers\hic_get_utm_params_by_sid($sid);
         $this->assertSame('google', $utm['utm_source']);
@@ -286,6 +299,7 @@ final class CaptureTrackingParamsTest extends TestCase
     {
         $_GET = [
             'gclid' => 'booking-gclid-12345',
+            'gbraid' => 'booking-gbraid-12345',
             'utm_source' => 'meta',
         ];
 
@@ -302,6 +316,7 @@ final class CaptureTrackingParamsTest extends TestCase
 
         $trackingBeforeBooking = Helpers\hic_get_tracking_ids_by_sid($sid);
         $this->assertSame('booking-gclid-12345', $trackingBeforeBooking['gclid']);
+        $this->assertSame('booking-gbraid-12345', $trackingBeforeBooking['gbraid']);
         $result = \FpHic\hic_process_booking_data([
             'email' => 'guest@example.com',
             'sid' => $sid,

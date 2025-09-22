@@ -7,7 +7,7 @@ namespace FpHic;
 if (!defined('ABSPATH')) exit;
 
 /* ============ Meta CAPI (Purchase + bucket) ============ */
-function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
+function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = ''){
   if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
     hic_log('FB Pixel non configurato.');
     return false;
@@ -75,6 +75,8 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   if (!empty($fbclid))  { $custom_data['fbclid']  = sanitize_text_field($fbclid); }
   if (!empty($msclkid)) { $custom_data['msclkid'] = sanitize_text_field($msclkid); }
   if (!empty($ttclid))  { $custom_data['ttclid']  = sanitize_text_field($ttclid); }
+  if (!empty($gbraid))  { $custom_data['gbraid']  = sanitize_text_field($gbraid); }
+  if (!empty($wbraid))  { $custom_data['wbraid']  = sanitize_text_field($wbraid); }
 
   // Attach UTM parameters if available
   if (!empty($data['sid'])) {
@@ -101,7 +103,7 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
   ];
 
   // Allow payload customization before encoding
-  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid);
+  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
@@ -154,7 +156,7 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
 /**
  * Send refund event to Meta with negative value
  */
-function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
+function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = ''){
   if (!Helpers\hic_get_fb_pixel_id() || !Helpers\hic_get_fb_access_token()) {
     hic_log('FB refund: Pixel ID o Access Token mancanti.');
     return false;
@@ -218,6 +220,8 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
   if (!empty($fbclid))  { $custom_data['fbclid']  = sanitize_text_field($fbclid); }
   if (!empty($msclkid)) { $custom_data['msclkid'] = sanitize_text_field($msclkid); }
   if (!empty($ttclid))  { $custom_data['ttclid']  = sanitize_text_field($ttclid); }
+  if (!empty($gbraid))  { $custom_data['gbraid']  = sanitize_text_field($gbraid); }
+  if (!empty($wbraid))  { $custom_data['wbraid']  = sanitize_text_field($wbraid); }
 
   if (!empty($data['sid'])) {
     $utm = Helpers\hic_get_utm_params_by_sid($data['sid']);
@@ -242,7 +246,7 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '')
     ]]
   ];
 
-  $payload = apply_filters('hic_fb_refund_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid);
+  $payload = apply_filters('hic_fb_refund_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
 
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
@@ -332,6 +336,8 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
   $fbclid = '';
   $msclkid = '';
   $ttclid = '';
+  $gbraid = '';
+  $wbraid = '';
   $lookup_id = $sid !== '' ? $sid : $transaction_id;
   if (!empty($lookup_id)) {
     $tracking = Helpers\hic_get_tracking_ids_by_sid($lookup_id);
@@ -339,6 +345,8 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
     $fbclid = $tracking['fbclid'] ?? '';
     $msclkid = $tracking['msclkid'] ?? '';
     $ttclid = $tracking['ttclid'] ?? '';
+    $gbraid = $tracking['gbraid'] ?? '';
+    $wbraid = $tracking['wbraid'] ?? '';
   }
 
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
@@ -383,6 +391,8 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
   if (!empty($fbclid))  { $custom_data['fbclid']  = sanitize_text_field($fbclid); }
   if (!empty($msclkid)) { $custom_data['msclkid'] = sanitize_text_field($msclkid); }
   if (!empty($ttclid))  { $custom_data['ttclid']  = sanitize_text_field($ttclid); }
+  if (!empty($gbraid))  { $custom_data['gbraid']  = sanitize_text_field($gbraid); }
+  if (!empty($wbraid))  { $custom_data['wbraid']  = sanitize_text_field($wbraid); }
 
   // Add UTM parameters if available
   $utm_lookup = $sid !== '' ? $sid : $transaction_id;
@@ -419,7 +429,7 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
   ];
 
   // Allow payload customization before encoding
-  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid);
+  $payload = apply_filters('hic_fb_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);

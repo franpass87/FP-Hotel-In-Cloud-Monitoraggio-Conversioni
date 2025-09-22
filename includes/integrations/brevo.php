@@ -7,7 +7,7 @@ namespace FpHic;
 if (!defined('ABSPATH')) exit;
 
 /* ============ Brevo: aggiorna contatto ============ */
-function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
+function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = ''){
   if (!Helpers\hic_get_brevo_api_key()) { 
     hic_log('Brevo dispatch SKIPPED: API key mancante'); 
     return; 
@@ -53,6 +53,8 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
       'FBCLID'    => isset($fbclid) ? $fbclid : '',
       'MSCLKID'   => isset($msclkid) ? $msclkid : '',
       'TTCLID'    => isset($ttclid) ? $ttclid : '',
+      'GBRAID'    => isset($gbraid) ? $gbraid : '',
+      'WBRAID'    => isset($wbraid) ? $wbraid : '',
       'DATE'      => isset($data['date']) ? $data['date'] : wp_date('Y-m-d'),
       'AMOUNT'    => isset($data['amount']) ? Helpers\hic_normalize_price($data['amount']) : 0,
       'CURRENCY'  => isset($data['currency']) ? $data['currency'] : 'EUR',
@@ -102,7 +104,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
 }
 
 /* ============ Brevo: evento personalizzato (purchase + bucket) ============ */
-function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
+function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = ''){
   if (!Helpers\hic_get_brevo_api_key()) { return; }
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
 
@@ -121,7 +123,9 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
       'bucket'         => $bucket,
       'vertical'       => 'hotel',
       'msclkid'        => $msclkid,
-      'ttclid'         => $ttclid
+      'ttclid'         => $ttclid,
+      'gbraid'         => $gbraid,
+      'wbraid'         => $wbraid
     )
   );
 
@@ -165,7 +169,7 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
 /**
  * Brevo refund event
  */
-function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '', $ttclid = ''){
+function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = ''){
   if (!Helpers\hic_get_brevo_api_key()) { return false; }
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
 
@@ -184,7 +188,9 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
       'bucket'         => $bucket,
       'vertical'       => 'hotel',
       'msclkid'        => $msclkid,
-      'ttclid'         => $ttclid
+      'ttclid'         => $ttclid,
+      'gbraid'         => $gbraid,
+      'wbraid'         => $wbraid
     )
   );
 
@@ -225,7 +231,7 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
 /**
  * Brevo dispatcher for HIC reservation schema
  */
-function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '', $sid = '') {
+function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = '', $sid = '') {
   if (!Helpers\hic_get_brevo_api_key()) {
     hic_log('Brevo disabilitato (API key vuota).');
     return false;
@@ -293,12 +299,14 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
   // Get tracking IDs for legacy compatibility
   // Use provided values when available before querying the database
   $lookup_id = $sid !== '' ? $sid : ($data['transaction_id'] ?? '');
-  if (!empty($lookup_id) && is_scalar($lookup_id) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid))) {
+  if (!empty($lookup_id) && is_scalar($lookup_id) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid) || empty($gbraid) || empty($wbraid))) {
     $tracking = Helpers\hic_get_tracking_ids_by_sid((string) $lookup_id);
     if (empty($gclid))   { $gclid   = $tracking['gclid'] ?? ''; }
     if (empty($fbclid))  { $fbclid  = $tracking['fbclid'] ?? ''; }
     if (empty($msclkid)) { $msclkid = $tracking['msclkid'] ?? ''; }
     if (empty($ttclid))  { $ttclid  = $tracking['ttclid'] ?? ''; }
+    if (empty($gbraid))  { $gbraid  = $tracking['gbraid'] ?? ''; }
+    if (empty($wbraid))  { $wbraid  = $tracking['wbraid'] ?? ''; }
   }
 
   $attributes = array(
@@ -331,6 +339,8 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'FBCLID' => $fbclid,
     'MSCLKID' => $msclkid,
     'TTCLID'  => $ttclid,
+    'GBRAID' => $gbraid,
+    'WBRAID' => $wbraid,
     'DATE' => isset($data['from_date']) ? $data['from_date'] : wp_date('Y-m-d'),
     'AMOUNT' => isset($data['original_price']) ? Helpers\hic_normalize_price($data['original_price']) : 0,
     'CURRENCY' => isset($data['currency']) ? $data['currency'] : 'EUR',
@@ -418,7 +428,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
  *     @type bool        $skipped   True when the event was skipped before sending
  * }
  */
-function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '') {
+function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = '') {
   if (!Helpers\hic_get_brevo_api_key()) {
     hic_log('Brevo reservation_created event SKIPPED: API key mancante');
     return array(
@@ -473,12 +483,14 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
 
   // Get tracking IDs for bucket normalization if available
   $lookup_id = $sid !== '' ? $sid : ($data['transaction_id'] ?? '');
-  if (!empty($lookup_id) && is_scalar($lookup_id) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid))) {
+  if (!empty($lookup_id) && is_scalar($lookup_id) && (empty($gclid) || empty($fbclid) || empty($msclkid) || empty($ttclid) || empty($gbraid) || empty($wbraid))) {
     $tracking = Helpers\hic_get_tracking_ids_by_sid((string) $lookup_id);
     if (empty($gclid))   { $gclid   = $tracking['gclid'] ?? ''; }
     if (empty($fbclid))  { $fbclid  = $tracking['fbclid'] ?? ''; }
     if (empty($msclkid)) { $msclkid = $tracking['msclkid'] ?? ''; }
     if (empty($ttclid))  { $ttclid  = $tracking['ttclid'] ?? ''; }
+    if (empty($gbraid))  { $gbraid  = $tracking['gbraid'] ?? ''; }
+    if (empty($wbraid))  { $wbraid  = $tracking['wbraid'] ?? ''; }
   }
 
   // Normalize phone number and detect language from prefix
@@ -516,6 +528,8 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'vertical' => 'hotel',
       'msclkid' => $msclkid,
       'ttclid' => $ttclid,
+      'gbraid' => $gbraid,
+      'wbraid' => $wbraid,
       'created_at' => current_time('mysql')
     )
   );
@@ -761,7 +775,7 @@ function hic_is_brevo_error_retryable($result) {
  * Unified Brevo event sender to prevent duplicate API calls
  * Replaces separate hic_send_brevo_contact() + hic_send_brevo_event() calls
  */
-function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $ttclid = '') {
+function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = '') {
   if (!Helpers\hic_get_brevo_api_key()) { 
     hic_log('Unified Brevo dispatch SKIPPED: API key mancante'); 
     return false; 
@@ -784,7 +798,7 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
   if ($transformed_sid !== '') {
     $transformed_data['sid'] = $transformed_sid;
   }
-  $contact_updated = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid, $msclkid, $ttclid, $transformed_sid);
+  $contact_updated = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $transformed_sid);
   hic_log(
     $contact_updated
       ? 'Unified Brevo: contact update succeeded'
@@ -807,8 +821,10 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
           'fbclid' => $fbclid,
           'msclkid' => $msclkid,
           'ttclid' => $ttclid,
+          'gbraid' => $gbraid,
+          'wbraid' => $wbraid,
         );
-        $event_result = hic_send_brevo_reservation_created_event($transformed_data, $gclid, $fbclid, $msclkid, $ttclid);
+        $event_result = hic_send_brevo_reservation_created_event($transformed_data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
         if ($event_result['success']) {
           hic_log('Unified Brevo: reservation_created event sent');
           hic_mark_reservation_notified_to_brevo($reservation_id);

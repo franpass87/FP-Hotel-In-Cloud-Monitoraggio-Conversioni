@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) exit;
  * Send conversion data to GTM Data Layer
  * This pushes data to the client-side dataLayer for GTM to process
  */
-function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
+function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = '', $sid = null) {
     // Only proceed if GTM is enabled
     if (!Helpers\hic_is_gtm_enabled()) {
         return false;
@@ -70,6 +70,18 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $sid = null) {
     }
     if (!empty($fbclid)) {
         $gtm_data['fbclid'] = sanitize_text_field($fbclid);
+    }
+    if (!empty($msclkid)) {
+        $gtm_data['msclkid'] = sanitize_text_field($msclkid);
+    }
+    if (!empty($ttclid)) {
+        $gtm_data['ttclid'] = sanitize_text_field($ttclid);
+    }
+    if (!empty($gbraid)) {
+        $gtm_data['gbraid'] = sanitize_text_field($gbraid);
+    }
+    if (!empty($wbraid)) {
+        $gtm_data['wbraid'] = sanitize_text_field($wbraid);
     }
 
     // Include UTM parameters if available
@@ -345,11 +357,19 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
     // Get gclid/fbclid for bucket normalization if available
     $gclid = '';
     $fbclid = '';
+    $msclkid = '';
+    $ttclid = '';
+    $gbraid = '';
+    $wbraid = '';
     $lookup_id = $sid !== '' ? $sid : $transaction_id;
     if (!empty($lookup_id)) {
         $tracking = Helpers\hic_get_tracking_ids_by_sid($lookup_id);
         $gclid = $tracking['gclid'] ?? '';
         $fbclid = $tracking['fbclid'] ?? '';
+        $msclkid = $tracking['msclkid'] ?? '';
+        $ttclid = $tracking['ttclid'] ?? '';
+        $gbraid = $tracking['gbraid'] ?? '';
+        $wbraid = $tracking['wbraid'] ?? '';
     }
 
     $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
@@ -391,6 +411,18 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
     }
     if (!empty($fbclid)) {
         $gtm_data['fbclid'] = sanitize_text_field($fbclid);
+    }
+    if (!empty($msclkid)) {
+        $gtm_data['msclkid'] = sanitize_text_field($msclkid);
+    }
+    if (!empty($ttclid)) {
+        $gtm_data['ttclid'] = sanitize_text_field($ttclid);
+    }
+    if (!empty($gbraid)) {
+        $gtm_data['gbraid'] = sanitize_text_field($gbraid);
+    }
+    if (!empty($wbraid)) {
+        $gtm_data['wbraid'] = sanitize_text_field($wbraid);
     }
 
     $utm_lookup = $sid !== '' ? $sid : $transaction_id;

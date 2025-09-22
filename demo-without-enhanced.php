@@ -69,14 +69,14 @@ namespace FpHic {
         echo "✅ Amount: €{$data['amount']}\n";
         
         // Mock sending to integrations
-        \hic_send_to_ga4($data, null, null, null, null, null);
+        \hic_send_to_ga4($data, null, null, null, null, null, null, null);
         
         return true;
     }
 }
 
 // Mock integration functions
-function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid, $ttclid, $sid) {
+function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid) {
     echo "✅ GA4: Sending purchase event for {$data['email']} (€{$data['amount']})\n";
     return true;
 }
