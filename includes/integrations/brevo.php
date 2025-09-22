@@ -853,8 +853,16 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
 
   // Send event for new reservations, allowing override via filter
   $event_sent = false;
-  $reservation_id = Helpers\hic_extract_reservation_id($data);
-  if (!empty($reservation_id)) {
+  $reservation_id = '';
+  $raw_reservation_id = Helpers\hic_extract_reservation_id($data);
+  if (!empty($raw_reservation_id)) {
+    $reservation_id = Helpers\hic_normalize_reservation_id((string) $raw_reservation_id);
+    if ($reservation_id === '') {
+      hic_log('Unified Brevo: reservation ID normalization failed');
+    }
+  }
+
+  if ($reservation_id !== '') {
     $is_new = hic_is_reservation_new_for_realtime($reservation_id);
     if ($is_new) {
       $send_event = apply_filters('hic_brevo_send_event', true, $data);
