@@ -93,6 +93,7 @@ function hic_init_helper_hooks() {
 
         add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
         add_action('hic_cleanup_failed_requests', __NAMESPACE__ . '\\hic_cleanup_failed_requests');
+        add_action('admin_init', __NAMESPACE__ . '\\hic_upgrade_reservation_email_map');
     }
 }
 
@@ -1169,25 +1170,46 @@ function hic_mark_email_enriched($reservation_id, $real_email) {
         hic_log('hic_mark_email_enriched: reservation_id is empty or not scalar');
         return false;
     }
-    
+
+    $normalized_id = hic_normalize_reservation_id((string) $reservation_id);
+    if ($normalized_id === '') {
+        hic_log('hic_mark_email_enriched: normalized reservation_id is empty');
+        return false;
+    }
+
     if (empty($real_email) || !is_string($real_email) || !hic_is_valid_email($real_email)) {
         hic_log('hic_mark_email_enriched: real_email is empty, not string, or invalid email format');
         return false;
     }
-    
+
     $email_map = get_option('hic_res_email_map', array());
     if (!is_array($email_map)) {
         $email_map = array(); // Reset if corrupted
     }
-    
-    $email_map[$reservation_id] = $real_email;
-    
-    // Keep only last 5k entries (FIFO) to prevent bloat
-    if (count($email_map) > 5000) {
-        $email_map = array_slice($email_map, -5000, null, true);
+
+    $normalized_map = array();
+
+    foreach ($email_map as $key => $value) {
+        if (!is_scalar($key)) {
+            continue;
+        }
+
+        $candidate_key = hic_normalize_reservation_id((string) $key);
+        if ($candidate_key === '') {
+            continue;
+        }
+
+        $normalized_map[$candidate_key] = $value;
     }
-    
-    $result = update_option('hic_res_email_map', $email_map, false); // autoload=false
+
+    $normalized_map[$normalized_id] = $real_email;
+
+    // Keep only last 5k entries (FIFO) to prevent bloat
+    if (count($normalized_map) > 5000) {
+        $normalized_map = array_slice($normalized_map, -5000, null, true);
+    }
+
+    $result = update_option('hic_res_email_map', $normalized_map, false); // autoload=false
     hic_clear_option_cache('hic_res_email_map');
     return $result;
 }
@@ -1196,13 +1218,88 @@ function hic_get_reservation_email($reservation_id) {
     if (empty($reservation_id) || !is_scalar($reservation_id)) {
         return null;
     }
-    
+
+    $normalized_id = hic_normalize_reservation_id((string) $reservation_id);
+    if ($normalized_id === '') {
+        return null;
+    }
+
     $email_map = get_option('hic_res_email_map', array());
     if (!is_array($email_map)) {
         return null; // Corrupted data
     }
-    
-    return isset($email_map[$reservation_id]) ? $email_map[$reservation_id] : null;
+
+    if (isset($email_map[$normalized_id]) && is_string($email_map[$normalized_id])) {
+        return $email_map[$normalized_id];
+    }
+
+    foreach ($email_map as $key => $value) {
+        if (!is_scalar($key) || !is_string($value)) {
+            continue;
+        }
+
+        $candidate_key = hic_normalize_reservation_id((string) $key);
+        if ($candidate_key === '') {
+            continue;
+        }
+
+        if ($candidate_key === $normalized_id) {
+            return $value;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Normalize stored reservation email mappings once during upgrade.
+ */
+function hic_upgrade_reservation_email_map() {
+    $already_normalized = get_option('hic_res_email_map_normalized');
+    if ($already_normalized === '1') {
+        return;
+    }
+
+    $email_map = get_option('hic_res_email_map', array());
+    $normalized_map = array();
+    $changed = false;
+
+    if (!is_array($email_map)) {
+        $changed = true;
+        $email_map = array();
+    }
+
+    foreach ($email_map as $key => $value) {
+        if (!is_scalar($key) || !is_string($value)) {
+            $changed = true;
+            continue;
+        }
+
+        $original_key = (string) $key;
+        $normalized_key = hic_normalize_reservation_id($original_key);
+        if ($normalized_key === '') {
+            $changed = true;
+            continue;
+        }
+
+        if ($normalized_key !== $original_key) {
+            $changed = true;
+        }
+
+        $normalized_map[$normalized_key] = $value;
+    }
+
+    if (count($normalized_map) > 5000) {
+        $normalized_map = array_slice($normalized_map, -5000, null, true);
+        $changed = true;
+    }
+
+    if ($changed) {
+        update_option('hic_res_email_map', $normalized_map, false);
+        hic_clear_option_cache('hic_res_email_map');
+    }
+
+    update_option('hic_res_email_map_normalized', '1', false);
 }
 
 /* ================= DEDUPLICATION HELPER FUNCTIONS ================= */
