@@ -43,6 +43,33 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttcli
         $transaction_id = uniqid('hic_gtm_');
     }
 
+    // Determine item name with fallbacks matching booking processor normalization
+    $item_name = '';
+    foreach (['room', 'room_name', 'accommodation_name'] as $name_field) {
+        if (!empty($data[$name_field]) && is_scalar($data[$name_field])) {
+            $candidate = sanitize_text_field((string) $data[$name_field]);
+            if ($candidate !== '') {
+                $item_name = $candidate;
+                break;
+            }
+        }
+    }
+    if ($item_name === '') {
+        $item_name = 'Prenotazione';
+    }
+
+    // Prefer item identifiers from payload when available to mirror reservation dispatch
+    $item_id = sanitize_text_field((string) $transaction_id);
+    foreach (['accommodation_id', 'room_id'] as $id_field) {
+        if (!empty($data[$id_field]) && is_scalar($data[$id_field])) {
+            $candidate_id = sanitize_text_field((string) $data[$id_field]);
+            if ($candidate_id !== '') {
+                $item_id = $candidate_id;
+                break;
+            }
+        }
+    }
+
     // Prepare enhanced ecommerce data for GTM
     $gtm_data = [
         'event' => 'purchase',
@@ -52,8 +79,8 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttcli
             'value' => $amount,
             'currency' => sanitize_text_field($data['currency'] ?? 'EUR'),
             'items' => [[
-                'item_id' => $transaction_id,
-                'item_name' => sanitize_text_field($data['room'] ?? 'Prenotazione'),
+                'item_id' => $item_id,
+                'item_name' => $item_name,
                 'item_category' => 'Hotel',
                 'quantity' => 1,
                 'price' => $amount
