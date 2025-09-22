@@ -494,6 +494,16 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         $this->assertSame($sid, $event['client_id']);
         $this->assertSame($sid, $event['hic_sid']);
         $this->assertArrayNotHasKey('sid', $event);
+
+        $this->assertArrayHasKey('ecommerce', $event);
+        $this->assertArrayHasKey('items', $event['ecommerce']);
+        $this->assertNotEmpty($event['ecommerce']['items']);
+        $line_item = $event['ecommerce']['items'][0];
+        $this->assertIsArray($line_item);
+        $this->assertArrayHasKey('item_name', $line_item);
+        $this->assertSame('Camera Deluxe', $line_item['item_name']);
+        $this->assertArrayHasKey('item_id', $line_item);
+        $this->assertSame('WEBHOOK-GTM-123', $line_item['item_id']);
     }
 
     public function tearDown(): void {
