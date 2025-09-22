@@ -132,6 +132,7 @@ final class ReservationCodeDeduplicationTest extends TestCase
     {
         delete_option('hic_synced_res_ids');
         delete_option('hic_integration_retry_queue');
+        delete_option('hic_allow_status_updates');
         Helpers\hic_clear_option_cache();
         Helpers\hic_clear_option_cache('hic_integration_retry_queue');
 
@@ -323,6 +324,57 @@ final class ReservationCodeDeduplicationTest extends TestCase
         $this->assertSame(0, $aliasOnlyResult['new']);
         $this->assertSame(1, $aliasOnlyResult['skipped']);
         $this->assertLogContains('Reservation ALIAS-NEW already processed, skipping');
+    }
+
+    public function test_status_update_learns_new_alias_without_counting_as_new(): void
+    {
+        update_option('hic_allow_status_updates', '1');
+        Helpers\hic_clear_option_cache('allow_status_updates');
+
+        $initialReservation = [
+            'reservation_code' => 'STATUS-PRIMARY-1',
+            'checkin' => '2025-01-10',
+            'checkout' => '2025-01-12',
+            'valid' => 1,
+        ];
+
+        $initialResult = \FpHic\hic_process_reservations_batch([$initialReservation]);
+
+        $this->assertIsArray($initialResult);
+        $this->assertSame(1, $initialResult['new']);
+        $this->assertSame(0, $initialResult['errors']);
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('STATUS-PRIMARY-1'));
+
+        $statusUpdate = [
+            'reservation_code' => 'STATUS-PRIMARY-1',
+            'id' => 'STATUS-ALIAS-NEW',
+            'presence' => 'arrived',
+            'checkin' => '2025-01-10',
+            'checkout' => '2025-01-12',
+            'valid' => 1,
+        ];
+
+        $statusResult = \FpHic\hic_process_reservations_batch([$statusUpdate]);
+
+        $this->assertIsArray($statusResult);
+        $this->assertSame(0, $statusResult['new']);
+        $this->assertSame(0, $statusResult['errors']);
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('STATUS-ALIAS-NEW'));
+
+        $aliasOnlyReservation = [
+            'reservation_code' => 'STATUS-ALIAS-NEW',
+            'checkin' => '2025-01-10',
+            'checkout' => '2025-01-12',
+            'valid' => 1,
+        ];
+
+        $aliasOnlyResult = \FpHic\hic_process_reservations_batch([$aliasOnlyReservation]);
+
+        $this->assertIsArray($aliasOnlyResult);
+        $this->assertSame(0, $aliasOnlyResult['new']);
+        $this->assertSame(1, $aliasOnlyResult['skipped']);
+        $this->assertSame(0, $aliasOnlyResult['errors']);
+        $this->assertLogContains('Reservation STATUS-ALIAS-NEW already processed, skipping');
     }
 
     public function test_webhook_partial_success_marks_processed_and_queues_retry(): void

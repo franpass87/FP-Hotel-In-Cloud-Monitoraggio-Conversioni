@@ -467,6 +467,7 @@ function hic_should_process_reservation($reservation) {
         if (Helpers\hic_allow_status_updates()) {
             $presence = $reservation['presence'] ?? '';
             if (in_array($presence, ['arrived', 'departed'])) {
+                Helpers\hic_mark_reservation_processed_by_id($aliases);
                 hic_log("Reservation $log_uid: status update allowed for presence=$presence");
                 return true;
             }
@@ -1341,6 +1342,10 @@ function hic_process_reservations_batch($reservations) {
                                     hic_log("Reservation $dedup_uid: status update processed with partial failures$failed_message", HIC_LOG_LEVEL_WARNING);
                                 } else {
                                     hic_log("Reservation $dedup_uid: status update processed");
+                                }
+
+                                if ($status_value === 'success' || ($status_value === 'partial' && !empty($status_result['should_mark_processed']))) {
+                                    hic_mark_reservation_processed($reservation);
                                 }
                             }
                         } finally {
