@@ -323,7 +323,12 @@ final class CaptureTrackingParamsTest extends TestCase
             'reservation_id' => 'ABC123',
         ]);
 
-        $this->assertTrue($result);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertTrue(
+            in_array($result['status'], ['success', 'partial'], true),
+            'La prenotazione deve essere processata con successo o parzialmente'
+        );
         $this->assertIsArray($capturedTracking);
         $this->assertSame('booking-gclid-12345', $capturedTracking['gclid']);
         $this->assertSame($sid, $capturedTracking['sid']);

@@ -275,33 +275,62 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
 
     // Processa singole prenotazioni con la nuova pipeline
     $processed_count = 0;
+    $partial_processed = 0;
     $dispatch_failures = 0;
     if (is_array($reservations)) {
+        $normalize_fetch_result = static function ($raw, $uid) {
+            if (is_array($raw)) {
+                return $raw;
+            }
+
+            $result = Helpers\hic_create_integration_result([
+                'uid' => $uid,
+            ]);
+            $result['status'] = $raw ? 'success' : 'failed';
+
+            return Helpers\hic_finalize_integration_result($result);
+        };
         foreach ($reservations as $reservation) {
             try {
                 if (hic_should_process_reservation($reservation)) {
                     $uid = Helpers\hic_booking_uid($reservation);
-                    
+
                     // Acquire processing lock to prevent concurrent processing
                     if (!empty($uid) && !Helpers\hic_acquire_reservation_lock($uid)) {
                         hic_log("Polling skipped: reservation $uid is being processed concurrently");
                         continue;
                     }
-                    
+
                     try {
-                        $transformed = hic_transform_reservation($reservation);
-                        if ($transformed !== false) {
-                            $dispatch_success = hic_dispatch_reservation($transformed, $reservation);
-                            if ($dispatch_success) {
-                                hic_mark_reservation_processed($reservation);
-                                $processed_count++;
+                        $dispatch_result = $normalize_fetch_result(hic_process_single_reservation($reservation), $uid);
+                        $status_value = isset($dispatch_result['status']) ? (string) $dispatch_result['status'] : 'failed';
+
+                        if ($status_value === 'failed') {
+                            $dispatch_failures++;
+                            if (!empty($uid)) {
+                                hic_log("Reservation $uid: dispatch failed during fetch, will retry");
                             } else {
-                                $dispatch_failures++;
-                                if (!empty($uid)) {
-                                    hic_log("Reservation $uid: dispatch failed during fetch, will retry");
-                                } else {
-                                    hic_log('Reservation dispatch failed during fetch, will retry');
+                                hic_log('Reservation dispatch failed during fetch, will retry');
+                            }
+                        } else {
+                            if (!empty($dispatch_result['should_mark_processed'])) {
+                                hic_mark_reservation_processed($reservation);
+                            }
+                            $processed_count++;
+
+                            if ($status_value === 'partial') {
+                                $partial_processed++;
+                                if (!empty($dispatch_result['failed_details'])) {
+                                    Helpers\hic_queue_integration_retry($uid, $dispatch_result['failed_details'], array(
+                                        'source' => 'polling',
+                                        'type' => 'immediate_fetch',
+                                    ));
                                 }
+                                $failed = isset($dispatch_result['failed_integrations']) && is_array($dispatch_result['failed_integrations'])
+                                    ? $dispatch_result['failed_integrations']
+                                    : array();
+                                $failed_message = !empty($failed) ? ' - Failed integrations: ' . implode(', ', $failed) : '';
+                                hic_log("Reservation $uid: processed during fetch with partial failures$failed_message", HIC_LOG_LEVEL_WARNING);
                             }
                         }
                     } finally {
@@ -317,6 +346,9 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
         }
         if (count($reservations) > 0) {
             $log_message = "Processed $processed_count out of " . count($reservations) . " reservations (duplicates/invalid skipped)";
+            if ($partial_processed > 0) {
+                $log_message .= " - Partial: $partial_processed";
+            }
             if ($dispatch_failures > 0) {
                 $log_message .= " - Dispatch failures: $dispatch_failures";
             }
@@ -726,25 +758,17 @@ function hic_dispatch_reservation($transformed, $original) {
             $sid = \sanitize_text_field((string) $transformed['sid']);
         }
 
-        $integration_results = array();
-        $failed_integrations = array();
-        $skipped_integrations = array();
+        $result = Helpers\hic_create_integration_result([
+            'uid' => $uid,
+        ]);
+        $result['context'] = array(
+            'connection_type' => $connection_type,
+            'tracking_mode' => $tracking_mode,
+            'is_status_update' => $is_status_update ? '1' : '0',
+        );
 
-        $record_result = static function (string $integration, string $status, string $note = '') use (&$integration_results, &$failed_integrations, &$skipped_integrations): void {
-            $integration_results[$integration] = array(
-                'status' => $status,
-                'note' => $note,
-            );
-
-            if ($status === 'failed') {
-                $failed_integrations[] = $integration;
-            } elseif ($status === 'skipped') {
-                $entry = $integration;
-                if ($note !== '') {
-                    $entry .= ' (' . $note . ')';
-                }
-                $skipped_integrations[] = $entry;
-            }
+        $record_result = static function (string $integration, string $status, string $note = '') use (&$result): void {
+            Helpers\hic_append_integration_result($result, $integration, $status, $note);
         };
 
         // GA4 - only send once unless it's a status update we want to track
@@ -911,47 +935,68 @@ function hic_dispatch_reservation($transformed, $original) {
             }
         }
 
-        if (!empty($integration_results)) {
-            $summary_parts = array();
-            foreach ($integration_results as $integration => $result) {
-                if (is_array($result)) {
-                    $status = isset($result['status']) ? (string) $result['status'] : '';
-                    $note = isset($result['note']) ? (string) $result['note'] : '';
-                } else {
-                    $status = (string) $result;
-                    $note = '';
-                }
+        $result = Helpers\hic_finalize_integration_result($result);
 
-                $part = $integration . '=' . $status;
-                if ($note !== '') {
-                    $part .= ' (' . $note . ')';
-                }
-                $summary_parts[] = $part;
+        $summary_parts = array();
+        foreach ($result['integrations'] as $integration => $details) {
+            $status = isset($details['status']) ? (string) $details['status'] : '';
+            $note = isset($details['note']) ? (string) $details['note'] : '';
+            $part = $integration . '=' . $status;
+            if ($note !== '') {
+                $part .= ' (' . $note . ')';
             }
-            $summary = implode(', ', $summary_parts);
-        } else {
-            $summary = '';
+            $summary_parts[] = $part;
+        }
+        $summary = !empty($summary_parts) ? implode(', ', $summary_parts) : '';
+
+        $skipped_messages = array();
+        foreach ($result['skipped_integrations'] as $integration => $note) {
+            $entry = $integration;
+            if ($note !== '') {
+                $entry .= ' (' . $note . ')';
+            }
+            $skipped_messages[] = $entry;
         }
 
-        if (!empty($failed_integrations)) {
-            $message = "Reservation $uid dispatch failed (mode: $connection_type) - Failed integrations: " . implode(', ', $failed_integrations);
+        $result['summary'] = $summary;
+
+        if ($result['status'] === 'failed') {
+            $message = "Reservation $uid dispatch failed (mode: $connection_type)";
+            if (!empty($result['failed_integrations'])) {
+                $message .= ' - Failed integrations: ' . implode(', ', $result['failed_integrations']);
+            }
             if ($summary !== '') {
                 $message .= " - Summary: $summary";
             }
-            hic_log($message);
-            return false;
+            hic_log($message, HIC_LOG_LEVEL_ERROR);
+            return $result;
+        }
+
+        if ($result['status'] === 'partial') {
+            $message = "Reservation $uid dispatched with partial success (mode: $connection_type)";
+            if (!empty($result['failed_integrations'])) {
+                $message .= ' - Failed integrations: ' . implode(', ', $result['failed_integrations']);
+            }
+            if ($summary !== '') {
+                $message .= " - Summary: $summary";
+            }
+            if (!empty($skipped_messages)) {
+                $message .= " - Skipped: " . implode(', ', $skipped_messages);
+            }
+            hic_log($message, HIC_LOG_LEVEL_WARNING);
+            return $result;
         }
 
         $message = "Reservation $uid dispatched successfully (mode: $connection_type)";
         if ($summary !== '') {
             $message .= " - Summary: $summary";
         }
-        if (!empty($skipped_integrations)) {
-            $message .= " - Skipped: " . implode(', ', $skipped_integrations);
+        if (!empty($skipped_messages)) {
+            $message .= " - Skipped: " . implode(', ', $skipped_messages);
         }
         hic_log($message);
 
-        return true;
+        return $result;
     } catch (\Exception $e) {
         hic_log("Error dispatching reservation $uid: " . $e->getMessage());
         throw $e;
@@ -1150,9 +1195,23 @@ function hic_quasi_realtime_poll($prop_id, $start_time) {
 function hic_process_reservations_batch($reservations) {
     $start = microtime(true);
     $new_count = 0;
+    $partial_count = 0;
     $skipped_count = 0;
     $error_count = 0;
     $remaining_count = 0;
+
+    $normalize_result = static function ($raw, $uid) {
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        $result = Helpers\hic_create_integration_result([
+            'uid' => $uid,
+        ]);
+        $result['status'] = $raw ? 'success' : 'failed';
+
+        return Helpers\hic_finalize_integration_result($result);
+    };
 
     if (!is_array($reservations)) {
         return array('new' => 0, 'skipped' => 0, 'errors' => 1, 'remaining' => 0);
@@ -1193,11 +1252,28 @@ function hic_process_reservations_batch($reservations) {
 
                         try {
                             // Process as status update but don't count as new
-                            if (hic_process_single_reservation($reservation)) {
-                                hic_log("Reservation $uid: status update processed");
-                            } else {
+                            $status_result = $normalize_result(hic_process_single_reservation($reservation), $uid);
+                            $status_value = isset($status_result['status']) ? (string) $status_result['status'] : 'failed';
+
+                            if ($status_value === 'failed') {
                                 $error_count++;
                                 hic_log("Reservation $uid: status update failed");
+                            } else {
+                                if ($status_value === 'partial') {
+                                    $failed = isset($status_result['failed_integrations']) && is_array($status_result['failed_integrations'])
+                                        ? $status_result['failed_integrations']
+                                        : array();
+                                    if (!empty($status_result['failed_details'])) {
+                                        Helpers\hic_queue_integration_retry($uid, $status_result['failed_details'], array(
+                                            'source' => 'polling',
+                                            'type' => 'status_update',
+                                        ));
+                                    }
+                                    $failed_message = !empty($failed) ? ' - Failed integrations: ' . implode(', ', $failed) : '';
+                                    hic_log("Reservation $uid: status update processed with partial failures$failed_message", HIC_LOG_LEVEL_WARNING);
+                                } else {
+                                    hic_log("Reservation $uid: status update processed");
+                                }
                             }
                         } finally {
                             Helpers\hic_release_reservation_lock($uid);
@@ -1219,13 +1295,35 @@ function hic_process_reservations_batch($reservations) {
 
             try {
                 // Process new reservation
-                if (hic_process_single_reservation($reservation)) {
-                    hic_mark_reservation_processed($reservation);
-                    $new_count++;
-                    hic_log("Reservation $uid: processed");
-                } else {
+                $process_result = $normalize_result(hic_process_single_reservation($reservation), $uid);
+                $status_value = isset($process_result['status']) ? (string) $process_result['status'] : 'failed';
+
+                if ($status_value === 'failed') {
                     $error_count++;
                     hic_log("Reservation $uid: dispatch failed, will retry");
+                } else {
+                    if (!empty($process_result['should_mark_processed'])) {
+                        hic_mark_reservation_processed($reservation);
+                    }
+
+                    $new_count++;
+
+                    if ($status_value === 'partial') {
+                        $partial_count++;
+                        if (!empty($process_result['failed_details'])) {
+                            Helpers\hic_queue_integration_retry($uid, $process_result['failed_details'], array(
+                                'source' => 'polling',
+                                'type' => 'new_reservation',
+                            ));
+                        }
+                        $failed = isset($process_result['failed_integrations']) && is_array($process_result['failed_integrations'])
+                            ? $process_result['failed_integrations']
+                            : array();
+                        $failed_message = !empty($failed) ? ' - Failed integrations: ' . implode(', ', $failed) : '';
+                        hic_log("Reservation $uid: processed with partial failures$failed_message", HIC_LOG_LEVEL_WARNING);
+                    } else {
+                        hic_log("Reservation $uid: processed");
+                    }
                 }
             } finally {
                 Helpers\hic_release_reservation_lock($uid);
@@ -1238,8 +1336,8 @@ function hic_process_reservations_batch($reservations) {
         }
     }
 
-    hic_log("Batch summary: processed=$new_count, skipped=$skipped_count, failed=$error_count, remaining=$remaining_count");
-    return array('new' => $new_count, 'skipped' => $skipped_count, 'errors' => $error_count, 'remaining' => $remaining_count);
+    hic_log("Batch summary: processed=$new_count, partial=$partial_count, skipped=$skipped_count, failed=$error_count, remaining=$remaining_count");
+    return array('new' => $new_count, 'partial' => $partial_count, 'skipped' => $skipped_count, 'errors' => $error_count, 'remaining' => $remaining_count);
 }
 
 /**
@@ -1247,30 +1345,43 @@ function hic_process_reservations_batch($reservations) {
  *
  * @return bool True on success, false on transformation failure
  */
-function hic_process_single_reservation($reservation): bool {
-    $transformed = hic_transform_reservation($reservation);
+function hic_process_single_reservation($reservation) {
     $uid = Helpers\hic_booking_uid($reservation);
+    $result = Helpers\hic_create_integration_result([
+        'uid' => $uid,
+    ]);
+
+    $transformed = hic_transform_reservation($reservation);
 
     if ($transformed !== false && is_array($transformed)) {
-        $dispatch_success = hic_dispatch_reservation($transformed, $reservation);
-        if ($dispatch_success) {
-            return true;
+        $dispatch_result = hic_dispatch_reservation($transformed, $reservation);
+
+        if (is_array($dispatch_result)) {
+            return $dispatch_result;
         }
+
+        $result['status'] = 'failed';
+        $result['messages'][] = 'dispatch_failure';
 
         if (!empty($uid)) {
             hic_log("Reservation $uid: dispatch failed, keeping reservation for retry");
         } else {
             hic_log('Reservation dispatch failed, keeping reservation for retry');
         }
-        return false;
+
+        return Helpers\hic_finalize_integration_result($result);
     }
+
+    $result['status'] = 'failed';
+    $result['messages'][] = 'transformation_failed';
 
     if (!empty($uid)) {
         hic_log("Reservation $uid: transformation failed");
     } else {
         hic_log('Reservation transformation failed: missing UID');
     }
-    return false;
+
+    return Helpers\hic_finalize_integration_result($result);
 }
 
 /**

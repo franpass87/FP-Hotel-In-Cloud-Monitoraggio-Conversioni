@@ -90,11 +90,15 @@ class HybridModeTest extends WP_UnitTestCase {
 
         // Test webhook processing
         $webhook_result = \FpHic\hic_process_booking_data($booking_data);
-        $this->assertTrue(is_bool($webhook_result));
+        $this->assertIsArray($webhook_result);
+        $this->assertArrayHasKey('status', $webhook_result);
+        $this->assertTrue(in_array($webhook_result['status'], ['success', 'partial'], true));
 
         // Test API processing (stesso dato, dovrebbe essere deduplicato)
         $api_result = \FpHic\hic_process_booking_data($booking_data);
-        $this->assertTrue(is_bool($api_result));
+        $this->assertIsArray($api_result);
+        $this->assertArrayHasKey('status', $api_result);
+        $this->assertTrue(in_array($api_result['status'], ['success', 'partial'], true));
         
         // Verifica che la reservation_id sia gestita correttamente
         $reservation_id = hic_extract_reservation_id($booking_data);

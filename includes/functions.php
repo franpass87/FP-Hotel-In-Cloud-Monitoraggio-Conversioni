@@ -607,6 +607,188 @@ function hic_store_failed_request($url, $args, $error) {
     }
 }
 
+/**
+ * Create a standardized result array for integration processing.
+ *
+ * @param array $overrides Custom values to merge with defaults.
+ * @return array<string,mixed>
+ */
+function hic_create_integration_result(array $overrides = []) {
+    $defaults = [
+        'status' => 'pending',
+        'integrations' => [],
+        'successful_integrations' => [],
+        'failed_integrations' => [],
+        'failed_details' => [],
+        'skipped_integrations' => [],
+        'messages' => [],
+        'should_mark_processed' => false,
+    ];
+
+    return array_merge($defaults, $overrides);
+}
+
+/**
+ * Append an integration outcome to the aggregated result structure.
+ */
+function hic_append_integration_result(array &$result, string $integration, string $status, string $note = ''): void {
+    $normalized_integration = trim($integration);
+    if ($normalized_integration === '') {
+        $normalized_integration = 'integration';
+    }
+    $normalized_integration = \sanitize_text_field($normalized_integration);
+
+    $normalized_status = strtolower($status);
+    if (!in_array($normalized_status, ['success', 'failed', 'skipped'], true)) {
+        $normalized_status = 'failed';
+    }
+
+    $normalized_note = '';
+    if ($note !== '') {
+        $normalized_note = \sanitize_text_field((string) $note);
+    }
+
+    $result['integrations'][$normalized_integration] = ['status' => $normalized_status];
+    if ($normalized_note !== '') {
+        $result['integrations'][$normalized_integration]['note'] = $normalized_note;
+    }
+
+    switch ($normalized_status) {
+        case 'success':
+            $result['successful_integrations'][] = $normalized_integration;
+            break;
+        case 'failed':
+            $result['failed_integrations'][] = $normalized_integration;
+            $result['failed_details'][$normalized_integration] = $normalized_note;
+            break;
+        case 'skipped':
+            $result['skipped_integrations'][$normalized_integration] = $normalized_note;
+            break;
+    }
+}
+
+/**
+ * Determine final status for integration processing results.
+ */
+function hic_finalize_integration_result(array $result, bool $tracking_skipped = false) {
+    $has_failures = !empty($result['failed_integrations']);
+    $has_success = !empty($result['successful_integrations']);
+
+    if ($has_failures && $has_success) {
+        $result['status'] = 'partial';
+    } elseif ($has_failures) {
+        $result['status'] = 'failed';
+    } else {
+        $result['status'] = 'success';
+    }
+
+    if ($tracking_skipped) {
+        $result['messages'][] = 'tracking_skipped';
+    }
+
+    $should_mark_processed = false;
+    if (in_array($result['status'], ['success', 'partial'], true)) {
+        $should_mark_processed = true;
+    }
+
+    if (!$has_success && !$has_failures && !$tracking_skipped && empty($result['integrations'])) {
+        // Nothing attempted but also nothing failed; avoid retry loops.
+        $should_mark_processed = true;
+    }
+
+    if ($tracking_skipped) {
+        $should_mark_processed = true;
+    }
+
+    $result['should_mark_processed'] = $should_mark_processed;
+    $result['messages'] = array_values(array_unique($result['messages']));
+
+    return $result;
+}
+
+/**
+ * Queue failed integrations for targeted retry handling.
+ *
+ * @param string|int $reservation_uid Unique reservation identifier
+ * @param array<string,string> $failed_details Integration => note map
+ * @param array<string,string> $context Additional context information
+ */
+function hic_queue_integration_retry($reservation_uid, array $failed_details, array $context = []): void {
+    if (!is_scalar($reservation_uid)) {
+        return;
+    }
+
+    $reservation_uid = trim((string) $reservation_uid);
+    if ($reservation_uid === '' || empty($failed_details)) {
+        return;
+    }
+
+    $normalized_details = [];
+    foreach ($failed_details as $integration => $note) {
+        if (!is_scalar($integration)) {
+            continue;
+        }
+
+        $safe_integration = \sanitize_text_field((string) $integration);
+        if ($safe_integration === '') {
+            continue;
+        }
+
+        $safe_note = '';
+        if (is_scalar($note) && $note !== '') {
+            $safe_note = \sanitize_text_field((string) $note);
+        }
+
+        $normalized_details[$safe_integration] = [
+            'note' => $safe_note,
+            'last_failure' => time(),
+        ];
+    }
+
+    if (empty($normalized_details)) {
+        return;
+    }
+
+    $queue = get_option('hic_integration_retry_queue', []);
+    if (!is_array($queue)) {
+        $queue = [];
+    }
+
+    $existing = isset($queue[$reservation_uid]) && is_array($queue[$reservation_uid])
+        ? $queue[$reservation_uid]
+        : [];
+
+    $integrations = isset($existing['integrations']) && is_array($existing['integrations'])
+        ? $existing['integrations']
+        : [];
+
+    foreach ($normalized_details as $integration => $payload) {
+        $integrations[$integration] = $payload;
+    }
+
+    $entry_context = [];
+    foreach ($context as $key => $value) {
+        if (!is_scalar($key) || !is_scalar($value)) {
+            continue;
+        }
+        $safe_key = \sanitize_key((string) $key);
+        $entry_context[$safe_key] = \sanitize_text_field((string) $value);
+    }
+
+    $queue[$reservation_uid] = [
+        'integrations' => $integrations,
+        'context' => $entry_context,
+        'last_updated' => time(),
+    ];
+
+    if (count($queue) > 200) {
+        $queue = array_slice($queue, -200, null, true);
+    }
+
+    update_option('hic_integration_retry_queue', $queue, false);
+    hic_clear_option_cache('hic_integration_retry_queue');
+}
+
 /* ============ Email admin (include bucket) ============ */
 function hic_send_admin_email($data, $gclid, $fbclid, $sid){
   // Validate input data
@@ -1161,6 +1343,10 @@ namespace {
     function hic_diagnose_email_issues() { return \FpHic\Helpers\hic_diagnose_email_issues(); }
     function hic_mark_email_enriched($reservation_id, $real_email) { return \FpHic\Helpers\hic_mark_email_enriched($reservation_id, $real_email); }
     function hic_get_reservation_email($reservation_id) { return \FpHic\Helpers\hic_get_reservation_email($reservation_id); }
+    function hic_create_integration_result($overrides = []) { return \FpHic\Helpers\hic_create_integration_result(is_array($overrides) ? $overrides : []); }
+    function hic_append_integration_result(array &$result, $integration, $status, $note = '') { \FpHic\Helpers\hic_append_integration_result($result, (string) $integration, (string) $status, (string) $note); }
+    function hic_finalize_integration_result($result, $tracking_skipped = false) { return \FpHic\Helpers\hic_finalize_integration_result(is_array($result) ? $result : [], (bool) $tracking_skipped); }
+    function hic_queue_integration_retry($reservation_uid, $failed_details, $context = []) { \FpHic\Helpers\hic_queue_integration_retry($reservation_uid, is_array($failed_details) ? $failed_details : [], is_array($context) ? $context : []); }
     function hic_extract_reservation_id($data) { return \FpHic\Helpers\hic_extract_reservation_id($data); }
     function hic_mark_reservation_processed_by_id($reservation_id) { return \FpHic\Helpers\hic_mark_reservation_processed_by_id($reservation_id); }
     function hic_acquire_reservation_lock($reservation_id, $timeout = 30) { return \FpHic\Helpers\hic_acquire_reservation_lock($reservation_id, $timeout); }

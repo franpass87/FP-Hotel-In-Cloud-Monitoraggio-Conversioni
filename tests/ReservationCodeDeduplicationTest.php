@@ -131,7 +131,9 @@ final class ReservationCodeDeduplicationTest extends TestCase
     protected function tearDown(): void
     {
         delete_option('hic_synced_res_ids');
+        delete_option('hic_integration_retry_queue');
         Helpers\hic_clear_option_cache();
+        Helpers\hic_clear_option_cache('hic_integration_retry_queue');
 
         parent::tearDown();
     }
@@ -183,6 +185,94 @@ final class ReservationCodeDeduplicationTest extends TestCase
         $this->assertFalse(\FpHic\hic_should_process_reservation($reservation));
 
         $this->assertLogContains('Reservation RCODE-POLL-1 already processed, skipping');
+    }
+
+    public function test_webhook_partial_success_marks_processed_and_queues_retry(): void
+    {
+        delete_option('hic_integration_retry_queue');
+        Helpers\hic_clear_option_cache('hic_integration_retry_queue');
+
+        update_option('hic_tracking_mode', 'hybrid');
+        update_option('hic_measurement_id', 'G-PARTIAL');
+        update_option('hic_api_secret', 'partial-secret');
+        update_option('hic_fb_pixel_id', '1234567890');
+        update_option('hic_fb_access_token', 'test-token');
+        Helpers\hic_clear_option_cache('tracking_mode');
+        Helpers\hic_clear_option_cache('measurement_id');
+        Helpers\hic_clear_option_cache('api_secret');
+        Helpers\hic_clear_option_cache('fb_pixel_id');
+        Helpers\hic_clear_option_cache('fb_access_token');
+
+        $http_interceptor = function ($preempt, $args, $url) {
+            if (strpos($url, 'google-analytics.com/mp/collect') !== false) {
+                return [
+                    'headers' => [],
+                    'body' => '',
+                    'response' => ['code' => 204],
+                ];
+            }
+
+            if (strpos($url, 'graph.facebook.com') !== false) {
+                return new \WP_Error('simulated_failure', 'Simulated Facebook failure');
+            }
+
+            return $preempt;
+        };
+
+        add_filter('pre_http_request', $http_interceptor, 10, 3);
+
+        $payload = [
+            'reservation_code' => 'RCODE-PARTIAL-1',
+            'amount' => 180.0,
+            'currency' => 'EUR',
+            'email' => 'partial@example.com',
+            'checkin' => '2024-07-01',
+            'checkout' => '2024-07-05',
+        ];
+
+        $request = new WP_REST_Request(
+            ['token' => 'secret-token', 'email' => 'partial@example.com'],
+            ['content-type' => 'application/json']
+        );
+
+        try {
+            $firstResult = $this->dispatchWebhook($payload, $request);
+        } finally {
+            remove_filter('pre_http_request', $http_interceptor, 10);
+        }
+
+        $this->assertIsArray($firstResult);
+        $this->assertTrue($firstResult['processed']);
+        $this->assertArrayHasKey('result', $firstResult);
+        $this->assertIsArray($firstResult['result']);
+        $this->assertSame('partial', $firstResult['result']['status']);
+        $this->assertContains('GA4', $firstResult['result']['successful_integrations']);
+        $this->assertContains('Meta Pixel', $firstResult['result']['failed_integrations']);
+
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('RCODE-PARTIAL-1'));
+
+        $queue = get_option('hic_integration_retry_queue', []);
+        $this->assertIsArray($queue);
+        $this->assertArrayHasKey('RCODE-PARTIAL-1', $queue);
+        $this->assertArrayHasKey('integrations', $queue['RCODE-PARTIAL-1']);
+        $this->assertArrayHasKey('Meta Pixel', $queue['RCODE-PARTIAL-1']['integrations']);
+        $this->assertArrayNotHasKey('GA4', $queue['RCODE-PARTIAL-1']['integrations']);
+
+        $secondResult = $this->dispatchWebhook($payload, $request);
+        $this->assertIsArray($secondResult);
+        $this->assertFalse($secondResult['processed']);
+        $this->assertSame('already_processed', $secondResult['reason']);
+
+        delete_option('hic_measurement_id');
+        delete_option('hic_api_secret');
+        delete_option('hic_fb_pixel_id');
+        delete_option('hic_fb_access_token');
+        delete_option('hic_tracking_mode');
+        Helpers\hic_clear_option_cache('measurement_id');
+        Helpers\hic_clear_option_cache('api_secret');
+        Helpers\hic_clear_option_cache('fb_pixel_id');
+        Helpers\hic_clear_option_cache('fb_access_token');
+        Helpers\hic_clear_option_cache('tracking_mode');
     }
 
     /**

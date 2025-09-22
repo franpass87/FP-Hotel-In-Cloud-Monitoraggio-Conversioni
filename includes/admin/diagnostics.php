@@ -920,16 +920,32 @@ function hic_ajax_download_latest_bookings() {
             // Process the booking through normal integration pipeline
             hic_log("Processing downloaded booking ID: " . ($booking['id'] ?? 'N/A') . " for integrations");
 
-            $processing_success = hic_process_booking_data($processed_data);
+            $processing_result = hic_process_booking_data($processed_data);
+            if (!is_array($processing_result)) {
+                $processing_result = [
+                    'status' => $processing_result ? 'success' : 'failed',
+                    'should_mark_processed' => (bool) $processing_result,
+                ];
+            }
+
+            $status = isset($processing_result['status']) ? (string) $processing_result['status'] : 'failed';
+            $processed_successfully = in_array($status, ['success', 'partial'], true);
 
             $processing_results[] = array(
                 'booking_id' => $booking['id'] ?? 'N/A',
                 'email' => $processed_data['email'] ?? 'N/A',
-                'success' => $processing_success,
+                'success' => $processed_successfully,
+                'status' => $status,
+                'should_mark_processed' => !empty($processing_result['should_mark_processed']),
+                'failed_integrations' => $processing_result['failed_integrations'] ?? array(),
+                'failed_details' => $processing_result['failed_details'] ?? array(),
+                'successful_integrations' => $processing_result['successful_integrations'] ?? array(),
+                'messages' => $processing_result['messages'] ?? array(),
+                'summary' => $processing_result['summary'] ?? '',
                 'amount' => $processed_data['amount'] ?? 'N/A'
             );
 
-            if ($processing_success) {
+            if ($processed_successfully) {
                 $success_count++;
             } else {
                 $error_count++;

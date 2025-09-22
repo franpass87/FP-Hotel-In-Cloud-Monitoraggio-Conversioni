@@ -27,23 +27,41 @@ if (!defined('ABSPATH')) exit;
  *   presence?: string|null
  * } $data Dati della prenotazione da processare.
  *
- * @return bool True se la prenotazione è stata processata con successo, false in caso contrario.
+ * @return array<string,mixed> Risultato strutturato con stato complessivo e dettagli delle integrazioni.
  */
-function hic_process_booking_data(array $data): bool {
+function hic_process_booking_data(array $data) {
+  $result = hic_create_integration_result([
+    'context' => [
+      'source' => 'booking_processor',
+    ],
+  ]);
+
+  $return_failure = static function (array $base, string $message) {
+    $failure = $base;
+    $failure['status'] = 'failed';
+    $failure['should_mark_processed'] = false;
+    if ($message !== '') {
+      $failure['messages'][] = $message;
+    }
+
+    $failure['messages'] = array_values(array_unique($failure['messages']));
+
+    return $failure;
+  };
 
   // Validate required fields
   $required_fields = ['email'];
   foreach ($required_fields as $field) {
     if (empty($data[$field])) {
       hic_log("hic_process_booking_data: campo obbligatorio mancante - $field");
-      return false;
+      return $return_failure($result, 'missing_field:' . $field);
     }
   }
 
   // Validate email format
   if (!Helpers\hic_is_valid_email($data['email'])) {
     hic_log('hic_process_booking_data: email non valida - ' . $data['email']);
-    return false;
+    return $return_failure($result, 'invalid_email');
   }
 
   // Sanitize SID input
@@ -63,6 +81,7 @@ function hic_process_booking_data(array $data): bool {
     $ttclid  = $tracking['ttclid'];
     $gbraid  = $tracking['gbraid'];
     $wbraid  = $tracking['wbraid'];
+    $result['context']['sid'] = $sid;
   }
 
   // Validation for amount if present
@@ -91,6 +110,14 @@ function hic_process_booking_data(array $data): bool {
 
   // Determine if booking should be tracked
   $booking_id = Helpers\hic_extract_reservation_id($data);
+  if (!empty($booking_id)) {
+    $safe_booking_id = is_scalar($booking_id) ? sanitize_text_field((string) $booking_id) : '';
+    if ($safe_booking_id !== '') {
+      $result['reservation_id'] = $safe_booking_id;
+      $result['uid'] = $safe_booking_id;
+      $result['context']['reservation_id'] = $safe_booking_id;
+    }
+  }
   $should_track = apply_filters('hic_should_track_reservation', true, $data);
   $tracking_skipped = false;
 
@@ -109,8 +136,13 @@ function hic_process_booking_data(array $data): bool {
     ));
   }
 
+  $result['context']['tracking_skipped'] = $tracking_skipped ? '1' : '0';
+
   // Normalize customer identifiers
   $data['email'] = sanitize_email($data['email']);
+  if (!empty($data['email'])) {
+    $result['context']['email'] = $data['email'];
+  }
 
   // Normalize currency with fallback to plugin configuration
   $currency = '';
@@ -348,146 +380,196 @@ function hic_process_booking_data(array $data): bool {
   $customer_payload = apply_filters('hic_booking_customer_data', $customer_payload, $booking_payload, $data);
 
   // Invii with error handling
-  $success_count = 0;
-  $error_count = 0;
-  $skipped_count = $tracking_skipped ? 1 : 0;
+  $tracking_mode = Helpers\hic_get_tracking_mode();
+  $result['context']['tracking_mode'] = $tracking_mode;
+  $result['context']['is_refund'] = $is_refund ? '1' : '0';
+
+  $has_ga4_credentials = Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret();
+  $has_fb_credentials = Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token();
+  $brevo_enabled = Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key();
+
+  $record_result = static function (string $integration, string $status, string $note = '') use (&$result): void {
+    Helpers\hic_append_integration_result($result, $integration, $status, $note);
+  };
 
   try {
     if (!$tracking_skipped) {
       do_action('hic_process_booking', $booking_payload, $customer_payload);
 
-      // Tracking integration based on selected mode
-      $tracking_mode = Helpers\hic_get_tracking_mode();
-
       if ($is_refund) {
         if (!Helpers\hic_refund_tracking_enabled()) {
           hic_log('hic_process_booking_data: refund detected but tracking disabled, skipping refund events');
+
+          if (in_array($tracking_mode, ['ga4_only', 'hybrid'], true)) {
+            $record_result('GA4', 'skipped', 'refund tracking disabled');
+          }
+
+          $record_result('Meta Pixel', 'skipped', 'refund tracking disabled');
+          $record_result('Brevo', 'skipped', 'refund tracking disabled');
         } else {
-          // GA4 refund event
-          if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') &&
-              Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
-            if (hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid)) {
-              $success_count++;
+          if (in_array($tracking_mode, ['ga4_only', 'hybrid'], true)) {
+            if ($has_ga4_credentials) {
+              $ga4_success = hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
+              $record_result('GA4', $ga4_success ? 'success' : 'failed', 'refund');
             } else {
-              $error_count++;
+              $record_result('GA4', 'skipped', 'missing credentials');
             }
           }
 
-          // Facebook refund event
-          if (Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token()) {
-            if (hic_send_fb_refund($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid)) {
-              $success_count++;
-            } else {
-              $error_count++;
-            }
+          if ($has_fb_credentials) {
+            $fb_success = hic_send_fb_refund($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
+            $record_result('Meta Pixel', $fb_success ? 'success' : 'failed', 'refund');
+          } else {
+            $record_result('Meta Pixel', 'skipped', 'missing credentials');
           }
 
-          // Brevo refund event
-          if (Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key()) {
+          if ($brevo_enabled) {
             $brevo_success = hic_send_brevo_refund_event($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
-            if ($brevo_success) {
-              $success_count++;
-            } else {
-              $error_count++;
-            }
+            $record_result('Brevo', $brevo_success ? 'success' : 'failed', 'refund');
+          } else {
+            $record_result('Brevo', 'skipped', 'not enabled');
           }
         }
       } else {
-        // GA4 Integration (server-side)
-        if (($tracking_mode === 'ga4_only' || $tracking_mode === 'hybrid') &&
-            Helpers\hic_get_measurement_id() && Helpers\hic_get_api_secret()) {
-          if (hic_send_to_ga4($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid)) {
-            $success_count++;
+        if (in_array($tracking_mode, ['ga4_only', 'hybrid'], true)) {
+          if ($has_ga4_credentials) {
+            $ga4_success = hic_send_to_ga4($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid);
+            $record_result('GA4', $ga4_success ? 'success' : 'failed');
           } else {
-            $error_count++;
+            if ($tracking_mode === 'ga4_only') {
+              hic_log('hic_process_booking_data: GA4 credentials missing for ga4_only mode, skipping');
+            }
+            $record_result('GA4', 'skipped', 'missing credentials');
           }
-        } else if ($tracking_mode === 'ga4_only') {
-          hic_log('hic_process_booking_data: GA4 credentials missing for ga4_only mode, skipping');
         }
 
-        // GTM Integration (client-side via dataLayer)
-        if (($tracking_mode === 'gtm_only' || $tracking_mode === 'hybrid') && Helpers\hic_is_gtm_enabled()) {
-          if (hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid)) {
-            $success_count++;
+        if (in_array($tracking_mode, ['gtm_only', 'hybrid'], true)) {
+          if (Helpers\hic_is_gtm_enabled()) {
+            $gtm_success = hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid);
+            $record_result('GTM', $gtm_success ? 'success' : 'failed');
           } else {
-            $error_count++;
+            if ($tracking_mode === 'gtm_only') {
+              hic_log('hic_process_booking_data: GTM not enabled for gtm_only mode, skipping');
+            }
+            $record_result('GTM', 'skipped', 'not enabled');
           }
-        } else if ($tracking_mode === 'gtm_only') {
-          hic_log('hic_process_booking_data: GTM not enabled for gtm_only mode, skipping');
         }
 
-        // Facebook Integration
-        if (Helpers\hic_get_fb_pixel_id() && Helpers\hic_get_fb_access_token()) {
-          if (hic_send_to_fb($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid)) {
-            $success_count++;
-          } else {
-            $error_count++;
-          }
+        if ($has_fb_credentials) {
+          $fb_success = hic_send_to_fb($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
+          $record_result('Meta Pixel', $fb_success ? 'success' : 'failed');
         } else {
           hic_log('hic_process_booking_data: Facebook credentials missing, skipping');
+          $record_result('Meta Pixel', 'skipped', 'missing credentials');
         }
 
-        // Brevo Integration - Unified approach to prevent duplicate events
-        if (Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key()) {
+        if ($brevo_enabled) {
           $brevo_email = '';
           if (isset($data['email']) && is_scalar($data['email'])) {
-            $brevo_email = \sanitize_email((string) $data['email']);
+            $brevo_email = sanitize_email((string) $data['email']);
           }
 
           if (!Helpers\hic_is_valid_email($brevo_email)) {
             hic_log('hic_process_booking_data: Brevo dispatch skipped - missing or invalid email');
-            $skipped_count++;
+            $record_result('Brevo', 'skipped', 'invalid email');
           } else {
             $data['email'] = $brevo_email;
             $brevo_result = hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
 
             if ($brevo_result === true) {
-              $success_count++;
+              $record_result('Brevo', 'success');
             } elseif ($brevo_result === 'skipped') {
-              $skipped_count++;
+              $record_result('Brevo', 'skipped', 'deferred');
             } else {
-              $error_count++;
+              $record_result('Brevo', 'failed');
             }
           }
         } else {
           hic_log('hic_process_booking_data: Brevo disabled or credentials missing, skipping');
+          $record_result('Brevo', 'skipped', 'not enabled');
         }
 
-        // Admin email - only attempt if valid email is configured
         $admin_email = Helpers\hic_get_admin_email();
         if (!empty($admin_email) && Helpers\hic_is_valid_email($admin_email)) {
-          if (Helpers\hic_send_admin_email($data, $gclid, $fbclid, $sid)) {
-            $success_count++;
+          $email_sid = $sid ?? '';
+          if (Helpers\hic_send_admin_email($data, $gclid, $fbclid, $email_sid)) {
+            $record_result('Admin email', 'success');
           } else {
-            $skipped_count++;
             $safe_sid = $sid !== null ? $sid : 'N/A';
             hic_log('hic_process_booking_data: Admin email sending failed, marking as skipped (SID: ' . $safe_sid . ')', HIC_LOG_LEVEL_WARNING);
+            $record_result('Admin email', 'skipped', 'send failed');
           }
         } else {
           hic_log('hic_process_booking_data: Admin email not configured or invalid, skipping');
+          $record_result('Admin email', 'skipped', 'not configured');
         }
       }
     }
 
-    hic_log("Prenotazione processata (SID: " . ($sid ?? 'N/A') . ") - Successi: $success_count, Errori: $error_count, Skippate: $skipped_count");
+    $result = Helpers\hic_finalize_integration_result($result, $tracking_skipped);
 
-    $processing_success = $error_count === 0;
+    $summary_parts = array();
+    foreach ($result['integrations'] as $integration => $details) {
+      $status = isset($details['status']) ? (string) $details['status'] : '';
+      $note = isset($details['note']) ? (string) $details['note'] : '';
+      $part = $integration . '=' . $status;
+      if ($note !== '') {
+        $part .= ' (' . $note . ')';
+      }
+      $summary_parts[] = $part;
+    }
+    $summary = !empty($summary_parts) ? implode(', ', $summary_parts) : '';
+    $result['summary'] = $summary;
 
-    if ($tracking_skipped) {
-      return true;
+    $skipped_messages = array();
+    foreach ($result['skipped_integrations'] as $integration => $note) {
+      $entry = $integration;
+      if ($note !== '') {
+        $entry .= ' (' . $note . ')';
+      }
+      $skipped_messages[] = $entry;
     }
 
-    if ($processing_success && !$is_refund && !empty($booking_payload['booking_id'])) {
+    $status = isset($result['status']) ? (string) $result['status'] : 'success';
+    $safe_sid = $sid !== null ? $sid : 'N/A';
+    $reference = $result['reservation_id'] ?? ($result['uid'] ?? 'N/A');
+
+    $log_message = 'Prenotazione ' . $reference . ' processata (SID: ' . $safe_sid . ') - Stato: ' . $status;
+    if ($summary !== '') {
+      $log_message .= ' - Summary: ' . $summary;
+    }
+    if (!empty($result['failed_integrations'])) {
+      $log_message .= ' - Failed integrations: ' . implode(', ', $result['failed_integrations']);
+    }
+    if (!empty($skipped_messages)) {
+      $log_message .= ' - Skipped: ' . implode(', ', $skipped_messages);
+    }
+    if (!empty($result['messages'])) {
+      $log_message .= ' - Messages: ' . implode(', ', array_unique(array_map('strval', $result['messages'])));
+    }
+
+    if ($status === 'failed') {
+      hic_log($log_message, HIC_LOG_LEVEL_ERROR);
+    } elseif ($status === 'partial') {
+      hic_log($log_message, HIC_LOG_LEVEL_WARNING);
+    } else {
+      hic_log($log_message);
+    }
+
+    if (!$tracking_skipped && !$is_refund && in_array($status, ['success', 'partial'], true) && !empty($booking_payload['booking_id'])) {
       do_action('hic_booking_processed', $booking_payload['booking_id'], $gclid, $customer_payload);
     }
 
-    return $processing_success;
-
+    return $result;
   } catch (\Exception $e) {
-    hic_log('Errore critico processando prenotazione: ' . $e->getMessage());
-    return false;
+    $message = $e->getMessage();
+    hic_log('Errore critico processando prenotazione: ' . $message);
+    $safe_message = sanitize_text_field((string) $message);
+    return $return_failure($result, 'exception:' . $safe_message);
   } catch (\Throwable $e) {
-    hic_log('Errore fatale processando prenotazione: ' . $e->getMessage());
-    return false;
+    $message = $e->getMessage();
+    hic_log('Errore fatale processando prenotazione: ' . $message);
+    $safe_message = sanitize_text_field((string) $message);
+    return $return_failure($result, 'exception:' . $safe_message);
   }
 }

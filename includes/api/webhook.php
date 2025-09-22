@@ -123,8 +123,32 @@ function hic_webhook_handler(WP_REST_Request $request) {
     $email_missing = empty($data['email']);
     $result = hic_process_booking_data($data);
 
-    // Mark reservation as processed if successful
-    if ($result && !empty($reservation_id)) {
+    if (!is_array($result)) {
+      $result = [
+        'status' => $result ? 'success' : 'failed',
+        'should_mark_processed' => (bool) $result,
+        'messages' => ['legacy_result'],
+      ];
+    }
+
+    $status = isset($result['status']) ? (string) $result['status'] : 'failed';
+    $should_mark_processed = !empty($result['should_mark_processed']);
+
+    if (!empty($reservation_id) && !empty($result['failed_details']) && is_array($result['failed_details'])) {
+      $retry_context = [];
+      if (!empty($result['context']) && is_array($result['context'])) {
+        $retry_context = $result['context'];
+      }
+      $retry_context['source'] = 'webhook';
+      $retry_context['status'] = $status;
+      if ($email_missing) {
+        $retry_context['email_missing'] = '1';
+      }
+
+      hic_queue_integration_retry($reservation_id, $result['failed_details'], $retry_context);
+    }
+
+    if ($should_mark_processed && !empty($reservation_id)) {
       hic_mark_reservation_processed_by_id($reservation_id);
     }
 
@@ -132,17 +156,45 @@ function hic_webhook_handler(WP_REST_Request $request) {
     update_option('hic_last_webhook_processing', current_time('mysql'), false);
     hic_clear_option_cache('hic_last_webhook_processing');
 
-    if (!$result) {
+    if ($status === 'failed') {
       if ($email_missing) {
         hic_log('Webhook: dati elaborati senza email, integrazioni limitate');
-        return ['status'=>'ok', 'processed' => false, 'reason' => 'missing_email'];
+        return [
+          'status' => 'ok',
+          'processed' => false,
+          'reason' => 'missing_email',
+          'result' => $result,
+        ];
       }
 
       hic_log('Webhook: elaborazione fallita per dati ricevuti');
-      return new WP_REST_Response(['error'=>'processing failed'], 500);
+      return new WP_REST_Response([
+        'error' => 'processing failed',
+        'result' => $result,
+      ], 500);
     }
 
-    return ['status'=>'ok', 'processed' => true];
+    $response_result = [
+      'status' => $status,
+      'should_mark_processed' => $should_mark_processed,
+      'failed_integrations' => $result['failed_integrations'] ?? [],
+      'successful_integrations' => $result['successful_integrations'] ?? [],
+      'messages' => $result['messages'] ?? [],
+    ];
+
+    if (!empty($result['failed_details'])) {
+      $response_result['failed_details'] = $result['failed_details'];
+    }
+
+    if (!empty($result['summary'])) {
+      $response_result['summary'] = $result['summary'];
+    }
+
+    return [
+      'status' => 'ok',
+      'processed' => $should_mark_processed,
+      'result' => $response_result,
+    ];
 
   } finally {
     // Always release the lock
