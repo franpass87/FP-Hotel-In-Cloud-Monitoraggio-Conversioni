@@ -375,6 +375,20 @@ function hic_maybe_upgrade_db() {
     $installed_version = '1.6';
   }
 
+  if (version_compare($installed_version, '1.7', '<')) {
+    $reindex_result = hic_reindex_realtime_sync_reservations();
+    if (is_array($reindex_result)) {
+      hic_log(sprintf(
+        'hic_maybe_upgrade_db: Reindexed real-time sync table (normalized: %d, deleted: %d)',
+        $reindex_result['normalized'] ?? 0,
+        $reindex_result['deleted'] ?? 0
+      ));
+    }
+    update_option('hic_db_version', '1.7');
+    hic_clear_option_cache('hic_db_version');
+    $installed_version = '1.7';
+  }
+
   // Set final version
   update_option('hic_db_version', HIC_DB_VERSION);
   hic_clear_option_cache('hic_db_version');
@@ -676,10 +690,18 @@ function hic_capture_tracking_params(){
  * Check if a reservation is new for real-time sync
  */
 function hic_is_reservation_new_for_realtime($reservation_id) {
-  if (empty($reservation_id) || !is_scalar($reservation_id)) {
+  if (!is_scalar($reservation_id)) {
+    hic_log('hic_is_reservation_new_for_realtime: Invalid reservation_id type');
+    return false;
+  }
+
+  $normalized_reservation_id = \FpHic\Helpers\hic_normalize_reservation_id((string) $reservation_id);
+  if ($normalized_reservation_id === '') {
     hic_log('hic_is_reservation_new_for_realtime: Invalid reservation_id');
     return false;
   }
+
+  $reservation_id = $normalized_reservation_id;
   
   global $wpdb;
   
@@ -715,10 +737,18 @@ function hic_is_reservation_new_for_realtime($reservation_id) {
  * Mark reservation as seen (new) for real-time sync
  */
 function hic_mark_reservation_new_for_realtime($reservation_id) {
-  if (empty($reservation_id) || !is_scalar($reservation_id)) {
+  if (!is_scalar($reservation_id)) {
+    hic_log('hic_mark_reservation_new_for_realtime: Invalid reservation_id type');
+    return false;
+  }
+
+  $normalized_reservation_id = \FpHic\Helpers\hic_normalize_reservation_id((string) $reservation_id);
+  if ($normalized_reservation_id === '') {
     hic_log('hic_mark_reservation_new_for_realtime: Invalid reservation_id');
     return false;
   }
+
+  $reservation_id = $normalized_reservation_id;
   
   global $wpdb;
   
@@ -757,11 +787,22 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
  * Mark reservation as successfully notified to Brevo
  */
 function hic_mark_reservation_notified_to_brevo($reservation_id) {
-  if (empty($reservation_id)) return false;
-  
+  if (!is_scalar($reservation_id)) {
+    hic_log('hic_mark_reservation_notified_to_brevo: Invalid reservation_id type');
+    return false;
+  }
+
+  $normalized_reservation_id = \FpHic\Helpers\hic_normalize_reservation_id((string) $reservation_id);
+  if ($normalized_reservation_id === '') {
+    hic_log('hic_mark_reservation_notified_to_brevo: Invalid reservation_id');
+    return false;
+  }
+
+  $reservation_id = $normalized_reservation_id;
+
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
-  
+
   $result = $wpdb->update(
     $table,
     array(
@@ -784,7 +825,18 @@ function hic_mark_reservation_notified_to_brevo($reservation_id) {
  * Mark reservation notification as failed
  */
 function hic_mark_reservation_notification_failed($reservation_id, $error_message = null, $payload = null) {
-  if (empty($reservation_id)) return false;
+  if (!is_scalar($reservation_id)) {
+    hic_log('hic_mark_reservation_notification_failed: Invalid reservation_id type');
+    return false;
+  }
+
+  $normalized_reservation_id = \FpHic\Helpers\hic_normalize_reservation_id((string) $reservation_id);
+  if ($normalized_reservation_id === '') {
+    hic_log('hic_mark_reservation_notification_failed: Invalid reservation_id');
+    return false;
+  }
+
+  $reservation_id = $normalized_reservation_id;
 
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
@@ -835,8 +887,19 @@ function hic_mark_reservation_notification_failed($reservation_id, $error_messag
  * Mark reservation notification as permanently failed (non-retryable)
  */
 function hic_mark_reservation_notification_permanent_failure($reservation_id, $error_message = null) {
-  if (empty($reservation_id)) return false;
-  
+  if (!is_scalar($reservation_id)) {
+    hic_log('hic_mark_reservation_notification_permanent_failure: Invalid reservation_id type');
+    return false;
+  }
+
+  $normalized_reservation_id = \FpHic\Helpers\hic_normalize_reservation_id((string) $reservation_id);
+  if ($normalized_reservation_id === '') {
+    hic_log('hic_mark_reservation_notification_permanent_failure: Invalid reservation_id');
+    return false;
+  }
+
+  $reservation_id = $normalized_reservation_id;
+
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
   
@@ -862,9 +925,9 @@ function hic_mark_reservation_notification_permanent_failure($reservation_id, $e
 function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_minutes = 30) {
   global $wpdb;
   $table = $wpdb->prefix . 'hic_realtime_sync';
-  
+
   $retry_time = wp_date('Y-m-d H:i:s', strtotime("-{$retry_delay_minutes} minutes", current_time('timestamp')));
-  
+
   $results = $wpdb->get_results($wpdb->prepare(
     "SELECT reservation_id, attempt_count, last_error, payload_json
      FROM $table
@@ -876,8 +939,266 @@ function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_m
     $max_attempts,
     $retry_time
   ));
-  
-  return $results ? $results : array();
+
+  if (empty($results)) {
+    return array();
+  }
+
+  $normalized_results = array();
+
+  foreach ($results as $result) {
+    if (!isset($result->reservation_id)) {
+      continue;
+    }
+
+    $normalized_reservation_id = \FpHic\Helpers\hic_normalize_reservation_id((string) $result->reservation_id);
+    if ($normalized_reservation_id === '') {
+      hic_log('hic_get_failed_reservations_for_retry: Skipping row with invalid reservation_id');
+      continue;
+    }
+
+    $result->reservation_id = $normalized_reservation_id;
+    $normalized_results[] = $result;
+  }
+
+  return $normalized_results;
+}
+
+/**
+ * Normalize and deduplicate stored real-time sync states.
+ *
+ * @return array{normalized:int,deleted:int}
+ */
+function hic_reindex_realtime_sync_reservations() {
+  global $wpdb;
+
+  if (!$wpdb) {
+    hic_log('hic_reindex_realtime_sync_reservations: wpdb is not available');
+    return array('normalized' => 0, 'deleted' => 0);
+  }
+
+  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+  if (!$table_exists) {
+    return array('normalized' => 0, 'deleted' => 0);
+  }
+
+  $rows = $wpdb->get_results(
+    "SELECT id, reservation_id, sync_status, first_seen, last_attempt, attempt_count, last_error, brevo_event_sent, payload_json FROM $table",
+    ARRAY_A
+  );
+
+  if ($rows === null) {
+    hic_log('hic_reindex_realtime_sync_reservations: Failed to fetch rows: ' . $wpdb->last_error);
+    return array('normalized' => 0, 'deleted' => 0);
+  }
+
+  if (empty($rows)) {
+    return array('normalized' => 0, 'deleted' => 0);
+  }
+
+  $status_priority = array(
+    'permanent_failure' => 4,
+    'failed' => 3,
+    'notified' => 2,
+    'new' => 1,
+  );
+
+  $groups = array();
+  $deleted = 0;
+
+  foreach ($rows as $row) {
+    $raw_reservation_id = is_scalar($row['reservation_id']) ? (string) $row['reservation_id'] : '';
+    $normalized = \FpHic\Helpers\hic_normalize_reservation_id($raw_reservation_id);
+
+    if ($normalized === '') {
+      $delete_result = $wpdb->delete($table, array('id' => (int) $row['id']), array('%d'));
+      if ($delete_result !== false) {
+        $deleted += (int) $delete_result;
+      } else {
+        hic_log('hic_reindex_realtime_sync_reservations: Failed to delete row with empty reservation_id (ID ' . $row['id'] . '): ' . $wpdb->last_error);
+      }
+      continue;
+    }
+
+    $row['normalized'] = $normalized;
+    if (!isset($groups[$normalized])) {
+      $groups[$normalized] = array();
+    }
+    $groups[$normalized][] = $row;
+  }
+
+  $normalized_count = 0;
+
+  foreach ($groups as $normalized => $group) {
+    if (empty($group)) {
+      continue;
+    }
+
+    $best_index = 0;
+    $group_count = count($group);
+
+    for ($i = 1; $i < $group_count; $i++) {
+      $candidate = $group[$i];
+      $current_best = $group[$best_index];
+
+      $candidate_priority = $status_priority[$candidate['sync_status']] ?? 0;
+      $best_priority = $status_priority[$current_best['sync_status']] ?? 0;
+
+      if ($candidate_priority > $best_priority) {
+        $best_index = $i;
+        continue;
+      }
+
+      if ($candidate_priority === $best_priority) {
+        $candidate_attempts = isset($candidate['attempt_count']) ? (int) $candidate['attempt_count'] : 0;
+        $best_attempts = isset($current_best['attempt_count']) ? (int) $current_best['attempt_count'] : 0;
+
+        if ($candidate_attempts > $best_attempts) {
+          $best_index = $i;
+          continue;
+        }
+
+        if ($candidate_attempts === $best_attempts) {
+          $candidate_last_attempt = $candidate['last_attempt'];
+          $best_last_attempt = $current_best['last_attempt'];
+
+          $candidate_has_attempt = is_string($candidate_last_attempt) && $candidate_last_attempt !== '';
+          $best_has_attempt = is_string($best_last_attempt) && $best_last_attempt !== '';
+
+          if ($candidate_has_attempt && (!$best_has_attempt || $candidate_last_attempt > $best_last_attempt)) {
+            $best_index = $i;
+            continue;
+          }
+
+          if ($candidate_last_attempt === $best_last_attempt) {
+            if ((int) $candidate['id'] < (int) $current_best['id']) {
+              $best_index = $i;
+            }
+          }
+        }
+      }
+    }
+
+    $best = $group[$best_index];
+
+    $first_seen = is_string($best['first_seen']) && $best['first_seen'] !== '' ? $best['first_seen'] : null;
+    $last_attempt = is_string($best['last_attempt']) && $best['last_attempt'] !== '' ? $best['last_attempt'] : null;
+    $attempt_count = isset($best['attempt_count']) ? (int) $best['attempt_count'] : 0;
+    $sync_status = is_string($best['sync_status']) && $best['sync_status'] !== '' ? $best['sync_status'] : 'new';
+    $last_error = isset($best['last_error']) ? $best['last_error'] : null;
+    $payload_json = isset($best['payload_json']) ? $best['payload_json'] : null;
+    $brevo_event_sent = isset($best['brevo_event_sent']) ? (int) $best['brevo_event_sent'] : 0;
+
+    foreach ($group as $row) {
+      $attempt_count = max($attempt_count, isset($row['attempt_count']) ? (int) $row['attempt_count'] : 0);
+
+      if (isset($row['first_seen']) && is_string($row['first_seen']) && $row['first_seen'] !== '') {
+        if ($first_seen === null || $row['first_seen'] < $first_seen) {
+          $first_seen = $row['first_seen'];
+        }
+      }
+
+      if (isset($row['last_attempt']) && is_string($row['last_attempt']) && $row['last_attempt'] !== '') {
+        if ($last_attempt === null || $row['last_attempt'] > $last_attempt) {
+          $last_attempt = $row['last_attempt'];
+          $last_error = $row['last_error'];
+          $payload_json = $row['payload_json'];
+        }
+      }
+
+      if (isset($row['brevo_event_sent']) && (int) $row['brevo_event_sent'] === 1) {
+        $brevo_event_sent = 1;
+      }
+
+      $row_priority = $status_priority[$row['sync_status']] ?? 0;
+      $current_priority = $status_priority[$sync_status] ?? 0;
+      if ($row_priority > $current_priority) {
+        $sync_status = $row['sync_status'];
+      }
+    }
+
+    $ids_to_delete = array();
+    foreach ($group as $row) {
+      if ((int) $row['id'] !== (int) $best['id']) {
+        $ids_to_delete[] = (int) $row['id'];
+      }
+    }
+
+    if (!empty($ids_to_delete)) {
+      $placeholders = implode(', ', array_fill(0, count($ids_to_delete), '%d'));
+      $delete_sql = "DELETE FROM $table WHERE id IN ($placeholders)";
+      $prepared_delete = $wpdb->prepare($delete_sql, $ids_to_delete);
+      if ($prepared_delete !== false) {
+        $delete_result = $wpdb->query($prepared_delete);
+        if ($delete_result !== false) {
+          $deleted += (int) $delete_result;
+        } else {
+          hic_log('hic_reindex_realtime_sync_reservations: Failed to delete duplicate rows for ' . $normalized . ': ' . $wpdb->last_error);
+        }
+      }
+    }
+
+    $set_clauses = array(
+      'reservation_id = %s',
+      'sync_status = %s',
+      'attempt_count = %d',
+      'brevo_event_sent = %d',
+    );
+    $params = array(
+      $normalized,
+      $sync_status,
+      $attempt_count,
+      $brevo_event_sent > 0 ? 1 : 0,
+    );
+
+    if ($first_seen !== null && $first_seen !== '') {
+      $set_clauses[] = 'first_seen = %s';
+      $params[] = $first_seen;
+    }
+
+    if ($last_attempt !== null && $last_attempt !== '') {
+      $set_clauses[] = 'last_attempt = %s';
+      $params[] = $last_attempt;
+    } else {
+      $set_clauses[] = 'last_attempt = NULL';
+    }
+
+    if ($last_error !== null && $last_error !== '') {
+      $set_clauses[] = 'last_error = %s';
+      $params[] = $last_error;
+    } else {
+      $set_clauses[] = 'last_error = NULL';
+    }
+
+    if ($payload_json !== null && $payload_json !== '') {
+      $set_clauses[] = 'payload_json = %s';
+      $params[] = $payload_json;
+    } else {
+      $set_clauses[] = 'payload_json = NULL';
+    }
+
+    $params[] = (int) $best['id'];
+    $update_sql = 'UPDATE ' . $table . ' SET ' . implode(', ', $set_clauses) . ' WHERE id = %d';
+    $prepared_update = $wpdb->prepare($update_sql, $params);
+    if ($prepared_update === false) {
+      hic_log('hic_reindex_realtime_sync_reservations: Failed to prepare update for ' . $normalized);
+      continue;
+    }
+
+    $update_result = $wpdb->query($prepared_update);
+    if ($update_result === false) {
+      hic_log('hic_reindex_realtime_sync_reservations: Failed to update row ' . $best['id'] . ': ' . $wpdb->last_error);
+    } else {
+      $normalized_count += (int) max(0, $update_result);
+    }
+  }
+
+  if ($normalized_count > 0 || $deleted > 0) {
+    hic_log(sprintf('hic_reindex_realtime_sync_reservations: normalized %d rows, deleted %d duplicates', $normalized_count, $deleted));
+  }
+
+  return array('normalized' => $normalized_count, 'deleted' => $deleted);
 }
 
 /* ============ Cleanup old GCLIDs ============ */

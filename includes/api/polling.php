@@ -1602,7 +1602,12 @@ function hic_retry_failed_brevo_notifications() {
 
     foreach ($failed_reservations as $failed) {
         $attempted++;
-        $reservation_id = $failed->reservation_id;
+        $raw_reservation_id = isset($failed->reservation_id) ? $failed->reservation_id : '';
+        $reservation_id = Helpers\hic_normalize_reservation_id((string) $raw_reservation_id);
+        if ($reservation_id === '') {
+            hic_log('hic_retry_failed_brevo_notifications: Skipping entry with invalid reservation ID');
+            continue;
+        }
         $current_attempt = isset($failed->attempt_count) ? (int) $failed->attempt_count : 0;
         $next_attempt = $current_attempt + 1;
 
@@ -1773,9 +1778,15 @@ function hic_process_update(array $u){
     }
     
     // Get reservation ID with proper validation
-    $id = Helpers\hic_extract_reservation_id($u);
-    if (empty($id)) {
+    $extracted_id = Helpers\hic_extract_reservation_id($u);
+    if (empty($extracted_id)) {
         hic_log('hic_process_update: missing or invalid reservation id');
+        return;
+    }
+
+    $id = Helpers\hic_normalize_reservation_id((string) $extracted_id);
+    if ($id === '') {
+        hic_log('hic_process_update: reservation id normalization failed');
         return;
     }
 
@@ -1832,9 +1843,15 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
         return;
     }
 
-    $reservation_id = Helpers\hic_extract_reservation_id($reservation_data);
-    if (!$reservation_id) {
+    $extracted_id = Helpers\hic_extract_reservation_id($reservation_data);
+    if (!$extracted_id) {
         hic_log('Cannot process new reservation: missing reservation ID');
+        return;
+    }
+
+    $reservation_id = Helpers\hic_normalize_reservation_id((string) $extracted_id);
+    if ($reservation_id === '') {
+        hic_log('Cannot process new reservation: invalid reservation ID after normalization');
         return;
     }
 
