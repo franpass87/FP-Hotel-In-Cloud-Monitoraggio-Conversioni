@@ -138,12 +138,14 @@ function hic_get_internal_scheduler_status() {
     
     // Real-time sync stats (keep existing functionality)  
     $realtime_table = $wpdb->prefix . 'hic_realtime_sync';
+    $escaped_realtime_table = esc_sql($realtime_table);
+    $realtime_table_sql = "`{$escaped_realtime_table}`";
     if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $realtime_table)) === $realtime_table) {
-        $status['realtime_sync']['total_tracked'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table)));
-        $status['realtime_sync']['notified'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'notified'));
-        $status['realtime_sync']['failed'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'failed'));
-        $status['realtime_sync']['permanent_failure'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'permanent_failure'));
-        $status['realtime_sync']['new'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM " . esc_sql($realtime_table) . " WHERE sync_status = %s", 'new'));
+        $status['realtime_sync']['total_tracked'] = $wpdb->get_var("SELECT COUNT(*) FROM {$realtime_table_sql}");
+        $status['realtime_sync']['notified'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$realtime_table_sql} WHERE sync_status = %s", 'notified'));
+        $status['realtime_sync']['failed'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$realtime_table_sql} WHERE sync_status = %s", 'failed'));
+        $status['realtime_sync']['permanent_failure'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$realtime_table_sql} WHERE sync_status = %s", 'permanent_failure'));
+        $status['realtime_sync']['new'] = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$realtime_table_sql} WHERE sync_status = %s", 'new'));
     } else {
         $status['realtime_sync']['table_exists'] = false;
     }
