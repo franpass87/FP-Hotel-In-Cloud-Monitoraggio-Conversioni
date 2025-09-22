@@ -20,6 +20,29 @@ if (!function_exists('add_filter')) {
         ];
     }
 }
+if (!function_exists('remove_filter')) {
+    function remove_filter($hook, $callback, $priority = 10) {
+        if (empty($GLOBALS['hic_test_filters'][$hook][$priority])) {
+            return false;
+        }
+
+        foreach ($GLOBALS['hic_test_filters'][$hook][$priority] as $index => $cb) {
+            if ($cb['function'] === $callback) {
+                unset($GLOBALS['hic_test_filters'][$hook][$priority][$index]);
+            }
+        }
+
+        if (empty($GLOBALS['hic_test_filters'][$hook][$priority])) {
+            unset($GLOBALS['hic_test_filters'][$hook][$priority]);
+        }
+
+        if (empty($GLOBALS['hic_test_filters'][$hook])) {
+            unset($GLOBALS['hic_test_filters'][$hook]);
+        }
+
+        return true;
+    }
+}
 if (!function_exists('apply_filters')) {
     function apply_filters($hook, $value, ...$args) {
         if (empty($GLOBALS['hic_test_filters'][$hook])) {
@@ -86,6 +109,15 @@ if (!function_exists('do_action')) {
 }
 if (!function_exists('wp_doing_cron')) { function wp_doing_cron() { return defined('HIC_TEST_DOING_CRON') && HIC_TEST_DOING_CRON; } }
 if (!function_exists('is_ssl')) { function is_ssl() { return false; } }
+if (!function_exists('home_url')) {
+    function home_url($path = '') {
+        if (!is_string($path)) {
+            $path = '';
+        }
+
+        return 'https://example.com' . $path;
+    }
+}
 if (!function_exists('wp_unslash')) { function wp_unslash($value) { return $value; } }
 if (!function_exists('is_wp_error')) { function is_wp_error($thing) { return $thing instanceof \WP_Error; } }
 if (!function_exists('wp_error')) { function wp_error($code = '', $message = '', $data = null) { return new \WP_Error($code, $message, $data); } }
@@ -172,6 +204,18 @@ if (!function_exists('sanitize_text_field')) {
         }
 
         return trim($value);
+    }
+}
+if (!function_exists('sanitize_key')) {
+    function sanitize_key($key) {
+        if (!is_scalar($key)) {
+            return '';
+        }
+
+        $key = strtolower((string) $key);
+        $key = preg_replace('/[^a-z0-9_]/', '', $key);
+
+        return $key ?? '';
     }
 }
 if (!function_exists('wp_date')) {

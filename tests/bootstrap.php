@@ -207,6 +207,11 @@ if (!function_exists('wp_safe_remote_request')) {
         global $hic_last_request, $hic_test_http_error, $hic_test_http_error_urls, $hic_test_http_mock;
         $hic_last_request = ['url' => $url, 'args' => $args];
 
+        $preempt = apply_filters('pre_http_request', false, $args, $url);
+        if ($preempt !== false) {
+            return $preempt;
+        }
+
         if (isset($hic_test_http_mock) && is_callable($hic_test_http_mock)) {
             $mock_response = call_user_func($hic_test_http_mock, $url, $args);
             if ($mock_response !== null) {

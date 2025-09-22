@@ -1008,21 +1008,26 @@ function hic_dispatch_reservation($transformed, $original) {
  */
 
 function hic_mark_reservation_processed($reservation) {
-    $uid = Helpers\hic_booking_uid($reservation);
-    if (empty($uid)) return;
-    
-    $synced = get_option('hic_synced_res_ids', array());
-    if (!in_array($uid, $synced)) {
-        $synced[] = $uid;
-        
-        // Keep only last 10k entries (FIFO)
-        if (count($synced) > 10000) {
-            $synced = array_slice($synced, -10000);
+    if (!is_array($reservation)) {
+        $uid = Helpers\hic_booking_uid($reservation);
+        if ($uid === '') {
+            return;
         }
-        
-        update_option('hic_synced_res_ids', $synced, false); // autoload=false
-        Helpers\hic_clear_option_cache('hic_synced_res_ids');
+
+        Helpers\hic_mark_reservation_processed_by_id($uid);
+        return;
     }
+
+    $ids = Helpers\hic_collect_reservation_ids($reservation);
+    if (empty($ids)) {
+        $uid = Helpers\hic_booking_uid($reservation);
+        if ($uid === '') {
+            return;
+        }
+        $ids = array($uid);
+    }
+
+    Helpers\hic_mark_reservation_processed_by_id($ids);
 }
 
 // Wrapper function - now simplified to use continuous polling by default
