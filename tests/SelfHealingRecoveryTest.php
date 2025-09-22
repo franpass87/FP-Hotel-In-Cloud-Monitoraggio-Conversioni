@@ -1,5 +1,6 @@
 <?php
 namespace {
+    use FpHic\HIC_Booking_Poller;
     use PHPUnit\Framework\TestCase;
 
     require_once __DIR__ . '/../includes/booking-poller.php';
@@ -67,7 +68,7 @@ namespace {
         public function test_recovery_schedules_cleanup_events_with_daily_recurrence(): void {
             global $recovery_log_messages, $wp_scheduled_events;
 
-            $poller = new \FpHic\HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             $poller->execute_self_healing_recovery();
 
             $cleanupEvents = array_values(array_filter(

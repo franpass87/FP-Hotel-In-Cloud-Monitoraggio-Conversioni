@@ -1,4 +1,6 @@
 <?php declare(strict_types=1);
+
+use FpHic\HIC_Booking_Poller;
 use function FpHic\hic_process_booking_data;
 /**
  * WP-CLI commands for HIC Plugin
@@ -28,7 +30,7 @@ if (defined('WP_CLI') && WP_CLI) {
         public function poll($args, $assoc_args) {
             $force = isset($assoc_args['force']) && $assoc_args['force'];
             
-            if (!class_exists('HIC_Booking_Poller')) {
+            if (!class_exists(HIC_Booking_Poller::class)) {
                 WP_CLI::error('HIC_Booking_Poller class not found');
                 return;
             }
@@ -64,7 +66,7 @@ if (defined('WP_CLI') && WP_CLI) {
          * @param array $assoc_args
          */
         public function stats($args, $assoc_args) {
-            if (!class_exists('HIC_Booking_Poller')) {
+            if (!class_exists(HIC_Booking_Poller::class)) {
                 WP_CLI::error('HIC_Booking_Poller class not found');
                 return;
             }
