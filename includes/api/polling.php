@@ -1800,36 +1800,43 @@ function hic_process_update(array $u){
         hic_process_new_reservation_for_realtime($u);
     }
 
+    // Capture presence changes even without usable email
+    $presence = '';
+    if (array_key_exists('presence', $u) && is_scalar($u['presence'])) {
+        $presence = (string) $u['presence'];
+    }
+
     // Validate and get email
     $email = $u['guest_email']
         ?? $u['email']
         ?? $u['client_email']
         ?? '';
-    if (empty($email) || !is_string($email)) {
-        hic_log("hic_process_update: no valid email in update for reservation $id");
-        return;
-    }
-    
-    $is_alias = Helpers\hic_is_ota_alias_email($email);
+    $email = is_string($email) ? trim($email) : '';
 
-    // Se c'è un'email reale nuova che sostituisce un alias
-    if (!$is_alias && Helpers\hic_is_valid_email($email)) {
-        // upsert Brevo con vera email + liste by language
-        $t = hic_transform_reservation($u); // riusa normalizzazioni
-        if ($t !== false && is_array($t)) {
-            $update_sid = !empty($t['sid']) && is_scalar($t['sid']) ? \sanitize_text_field((string) $t['sid']) : '';
-            hic_dispatch_brevo_reservation($t, true, '', '', '', '', '', '', $update_sid); // aggiorna contatto with enrichment flag
-            // aggiorna store locale per id -> true_email
-            Helpers\hic_mark_email_enriched($id, $email);
-            hic_log("Enriched email for reservation $id");
-        } else {
-            hic_log("hic_process_update: failed to transform reservation $id");
+    if ($email === '') {
+        hic_log("hic_process_update: no valid email in update for reservation $id");
+    } else {
+        $is_alias = Helpers\hic_is_ota_alias_email($email);
+
+        // Se c'è un'email reale nuova che sostituisce un alias
+        if (!$is_alias && Helpers\hic_is_valid_email($email)) {
+            // upsert Brevo con vera email + liste by language
+            $t = hic_transform_reservation($u); // riusa normalizzazioni
+            if ($t !== false && is_array($t)) {
+                $update_sid = !empty($t['sid']) && is_scalar($t['sid']) ? \sanitize_text_field((string) $t['sid']) : '';
+                hic_dispatch_brevo_reservation($t, true, '', '', '', '', '', '', $update_sid); // aggiorna contatto with enrichment flag
+                // aggiorna store locale per id -> true_email
+                Helpers\hic_mark_email_enriched($id, $email);
+                hic_log("Enriched email for reservation $id");
+            } else {
+                hic_log("hic_process_update: failed to transform reservation $id");
+            }
         }
     }
 
     // Se cambia presence e impostazione consente aggiornamenti:
-    if (Helpers\hic_allow_status_updates() && !empty($u['presence'])) {
-        hic_log("Reservation $id presence update: ".$u['presence']);
+    if (Helpers\hic_allow_status_updates() && $presence !== '') {
+        hic_log("Reservation $id presence update: " . $presence);
         // opzionale: dispatch evento custom (no purchase)
     }
 }
