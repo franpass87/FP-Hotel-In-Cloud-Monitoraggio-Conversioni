@@ -214,6 +214,36 @@ final class ReservationCodeDeduplicationTest extends TestCase
         $this->assertLogContains('Reservation ALIAS-SECONDARY-1 already processed, skipping');
     }
 
+    public function test_polling_skips_follow_up_update_when_alias_field_changes(): void
+    {
+        $initialReservation = [
+            'reservation_code' => 'ALIAS-FOLLOW-1',
+            'checkin' => '2024-10-15',
+            'checkout' => '2024-10-17',
+            'valid' => 1,
+        ];
+
+        \FpHic\hic_mark_reservation_processed($initialReservation);
+
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('ALIAS-FOLLOW-1'));
+
+        $updateReservation = [
+            'code' => 'ALIAS-FOLLOW-1',
+            'checkin' => '2024-10-15',
+            'checkout' => '2024-10-17',
+            'valid' => 1,
+        ];
+
+        $result = \FpHic\hic_process_reservations_batch([$updateReservation]);
+
+        $this->assertIsArray($result);
+        $this->assertSame(0, $result['new']);
+        $this->assertSame(1, $result['skipped']);
+        $this->assertSame(0, $result['errors']);
+
+        $this->assertLogContains('Reservation ALIAS-FOLLOW-1 already processed, skipping');
+    }
+
     public function test_webhook_partial_success_marks_processed_and_queues_retry(): void
     {
         delete_option('hic_integration_retry_queue');
