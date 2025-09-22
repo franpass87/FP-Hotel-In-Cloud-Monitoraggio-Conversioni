@@ -28,6 +28,18 @@ if (!class_exists('MockPhpStream')) {
     }
 }
 
+if (!class_exists('MockPhpStreamFailure')) {
+    class MockPhpStreamFailure {
+        public function stream_open($path, $mode, $options, &$opened_path) {
+            return false;
+        }
+
+        public function stream_stat() {
+            return [];
+        }
+    }
+}
+
 if (!class_exists('WP_REST_Request')) {
     class WP_REST_Request {
         private $method;
@@ -98,6 +110,32 @@ final class WebhookInvalidJsonTest extends TestCase {
 
         $this->assertInstanceOf(WP_Error::class, $result);
         $this->assertSame('invalid_json', $result->get_error_code());
+    }
+
+    public function test_returns_wp_error_when_body_unreadable(): void {
+        stream_wrapper_unregister('php');
+        stream_wrapper_register('php', MockPhpStreamFailure::class);
+
+        $request = new WP_REST_Request(
+            ['token' => 'secret', 'email' => 'user@example.com'],
+            ['content-type' => 'application/json']
+        );
+
+        $result = null;
+
+        try {
+            $result = hic_webhook_handler($request);
+        } finally {
+            stream_wrapper_restore('php');
+        }
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame('invalid_body', $result->get_error_code());
+
+        $error_data = $result->get_error_data();
+        $this->assertIsArray($error_data);
+        $this->assertArrayHasKey('status', $error_data);
+        $this->assertSame(400, $error_data['status']);
     }
 
 
