@@ -29,8 +29,14 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $g
 
   // Validate and normalize amount
   $amount = 0;
+  $amount_source = null;
   if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-    $amount = Helpers\hic_normalize_price($data['amount']);
+    $amount_source = $data['amount'];
+  } elseif (isset($data['value']) && (is_numeric($data['value']) || is_string($data['value']))) {
+    $amount_source = $data['value'];
+  }
+  if ($amount_source !== null) {
+    $amount = Helpers\hic_normalize_price($amount_source);
   }
 
   // Generate transaction ID using consistent extraction
@@ -148,8 +154,14 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
   $sid = !empty($sid) ? sanitize_text_field($sid) : '';
 
   $amount = 0;
+  $amount_source = null;
   if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-    $amount = -abs(Helpers\hic_normalize_price($data['amount']));
+    $amount_source = $data['amount'];
+  } elseif (isset($data['value']) && (is_numeric($data['value']) || is_string($data['value']))) {
+    $amount_source = $data['value'];
+  }
+  if ($amount_source !== null) {
+    $amount = -abs(Helpers\hic_normalize_price($amount_source));
   }
 
   $transaction_id = Helpers\hic_extract_reservation_id($data);

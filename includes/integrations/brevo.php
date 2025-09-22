@@ -42,6 +42,17 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
   }
   $list_ids = array_filter($list_ids);
 
+  $amount = 0;
+  $amount_source = null;
+  if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
+    $amount_source = $data['amount'];
+  } elseif (isset($data['value']) && (is_numeric($data['value']) || is_string($data['value']))) {
+    $amount_source = $data['value'];
+  }
+  if ($amount_source !== null) {
+    $amount = Helpers\hic_normalize_price($amount_source);
+  }
+
   $body = array(
     'email' => $email,
     'attributes' => array(
@@ -56,7 +67,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
       'GBRAID'    => isset($gbraid) ? $gbraid : '',
       'WBRAID'    => isset($wbraid) ? $wbraid : '',
       'DATE'      => isset($data['date']) ? $data['date'] : wp_date('Y-m-d'),
-      'AMOUNT'    => isset($data['amount']) ? Helpers\hic_normalize_price($data['amount']) : 0,
+      'AMOUNT'    => $amount,
       'CURRENCY'  => isset($data['currency']) ? $data['currency'] : 'EUR',
       'WHATSAPP'  => $normalized_phone,
       'LANGUAGE'  => $lang,
@@ -108,12 +119,23 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
   if (!Helpers\hic_get_brevo_api_key()) { return; }
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
 
+  $amount = 0;
+  $amount_source = null;
+  if (isset($reservation['amount']) && (is_numeric($reservation['amount']) || is_string($reservation['amount']))) {
+    $amount_source = $reservation['amount'];
+  } elseif (isset($reservation['value']) && (is_numeric($reservation['value']) || is_string($reservation['value']))) {
+    $amount_source = $reservation['value'];
+  }
+  if ($amount_source !== null) {
+    $amount = Helpers\hic_normalize_price($amount_source);
+  }
+
   $event_data = array(
     'event' => 'purchase', // puoi rinominare in 'hic_booking' se preferisci
     'email' => isset($reservation['email']) ? $reservation['email'] : '',
     'properties' => array(
       'reservation_id' => isset($reservation['reservation_id']) ? $reservation['reservation_id'] : (isset($reservation['id']) ? $reservation['id'] : ''),
-      'amount'         => isset($reservation['amount']) ? Helpers\hic_normalize_price($reservation['amount']) : 0,
+      'amount'         => $amount,
       'currency'       => isset($reservation['currency']) ? $reservation['currency'] : 'EUR',
       'date'           => isset($reservation['date']) ? $reservation['date'] : wp_date('Y-m-d'),
       'phone'          => isset($reservation['phone']) ? $reservation['phone'] : '',
@@ -173,12 +195,23 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
   if (!Helpers\hic_get_brevo_api_key()) { return false; }
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
 
+  $amount = 0;
+  $amount_source = null;
+  if (isset($reservation['amount']) && (is_numeric($reservation['amount']) || is_string($reservation['amount']))) {
+    $amount_source = $reservation['amount'];
+  } elseif (isset($reservation['value']) && (is_numeric($reservation['value']) || is_string($reservation['value']))) {
+    $amount_source = $reservation['value'];
+  }
+  if ($amount_source !== null) {
+    $amount = -abs(Helpers\hic_normalize_price($amount_source));
+  }
+
   $event_data = array(
     'event' => 'refund',
     'email' => isset($reservation['email']) ? $reservation['email'] : '',
     'properties' => array(
       'reservation_id' => isset($reservation['reservation_id']) ? $reservation['reservation_id'] : (isset($reservation['id']) ? $reservation['id'] : ''),
-      'amount'         => isset($reservation['amount']) ? -abs(Helpers\hic_normalize_price($reservation['amount'])) : 0,
+      'amount'         => $amount,
       'currency'       => isset($reservation['currency']) ? $reservation['currency'] : 'EUR',
       'date'           => isset($reservation['date']) ? $reservation['date'] : wp_date('Y-m-d'),
       'phone'          => isset($reservation['phone']) ? $reservation['phone'] : '',

@@ -34,8 +34,14 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gb
 
   // Validate and sanitize amount
   $amount = 0;
+  $amount_source = null;
   if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-    $amount = Helpers\hic_normalize_price($data['amount']);
+    $amount_source = $data['amount'];
+  } elseif (isset($data['value']) && (is_numeric($data['value']) || is_string($data['value']))) {
+    $amount_source = $data['value'];
+  }
+  if ($amount_source !== null) {
+    $amount = Helpers\hic_normalize_price($amount_source);
   }
 
   $user_data = [
@@ -180,8 +186,14 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '',
   }
 
   $amount = 0;
+  $amount_source = null;
   if (isset($data['amount']) && (is_numeric($data['amount']) || is_string($data['amount']))) {
-    $amount = -abs(Helpers\hic_normalize_price($data['amount']));
+    $amount_source = $data['amount'];
+  } elseif (isset($data['value']) && (is_numeric($data['value']) || is_string($data['value']))) {
+    $amount_source = $data['value'];
+  }
+  if ($amount_source !== null) {
+    $amount = -abs(Helpers\hic_normalize_price($amount_source));
   }
 
   $user_data = [

@@ -676,6 +676,8 @@ function hic_transform_reservation($reservation) {
         'transaction_id' => $transaction_id,
         'reservation_code' => isset($reservation['reservation_code']) ? $reservation['reservation_code'] : '',
         'value' => $value,
+        // Both 'value' and 'amount' are required by different consumers/APIs; currently, they are set to the same value.
+        'amount' => $value,
         'currency' => $currency,
         'accommodation_id' => $accommodation_id,
         'accommodation_name' => $accommodation_name,
