@@ -347,8 +347,8 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         if (!isset($hic_test_filters)) {
             $hic_test_filters = [];
         }
-        $previous_filters = $hic_test_filters['hic_booking_data'] ?? null;
-        $hic_test_filters['hic_booking_data'] = [];
+        $previous_filters = $hic_test_filters['hic_booking_payload'] ?? null;
+        $hic_test_filters['hic_booking_payload'] = [];
         $previous_log_filters = $hic_test_filters['hic_log_message'] ?? null;
         $hic_test_filters['hic_log_message'] = $hic_test_filters['hic_log_message'] ?? [];
 
@@ -371,7 +371,7 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
 
         $capturedTracking = null;
         $loggedMessages = [];
-        add_filter('hic_booking_data', function ($payload, $context) use (&$capturedTracking) {
+        add_filter('hic_booking_payload', function ($payload, $context) use (&$capturedTracking) {
             if (is_array($context) && array_key_exists('gclid', $context) && array_key_exists('sid', $context)) {
                 $capturedTracking = $context;
                 hic_log(sprintf(
@@ -424,9 +424,9 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         $this->assertTrue($logContainsGclid, 'Expected logs to contain gclid from tracking helper');
 
         if ($previous_filters === null) {
-            unset($hic_test_filters['hic_booking_data']);
+            unset($hic_test_filters['hic_booking_payload']);
         } else {
-            $hic_test_filters['hic_booking_data'] = $previous_filters;
+            $hic_test_filters['hic_booking_payload'] = $previous_filters;
         }
         if ($previous_log_filters === null) {
             unset($hic_test_filters['hic_log_message']);

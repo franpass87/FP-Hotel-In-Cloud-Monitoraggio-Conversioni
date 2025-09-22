@@ -89,7 +89,7 @@ function hic_process_booking_data(array $data) {
     $data['amount'] = Helpers\hic_normalize_price($data['amount']);
   }
 
-  $filtered_data = apply_filters('hic_booking_data', $data, [
+  $tracking_context = [
     'gclid'   => $gclid,
     'fbclid'  => $fbclid,
     'msclkid' => $msclkid,
@@ -97,7 +97,9 @@ function hic_process_booking_data(array $data) {
     'gbraid'  => $gbraid,
     'wbraid'  => $wbraid,
     'sid'     => $sid,
-  ]);
+  ];
+
+  $filtered_data = apply_filters('hic_booking_data', $data, $tracking_context);
 
   if (is_array($filtered_data)) {
     $data = $filtered_data;
@@ -376,7 +378,13 @@ function hic_process_booking_data(array $data) {
     $customer_payload['phone_language'] = sanitize_text_field((string) $detected_language);
   }
 
-  $booking_payload = apply_filters('hic_booking_data', $booking_payload, $data);
+  $filtered_booking_payload = apply_filters('hic_booking_payload', $booking_payload, $tracking_context, $data);
+
+  if (is_array($filtered_booking_payload)) {
+    $booking_payload = $filtered_booking_payload;
+  } else {
+    hic_log('hic_process_booking_data: hic_booking_payload filter must return an array');
+  }
   $customer_payload = apply_filters('hic_booking_customer_data', $customer_payload, $booking_payload, $data);
 
   // Invii with error handling

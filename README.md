@@ -287,6 +287,15 @@ wp cron event delete hic_continuous_poll_event
 wp cron event schedule now hic_continuous_poll_event
 ```
 
+## Hook per sviluppatori
+
+### Prenotazioni
+
+- **Filtro `hic_booking_data`**: consente di modificare i dati grezzi ricevuti dal webhook/API *prima* della normalizzazione. Il secondo parametro fornisce il contesto di tracciamento (SID, gclid, fbclid, ecc.).
+- **Filtro `hic_booking_payload`**: nuovo hook dedicato al payload normalizzato inviato alle integrazioni. Riceve lo stesso contesto di tracciamento del filtro precedente come secondo parametro e l'array normalizzato come terzo parametro per eventuali confronti con i dati originari.
+
+I callback esistenti che operavano sul payload normalizzato devono spostarsi su `hic_booking_payload`, mentre `hic_booking_data` continua a occuparsi esclusivamente dei dati grezzi in ingresso.
+
 ## Notifiche Email
 
 Il plugin invia automaticamente email di notifica all'amministratore per ogni nuova prenotazione ricevuta.
