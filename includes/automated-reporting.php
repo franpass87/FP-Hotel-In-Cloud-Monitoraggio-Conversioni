@@ -1138,9 +1138,24 @@ class AutomatedReportingManager {
             wp_send_json_error('Insufficient permissions');
         }
 
+        $base_path = realpath($this->export_dir);
+
+        if ($base_path === false) {
+            $this->log('Export directory missing or inaccessible: ' . $this->export_dir);
+            wp_die('File not found');
+        }
+
         $filepath = realpath($this->export_dir . $filename);
 
-        if (!$filepath || strpos($filepath, realpath($this->export_dir)) !== 0 || !file_exists($filepath)) {
+        if ($filepath === false) {
+            $this->log('Requested export file could not be resolved: ' . $filename);
+            wp_die('File not found');
+        }
+
+        $base_prefix = rtrim($base_path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+
+        if (strpos($filepath, $base_prefix) !== 0 || !file_exists($filepath)) {
+            $this->log('Blocked export download outside export directory: ' . $filepath);
             wp_die('File not found');
         }
 
