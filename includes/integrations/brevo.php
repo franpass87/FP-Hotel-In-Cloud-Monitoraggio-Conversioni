@@ -665,21 +665,25 @@ function hic_handle_brevo_response($response, $request_type = 'unknown', $log_co
   
   $http_code = wp_remote_retrieve_response_code($response);
   $response_body = wp_remote_retrieve_body($response);
-  
-  // Parse response body for additional error information
-  $parsed_body = json_decode($response_body, true);
-  if (json_last_error() !== JSON_ERROR_NONE) {
-    $log_data = array_merge($log_context, array('error_type' => 'json', 'HTTP' => $http_code));
-    hic_log(array('Brevo response JSON parse error' => array_merge($log_data, array('error' => json_last_error_msg()))));
-    return array(
-      'success' => false,
-      'error' => 'Invalid JSON: ' . json_last_error_msg(),
-      'log_data' => $log_data
-    );
+
+  // Parse response body for additional error information (when provided)
+  $parsed_body = array();
+  $response_body_string = is_string($response_body) ? trim($response_body) : '';
+  if ($response_body_string !== '') {
+    $parsed_body = json_decode($response_body_string, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+      $log_data = array_merge($log_context, array('error_type' => 'json', 'HTTP' => $http_code));
+      hic_log(array('Brevo response JSON parse error' => array_merge($log_data, array('error' => json_last_error_msg()))));
+      return array(
+        'success' => false,
+        'error' => 'Invalid JSON: ' . json_last_error_msg(),
+        'log_data' => $log_data
+      );
+    }
   }
   $brevo_error_code = null;
   $brevo_error_message = null;
-  
+
   if (is_array($parsed_body)) {
     $brevo_error_code = isset($parsed_body['code']) ? $parsed_body['code'] : null;
     $brevo_error_message = isset($parsed_body['message']) ? $parsed_body['message'] : null;
