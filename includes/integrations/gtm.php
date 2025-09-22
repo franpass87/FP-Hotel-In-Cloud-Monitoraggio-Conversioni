@@ -67,7 +67,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttcli
 
     if ($sid !== '') {
         $gtm_data['client_id'] = $sid;
-        $gtm_data['sid'] = $sid;
+        $gtm_data['hic_sid'] = $sid;
     }
 
     // Add tracking IDs if available for enhanced attribution
