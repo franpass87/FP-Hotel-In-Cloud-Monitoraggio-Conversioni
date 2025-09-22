@@ -379,22 +379,87 @@ function hic_detect_phone_language($phone) {
     return ['phone' => $normalized, 'language' => 'en'];
 }
 
+/**
+ * Primary fields checked for reservation unique identifiers.
+ *
+ * @return string[]
+ */
+function hic_booking_uid_primary_fields() {
+    return ['id', 'reservation_id', 'booking_id', 'transaction_id'];
+}
+
+/**
+ * Additional aliases that may contain reservation identifiers.
+ *
+ * @return string[]
+ */
+function hic_reservation_id_aliases() {
+    return [
+        'reservationId',
+        'bookingId',
+        'transactionId',
+        'reservation_code',
+        'reservationCode',
+        'booking_code',
+        'bookingCode',
+        'code',
+        'reservation_number',
+        'reservationNumber',
+        'reservation_reference',
+        'reservationReference',
+        'confirmation_code',
+        'confirmationCode',
+        'confirmationNumber',
+        'reference',
+        'reference_id',
+        'referenceId',
+        'reference_code',
+        'referenceCode',
+    ];
+}
+
+/**
+ * Build the list of candidate reservation identifier fields, keeping order of preference.
+ *
+ * @param string[] $preferred_fields
+ * @return string[]
+ */
+function hic_candidate_reservation_id_fields(array $preferred_fields) {
+    $candidates = array_merge($preferred_fields, hic_reservation_id_aliases());
+
+    return array_values(array_unique($candidates));
+}
+
 function hic_booking_uid($reservation) {
     if (!is_array($reservation)) {
         hic_log('hic_booking_uid: reservation is not an array');
         return '';
     }
-    
+
     // Try multiple possible ID fields in order of preference
-    $id_fields = ['id', 'reservation_id', 'booking_id', 'transaction_id'];
-    
+    $id_fields = hic_candidate_reservation_id_fields(hic_booking_uid_primary_fields());
+
     foreach ($id_fields as $field) {
-        if (!empty($reservation[$field]) && is_scalar($reservation[$field])) {
-            return (string) $reservation[$field];
+        if (!array_key_exists($field, $reservation)) {
+            continue;
+        }
+
+        $value = $reservation[$field];
+        if (!is_scalar($value)) {
+            continue;
+        }
+
+        $candidate = trim((string) $value);
+        if ($candidate !== '') {
+            return $candidate;
         }
     }
-    
-    hic_log('hic_booking_uid: No valid ID found in reservation data');
+
+    hic_log(
+        'hic_booking_uid: No valid ID found in reservation data (checked fields: ' .
+        implode(', ', $id_fields) .
+        ')'
+    );
     return '';
 }
 
@@ -897,16 +962,26 @@ function hic_extract_reservation_id($data) {
     if (!is_array($data)) {
         return null;
     }
-    
+
     // Try different field names in order of preference
-    $id_fields = ['transaction_id', 'reservation_id', 'id', 'booking_id'];
-    
+    $id_fields = hic_candidate_reservation_id_fields(['transaction_id', 'reservation_id', 'id', 'booking_id']);
+
     foreach ($id_fields as $field) {
-        if (!empty($data[$field]) && is_scalar($data[$field])) {
-            return (string) $data[$field];
+        if (!array_key_exists($field, $data)) {
+            continue;
+        }
+
+        $value = $data[$field];
+        if (!is_scalar($value)) {
+            continue;
+        }
+
+        $candidate = trim((string) $value);
+        if ($candidate !== '') {
+            return $candidate;
         }
     }
-    
+
     return null;
 }
 
