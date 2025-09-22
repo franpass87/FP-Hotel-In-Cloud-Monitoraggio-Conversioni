@@ -419,7 +419,7 @@ function hic_should_process_reservation($reservation) {
         hic_log('Reservation skipped: missing critical field(s) ' . implode(', ', $missing));
         return false;
     }
-    
+
     // Check for any valid ID field (more flexible than requiring specific 'id' field)
     $uid = Helpers\hic_booking_uid($reservation);
     if (empty($uid)) {
@@ -427,36 +427,55 @@ function hic_should_process_reservation($reservation) {
         hic_log('Reservation skipped: no valid ID field found (tried: ' . implode(', ', $tried_fields) . ')');
         return false;
     }
-    
+
+    $aliases = is_array($reservation)
+        ? Helpers\hic_collect_reservation_ids($reservation)
+        : array();
+    if (empty($aliases) && $uid !== '') {
+        $sanitized_uid = \sanitize_text_field((string) $uid);
+        $sanitized_uid = trim($sanitized_uid);
+        if ($sanitized_uid !== '') {
+            $aliases[] = $sanitized_uid;
+        }
+    }
+
+    $processed_alias = is_array($reservation)
+        ? Helpers\hic_find_processed_reservation_alias($reservation)
+        : null;
+    $log_uid = $processed_alias ?? $uid;
+    if ($log_uid === '' && !empty($aliases)) {
+        $log_uid = $aliases[0];
+    }
+
     // Log warnings for missing optional data but don't block processing
     $optional_fields = ['accommodation_id', 'accommodation_name'];
     foreach ($optional_fields as $field) {
         if (empty($reservation[$field])) {
-            hic_log("Reservation $uid: Warning - missing optional field '$field', using defaults");
+            hic_log("Reservation $log_uid: Warning - missing optional field '$field', using defaults");
         }
     }
-    
+
     // Check valid flag
     $valid = isset($reservation['valid']) ? intval($reservation['valid']) : 1;
     if ($valid === 0 && !Helpers\hic_process_invalid()) {
-        hic_log("Reservation $uid skipped: valid=0 and process_invalid=false");
+        hic_log("Reservation $log_uid skipped: valid=0 and process_invalid=false");
         return false;
     }
-    
+
     // Check deduplication
-    if (Helpers\hic_is_reservation_already_processed($uid)) {
+    if (!empty($aliases) && Helpers\hic_is_reservation_already_processed($aliases)) {
         // Check if status update is allowed
         if (Helpers\hic_allow_status_updates()) {
             $presence = $reservation['presence'] ?? '';
             if (in_array($presence, ['arrived', 'departed'])) {
-                hic_log("Reservation $uid: status update allowed for presence=$presence");
+                hic_log("Reservation $log_uid: status update allowed for presence=$presence");
                 return true;
             }
         }
-        hic_log("Reservation $uid already processed, skipping");
+        hic_log("Reservation $log_uid already processed, skipping");
         return false;
     }
-    
+
     return true;
 }
 
@@ -734,8 +753,27 @@ function hic_transform_reservation($reservation) {
  * Dispatch transformed reservation to all services
  */
 function hic_dispatch_reservation($transformed, $original) {
-    $uid = Helpers\hic_booking_uid($original);
-    $is_status_update = Helpers\hic_is_reservation_already_processed($uid);
+    $canonical_uid = Helpers\hic_booking_uid($original);
+    $aliases = is_array($original)
+        ? Helpers\hic_collect_reservation_ids($original)
+        : array();
+    if (empty($aliases) && $canonical_uid !== '') {
+        $sanitized_uid = \sanitize_text_field((string) $canonical_uid);
+        $sanitized_uid = trim($sanitized_uid);
+        if ($sanitized_uid !== '') {
+            $aliases[] = $sanitized_uid;
+        }
+    }
+
+    $processed_alias = is_array($original)
+        ? Helpers\hic_find_processed_reservation_alias($original)
+        : null;
+    $uid = $processed_alias ?? $canonical_uid;
+    if ($uid === '' && !empty($aliases)) {
+        $uid = $aliases[0];
+    }
+
+    $is_status_update = Helpers\hic_is_reservation_already_processed($aliases);
 
     // Debug log to verify fixes are in place
     $realtime_enabled = Helpers\hic_realtime_brevo_sync_enabled();
@@ -1233,6 +1271,9 @@ function hic_process_reservations_batch($reservations) {
             }
             break;
         }
+        $canonical_uid = '';
+        $dedup_uid = '';
+        $aliases = array();
         try {
             // Apply minimal filters first
             if (!hic_should_process_reservation($reservation)) {
@@ -1240,72 +1281,97 @@ function hic_process_reservations_batch($reservations) {
                 continue;
             }
 
+            $canonical_uid = Helpers\hic_booking_uid($reservation);
+            $aliases = is_array($reservation)
+                ? Helpers\hic_collect_reservation_ids($reservation)
+                : array();
+            if (empty($aliases) && $canonical_uid !== '') {
+                $sanitized_uid = \sanitize_text_field((string) $canonical_uid);
+                $sanitized_uid = trim($sanitized_uid);
+                if ($sanitized_uid !== '') {
+                    $aliases[] = $sanitized_uid;
+                }
+            }
+
+            $processed_alias = is_array($reservation)
+                ? Helpers\hic_find_processed_reservation_alias($reservation)
+                : null;
+            $dedup_uid = $processed_alias ?? $canonical_uid;
+            if ($dedup_uid === '' && !empty($aliases)) {
+                $dedup_uid = $aliases[0];
+            }
+
             // Check deduplication
-            $uid = Helpers\hic_booking_uid($reservation);
-            if (Helpers\hic_is_reservation_already_processed($uid)) {
+            if (!empty($aliases) && Helpers\hic_is_reservation_already_processed($aliases)) {
                 // Check if status update is allowed
                 if (Helpers\hic_allow_status_updates()) {
                     $presence = $reservation['presence'] ?? '';
                     if (in_array($presence, ['arrived', 'departed'])) {
-                        hic_log("Reservation $uid: processing status update for presence=$presence");
+                        hic_log("Reservation $dedup_uid: processing status update for presence=$presence");
 
                         // Acquire lock for status update processing
-                        if (!Helpers\hic_acquire_reservation_lock($uid, 10)) {
-                            hic_log("Reservation $uid: skipped status update due to concurrent processing");
+                        if ($dedup_uid === '') {
+                            $dedup_uid = $canonical_uid;
+                        }
+                        if (!Helpers\hic_acquire_reservation_lock($dedup_uid, 10)) {
+                            hic_log("Reservation $dedup_uid: skipped status update due to concurrent processing");
                             continue;
                         }
 
                         try {
                             // Process as status update but don't count as new
-                            $status_result = $normalize_result(hic_process_single_reservation($reservation), $uid);
+                            $status_result = $normalize_result(hic_process_single_reservation($reservation), $dedup_uid);
                             $status_value = isset($status_result['status']) ? (string) $status_result['status'] : 'failed';
 
                             if ($status_value === 'failed') {
                                 $error_count++;
-                                hic_log("Reservation $uid: status update failed");
+                                hic_log("Reservation $dedup_uid: status update failed");
                             } else {
                                 if ($status_value === 'partial') {
                                     $failed = isset($status_result['failed_integrations']) && is_array($status_result['failed_integrations'])
                                         ? $status_result['failed_integrations']
                                         : array();
                                     if (!empty($status_result['failed_details'])) {
-                                        Helpers\hic_queue_integration_retry($uid, $status_result['failed_details'], array(
+                                        Helpers\hic_queue_integration_retry($dedup_uid, $status_result['failed_details'], array(
                                             'source' => 'polling',
                                             'type' => 'status_update',
                                         ));
                                     }
                                     $failed_message = !empty($failed) ? ' - Failed integrations: ' . implode(', ', $failed) : '';
-                                    hic_log("Reservation $uid: status update processed with partial failures$failed_message", HIC_LOG_LEVEL_WARNING);
+                                    hic_log("Reservation $dedup_uid: status update processed with partial failures$failed_message", HIC_LOG_LEVEL_WARNING);
                                 } else {
-                                    hic_log("Reservation $uid: status update processed");
+                                    hic_log("Reservation $dedup_uid: status update processed");
                                 }
                             }
                         } finally {
-                            Helpers\hic_release_reservation_lock($uid);
+                            Helpers\hic_release_reservation_lock($dedup_uid);
                         }
                         continue;
                     }
                 }
                 $skipped_count++;
-                hic_log("Reservation $uid: skipped (already processed)");
+                hic_log("Reservation $dedup_uid: skipped (already processed)");
                 continue;
             }
 
             // Acquire lock for new reservation processing
-            if (!Helpers\hic_acquire_reservation_lock($uid)) {
-                hic_log("Reservation $uid: skipped due to concurrent processing");
+            if ($dedup_uid === '') {
+                $dedup_uid = $canonical_uid;
+            }
+            if (!Helpers\hic_acquire_reservation_lock($dedup_uid)) {
+                hic_log("Reservation $dedup_uid: skipped due to concurrent processing");
                 $skipped_count++;
                 continue;
             }
 
             try {
                 // Process new reservation
-                $process_result = $normalize_result(hic_process_single_reservation($reservation), $uid);
+                $process_result = $normalize_result(hic_process_single_reservation($reservation), $dedup_uid);
                 $status_value = isset($process_result['status']) ? (string) $process_result['status'] : 'failed';
 
                 if ($status_value === 'failed') {
                     $error_count++;
-                    hic_log("Reservation $uid: dispatch failed, will retry");
+                    hic_log("Reservation $dedup_uid: dispatch failed, will retry");
                 } else {
                     if (!empty($process_result['should_mark_processed'])) {
                         hic_mark_reservation_processed($reservation);
@@ -1316,7 +1382,7 @@ function hic_process_reservations_batch($reservations) {
                     if ($status_value === 'partial') {
                         $partial_count++;
                         if (!empty($process_result['failed_details'])) {
-                            Helpers\hic_queue_integration_retry($uid, $process_result['failed_details'], array(
+                            Helpers\hic_queue_integration_retry($dedup_uid, $process_result['failed_details'], array(
                                 'source' => 'polling',
                                 'type' => 'new_reservation',
                             ));
@@ -1325,19 +1391,22 @@ function hic_process_reservations_batch($reservations) {
                             ? $process_result['failed_integrations']
                             : array();
                         $failed_message = !empty($failed) ? ' - Failed integrations: ' . implode(', ', $failed) : '';
-                        hic_log("Reservation $uid: processed with partial failures$failed_message", HIC_LOG_LEVEL_WARNING);
+                        hic_log("Reservation $dedup_uid: processed with partial failures$failed_message", HIC_LOG_LEVEL_WARNING);
                     } else {
-                        hic_log("Reservation $uid: processed");
+                        hic_log("Reservation $dedup_uid: processed");
                     }
                 }
             } finally {
-                Helpers\hic_release_reservation_lock($uid);
+                Helpers\hic_release_reservation_lock($dedup_uid);
             }
 
         } catch (\Exception $e) {
             $error_count++;
-            $uid = Helpers\hic_booking_uid($reservation);
-            hic_log("Reservation $uid: failed with error - " . $e->getMessage());
+            $log_uid = $dedup_uid !== '' ? $dedup_uid : $canonical_uid;
+            if ($log_uid === '') {
+                $log_uid = Helpers\hic_booking_uid($reservation);
+            }
+            hic_log("Reservation $log_uid: failed with error - " . $e->getMessage());
         }
     }
 

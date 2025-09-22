@@ -495,6 +495,27 @@ function hic_collect_reservation_ids(array $reservation): array {
     return array_keys($unique_ids);
 }
 
+/**
+ * Locate the first reservation identifier already marked as processed.
+ *
+ * @param array<string, mixed> $reservation
+ */
+function hic_find_processed_reservation_alias(array $reservation): ?string {
+    $aliases = hic_collect_reservation_ids($reservation);
+    if (empty($aliases)) {
+        return null;
+    }
+
+    $processed = hic_get_processed_reservation_id_set();
+    foreach ($aliases as $alias) {
+        if (array_key_exists($alias, $processed)) {
+            return $alias;
+        }
+    }
+
+    return null;
+}
+
 /* ============ Helpers ============ */
 function hic_http_request($url, $args = [], bool $suppress_failed_storage = false) {
     $validated_url = wp_http_validate_url($url);
@@ -1518,6 +1539,7 @@ namespace {
     function hic_mark_email_enriched($reservation_id, $real_email) { return \FpHic\Helpers\hic_mark_email_enriched($reservation_id, $real_email); }
     function hic_get_reservation_email($reservation_id) { return \FpHic\Helpers\hic_get_reservation_email($reservation_id); }
     function hic_collect_reservation_ids(array $reservation) { return \FpHic\Helpers\hic_collect_reservation_ids($reservation); }
+    function hic_find_processed_reservation_alias(array $reservation) { return \FpHic\Helpers\hic_find_processed_reservation_alias($reservation); }
     function hic_create_integration_result($overrides = []) { return \FpHic\Helpers\hic_create_integration_result(is_array($overrides) ? $overrides : []); }
     function hic_append_integration_result(array &$result, $integration, $status, $note = '') { \FpHic\Helpers\hic_append_integration_result($result, (string) $integration, (string) $status, (string) $note); }
     function hic_finalize_integration_result($result, $tracking_skipped = false) { return \FpHic\Helpers\hic_finalize_integration_result(is_array($result) ? $result : [], (bool) $tracking_skipped); }
