@@ -897,8 +897,14 @@ function hic_dispatch_reservation($transformed, $original) {
             $admin_email = Helpers\hic_get_admin_email();
             if (!empty($admin_email) && Helpers\hic_is_valid_email($admin_email)) {
                 $email_result = Helpers\hic_send_admin_email($admin_data, $gclid, $fbclid, (string) $email_identifier);
-                hic_log('Admin email dispatch result for reservation ' . $uid . ': ' . ($email_result ? 'success' : 'failure'));
-                $record_result('Admin email', $email_result ? 'success' : 'failed');
+                if ($email_result) {
+                    hic_log('Admin email dispatch succeeded for reservation ' . $uid);
+                    $record_result('Admin email', 'success');
+                } else {
+                    $warning_message = 'Admin email dispatch failed for reservation ' . $uid . ' - marking as skipped. Check SMTP or wp_mail configuration.';
+                    hic_log($warning_message, HIC_LOG_LEVEL_WARNING);
+                    $record_result('Admin email', 'skipped', 'send failed');
+                }
             } else {
                 $record_result('Admin email', 'skipped');
             }
