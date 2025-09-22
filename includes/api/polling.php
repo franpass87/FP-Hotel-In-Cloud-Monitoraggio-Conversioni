@@ -1170,7 +1170,7 @@ function hic_process_reservations_batch($reservations) {
         }
         try {
             // Apply minimal filters first
-            if (!hic_should_process_reservation_with_email($reservation)) {
+            if (!hic_should_process_reservation($reservation)) {
                 $skipped_count++;
                 continue;
             }
@@ -1239,30 +1239,6 @@ function hic_process_reservations_batch($reservations) {
 
     hic_log("Batch summary: processed=$new_count, skipped=$skipped_count, failed=$error_count, remaining=$remaining_count");
     return array('new' => $new_count, 'skipped' => $skipped_count, 'errors' => $error_count, 'remaining' => $remaining_count);
-}
-
-/**
- * Enhanced filtering for reservations (includes email check)
- */
-function hic_should_process_reservation_with_email($reservation) {
-    // Use existing validation logic
-    if (!hic_should_process_reservation($reservation)) {
-        return false;
-    }
-
-    // Determine email from reservation data
-    $email = $reservation['guest_email']
-        ?? $reservation['email']
-        ?? $reservation['client_email']
-        ?? '';
-
-    // Additional check: Skip reservations without or with invalid email
-    if (empty($email) || !is_string($email) || !Helpers\hic_is_valid_email($email)) {
-        hic_log("Reservation skipped: missing or invalid email");
-        return false;
-    }
-
-    return true;
 }
 
 /**
