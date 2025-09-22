@@ -3,6 +3,20 @@
 use PHPUnit\Framework\TestCase;
 use FpHic\Helpers;
 
+if (!function_exists('hic_is_reservation_new_for_realtime')) {
+    function hic_is_reservation_new_for_realtime($reservation_id): bool
+    {
+        return false;
+    }
+}
+
+if (!function_exists('hic_mark_reservation_new_for_realtime')) {
+    function hic_mark_reservation_new_for_realtime($reservation_id): bool
+    {
+        return true;
+    }
+}
+
 final class ReservationProcessingWithoutEmailTest extends TestCase
 {
     private string $logFile;
@@ -124,6 +138,28 @@ final class ReservationProcessingWithoutEmailTest extends TestCase
 
         $gtmLog = self::findLogContaining('GTM dispatch');
         $this->assertNotNull($gtmLog, 'GTM dispatch log should be present.');
+    }
+
+    public function testUpdatePresenceLoggedWithoutEmail(): void
+    {
+        update_option('hic_allow_status_updates', '1');
+        Helpers\hic_clear_option_cache('allow_status_updates');
+
+        $update = [
+            'id' => 'UP-123',
+            'presence' => 'arrived',
+        ];
+
+        \FpHic\hic_process_update($update);
+
+        $missingEmailLog = self::findLogContaining('hic_process_update: no valid email in update for reservation UP-123');
+        $this->assertNotNull($missingEmailLog, 'Missing email skip should be logged.');
+
+        $presenceLog = self::findLogContaining('Reservation UP-123 presence update: arrived');
+        $this->assertNotNull($presenceLog, 'Presence change should be logged even without email.');
+
+        $enrichmentLog = self::findLogContaining('Enriched email for reservation UP-123');
+        $this->assertNull($enrichmentLog, 'Email enrichment should be skipped when email is missing.');
     }
 
     public static function captureLogMessage($message, $level): mixed
