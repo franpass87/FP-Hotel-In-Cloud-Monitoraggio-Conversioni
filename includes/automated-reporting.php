@@ -1172,10 +1172,10 @@ class AutomatedReportingManager {
     private function get_raw_data_for_period($period) {
         global $wpdb;
         
-        $main_table = $wpdb->prefix . 'hic_gclids';
+        $table_name = \esc_sql($wpdb->prefix . 'hic_gclids');
         $date_condition = $this->get_date_condition_for_period($period);
-        
-        return $wpdb->get_results($wpdb->prepare("
+
+        $sql = "
             SELECT
                 id,
                 gclid,
@@ -1191,10 +1191,12 @@ class AutomatedReportingManager {
                 utm_content,
                 utm_term,
                 created_at
-            FROM {$main_table} 
+            FROM `{$table_name}`
             WHERE {$date_condition}
             ORDER BY created_at DESC
-        "), ARRAY_A);
+        ";
+
+        return $wpdb->get_results($sql, ARRAY_A);
     }
     
     /**
