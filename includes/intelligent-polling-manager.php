@@ -15,7 +15,10 @@ class IntelligentPollingManager {
     
     /** @var array Connection pool for API connections */
     private static $connection_pool = [];
-    
+
+    /** @var bool Tracks whether the fallback transport warning was already emitted */
+    private static $fallback_notice_logged = false;
+
     /** @var array Backoff intervals in seconds */
     private static $backoff_intervals = [60, 120, 300, 900, 1800]; // 1min → 2min → 5min → 15min → 30min
     
@@ -291,16 +294,28 @@ class IntelligentPollingManager {
             'created_at' => time(),
             'last_used' => time(),
             'request_count' => 0,
+            'transport' => 'curl',
             'curl_handle' => null
         ];
-        
+
+        if (!function_exists('curl_init')) {
+            $connection['transport'] = 'wp_http';
+
+            if (!self::$fallback_notice_logged) {
+                $this->log('cURL not available, falling back to standard HTTP');
+                self::$fallback_notice_logged = true;
+            }
+
+            return $connection;
+        }
+
         // Initialize cURL handle with keep-alive
         $curl = curl_init();
-        
+
         if ($curl === false) {
             throw new \Exception('Failed to initialize cURL');
         }
-        
+
         curl_setopt_array($curl, [
             CURLOPT_TIMEOUT => self::CONNECTION_TIMEOUT,
             CURLOPT_CONNECTTIMEOUT => 10,
@@ -315,11 +330,13 @@ class IntelligentPollingManager {
             CURLOPT_TCP_KEEPIDLE => 30,
             CURLOPT_TCP_KEEPINTVL => 10,
         ]);
-        
+
         $connection['curl_handle'] = $curl;
-        
+
+        self::$fallback_notice_logged = false;
+
         $this->log('Created new HTTP connection with keep-alive');
-        
+
         return $connection;
     }
     
@@ -327,22 +344,27 @@ class IntelligentPollingManager {
      * Check if a connection is still valid
      */
     private function is_connection_valid($connection) {
-        if (!isset($connection['created_at'], $connection['curl_handle'])) {
+        if (!isset($connection['created_at'])) {
             return false;
         }
-        
+
+        $transport = $connection['transport'] ?? 'curl';
+
+        if ($transport === 'wp_http') {
+            return true;
+        }
+
+        if (!isset($connection['curl_handle'])) {
+            return false;
+        }
+
         // Check if connection is too old
         $age = time() - $connection['created_at'];
         if ($age > self::KEEP_ALIVE_TIMEOUT) {
             return false;
         }
-        
-        // Check if cURL handle is still valid
-        if (!is_resource($connection['curl_handle'])) {
-            return false;
-        }
-        
-        return true;
+
+        return $this->is_curl_handle($connection['curl_handle']);
     }
     
     /**
@@ -351,7 +373,13 @@ class IntelligentPollingManager {
     private function execute_polling_with_connection($connection) {
         $connection['last_used'] = time();
         $connection['request_count']++;
-        
+
+        $transport = $connection['transport'] ?? 'curl';
+
+        if ($transport === 'wp_http') {
+            // Using fallback transport; hic_api_poll_bookings() internally uses WordPress HTTP API helpers.
+        }
+
         // Use existing polling logic but with our pooled connection
         if (function_exists('\\FpHic\\hic_api_poll_bookings')) {
             $result = \FpHic\hic_api_poll_bookings();
@@ -451,7 +479,7 @@ class IntelligentPollingManager {
         foreach (self::$connection_pool as $key => $connection) {
             if (!$this->is_connection_valid($connection)) {
                 // Close cURL handle if it exists
-                if (isset($connection['curl_handle']) && is_resource($connection['curl_handle'])) {
+                if (isset($connection['curl_handle']) && $this->is_curl_handle($connection['curl_handle']) && function_exists('curl_close')) {
                     curl_close($connection['curl_handle']);
                 }
                 
@@ -532,6 +560,24 @@ class IntelligentPollingManager {
         if (function_exists('\\FpHic\\Helpers\\hic_log')) {
             \FpHic\Helpers\hic_log("[Intelligent Polling] {$message}");
         }
+    }
+
+    /**
+     * Determine whether the provided handle is a valid cURL resource/object.
+     *
+     * @param mixed $handle
+     */
+    private function is_curl_handle($handle) {
+        if (is_resource($handle)) {
+            return true;
+        }
+
+        if (is_object($handle)) {
+            $type = function_exists('get_debug_type') ? get_debug_type($handle) : get_class($handle);
+            return $type === 'CurlHandle';
+        }
+
+        return false;
     }
 }
 
