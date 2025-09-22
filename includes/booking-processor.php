@@ -429,11 +429,25 @@ function hic_process_booking_data(array $data): bool {
 
         // Brevo Integration - Unified approach to prevent duplicate events
         if (Helpers\hic_is_brevo_enabled() && Helpers\hic_get_brevo_api_key()) {
-          $brevo_success = hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
-          if ($brevo_success) {
-            $success_count++;
+          $brevo_email = '';
+          if (isset($data['email']) && is_scalar($data['email'])) {
+            $brevo_email = \sanitize_email((string) $data['email']);
+          }
+
+          if (!Helpers\hic_is_valid_email($brevo_email)) {
+            hic_log('hic_process_booking_data: Brevo dispatch skipped - missing or invalid email');
+            $skipped_count++;
           } else {
-            $error_count++;
+            $data['email'] = $brevo_email;
+            $brevo_result = hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
+
+            if ($brevo_result === true) {
+              $success_count++;
+            } elseif ($brevo_result === 'skipped') {
+              $skipped_count++;
+            } else {
+              $error_count++;
+            }
           }
         } else {
           hic_log('hic_process_booking_data: Brevo disabled or credentials missing, skipping');

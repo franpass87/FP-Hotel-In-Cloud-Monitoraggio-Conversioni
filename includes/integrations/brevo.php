@@ -230,17 +230,19 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
 
 /**
  * Brevo dispatcher for HIC reservation schema
+ *
+ * @return bool|string True on success, 'skipped' when prerequisites are missing, false on failure.
  */
 function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = '', $fbclid = '', $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = '', $sid = '') {
   if (!Helpers\hic_get_brevo_api_key()) {
     hic_log('Brevo disabilitato (API key vuota).');
-    return false;
+    return 'skipped';
   }
 
   $email = isset($data['email']) ? $data['email'] : '';
   if (!Helpers\hic_is_valid_email($email)) {
     hic_log('Brevo: email mancante o non valida, skip contatto.');
-    return false;
+    return 'skipped';
   }
 
   $is_alias = Helpers\hic_is_ota_alias_email($email);
@@ -774,18 +776,20 @@ function hic_is_brevo_error_retryable($result) {
 /**
  * Unified Brevo event sender to prevent duplicate API calls
  * Replaces separate hic_send_brevo_contact() + hic_send_brevo_event() calls
+ *
+ * @return bool|string True on success, 'skipped' when prerequisites are missing, false on failure.
  */
 function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = '') {
-  if (!Helpers\hic_get_brevo_api_key()) { 
-    hic_log('Unified Brevo dispatch SKIPPED: API key mancante'); 
-    return false; 
+  if (!Helpers\hic_get_brevo_api_key()) {
+    hic_log('Unified Brevo dispatch SKIPPED: API key mancante');
+    return 'skipped';
   }
 
   // Validate essential data
   $email = isset($data['email']) ? $data['email'] : null;
-  if (!Helpers\hic_is_valid_email($email)) { 
-    hic_log('Unified Brevo dispatch SKIPPED: email mancante o non valida'); 
-    return false; 
+  if (!Helpers\hic_is_valid_email($email)) {
+    hic_log('Unified Brevo dispatch SKIPPED: email mancante o non valida');
+    return 'skipped';
   }
 
   // Transform webhook data to modern format for consistency
@@ -798,13 +802,17 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
   if ($transformed_sid !== '') {
     $transformed_data['sid'] = $transformed_sid;
   }
-  $contact_updated = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $transformed_sid);
-  hic_log(
-    $contact_updated
-      ? 'Unified Brevo: contact update succeeded'
-      : 'Unified Brevo: contact update failed',
-    $contact_updated ? HIC_LOG_LEVEL_INFO : HIC_LOG_LEVEL_ERROR
-  );
+  $contact_result = hic_dispatch_brevo_reservation($transformed_data, false, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $transformed_sid);
+  $contact_updated = $contact_result === true;
+  $contact_skipped = $contact_result === 'skipped';
+
+  if ($contact_updated) {
+    hic_log('Unified Brevo: contact update succeeded', HIC_LOG_LEVEL_INFO);
+  } elseif ($contact_skipped) {
+    hic_log('Unified Brevo: contact update skipped', HIC_LOG_LEVEL_INFO);
+  } else {
+    hic_log('Unified Brevo: contact update failed', HIC_LOG_LEVEL_ERROR);
+  }
 
   // Send event for new reservations, allowing override via filter
   $event_sent = false;
@@ -846,15 +854,23 @@ function hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid = '', $t
     }
   }
 
-  if (!$contact_updated && !$event_sent) {
-    return false;
-  }
-
   if (!$contact_updated && $event_sent) {
-    hic_log('Unified Brevo: contact update failed but event sent', HIC_LOG_LEVEL_WARNING);
+    if ($contact_skipped) {
+      hic_log('Unified Brevo: contact update skipped but event sent', HIC_LOG_LEVEL_INFO);
+    } else {
+      hic_log('Unified Brevo: contact update failed but event sent', HIC_LOG_LEVEL_WARNING);
+    }
   }
 
-  return true;
+  if ($contact_updated || $event_sent) {
+    return true;
+  }
+
+  if ($contact_skipped) {
+    return 'skipped';
+  }
+
+  return false;
 }
 
 /**

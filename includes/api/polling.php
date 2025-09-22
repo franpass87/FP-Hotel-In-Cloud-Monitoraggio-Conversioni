@@ -800,11 +800,27 @@ function hic_dispatch_reservation($transformed, $original) {
 
         // Brevo - handle differently based on connection type to prevent duplication
         if ($brevo_enabled) {
-            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid);
-            if (!$brevo_success) {
-                hic_log('Brevo contact dispatch failed for reservation ' . $uid);
+            $email_value = '';
+            if (isset($transformed['email']) && is_scalar($transformed['email'])) {
+                $email_value = \sanitize_email((string) $transformed['email']);
             }
-            $record_result('Brevo contact', $brevo_success ? 'success' : 'failed');
+
+            if (!Helpers\hic_is_valid_email($email_value)) {
+                hic_log('Brevo contact skipped for reservation ' . $uid . ': missing or invalid email');
+                $record_result('Brevo contact', 'skipped', 'missing email');
+            } else {
+                $transformed['email'] = $email_value;
+                $brevo_result = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid);
+
+                if ($brevo_result === true) {
+                    $record_result('Brevo contact', 'success');
+                } elseif ($brevo_result === 'skipped') {
+                    $record_result('Brevo contact', 'skipped');
+                } else {
+                    hic_log('Brevo contact dispatch failed for reservation ' . $uid);
+                    $record_result('Brevo contact', 'failed');
+                }
+            }
         } else {
             $record_result('Brevo contact', 'skipped');
         }
