@@ -176,13 +176,23 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         $result = hic_validate_webhook_payload($valid_payload);
         $this->assertTrue($result);
         
-        // Test payload senza email (dovrebbe fallire)
-        $invalid_payload = [
+        // Test payload senza email (ora accettato)
+        $missing_email_payload = [
+            'reservation_id' => 'MISSING_EMAIL_123',
+            'amount' => 100.00
+        ];
+
+        $result = hic_validate_webhook_payload($missing_email_payload);
+        $this->assertTrue($result);
+
+        // Test payload con email non valida
+        $invalid_email_payload = [
+            'email' => 'invalid-email',
             'reservation_id' => 'INVALID_123',
             'amount' => 100.00
         ];
-        
-        $result = hic_validate_webhook_payload($invalid_payload);
+
+        $result = hic_validate_webhook_payload($invalid_email_payload);
         $this->assertInstanceOf('WP_Error', $result);
         $this->assertEquals('invalid_email', $result->get_error_code());
     }

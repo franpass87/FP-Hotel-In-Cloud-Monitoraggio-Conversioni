@@ -52,24 +52,26 @@ class HIC_Input_Validator {
         
         $errors = [];
         
-        // Required fields validation
-        $required_fields = ['email'];
-        foreach ($required_fields as $field) {
-            if (!isset($data[$field]) || empty($data[$field])) {
-                $errors[] = "Campo obbligatorio mancante: $field";
-            }
-        }
-        
         // Email validation
-        if (isset($data['email'])) {
-            $email_validation = self::validate_email($data['email']);
-            if (is_wp_error($email_validation)) {
-                $errors[] = $email_validation->get_error_message();
+        if (array_key_exists('email', $data)) {
+            $email_value = $data['email'];
+
+            if (is_string($email_value)) {
+                $email_value = trim($email_value);
+            }
+
+            if ($email_value === '' || $email_value === null) {
+                unset($data['email']);
             } else {
-                $data['email'] = $email_validation;
+                $email_validation = self::validate_email($email_value);
+                if (is_wp_error($email_validation)) {
+                    $errors[] = $email_validation->get_error_message();
+                } else {
+                    $data['email'] = $email_validation;
+                }
             }
         }
-        
+
         // Amount validation
         if (isset($data['amount'])) {
             $amount_validation = self::validate_amount($data['amount']);
