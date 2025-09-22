@@ -464,7 +464,20 @@ function hic_booking_uid($reservation) {
 }
 
 /**
- * Collect every sanitized reservation identifier present in the payload.
+ * Normalize reservation identifiers for consistent storage and comparisons.
+ */
+function hic_normalize_reservation_id(string $value): string {
+    $sanitized = sanitize_text_field($value);
+    $sanitized = trim($sanitized);
+    if ($sanitized === '') {
+        return '';
+    }
+
+    return strtoupper($sanitized);
+}
+
+/**
+ * Collect every normalized reservation identifier present in the payload.
  *
  * @param array<string, mixed> $reservation
  * @return string[]
@@ -483,8 +496,7 @@ function hic_collect_reservation_ids(array $reservation): array {
             continue;
         }
 
-        $candidate = sanitize_text_field((string) $value);
-        $candidate = trim($candidate);
+        $candidate = hic_normalize_reservation_id((string) $value);
         if ($candidate === '') {
             continue;
         }
@@ -508,8 +520,13 @@ function hic_find_processed_reservation_alias(array $reservation): ?string {
 
     $processed = hic_get_processed_reservation_id_set();
     foreach ($aliases as $alias) {
-        if (array_key_exists($alias, $processed)) {
-            return $alias;
+        $normalized = hic_normalize_reservation_id($alias);
+        if ($normalized === '') {
+            continue;
+        }
+
+        if (array_key_exists($normalized, $processed)) {
+            return $normalized;
         }
     }
 
@@ -1259,29 +1276,29 @@ function hic_get_processed_reservation_id_set(): array {
     foreach ($stored as $key => $value) {
         $position++;
 
+        $id = '';
+        $timestamp = $position;
+
         if (is_string($key) && $key !== '') {
-            $id = sanitize_text_field($key);
-            $id = trim($id);
+            $id = hic_normalize_reservation_id($key);
             if ($id === '') {
                 continue;
             }
 
-            $normalized[$id] = hic_normalize_processed_reservation_timestamp($value, $position);
-            continue;
-        }
-
-        if (!is_scalar($value)) {
-            continue;
-        }
-
-        $id = sanitize_text_field((string) $value);
-        $id = trim($id);
-        if ($id === '') {
+            $timestamp = hic_normalize_processed_reservation_timestamp($value, $position);
+        } elseif (is_scalar($value)) {
+            $id = hic_normalize_reservation_id((string) $value);
+            if ($id === '') {
+                continue;
+            }
+        } else {
             continue;
         }
 
         if (!array_key_exists($id, $normalized)) {
-            $normalized[$id] = $position;
+            $normalized[$id] = $timestamp;
+        } else {
+            $normalized[$id] = min($normalized[$id], $timestamp);
         }
     }
 
@@ -1316,8 +1333,7 @@ function hic_mark_reservation_processed_by_id($reservation_id) {
                 continue;
             }
 
-            $sanitized = sanitize_text_field((string) $candidate);
-            $sanitized = trim($sanitized);
+            $sanitized = hic_normalize_reservation_id((string) $candidate);
             if ($sanitized === '') {
                 continue;
             }
@@ -1325,8 +1341,7 @@ function hic_mark_reservation_processed_by_id($reservation_id) {
             $ids[$sanitized] = true;
         }
     } elseif (is_scalar($reservation_id)) {
-        $sanitized = sanitize_text_field((string) $reservation_id);
-        $sanitized = trim($sanitized);
+        $sanitized = hic_normalize_reservation_id((string) $reservation_id);
         if ($sanitized !== '') {
             $ids[$sanitized] = true;
         }
@@ -1415,8 +1430,7 @@ function hic_is_reservation_already_processed($reservation_id) {
                 continue;
             }
 
-            $sanitized = sanitize_text_field((string) $candidate);
-            $sanitized = trim($sanitized);
+            $sanitized = hic_normalize_reservation_id((string) $candidate);
             if ($sanitized === '') {
                 continue;
             }
@@ -1424,8 +1438,7 @@ function hic_is_reservation_already_processed($reservation_id) {
             $ids[$sanitized] = true;
         }
     } elseif (is_scalar($reservation_id)) {
-        $sanitized = sanitize_text_field((string) $reservation_id);
-        $sanitized = trim($sanitized);
+        $sanitized = hic_normalize_reservation_id((string) $reservation_id);
         if ($sanitized !== '') {
             $ids[$sanitized] = true;
         }
@@ -1538,6 +1551,7 @@ namespace {
     function hic_diagnose_email_issues() { return \FpHic\Helpers\hic_diagnose_email_issues(); }
     function hic_mark_email_enriched($reservation_id, $real_email) { return \FpHic\Helpers\hic_mark_email_enriched($reservation_id, $real_email); }
     function hic_get_reservation_email($reservation_id) { return \FpHic\Helpers\hic_get_reservation_email($reservation_id); }
+    function hic_normalize_reservation_id($value) { return \FpHic\Helpers\hic_normalize_reservation_id((string) $value); }
     function hic_collect_reservation_ids(array $reservation) { return \FpHic\Helpers\hic_collect_reservation_ids($reservation); }
     function hic_find_processed_reservation_alias(array $reservation) { return \FpHic\Helpers\hic_find_processed_reservation_alias($reservation); }
     function hic_create_integration_result($overrides = []) { return \FpHic\Helpers\hic_create_integration_result(is_array($overrides) ? $overrides : []); }

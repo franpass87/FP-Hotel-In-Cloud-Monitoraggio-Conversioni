@@ -169,6 +169,42 @@ final class ReservationCodeDeduplicationTest extends TestCase
         $this->assertLogContains('Webhook skipped: reservation RCODE-WEB-1 already processed');
     }
 
+    public function test_webhook_deduplicates_mixed_case_reservation_ids(): void
+    {
+        $payload = [
+            'reservation_code' => 'RCODE-MIXED-1',
+            'amount' => 199.99,
+            'currency' => 'EUR',
+            'checkin' => '2024-11-01',
+            'checkout' => '2024-11-03',
+        ];
+
+        $request = new WP_REST_Request(
+            ['token' => 'secret-token', 'email' => 'mixed@example.com'],
+            ['content-type' => 'application/json']
+        );
+
+        $firstResult = $this->dispatchWebhook($payload, $request);
+
+        $this->assertIsArray($firstResult);
+        $this->assertArrayHasKey('processed', $firstResult);
+        $this->assertTrue($firstResult['processed']);
+
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('RCODE-MIXED-1'));
+        $this->assertTrue(Helpers\hic_is_reservation_already_processed('rcode-mixed-1'));
+
+        $followUp = $payload;
+        $followUp['reservation_code'] = 'rcode-mixed-1';
+
+        $secondResult = $this->dispatchWebhook($followUp, $request);
+
+        $this->assertIsArray($secondResult);
+        $this->assertFalse($secondResult['processed']);
+        $this->assertSame('already_processed', $secondResult['reason']);
+
+        $this->assertLogContains('Webhook skipped: reservation RCODE-MIXED-1 already processed');
+    }
+
     public function test_polling_deduplicates_reservation_code(): void
     {
         $reservation = [

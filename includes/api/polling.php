@@ -432,8 +432,7 @@ function hic_should_process_reservation($reservation) {
         ? Helpers\hic_collect_reservation_ids($reservation)
         : array();
     if (empty($aliases) && $uid !== '') {
-        $sanitized_uid = \sanitize_text_field((string) $uid);
-        $sanitized_uid = trim($sanitized_uid);
+        $sanitized_uid = Helpers\hic_normalize_reservation_id((string) $uid);
         if ($sanitized_uid !== '') {
             $aliases[] = $sanitized_uid;
         }
