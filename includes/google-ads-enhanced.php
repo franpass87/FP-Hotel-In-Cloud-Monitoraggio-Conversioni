@@ -34,7 +34,7 @@ class GoogleAdsEnhancedConversions {
         add_action('hic_process_booking', [$this, 'process_enhanced_conversion'], 10, 2);
         add_action('hic_enhanced_conversions_batch_upload', [$this, 'batch_upload_enhanced_conversions']);
         add_action('hic_booking_processed', [$this, 'queue_enhanced_conversion'], 10, 3);
-        add_filter('hic_booking_data', [$this, 'enrich_booking_data_for_enhanced_conversions'], 10, 2);
+        add_filter('hic_booking_payload', [$this, 'enrich_booking_data_for_enhanced_conversions'], 10, 3);
         add_action('wp', [$this, 'schedule_batch_processing']);
 
         if (\is_admin()) {
@@ -66,13 +66,19 @@ class GoogleAdsEnhancedConversions {
     /**
      * Normalize booking metadata for enhanced conversion processing.
      *
-     * @param array $booking  Raw booking data provided by the processor.
-     * @param array $context  Tracking context such as gclid and sid values.
+     * @param array $booking      Normalized booking payload provided by the processor.
+     * @param array $context      Tracking context such as gclid and sid values.
+     * @param array $raw_booking  Original booking array before normalization.
      *
      * @return array Enriched booking payload ready for downstream hooks.
      */
-    public function enrich_booking_data_for_enhanced_conversions(array $booking, array $context = []): array {
+    public function enrich_booking_data_for_enhanced_conversions(array $booking, array $context = [], array $raw_booking = []): array {
         $enriched = $booking;
+
+        $source_booking = $booking;
+        if (!empty($raw_booking)) {
+            $source_booking += $raw_booking;
+        }
 
         $booking_id = '';
         if (isset($enriched['booking_id']) && is_scalar($enriched['booking_id']) && $enriched['booking_id'] !== '') {
@@ -82,7 +88,7 @@ class GoogleAdsEnhancedConversions {
         } else {
             $reservation_helper = '\\FpHic\\Helpers\\hic_extract_reservation_id';
             if (\function_exists($reservation_helper)) {
-                $extracted_id = $reservation_helper($booking);
+                $extracted_id = $reservation_helper($source_booking);
                 if (!empty($extracted_id)) {
                     $booking_id = (string) $extracted_id;
                 }
@@ -101,6 +107,8 @@ class GoogleAdsEnhancedConversions {
             $gclid = (string) $context['gclid'];
         } elseif (isset($enriched['gclid']) && is_scalar($enriched['gclid']) && $enriched['gclid'] !== '') {
             $gclid = (string) $enriched['gclid'];
+        } elseif (isset($source_booking['gclid']) && is_scalar($source_booking['gclid']) && $source_booking['gclid'] !== '') {
+            $gclid = (string) $source_booking['gclid'];
         }
         if ($gclid !== null && $gclid !== '') {
             $enriched['gclid'] = \sanitize_text_field($gclid);
@@ -108,8 +116,8 @@ class GoogleAdsEnhancedConversions {
 
         $amount_value = null;
         foreach (['total_amount', 'revenue', 'amount', 'value'] as $amount_key) {
-            if (isset($booking[$amount_key]) && is_scalar($booking[$amount_key]) && $booking[$amount_key] !== '') {
-                $amount_value = $booking[$amount_key];
+            if (isset($source_booking[$amount_key]) && is_scalar($source_booking[$amount_key]) && $source_booking[$amount_key] !== '') {
+                $amount_value = $source_booking[$amount_key];
                 break;
             }
         }
@@ -126,8 +134,8 @@ class GoogleAdsEnhancedConversions {
             $enriched['revenue'] = $normalized_amount;
         }
 
-        if (isset($booking['currency']) && is_scalar($booking['currency'])) {
-            $currency = strtoupper(\sanitize_text_field((string) $booking['currency']));
+        if (isset($source_booking['currency']) && is_scalar($source_booking['currency'])) {
+            $currency = strtoupper(\sanitize_text_field((string) $source_booking['currency']));
             if ($currency !== '') {
                 $enriched['currency'] = $currency;
             }
@@ -135,8 +143,8 @@ class GoogleAdsEnhancedConversions {
 
         $email = '';
         foreach (['customer_email', 'email', 'guest_email'] as $email_field) {
-            if (!empty($booking[$email_field]) && is_scalar($booking[$email_field])) {
-                $email_candidate = \sanitize_email((string) $booking[$email_field]);
+            if (!empty($source_booking[$email_field]) && is_scalar($source_booking[$email_field])) {
+                $email_candidate = \sanitize_email((string) $source_booking[$email_field]);
                 if ($email_candidate !== '') {
                     $email = $email_candidate;
                     break;
@@ -150,22 +158,22 @@ class GoogleAdsEnhancedConversions {
 
         $first_name = '';
         foreach (['customer_first_name', 'customer_firstname', 'first_name', 'firstname', 'guest_first_name', 'guest_firstname'] as $field) {
-            if (!empty($booking[$field]) && is_scalar($booking[$field])) {
-                $first_name = \sanitize_text_field((string) $booking[$field]);
+            if (!empty($source_booking[$field]) && is_scalar($source_booking[$field])) {
+                $first_name = \sanitize_text_field((string) $source_booking[$field]);
                 break;
             }
         }
 
         $last_name = '';
         foreach (['customer_last_name', 'customer_lastname', 'last_name', 'lastname', 'guest_last_name', 'guest_lastname'] as $field) {
-            if (!empty($booking[$field]) && is_scalar($booking[$field])) {
-                $last_name = \sanitize_text_field((string) $booking[$field]);
+            if (!empty($source_booking[$field]) && is_scalar($source_booking[$field])) {
+                $last_name = \sanitize_text_field((string) $source_booking[$field]);
                 break;
             }
         }
 
-        if (($first_name === '' || $last_name === '') && !empty($booking['guest_name']) && is_scalar($booking['guest_name'])) {
-            $parts = preg_split('/\s+/', trim((string) $booking['guest_name']), 2);
+        if (($first_name === '' || $last_name === '') && !empty($source_booking['guest_name']) && is_scalar($source_booking['guest_name'])) {
+            $parts = preg_split('/\s+/', trim((string) $source_booking['guest_name']), 2);
             if ($first_name === '' && !empty($parts[0])) {
                 $first_name = \sanitize_text_field($parts[0]);
             }
@@ -174,8 +182,8 @@ class GoogleAdsEnhancedConversions {
             }
         }
 
-        if (($first_name === '' || $last_name === '') && !empty($booking['name']) && is_scalar($booking['name'])) {
-            $parts = preg_split('/\s+/', trim((string) $booking['name']), 2);
+        if (($first_name === '' || $last_name === '') && !empty($source_booking['name']) && is_scalar($source_booking['name'])) {
+            $parts = preg_split('/\s+/', trim((string) $source_booking['name']), 2);
             if ($first_name === '' && !empty($parts[0])) {
                 $first_name = \sanitize_text_field($parts[0]);
             }
@@ -196,8 +204,8 @@ class GoogleAdsEnhancedConversions {
 
         $raw_phone = '';
         foreach (['customer_phone', 'phone', 'client_phone', 'whatsapp'] as $phone_field) {
-            if (!empty($booking[$phone_field]) && is_scalar($booking[$phone_field])) {
-                $raw_phone = (string) $booking[$phone_field];
+            if (!empty($source_booking[$phone_field]) && is_scalar($source_booking[$phone_field])) {
+                $raw_phone = (string) $source_booking[$phone_field];
                 break;
             }
         }

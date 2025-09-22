@@ -246,6 +246,8 @@ final class CaptureTrackingParamsTest extends TestCase
         global $wpdb;
 
         unset($GLOBALS['hic_test_filters']['hic_booking_data']);
+        unset($GLOBALS['hic_test_filters']['hic_booking_payload']);
+        unset($GLOBALS['hic_test_filters']['hic_booking_customer_data']);
         $_GET = [];
         $_COOKIE = [];
         $wpdb = $this->previousWpdb;
@@ -332,6 +334,53 @@ final class CaptureTrackingParamsTest extends TestCase
         $this->assertIsArray($capturedTracking);
         $this->assertSame('booking-gclid-12345', $capturedTracking['gclid']);
         $this->assertSame($sid, $capturedTracking['sid']);
+    }
+
+    public function test_booking_payload_filter_receives_tracking_context(): void
+    {
+        $_GET = [
+            'gclid' => 'payload-gclid-999',
+            'utm_source' => 'newsletter',
+        ];
+
+        $this->assertTrue(hic_capture_tracking_params());
+        $sid = $_COOKIE['hic_sid'];
+
+        $capturedContext = null;
+        $capturedRaw = null;
+        $bookingFromCustomerFilter = null;
+
+        add_filter('hic_booking_payload', function ($payload, $context, $raw) use (&$capturedContext, &$capturedRaw) {
+            $capturedContext = $context;
+            $capturedRaw = $raw;
+            $payload['test_injected'] = 'yes';
+
+            return $payload;
+        }, 10, 3);
+
+        add_filter('hic_booking_customer_data', function ($customer, $bookingPayload) use (&$bookingFromCustomerFilter) {
+            $bookingFromCustomerFilter = $bookingPayload;
+
+            return $customer;
+        }, 10, 2);
+
+        $result = \FpHic\hic_process_booking_data([
+            'email' => 'payload@example.com',
+            'sid' => $sid,
+            'reservation_id' => 'PAYLOAD-123',
+            'amount' => '150.00',
+        ]);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertIsArray($capturedContext);
+        $this->assertSame('payload-gclid-999', $capturedContext['gclid']);
+        $this->assertSame($sid, $capturedContext['sid']);
+        $this->assertIsArray($capturedRaw);
+        $this->assertSame('payload@example.com', $capturedRaw['email']);
+        $this->assertIsArray($bookingFromCustomerFilter);
+        $this->assertArrayHasKey('test_injected', $bookingFromCustomerFilter);
+        $this->assertSame('yes', $bookingFromCustomerFilter['test_injected']);
     }
 }
 
