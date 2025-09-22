@@ -49,20 +49,7 @@ function hic_process_booking_data(array $data) {
     return $failure;
   };
 
-  // Validate required fields
-  $required_fields = ['email'];
-  foreach ($required_fields as $field) {
-    if (empty($data[$field])) {
-      hic_log("hic_process_booking_data: campo obbligatorio mancante - $field");
-      return $return_failure($result, 'missing_field:' . $field);
-    }
-  }
-
-  // Validate email format
-  if (!Helpers\hic_is_valid_email($data['email'])) {
-    hic_log('hic_process_booking_data: email non valida - ' . $data['email']);
-    return $return_failure($result, 'invalid_email');
-  }
+  $normalized_email = null;
 
   // Sanitize SID input
   $sid = !empty($data['sid']) ? sanitize_text_field($data['sid']) : null;
@@ -141,9 +128,32 @@ function hic_process_booking_data(array $data) {
   $result['context']['tracking_skipped'] = $tracking_skipped ? '1' : '0';
 
   // Normalize customer identifiers
-  $data['email'] = sanitize_email($data['email']);
-  if (!empty($data['email'])) {
-    $result['context']['email'] = $data['email'];
+  if (array_key_exists('email', $data)) {
+    $email_value = $data['email'];
+
+    if (is_scalar($email_value)) {
+      $email_candidate = trim((string) $email_value);
+
+      if ($email_candidate === '') {
+        unset($data['email']);
+      } else {
+        $sanitized_email = sanitize_email($email_candidate);
+
+        if ($sanitized_email === '' || !Helpers\hic_is_valid_email($sanitized_email)) {
+          hic_log('hic_process_booking_data: email non valida - ' . $email_candidate);
+          return $return_failure($result, 'invalid_email');
+        }
+
+        $normalized_email = $sanitized_email;
+        $data['email'] = $sanitized_email;
+        $result['context']['email'] = $sanitized_email;
+      }
+    } elseif ($email_value === null || $email_value === '') {
+      unset($data['email']);
+    } else {
+      hic_log('hic_process_booking_data: email non valida - tipo non supportato');
+      return $return_failure($result, 'invalid_email');
+    }
   }
 
   // Normalize currency with fallback to plugin configuration
@@ -340,9 +350,11 @@ function hic_process_booking_data(array $data) {
   }
 
   // Build customer payload with normalized identifiers
-  $customer_payload = [
-    'email' => $data['email'],
-  ];
+  $customer_payload = [];
+
+  if (!empty($data['email'])) {
+    $customer_payload['email'] = $data['email'];
+  }
 
   if ($first_name !== '') {
     $customer_payload['first_name'] = $first_name;
@@ -472,16 +484,11 @@ function hic_process_booking_data(array $data) {
         }
 
         if ($brevo_enabled) {
-          $brevo_email = '';
-          if (isset($data['email']) && is_scalar($data['email'])) {
-            $brevo_email = sanitize_email((string) $data['email']);
-          }
-
-          if (!Helpers\hic_is_valid_email($brevo_email)) {
-            hic_log('hic_process_booking_data: Brevo dispatch skipped - missing or invalid email');
-            $record_result('Brevo', 'skipped', 'invalid email');
+          if ($normalized_email === null || $normalized_email === '') {
+            hic_log('hic_process_booking_data: Brevo contact dispatch skipped - missing email');
+            $record_result('Brevo contact', 'skipped', 'missing email');
           } else {
-            $data['email'] = $brevo_email;
+            $data['email'] = $normalized_email;
             $brevo_result = hic_send_unified_brevo_events($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
 
             if ($brevo_result === true) {
