@@ -2,6 +2,8 @@
 
 namespace FpHic;
 
+use \Exception;
+
 /**
  * Internal Booking Scheduler - WP-Cron System
  */
