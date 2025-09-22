@@ -1161,12 +1161,14 @@ class AutomatedReportingManager {
         $date_condition = $this->get_date_condition_for_period($period);
         
         return $wpdb->get_results($wpdb->prepare("
-            SELECT 
+            SELECT
                 id,
                 gclid,
                 fbclid,
                 msclkid,
                 ttclid,
+                gbraid,
+                wbraid,
                 sid,
                 utm_source,
                 utm_medium,

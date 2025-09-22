@@ -69,6 +69,8 @@ final class BrevoSidUtmTest extends TestCase
                         'fbclid' => null,
                         'msclkid' => null,
                         'ttclid' => null,
+                        'gbraid' => 'GBRAID-123',
+                        'wbraid' => 'WBRAID-789',
                         'utm_source' => null,
                         'utm_medium' => null,
                         'utm_campaign' => null,
@@ -92,6 +94,8 @@ final class BrevoSidUtmTest extends TestCase
                         'fbclid' => null,
                         'msclkid' => null,
                         'ttclid' => null,
+                        'gbraid' => null,
+                        'wbraid' => null,
                     ];
                 }
 
@@ -150,5 +154,7 @@ final class BrevoSidUtmTest extends TestCase
         $this->assertSame('retargeting', $payload['properties']['utm_campaign']);
         $this->assertSame('carousel', $payload['properties']['utm_content']);
         $this->assertSame('hotel+rome', $payload['properties']['utm_term']);
+        $this->assertSame('GBRAID-123', $payload['properties']['gbraid']);
+        $this->assertSame('WBRAID-789', $payload['properties']['wbraid']);
     }
 }

@@ -7,7 +7,7 @@ namespace FpHic;
 if (!defined('ABSPATH')) exit;
 
 /* ============ GA4 (purchase + bucket) ============ */
-function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $sid = null) {
+function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = '', $sid = null) {
   // Validate configuration
   $measurement_id = Helpers\hic_get_measurement_id();
   $api_secret = Helpers\hic_get_api_secret();
@@ -64,6 +64,8 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
   if (!empty($fbclid))  { $params['fbclid']  = sanitize_text_field($fbclid); }
   if (!empty($msclkid)) { $params['msclkid'] = sanitize_text_field($msclkid); }
   if (!empty($ttclid))  { $params['ttclid']  = sanitize_text_field($ttclid); }
+  if (!empty($gbraid))  { $params['gbraid']  = sanitize_text_field($gbraid); }
+  if (!empty($wbraid))  { $params['wbraid']  = sanitize_text_field($wbraid); }
 
   // Append UTM parameters if available
   if ($sid !== '') {
@@ -84,7 +86,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
   ];
 
   // Allow external modification of the GA4 payload
-  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $sid);
+  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);
@@ -127,7 +129,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $s
 /**
  * Send refund event to GA4 with negative value
  */
-function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $sid = null) {
+function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = '', $sid = null) {
   $measurement_id = Helpers\hic_get_measurement_id();
   $api_secret = Helpers\hic_get_api_secret();
 
@@ -180,6 +182,8 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
   if (!empty($fbclid))  { $params['fbclid']  = sanitize_text_field($fbclid); }
   if (!empty($msclkid)) { $params['msclkid'] = sanitize_text_field($msclkid); }
   if (!empty($ttclid))  { $params['ttclid']  = sanitize_text_field($ttclid); }
+  if (!empty($gbraid))  { $params['gbraid']  = sanitize_text_field($gbraid); }
+  if (!empty($wbraid))  { $params['wbraid']  = sanitize_text_field($wbraid); }
 
   if ($sid !== '') {
     $utm = Helpers\hic_get_utm_params_by_sid($sid);
@@ -198,7 +202,7 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
     ]]
   ];
 
-  $payload = apply_filters('hic_ga4_refund_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $sid);
+  $payload = apply_filters('hic_ga4_refund_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid);
 
   $json_payload = wp_json_encode($payload);
   if ($json_payload === false) {
@@ -283,6 +287,8 @@ function hic_dispatch_ga4_reservation($data, $sid = '') {
   $fbclid = '';
   $msclkid = '';
   $ttclid = '';
+  $gbraid = '';
+  $wbraid = '';
   $lookup_id = $sid !== '' ? $sid : $transaction_id;
   if (!empty($lookup_id)) {
     $tracking = Helpers\hic_get_tracking_ids_by_sid($lookup_id);
@@ -290,6 +296,8 @@ function hic_dispatch_ga4_reservation($data, $sid = '') {
     $fbclid = $tracking['fbclid'] ?? '';
     $msclkid = $tracking['msclkid'] ?? '';
     $ttclid = $tracking['ttclid'] ?? '';
+    $gbraid = $tracking['gbraid'] ?? '';
+    $wbraid = $tracking['wbraid'] ?? '';
   }
 
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
@@ -321,6 +329,8 @@ function hic_dispatch_ga4_reservation($data, $sid = '') {
   if (!empty($fbclid))  { $params['fbclid']  = sanitize_text_field($fbclid); }
   if (!empty($msclkid)) { $params['msclkid'] = sanitize_text_field($msclkid); }
   if (!empty($ttclid))  { $params['ttclid']  = sanitize_text_field($ttclid); }
+  if (!empty($gbraid))  { $params['gbraid']  = sanitize_text_field($gbraid); }
+  if (!empty($wbraid))  { $params['wbraid']  = sanitize_text_field($wbraid); }
 
   // Attach UTM parameters if available
   $utm_lookup = $sid !== '' ? $sid : $transaction_id;
@@ -350,7 +360,7 @@ function hic_dispatch_ga4_reservation($data, $sid = '') {
   ];
 
   // Allow external modification of the GA4 payload
-  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $sid);
+  $payload = apply_filters('hic_ga4_payload', $payload, $data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid);
 
   // Validate JSON encoding
   $json_payload = wp_json_encode($payload);

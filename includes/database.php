@@ -37,6 +37,8 @@ function hic_create_database_table(){
     fbclid       VARCHAR(255),
     msclkid      VARCHAR(255),
     ttclid       VARCHAR(255),
+    gbraid       VARCHAR(255),
+    wbraid       VARCHAR(255),
     sid          VARCHAR(255),
     utm_source   VARCHAR(255),
     utm_medium   VARCHAR(255),
@@ -48,6 +50,8 @@ function hic_create_database_table(){
     KEY fbclid (fbclid(100)),
     KEY msclkid (msclkid(100)),
     KEY ttclid (ttclid(100)),
+    KEY gbraid (gbraid(100)),
+    KEY wbraid (wbraid(100)),
     KEY sid (sid(100)),
     KEY utm_source (utm_source(100)),
     KEY utm_medium (utm_medium(100)),
@@ -356,6 +360,21 @@ function hic_maybe_upgrade_db() {
     $installed_version = '1.5';
   }
 
+  // Migration to version 1.6 - add gbraid and wbraid columns
+  if (version_compare($installed_version, '1.6', '<')) {
+    $table = $wpdb->prefix . 'hic_gclids';
+    $columns = ['gbraid', 'wbraid'];
+    foreach ($columns as $col) {
+      $exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", $col));
+      if (empty($exists)) {
+        $wpdb->query("ALTER TABLE $table ADD COLUMN $col VARCHAR(255)");
+      }
+    }
+    update_option('hic_db_version', '1.6');
+    hic_clear_option_cache('hic_db_version');
+    $installed_version = '1.6';
+  }
+
   // Set final version
   update_option('hic_db_version', HIC_DB_VERSION);
   hic_clear_option_cache('hic_db_version');
@@ -379,7 +398,7 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
   }
 
   // Only allow specific tracking types
-  $allowed_types = ['gclid', 'fbclid', 'msclkid', 'ttclid'];
+  $allowed_types = ['gclid', 'fbclid', 'msclkid', 'ttclid', 'gbraid', 'wbraid'];
   if (!in_array($type, $allowed_types, true)) {
     hic_log('hic_store_tracking_id: Invalid type: ' . $type);
     return new \WP_Error('invalid_type', 'Invalid tracking type');
@@ -533,44 +552,56 @@ function hic_capture_tracking_params(){
     }
   }
 
-  if (!empty($_GET['gclid'])) {
-    $gclid = sanitize_text_field( wp_unslash( $_GET['gclid'] ) );
-    $result = hic_store_tracking_id('gclid', $gclid, $existing_sid);
-    if (is_wp_error($result)) {
-      hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
-      return false;
-    }
-    $refresh_existing_sid();
-  }
+  $tracking_cookie_setter = static function (string $cookie_name, string $value): void {
+    $cookie_args = apply_filters('hic_tracking_cookie_args', [
+      'expires'  => time() + 60 * 60 * 24 * 90,
+      'path'     => '/',
+      'secure'   => is_ssl(),
+      'httponly' => false,
+      'samesite' => 'Lax',
+    ], $cookie_name, $value);
 
-  if (!empty($_GET['fbclid'])) {
-    $fbclid = sanitize_text_field( wp_unslash( $_GET['fbclid'] ) );
-    $result = hic_store_tracking_id('fbclid', $fbclid, $existing_sid);
-    if (is_wp_error($result)) {
-      hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
-      return false;
+    if (!setcookie($cookie_name, $value, $cookie_args)) {
+      hic_log('hic_capture_tracking_params: Failed to set tracking cookie ' . $cookie_name);
+      return;
     }
-    $refresh_existing_sid();
-  }
 
-  if (!empty($_GET['msclkid'])) {
-    $msclkid = sanitize_text_field( wp_unslash( $_GET['msclkid'] ) );
-    $result = hic_store_tracking_id('msclkid', $msclkid, $existing_sid);
-    if (is_wp_error($result)) {
-      hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
-      return false;
-    }
-    $refresh_existing_sid();
-  }
+    $_COOKIE[$cookie_name] = $value;
+  };
 
-  if (!empty($_GET['ttclid'])) {
-    $ttclid = sanitize_text_field( wp_unslash( $_GET['ttclid'] ) );
-    $result = hic_store_tracking_id('ttclid', $ttclid, $existing_sid);
+  $tracking_sources = [
+    'gclid'  => ['cookie' => null],
+    'fbclid' => ['cookie' => null],
+    'msclkid' => ['cookie' => null],
+    'ttclid' => ['cookie' => null],
+    'gbraid' => ['cookie' => 'hic_gbraid'],
+    'wbraid' => ['cookie' => 'hic_wbraid'],
+  ];
+
+  foreach ($tracking_sources as $type => $config) {
+    $value = null;
+
+    if (!empty($_GET[$type])) {
+      $value = sanitize_text_field(wp_unslash($_GET[$type]));
+    } elseif (!empty($config['cookie']) && isset($_COOKIE[$config['cookie']])) {
+      $value = sanitize_text_field(wp_unslash($_COOKIE[$config['cookie']]));
+    }
+
+    if ($value === null || $value === '') {
+      continue;
+    }
+
+    $result = hic_store_tracking_id($type, $value, $existing_sid);
     if (is_wp_error($result)) {
       hic_log('hic_capture_tracking_params: ' . $result->get_error_message());
       return false;
     }
+
     $refresh_existing_sid();
+
+    if (!empty($config['cookie'])) {
+      $tracking_cookie_setter($config['cookie'], $value);
+    }
   }
 
   // Capture UTM parameters if present

@@ -782,6 +782,8 @@ function hic_dispatch_reservation($transformed, $original) {
         $fbclid = '';
         $msclkid = '';
         $ttclid = '';
+        $gbraid = '';
+        $wbraid = '';
         if (!empty($lookup_id) && is_scalar($lookup_id)) {
             $tracking = Helpers\hic_get_tracking_ids_by_sid((string) $lookup_id);
             if (is_array($tracking)) {
@@ -789,6 +791,8 @@ function hic_dispatch_reservation($transformed, $original) {
                 $fbclid = $tracking['fbclid'] ?? '';
                 $msclkid = $tracking['msclkid'] ?? '';
                 $ttclid = $tracking['ttclid'] ?? '';
+                $gbraid = $tracking['gbraid'] ?? '';
+                $wbraid = $tracking['wbraid'] ?? '';
             }
         }
 
@@ -796,7 +800,7 @@ function hic_dispatch_reservation($transformed, $original) {
 
         // Brevo - handle differently based on connection type to prevent duplication
         if ($brevo_enabled) {
-            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $sid);
+            $brevo_success = hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid);
             if (!$brevo_success) {
                 hic_log('Brevo contact dispatch failed for reservation ' . $uid);
             }
@@ -811,7 +815,7 @@ function hic_dispatch_reservation($transformed, $original) {
 
         if ($should_send_brevo_event) {
             if ($brevo_enabled) {
-                $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid);
+                $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
                 if (is_array($event_result)) {
                     if (!empty($event_result['success'])) {
                         $record_result('Brevo event', 'success');
@@ -1442,8 +1446,10 @@ function hic_retry_failed_brevo_notifications() {
         $fbclid = isset($payload_data['fbclid']) ? $payload_data['fbclid'] : '';
         $msclkid = isset($payload_data['msclkid']) ? $payload_data['msclkid'] : '';
         $ttclid = isset($payload_data['ttclid']) ? $payload_data['ttclid'] : '';
+        $gbraid = isset($payload_data['gbraid']) ? $payload_data['gbraid'] : '';
+        $wbraid = isset($payload_data['wbraid']) ? $payload_data['wbraid'] : '';
 
-        $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid);
+        $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
 
         if (is_array($event_result) && $event_result['success']) {
             hic_mark_reservation_notified_to_brevo($reservation_id);
@@ -1609,7 +1615,7 @@ function hic_process_update(array $u){
         $t = hic_transform_reservation($u); // riusa normalizzazioni
         if ($t !== false && is_array($t)) {
             $update_sid = !empty($t['sid']) && is_scalar($t['sid']) ? \sanitize_text_field((string) $t['sid']) : '';
-            hic_dispatch_brevo_reservation($t, true, '', '', '', '', $update_sid); // aggiorna contatto with enrichment flag
+            hic_dispatch_brevo_reservation($t, true, '', '', '', '', '', '', $update_sid); // aggiorna contatto with enrichment flag
             // aggiorna store locale per id -> true_email
             Helpers\hic_mark_email_enriched($id, $email);
             hic_log("Enriched email for reservation $id");
@@ -1657,6 +1663,8 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
     $fbclid = '';
     $msclkid = '';
     $ttclid = '';
+    $gbraid = '';
+    $wbraid = '';
     if (!empty($lookup_id) && is_scalar($lookup_id)) {
         $tracking = Helpers\hic_get_tracking_ids_by_sid((string) $lookup_id);
         if (is_array($tracking)) {
@@ -1664,6 +1672,8 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
             $fbclid = $tracking['fbclid'] ?? '';
             $msclkid = $tracking['msclkid'] ?? '';
             $ttclid = $tracking['ttclid'] ?? '';
+            $gbraid = $tracking['gbraid'] ?? '';
+            $wbraid = $tracking['wbraid'] ?? '';
         }
     }
 
@@ -1673,14 +1683,16 @@ function hic_process_new_reservation_for_realtime($reservation_data) {
         'fbclid' => $fbclid,
         'msclkid' => $msclkid,
         'ttclid' => $ttclid,
+        'gbraid' => $gbraid,
+        'wbraid' => $wbraid,
     );
 
     // Send reservation_created event to Brevo
-    $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid);
+    $event_result = hic_send_brevo_reservation_created_event($transformed, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid);
 
     // Also send/update contact information regardless of event result
     if (Helpers\hic_is_valid_email($transformed['email']) && !Helpers\hic_is_ota_alias_email($transformed['email'])) {
-        if (!hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $sid)) {
+        if (!hic_dispatch_brevo_reservation($transformed, false, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid)) {
             hic_log("Failed to update Brevo contact for reservation $reservation_id");
         }
     }

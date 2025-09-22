@@ -191,6 +191,8 @@ class DatabaseOptimizer {
             fbclid VARCHAR(255),
             msclkid VARCHAR(255),
             ttclid VARCHAR(255),
+            gbraid VARCHAR(255),
+            wbraid VARCHAR(255),
             sid VARCHAR(255),
             utm_source VARCHAR(255),
             utm_medium VARCHAR(255),
@@ -372,8 +374,8 @@ class DatabaseOptimizer {
             // Insert batch into archive table
             $insert_query = $wpdb->prepare("
                 INSERT INTO {$archive_table} 
-                (original_id, gclid, fbclid, msclkid, ttclid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at)
-                SELECT id, gclid, fbclid, msclkid, ttclid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at
+                (original_id, gclid, fbclid, msclkid, ttclid, gbraid, wbraid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at)
+                SELECT id, gclid, fbclid, msclkid, ttclid, gbraid, wbraid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at
                 FROM {$main_table} 
                 WHERE created_at < %s 
                 LIMIT %d

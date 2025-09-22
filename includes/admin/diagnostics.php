@@ -262,7 +262,7 @@ function hic_test_dispatch_functions() {
         // Test GA4
         if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())) {
             $sid = $test_data['sid'] ?? null;
-            hic_send_to_ga4($test_data, $gclid, $fbclid, '', '', $sid);
+            hic_send_to_ga4($test_data, $gclid, $fbclid, '', '', '', '', $sid);
             $results['ga4'] = 'Test event sent to GA4';
         } else {
             $results['ga4'] = 'GA4 not configured';
@@ -271,7 +271,7 @@ function hic_test_dispatch_functions() {
         // Test GTM
         if (hic_is_gtm_enabled() && !empty(hic_get_gtm_container_id())) {
             $sid = $test_data['sid'] ?? null;
-            hic_send_to_gtm_datalayer($test_data, $gclid, $fbclid, $sid);
+            hic_send_to_gtm_datalayer($test_data, $gclid, $fbclid, '', '', '', '', $sid);
             $results['gtm'] = 'Test event queued for GTM DataLayer';
         } else {
             $results['gtm'] = 'GTM not configured or disabled';
@@ -279,7 +279,7 @@ function hic_test_dispatch_functions() {
         
         // Test Facebook
         if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())) {
-            hic_send_to_fb($test_data, $gclid, $fbclid, '', '');
+            hic_send_to_fb($test_data, $gclid, $fbclid, '', '', '', '');
             $results['facebook'] = 'Test event sent to Facebook';
         } else {
             $results['facebook'] = 'Facebook not configured';
@@ -287,8 +287,8 @@ function hic_test_dispatch_functions() {
         
         // Test Brevo
         if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) {
-            hic_send_brevo_contact($test_data, $gclid, $fbclid, '', '');
-            hic_send_brevo_event($test_data, $gclid, $fbclid, '', '');
+            hic_send_brevo_contact($test_data, $gclid, $fbclid, '', '', '', '');
+            hic_send_brevo_event($test_data, $gclid, $fbclid, '', '', '', '');
             $results['brevo'] = 'Test contact and event sent to Brevo';
         } else {
             $results['brevo'] = 'Brevo not configured or disabled';

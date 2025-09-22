@@ -2,7 +2,7 @@
 namespace FpHic\Helpers {
     if (!function_exists(__NAMESPACE__ . '\\hic_get_tracking_ids_by_sid')) {
         function hic_get_tracking_ids_by_sid($sid) {
-            return ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null];
+            return ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
         }
     }
 
