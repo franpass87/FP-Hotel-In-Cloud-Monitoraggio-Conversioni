@@ -282,10 +282,36 @@ if (defined('WP_CLI') && WP_CLI) {
             WP_CLI::log('Resending reservation ' . $reservation_id . '...');
             $result = \FpHic\hic_process_booking_data($data);
 
-            if ($result) {
+            if (!is_array($result)) {
+                $result = [
+                    'status' => $result ? 'success' : 'failed',
+                    'messages' => [],
+                ];
+            }
+
+            $status = isset($result['status']) ? (string) $result['status'] : 'failed';
+            $failed_integrations = $result['failed_integrations'] ?? [];
+            $messages = $result['messages'] ?? [];
+
+            if ($status === 'success') {
                 WP_CLI::success('Reservation resent successfully');
+            } elseif ($status === 'partial') {
+                WP_CLI::success('Reservation resent with partial success');
+                if (!empty($failed_integrations)) {
+                    WP_CLI::warning('Failed integrations: ' . implode(', ', $failed_integrations));
+                }
+                if (!empty($messages)) {
+                    WP_CLI::log('Messages: ' . implode(', ', $messages));
+                }
             } else {
-                WP_CLI::error('Failed to resend reservation');
+                $error_message = 'Failed to resend reservation';
+                if (!empty($messages)) {
+                    $error_message .= ' (' . implode(', ', $messages) . ')';
+                }
+                if (!empty($failed_integrations)) {
+                    $error_message .= ' - Failed integrations: ' . implode(', ', $failed_integrations);
+                }
+                WP_CLI::error($error_message);
             }
         }
 

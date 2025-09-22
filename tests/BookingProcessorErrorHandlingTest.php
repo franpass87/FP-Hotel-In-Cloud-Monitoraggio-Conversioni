@@ -93,7 +93,9 @@ final class BookingProcessorErrorHandlingTest extends TestCase
 
         $result = \FpHic\hic_process_booking_data($bookingData);
 
-        $this->assertFalse($result, 'Booking processing should fail gracefully when GA4 throws');
+        $this->assertIsArray($result, 'Booking processing should return structured result on failure');
+        $this->assertSame('failed', $result['status'], 'Booking processing should report failure when GA4 throws');
+        $this->assertTrue(empty($result['should_mark_processed']), 'Failed bookings should not be marked as processed');
 
         $this->assertFileExists($this->logFile);
         $logContents = file_get_contents($this->logFile);

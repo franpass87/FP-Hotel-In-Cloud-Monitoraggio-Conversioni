@@ -56,22 +56,38 @@ namespace FpHic\Helpers {
 
 namespace FpHic {
     // Mock booking processor function
-    function hic_process_booking_data(array $data): bool {
+    function hic_process_booking_data(array $data): array {
         echo "📦 Processing booking data...\n";
-        
+
         // Basic validation
         if (empty($data['email']) || !\FpHic\Helpers\hic_is_valid_email($data['email'])) {
             echo "❌ Invalid email\n";
-            return false;
+            return [
+                'status' => 'failed',
+                'should_mark_processed' => false,
+                'integrations' => [],
+                'successful_integrations' => [],
+                'failed_integrations' => [],
+                'messages' => ['invalid_email'],
+            ];
         }
-        
+
         echo "✅ Email valid: {$data['email']}\n";
         echo "✅ Amount: €{$data['amount']}\n";
-        
+
         // Mock sending to integrations
         \hic_send_to_ga4($data, null, null, null, null, null, null, null);
-        
-        return true;
+
+        return [
+            'status' => 'success',
+            'should_mark_processed' => true,
+            'integrations' => [
+                'GA4' => ['status' => 'success'],
+            ],
+            'successful_integrations' => ['GA4'],
+            'failed_integrations' => [],
+            'messages' => [],
+        ];
     }
 }
 

@@ -51,12 +51,16 @@ final class BookingProcessorRefundTrackingTest extends TestCase
 
         $result = \FpHic\hic_process_booking_data($bookingData);
 
-        $this->assertTrue($result, 'Refund processing should succeed when tracking is disabled');
+        $this->assertIsArray($result, 'Refund processing should return structured result');
+        $this->assertSame('success', $result['status'], 'Refund processing should report success when tracking is disabled');
+        $this->assertTrue(!empty($result['should_mark_processed']), 'Refund bookings should be marked as processed when tracking is disabled');
+        $this->assertEmpty($result['failed_integrations'], 'No integrations should fail when refund tracking is disabled');
 
         $this->assertFileExists($this->logFile);
         $logContents = file_get_contents($this->logFile);
         $this->assertIsString($logContents);
         $this->assertStringContainsString('refund detected but tracking disabled, skipping refund events', $logContents);
-        $this->assertStringContainsString('Successi: 0, Errori: 0', $logContents);
+        $this->assertStringContainsString('Stato: success', $logContents);
+        $this->assertStringContainsString('refund tracking disabled', $logContents);
     }
 }

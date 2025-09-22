@@ -55,12 +55,16 @@ final class BookingProcessorSkipFilterTest extends TestCase
 
         $result = \FpHic\hic_process_booking_data($bookingData);
 
-        $this->assertTrue($result, 'Expected booking processing to return true when tracking is skipped');
+        $this->assertIsArray($result, 'Expected structured result for skipped bookings');
+        $this->assertSame('success', $result['status'], 'Skipping tracking should not produce a failure status');
+        $this->assertTrue(!empty($result['should_mark_processed']), 'Skipped bookings should still be marked as processed');
+        $this->assertContains('tracking_skipped', $result['messages'], 'Tracking skip should be noted in result messages');
 
         $this->assertFileExists($this->logFile);
         $logContents = file_get_contents($this->logFile);
         $this->assertIsString($logContents);
         $this->assertStringContainsString('tracciamento ignorato da hic_should_track_reservation', $logContents);
-        $this->assertStringContainsString('Skippate: 1', $logContents);
+        $this->assertStringContainsString('Stato: success', $logContents);
+        $this->assertStringContainsString('Messages: tracking_skipped', $logContents);
     }
 }

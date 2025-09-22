@@ -44,7 +44,7 @@ class SystemWithoutEnhancedConversionsTest extends \PHPUnit\Framework\TestCase
         $output = ob_get_clean();
 
         // Test should not fail due to missing enhanced conversions
-        $this->assertIsBool($result, 'hic_process_booking_data deve restituire un boolean');
+        $this->assertBookingResultSuccessful($result, 'hic_process_booking_data deve restituire un risultato di successo');
         
         // Check no fatal errors occurred
         $this->assertStringNotContainsString(
@@ -80,7 +80,7 @@ class SystemWithoutEnhancedConversionsTest extends \PHPUnit\Framework\TestCase
             $result = \FpHic\hic_process_booking_data($booking_data);
             $output = ob_get_clean();
 
-            $this->assertIsBool(
+            $this->assertBookingResultSuccessful(
                 $result,
                 "Il sistema deve funzionare in modalità {$description} senza Google Ads Enhanced"
             );
@@ -131,7 +131,7 @@ class SystemWithoutEnhancedConversionsTest extends \PHPUnit\Framework\TestCase
         $result = \FpHic\hic_process_booking_data($booking_data);
         $output = ob_get_clean();
 
-        $this->assertIsBool(
+        $this->assertBookingResultSuccessful(
             $result,
             'Il sistema deve funzionare anche con GCLID presente ma Enhanced Conversions disabilitato'
         );
@@ -218,6 +218,25 @@ class SystemWithoutEnhancedConversionsTest extends \PHPUnit\Framework\TestCase
                 $value,
                 $retrieved,
                 "L'impostazione {$option} deve essere configurabile senza Enhanced Conversions"
+            );
+        }
+    }
+
+    private function assertBookingResultSuccessful($result, string $message = ''): void
+    {
+        $contextMessage = $message !== '' ? $message : 'Il risultato della prenotazione deve indicare successo o parziale successo';
+
+        $this->assertIsArray($result, $contextMessage);
+        $this->assertArrayHasKey('status', $result, 'Il risultato deve includere lo stato');
+        $this->assertTrue(
+            in_array($result['status'], ['success', 'partial'], true),
+            $contextMessage
+        );
+
+        if (array_key_exists('should_mark_processed', $result)) {
+            $this->assertTrue(
+                (bool) $result['should_mark_processed'],
+                'Le prenotazioni elaborate con successo devono essere segnate come processate'
             );
         }
     }

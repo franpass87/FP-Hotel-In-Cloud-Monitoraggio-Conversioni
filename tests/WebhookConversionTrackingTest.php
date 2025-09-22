@@ -126,9 +126,11 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
 
         // Il webhook processing dovrebbe funzionare senza problemi
         $result = \FpHic\hic_process_booking_data($booking_data);
-        
+
         // Il processo non dovrebbe fallire per mancanza di redirect
-        $this->assertTrue(is_bool($result));
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertTrue(in_array($result['status'], ['success', 'partial'], true));
         
         // Verifica che l'ID prenotazione sia estratto correttamente
         $reservation_id = hic_extract_reservation_id($booking_data);
@@ -152,7 +154,9 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         $this->assertSame(strtoupper($currency), $validated['currency']);
 
         $result = \FpHic\hic_process_booking_data($validated);
-        $this->assertIsBool($result);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertTrue(in_array($result['status'], ['success', 'partial'], true));
     }
 
     public static function extendedIsoCurrencyProvider(): array {
@@ -402,7 +406,9 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         $this->assertSame('alias-sid-123456', $validated['sid']);
 
         $result = \FpHic\hic_process_booking_data($validated);
-        $this->assertTrue(is_bool($result));
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertTrue(in_array($result['status'], ['success', 'partial'], true));
         $this->assertNotNull($capturedTracking);
         $this->assertSame('alias-sid-123456', $capturedTracking['sid']);
         $this->assertSame('test-gclid-alias', $capturedTracking['gclid']);
