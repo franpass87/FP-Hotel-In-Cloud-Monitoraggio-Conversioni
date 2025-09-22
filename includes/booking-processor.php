@@ -459,7 +459,9 @@ function hic_process_booking_data(array $data): bool {
           if (Helpers\hic_send_admin_email($data, $gclid, $fbclid, $sid)) {
             $success_count++;
           } else {
-            $error_count++;
+            $skipped_count++;
+            $safe_sid = $sid !== null ? $sid : 'N/A';
+            hic_log('hic_process_booking_data: Admin email sending failed, marking as skipped (SID: ' . $safe_sid . ')', HIC_LOG_LEVEL_WARNING);
           }
         } else {
           hic_log('hic_process_booking_data: Admin email not configured or invalid, skipping');
