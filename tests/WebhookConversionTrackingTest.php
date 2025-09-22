@@ -448,6 +448,54 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         \FpHic\Helpers\hic_clear_option_cache();
     }
 
+    public function test_webhook_processing_queues_gtm_event_with_hic_sid(): void
+    {
+        update_option('hic_tracking_mode', 'gtm_only');
+        update_option('hic_gtm_enabled', '1');
+        update_option('hic_gtm_container_id', 'GTM-SMOKE123');
+        update_option('hic_brevo_enabled', '0');
+        update_option('hic_fb_pixel_id', '');
+        update_option('hic_fb_access_token', '');
+
+        \FpHic\Helpers\hic_clear_option_cache();
+
+        $payload = [
+            'reservation_id' => 'WEBHOOK-GTM-123',
+            'amount' => 180.25,
+            'currency' => 'EUR',
+            'sid' => 'webhook-sid-123456789',
+            'room' => 'Camera Deluxe',
+        ];
+
+        $validated = \FpHic\HIC_Input_Validator::validate_webhook_payload($payload);
+
+        $this->assertFalse(is_wp_error($validated));
+        $sid = $validated['sid'] ?? '';
+        $this->assertSame('webhook-sid-123456789', $sid);
+
+        $queue_key = \FpHic\hic_get_gtm_queue_option_key($sid);
+        if ($queue_key !== '') {
+            delete_option($queue_key);
+            \FpHic\Helpers\hic_clear_option_cache($queue_key);
+        }
+
+        $result = \FpHic\hic_process_booking_data($validated);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('status', $result);
+        $this->assertTrue(in_array($result['status'], ['success', 'partial'], true));
+
+        $events = \FpHic\hic_get_and_clear_gtm_events_for_sid($sid);
+        $this->assertNotEmpty($events, 'Expected GTM events to be queued for the SID.');
+
+        $event = $events[0];
+        $this->assertSame('purchase', $event['event']);
+        $this->assertArrayHasKey('client_id', $event);
+        $this->assertArrayHasKey('hic_sid', $event);
+        $this->assertSame($sid, $event['client_id']);
+        $this->assertSame($sid, $event['hic_sid']);
+        $this->assertArrayNotHasKey('sid', $event);
+    }
+
     public function tearDown(): void {
         // Pulisci impostazioni di test
         delete_option('hic_connection_type');
