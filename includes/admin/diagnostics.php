@@ -3,6 +3,7 @@
  * HIC Plugin Diagnostics and Monitoring
  */
 
+use FpHic\HIC_Booking_Poller;
 use function FpHic\hic_send_to_ga4;
 use function FpHic\hic_send_to_gtm_datalayer;
 use function FpHic\hic_send_to_fb;
@@ -69,7 +70,7 @@ function hic_get_internal_scheduler_status() {
         hic_has_basic_auth_credentials();
     
     // Get stats from WP-Cron scheduler if available
-    if (class_exists('HIC_Booking_Poller')) {
+    if (class_exists(HIC_Booking_Poller::class)) {
         $poller = new HIC_Booking_Poller();
         $poller_stats = $poller->get_stats();
         
@@ -342,7 +343,7 @@ function hic_force_restart_internal_scheduler() {
         $results['polling_timestamps_reset'] = 'Timestamps reset for immediate execution';
         
         // Clear and reschedule WP-Cron events for fresh start
-        if (class_exists('HIC_Booking_Poller')) {
+        if (class_exists(HIC_Booking_Poller::class)) {
             $poller = new HIC_Booking_Poller();
             $poller->clear_all_scheduled_events();
             
@@ -377,7 +378,7 @@ function hic_trigger_watchdog_check() {
     
     $results = array();
     
-    if (class_exists('HIC_Booking_Poller')) {
+    if (class_exists(HIC_Booking_Poller::class)) {
         $poller = new HIC_Booking_Poller();
         $poller->run_watchdog_check();
         $results['watchdog_executed'] = 'Watchdog check completed';
@@ -996,7 +997,7 @@ function hic_ajax_force_polling() {
         $force = isset($_POST['force']) && wp_unslash( $_POST['force'] ) === 'true';
 
         // Check if poller class exists
-        if (!class_exists('HIC_Booking_Poller')) {
+        if (!class_exists(HIC_Booking_Poller::class)) {
             wp_send_json_error( [ 'message' => __( 'Classe HIC_Booking_Poller non trovata', 'hotel-in-cloud' ) ] );
         }
 
@@ -1099,7 +1100,7 @@ function hic_ajax_reset_timestamps() {
         hic_log('Admin Timestamp Reset: Manual timestamp reset initiated');
 
         // Execute timestamp recovery using the new method
-        if (class_exists('HIC_Booking_Poller')) {
+        if (class_exists(HIC_Booking_Poller::class)) {
             $poller = new HIC_Booking_Poller();
 
             // Check if the method exists
@@ -1273,7 +1274,7 @@ function hic_diagnostics_page() {
                         <h3>🌐 Monitoraggio Traffico Web</h3>
                         <?php
                         // Get web traffic monitoring statistics 
-                        $poller = new \FpHic\HIC_Booking_Poller();
+                        $poller = new HIC_Booking_Poller();
                         $web_stats = $poller->get_web_traffic_stats();
                         ?>
                         <table class="hic-status-table">
@@ -1785,7 +1786,7 @@ function hic_ajax_test_web_traffic_monitoring() {
         hic_log('Manual Web Traffic Test: Starting manual web traffic monitoring test');
         
         // Simulate web traffic polling checks
-        $poller = new \FpHic\HIC_Booking_Poller();
+        $poller = new HIC_Booking_Poller();
         
         // Record current state
         $current_time = time();
@@ -1837,7 +1838,7 @@ function hic_ajax_get_web_traffic_stats() {
     }
 
     try {
-        $poller = new \FpHic\HIC_Booking_Poller();
+        $poller = new HIC_Booking_Poller();
         $web_stats = $poller->get_web_traffic_stats();
         
         wp_send_json_success( array(

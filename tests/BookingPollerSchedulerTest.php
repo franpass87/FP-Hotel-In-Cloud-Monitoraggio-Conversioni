@@ -42,6 +42,7 @@ namespace FpHic {
 }
 
 namespace {
+    use FpHic\HIC_Booking_Poller;
     use PHPUnit\Framework\TestCase;
 
     require_once __DIR__ . '/../includes/booking-poller.php';
@@ -54,19 +55,19 @@ namespace {
         }
 
         public function test_execute_continuous_polling_calls_namespaced_function(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             $poller->execute_continuous_polling();
             $this->assertContains('continuous', $GLOBALS['poll_calls']);
         }
 
         public function test_execute_deep_check_calls_namespaced_function(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             $poller->execute_deep_check();
             $this->assertContains('deep', $GLOBALS['poll_calls']);
         }
 
         public function test_execute_deep_check_updates_timestamp_on_success(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             update_option('hic_last_deep_check', 0);
 
             $poller->execute_deep_check();
@@ -75,7 +76,7 @@ namespace {
         }
 
         public function test_execute_deep_check_failure_does_not_update_timestamp(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             $old = time() - 100;
             update_option('hic_last_deep_check', $old);
 
@@ -87,7 +88,7 @@ namespace {
         }
 
         public function test_execute_deep_check_skipped_does_not_update_timestamp(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             $old = time() - 100;
             update_option('hic_last_deep_check', $old);
 
@@ -99,7 +100,7 @@ namespace {
         }
 
         public function test_execute_deep_check_exception_is_handled(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             update_option('hic_deep_check_failures', 0);
 
             $GLOBALS['simulate_deep_exception'] = true;
@@ -111,7 +112,7 @@ namespace {
         }
 
         public function test_deep_check_recovers_after_exception(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             update_option('hic_deep_check_failures', 0);
             update_option('hic_last_deep_check', 0);
 
@@ -126,7 +127,7 @@ namespace {
         }
 
         public function test_execute_continuous_polling_updates_timestamp_on_success(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             update_option('hic_last_continuous_poll', 0);
 
             $poller->execute_continuous_polling();
@@ -136,7 +137,7 @@ namespace {
         }
 
         public function test_execute_continuous_polling_skipped_does_not_update_timestamp(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             $old = time() - 100;
             $old_success = time() - 50;
             update_option('hic_last_continuous_poll', $old);
@@ -151,7 +152,7 @@ namespace {
         }
 
         public function test_execute_continuous_polling_exception_is_handled(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             update_option('hic_continuous_poll_failures', 0);
             update_option('hic_last_continuous_poll', 0);
             update_option('hic_last_successful_poll', 0);
@@ -165,7 +166,7 @@ namespace {
         }
 
         public function test_continuous_polling_recovers_after_exception(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             update_option('hic_continuous_poll_failures', 0);
             update_option('hic_last_continuous_poll', 0);
             update_option('hic_last_successful_poll', 0);
@@ -182,7 +183,7 @@ namespace {
         }
 
         public function test_watchdog_detects_polling_failure(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             $old = time() - (HIC_WATCHDOG_THRESHOLD + 10);
             $old_success = time();
             update_option('hic_last_continuous_poll', $old);
@@ -204,7 +205,7 @@ namespace {
         }
 
         public function test_watchdog_not_blocked_with_deep_check_only(): void {
-            $poller = new \HIC_Booking_Poller();
+            $poller = new HIC_Booking_Poller();
             $sentinel = 123;
             update_option('hic_last_updates_since', $sentinel);
             update_option('hic_last_successful_poll', time() - 7200);

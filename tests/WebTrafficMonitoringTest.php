@@ -83,6 +83,7 @@ if (!function_exists('wp_doing_ajax')) {
 // Include required constants and helpers - carefully
 require_once __DIR__ . '/../includes/constants.php';
 
+use FpHic\HIC_Booking_Poller;
 use PHPUnit\Framework\TestCase;
 
 class WebTrafficMonitoringTest extends TestCase {
@@ -112,7 +113,7 @@ class WebTrafficMonitoringTest extends TestCase {
         require_once __DIR__ . '/../includes/booking-poller.php';
         
         // Initialize the booking poller
-        $this->poller = new \FpHic\HIC_Booking_Poller();
+        $this->poller = new HIC_Booking_Poller();
         
         // Start with clean state
         $this->original_stats = array();

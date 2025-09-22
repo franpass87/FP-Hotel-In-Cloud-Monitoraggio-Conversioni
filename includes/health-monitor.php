@@ -1,10 +1,12 @@
 <?php declare(strict_types=1);
 /**
  * Health Monitoring System for HIC Plugin
- * 
+ *
  * Provides comprehensive health checks and monitoring capabilities
  * for the Hotel in Cloud integration plugin.
  */
+
+use FpHic\HIC_Booking_Poller;
 
 if (!defined('ABSPATH')) exit;
 
@@ -100,7 +102,7 @@ class HIC_Health_Monitor {
             'details' => [
                 'functions_loaded' => function_exists('hic_log'),
                 'constants_loaded' => defined('HIC_PLUGIN_VERSION'),
-                'classes_loaded' => class_exists('HIC_Booking_Poller')
+                'classes_loaded' => class_exists(HIC_Booking_Poller::class)
             ]
         ];
     }

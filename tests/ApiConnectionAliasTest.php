@@ -1,5 +1,7 @@
 <?php
 
+use FpHic\HIC_Booking_Poller;
+
 class ApiConnectionAliasTest extends WP_UnitTestCase {
 
     protected function setUp(): void {
@@ -51,7 +53,7 @@ class ApiConnectionAliasTest extends WP_UnitTestCase {
             'Scheduler gate should allow polling. State: ' . json_encode($state)
         );
 
-        $poller = new \FpHic\HIC_Booking_Poller();
+        $poller = new HIC_Booking_Poller();
         $stats = $poller->get_stats();
         $this->assertArrayHasKey('should_poll', $stats);
         $this->assertTrue(
