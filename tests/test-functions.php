@@ -380,6 +380,49 @@ class HICFunctionsTest {
         echo "✅ Brevo reservation_created phone language override tests passed\n";
     }
 
+    public function testGa4TransactionIdFallbackIsStable() {
+        if (!function_exists('home_url')) { function home_url() { return 'https://example.com'; } }
+        if (!function_exists('wp_generate_uuid4')) { function wp_generate_uuid4() { return 'uuid-4'; } }
+        if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
+        if (!function_exists('wp_remote_retrieve_response_code')) { function wp_remote_retrieve_response_code($res) { return $res['response']['code'] ?? 0; } }
+        if (!function_exists('wp_remote_retrieve_body')) { function wp_remote_retrieve_body($res) { return $res['body'] ?? ''; } }
+        if (!function_exists('is_wp_error')) { function is_wp_error($thing) { return false; } }
+
+        require_once dirname(__DIR__) . '/includes/integrations/ga4.php';
+
+        update_option('hic_measurement_id', 'G-TEST');
+        update_option('hic_api_secret', 'secret');
+        Helpers\hic_clear_option_cache();
+
+        global $hic_last_request;
+
+        $data = [
+            'email' => 'guest@example.com',
+            'from_date' => '2024-05-01',
+            'amount' => 150,
+            'currency' => 'EUR'
+        ];
+
+        $hic_last_request = null;
+        \FpHic\hic_send_to_ga4($data, null, null, null, null, null, null, '');
+        $payload1 = json_decode($hic_last_request['args']['body'], true);
+        $transaction_id1 = $payload1['events'][0]['params']['transaction_id'];
+        $client_id1 = $payload1['client_id'];
+
+        $hic_last_request = null;
+        \FpHic\hic_send_to_ga4($data, null, null, null, null, null, null, '');
+        $payload2 = json_decode($hic_last_request['args']['body'], true);
+        $transaction_id2 = $payload2['events'][0]['params']['transaction_id'];
+        $client_id2 = $payload2['client_id'];
+
+        assert($transaction_id1 === $transaction_id2, 'GA4 fallback should reuse transaction_id when reservation_id is missing');
+        assert($transaction_id1 !== '', 'GA4 fallback transaction_id should not be empty');
+        assert($client_id1 === $transaction_id1, 'GA4 fallback client_id should reuse transaction_id');
+        assert($client_id2 === $transaction_id2, 'GA4 fallback client_id should reuse transaction_id');
+
+        echo "✅ GA4 transaction_id fallback stability tests passed\n";
+    }
+
     public function testEventRoomNameFallback() {
         // Ensure required WordPress stubs exist
         if (!function_exists('home_url')) {
@@ -473,6 +516,7 @@ class HICFunctionsTest {
             $this->testBrevoLanguageListFiltering();
             $this->testBrevoRoomNamePropagation();
             $this->testBrevoReservationCreatedPhoneLanguageOverride();
+            $this->testGa4TransactionIdFallbackIsStable();
             $this->testEventRoomNameFallback();
 
             echo "\n🎉 All tests passed successfully!\n";
