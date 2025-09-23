@@ -203,18 +203,72 @@ class EnterpriseManagementSuite {
         
         try {
             // Get HIC data count
-            $hic_count = $wpdb->get_var($wpdb->prepare(
+            $hic_count = (int) $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM {$main_table} WHERE DATE(created_at) = %s",
                 $date
             ));
-            
+
             // Get external system data count
-            $external_count = $this->get_external_system_count($system, $date);
-            
+            $external_result = $this->get_external_system_count($system, $date);
+            $status = $external_result['status'] ?? 'error';
+
+            if ($status === 'pending') {
+                $reason = isset($external_result['reason']) ? (string) $external_result['reason'] : 'Metrics unavailable';
+                $details = [
+                    'hic_data' => $hic_count,
+                    'external_status' => 'pending',
+                    'reason' => $reason,
+                ];
+
+                if (!empty($external_result['provider'])) {
+                    $details['provider'] = $external_result['provider'];
+                }
+
+                $wpdb->replace($recon_table, [
+                    'check_date' => $date,
+                    'source_system' => $system,
+                    'hic_count' => $hic_count,
+                    'analytics_count' => null,
+                    'discrepancy_count' => null,
+                    'discrepancy_percentage' => null,
+                    'status' => 'pending',
+                    'details' => wp_json_encode($details),
+                ]);
+
+                $this->log(
+                    sprintf('Reconciliation pending for %s: %s', $this->format_system_label($system), $reason),
+                    'info',
+                    [
+                        'system' => $system,
+                        'date' => $date,
+                        'reason' => $reason,
+                    ]
+                );
+
+                return;
+            }
+
+            if ($status === 'error') {
+                $message = isset($external_result['reason']) ? (string) $external_result['reason'] : 'Unable to fetch metrics';
+                throw new \RuntimeException($message);
+            }
+
+            $external_count = isset($external_result['count']) ? (int) $external_result['count'] : 0;
+
             // Calculate discrepancy
             $discrepancy = abs($hic_count - $external_count);
             $discrepancy_percentage = $hic_count > 0 ? ($discrepancy / $hic_count) * 100 : 0;
-            
+
+            $details = [
+                'hic_data' => $hic_count,
+                'external_data' => $external_count,
+                'threshold_exceeded' => $discrepancy_percentage > 10,
+            ];
+
+            if (!empty($external_result['provider'])) {
+                $details['provider'] = $external_result['provider'];
+            }
+
             // Store reconciliation result
             $wpdb->replace($recon_table, [
                 'check_date' => $date,
@@ -224,37 +278,54 @@ class EnterpriseManagementSuite {
                 'discrepancy_count' => $discrepancy,
                 'discrepancy_percentage' => $discrepancy_percentage,
                 'status' => 'completed',
-                'details' => json_encode([
-                    'hic_data' => $hic_count,
-                    'external_data' => $external_count,
-                    'threshold_exceeded' => $discrepancy_percentage > 10
-                ])
+                'details' => wp_json_encode($details),
             ]);
-            
+
             // Alert if significant discrepancy
             if ($discrepancy_percentage > 10) {
                 $this->send_reconciliation_alert($system, $date, $discrepancy_percentage);
             }
-            
-            $this->log("Reconciliation completed for {$system}: {$discrepancy_percentage}% discrepancy");
-            
+
+            $this->log(
+                sprintf(
+                    'Reconciliation completed for %s: %.2f%% discrepancy',
+                    $this->format_system_label($system),
+                    $discrepancy_percentage
+                ),
+                'info',
+                [
+                    'system' => $system,
+                    'date' => $date,
+                    'hic_count' => $hic_count,
+                    'external_count' => $external_count,
+                    'discrepancy' => $discrepancy,
+                    'discrepancy_percentage' => $discrepancy_percentage,
+                ]
+            );
+
         } catch (\Exception $e) {
             $wpdb->replace($recon_table, [
                 'check_date' => $date,
                 'source_system' => $system,
                 'status' => 'error',
-                'details' => json_encode(['error' => $e->getMessage()])
+                'details' => wp_json_encode(['error' => $e->getMessage()]),
             ]);
-            
-            $this->log("Reconciliation error for {$system}: " . $e->getMessage());
+
+            $this->log(
+                sprintf('Reconciliation error for %s: %s', $this->format_system_label($system), $e->getMessage()),
+                'warning',
+                [
+                    'system' => $system,
+                    'date' => $date,
+                ]
+            );
         }
     }
-    
+
     /**
      * Get external system data count
      */
     private function get_external_system_count($system, $date) {
-        // Placeholder implementation - would integrate with actual APIs
         switch ($system) {
             case 'google_analytics':
                 return $this->get_ga4_event_count($date);
@@ -263,32 +334,181 @@ class EnterpriseManagementSuite {
             case 'brevo_api':
                 return $this->get_brevo_event_count($date);
             default:
-                return 0;
+                return $this->create_metric_result('pending', [
+                    'reason' => 'Unknown reconciliation target',
+                ]);
         }
     }
-    
+
     /**
-     * Get GA4 event count (placeholder)
+     * Get GA4 event count
      */
     private function get_ga4_event_count($date) {
-        // Would use GA4 Reporting API
-        return rand(80, 120); // Placeholder random count for demo
+        $measurement_id = \FpHic\Helpers\hic_get_measurement_id();
+        $api_secret = \FpHic\Helpers\hic_get_api_secret();
+
+        if (empty($measurement_id) || empty($api_secret)) {
+            return $this->create_metric_result('pending', [
+                'reason' => 'GA4 measurement ID or API secret not configured',
+            ]);
+        }
+
+        $filter = 'hic_reconciliation_ga4_event_count';
+        $count = apply_filters($filter, null, $date);
+
+        if (is_array($count) && isset($count['status'])) {
+            return $count;
+        }
+
+        if (is_wp_error($count)) {
+            return $this->create_metric_result('error', [
+                'reason' => $count->get_error_message(),
+            ]);
+        }
+
+        if ($count === null) {
+            $reason = has_filter($filter)
+                ? 'GA4 metrics provider returned no data'
+                : 'No GA4 metrics provider connected';
+
+            return $this->create_metric_result('pending', [
+                'reason' => $reason,
+            ]);
+        }
+
+        if (!is_numeric($count)) {
+            return $this->create_metric_result('error', [
+                'reason' => 'Invalid GA4 event count value',
+            ]);
+        }
+
+        return $this->create_metric_result('ok', [
+            'count' => (int) $count,
+            'provider' => $filter,
+        ]);
     }
-    
+
     /**
-     * Get Facebook event count (placeholder)
+     * Get Facebook event count
      */
     private function get_facebook_event_count($date) {
-        // Would use Facebook Marketing API
-        return rand(75, 115); // Placeholder random count for demo
+        $pixel_id = \FpHic\Helpers\hic_get_fb_pixel_id();
+        $access_token = \FpHic\Helpers\hic_get_fb_access_token();
+
+        if (empty($pixel_id) || empty($access_token)) {
+            return $this->create_metric_result('pending', [
+                'reason' => 'Facebook Pixel ID or access token not configured',
+            ]);
+        }
+
+        $filter = 'hic_reconciliation_facebook_event_count';
+        $count = apply_filters($filter, null, $date);
+
+        if (is_array($count) && isset($count['status'])) {
+            return $count;
+        }
+
+        if (is_wp_error($count)) {
+            return $this->create_metric_result('error', [
+                'reason' => $count->get_error_message(),
+            ]);
+        }
+
+        if ($count === null) {
+            $reason = has_filter($filter)
+                ? 'Facebook metrics provider returned no data'
+                : 'No Facebook metrics provider connected';
+
+            return $this->create_metric_result('pending', [
+                'reason' => $reason,
+            ]);
+        }
+
+        if (!is_numeric($count)) {
+            return $this->create_metric_result('error', [
+                'reason' => 'Invalid Facebook event count value',
+            ]);
+        }
+
+        return $this->create_metric_result('ok', [
+            'count' => (int) $count,
+            'provider' => $filter,
+        ]);
     }
-    
+
     /**
-     * Get Brevo event count (placeholder)
+     * Get Brevo event count
      */
     private function get_brevo_event_count($date) {
-        // Would use Brevo API
-        return rand(85, 125); // Placeholder random count for demo
+        $brevo_enabled = \FpHic\Helpers\hic_is_brevo_enabled();
+        $api_key = \FpHic\Helpers\hic_get_brevo_api_key();
+
+        if (!$brevo_enabled || empty($api_key)) {
+            return $this->create_metric_result('pending', [
+                'reason' => 'Brevo integration disabled or API key missing',
+            ]);
+        }
+
+        $filter = 'hic_reconciliation_brevo_event_count';
+        $count = apply_filters($filter, null, $date);
+
+        if (is_array($count) && isset($count['status'])) {
+            return $count;
+        }
+
+        if (is_wp_error($count)) {
+            return $this->create_metric_result('error', [
+                'reason' => $count->get_error_message(),
+            ]);
+        }
+
+        if ($count === null) {
+            $reason = has_filter($filter)
+                ? 'Brevo metrics provider returned no data'
+                : 'No Brevo metrics provider connected';
+
+            return $this->create_metric_result('pending', [
+                'reason' => $reason,
+            ]);
+        }
+
+        if (!is_numeric($count)) {
+            return $this->create_metric_result('error', [
+                'reason' => 'Invalid Brevo event count value',
+            ]);
+        }
+
+        return $this->create_metric_result('ok', [
+            'count' => (int) $count,
+            'provider' => $filter,
+        ]);
+    }
+
+    /**
+     * Create a standardized metric result payload.
+     *
+     * @param string $status
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    private function create_metric_result(string $status, array $data = []): array {
+        return array_merge(['status' => $status], $data);
+    }
+
+    /**
+     * Get a human readable label for a reconciliation system key.
+     */
+    private function format_system_label(string $system): string {
+        switch ($system) {
+            case 'google_analytics':
+                return 'Google Analytics 4';
+            case 'facebook_api':
+                return 'Meta/Facebook';
+            case 'brevo_api':
+                return 'Brevo';
+            default:
+                return ucwords(str_replace('_', ' ', $system));
+        }
     }
     
     /**
@@ -1091,10 +1311,16 @@ class EnterpriseManagementSuite {
     /**
      * Log messages
      */
-    private function log($message) {
-        if (function_exists('\\FpHic\\Helpers\\hic_log')) {
-            \FpHic\Helpers\hic_log("[Enterprise Management] {$message}");
+    private function log($message, $level = null, array $context = []) {
+        if (!function_exists('\\FpHic\\Helpers\\hic_log')) {
+            return;
         }
+
+        if ($level === null) {
+            $level = defined('HIC_LOG_LEVEL_INFO') ? HIC_LOG_LEVEL_INFO : 'info';
+        }
+
+        \FpHic\Helpers\hic_log("[Enterprise Management] {$message}", $level, $context);
     }
 }
 

@@ -1527,8 +1527,14 @@ function hic_diagnostics_page() {
                         </div>
                     </div>
                 </div>
-                
-                <?php 
+
+                <p class="description hic-reconciliation-note">
+                    ℹ️ <strong>Riconciliazione:</strong> il controllo giornaliero confronta i dati HIC con i conteggi reali restituiti dalle API di GA4, Meta e Brevo.
+                    Finché le integrazioni non sono collegate (oppure non forniscono dati tramite i filtri <code>hic_reconciliation_*_event_count</code>)
+                    le righe della tabella verranno contrassegnate come <em>in attesa</em> senza inviare avvisi basati su valori casuali.
+                </p>
+
+                <?php
                 $downloaded_ids = hic_get_downloaded_booking_ids();
                 $downloaded_count = count($downloaded_ids);
                 ?>
