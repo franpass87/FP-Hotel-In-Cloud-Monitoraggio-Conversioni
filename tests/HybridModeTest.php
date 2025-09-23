@@ -141,22 +141,64 @@ class HybridModeTest extends WP_UnitTestCase {
         // Reimposta modalità hybrid
         update_option('hic_connection_type', 'hybrid');
         \FpHic\Helpers\hic_clear_option_cache();
-        
+
         // Verifica che entrambi i sistemi siano attivi
         do_action('rest_api_init');
         $routes = rest_get_server()->get_routes();
-        
+
         // Webhook attivo
         $this->assertArrayHasKey('/hic/v1/conversion', $routes);
-        
+
         // API polling attivo
         $this->assertTrue(hic_should_schedule_poll_event());
-        
+
         // Questa combinazione fornisce:
         // 1. Tracciamento in tempo reale via webhook
         // 2. Backup affidabile via API polling
         // 3. Copertura completa (nuove prenotazioni + modifiche manuali)
         $this->assertTrue(true, 'Hybrid mode provides both real-time and backup tracking');
+    }
+
+    public function test_reservations_without_explicit_id_generate_stable_transaction_id() {
+        delete_option('hic_synced_res_ids');
+        \FpHic\Helpers\hic_clear_option_cache('hic_synced_res_ids');
+
+        $reservation = [
+            'guest_email' => 'noid@example.com',
+            'checkin' => '2024-09-01',
+            'checkout' => '2024-09-05',
+            'price' => 150.0,
+            'guests' => 2,
+            'guest_first_name' => 'Guest',
+            'guest_last_name' => 'Example',
+        ];
+
+        $withSid = $reservation;
+        $withSid['sid'] = 'SID-12345';
+        $transformedWithSid = \FpHic\hic_transform_reservation($withSid);
+        $this->assertArrayHasKey('transaction_id', $transformedWithSid);
+        $this->assertSame('SID-12345', $transformedWithSid['transaction_id']);
+
+        $transformedA = \FpHic\hic_transform_reservation($reservation);
+        $transformedB = \FpHic\hic_transform_reservation($reservation);
+
+        $this->assertArrayHasKey('transaction_id', $transformedA);
+        $this->assertNotEmpty($transformedA['transaction_id']);
+        $this->assertSame($transformedA['transaction_id'], $transformedB['transaction_id']);
+
+        $differentReservation = $reservation;
+        $differentReservation['checkin'] = '2024-09-02';
+        $transformedDifferent = \FpHic\hic_transform_reservation($differentReservation);
+        $this->assertNotSame($transformedA['transaction_id'], $transformedDifferent['transaction_id']);
+
+        $this->assertFalse(\FpHic\Helpers\hic_is_reservation_already_processed($transformedA['transaction_id']));
+
+        \FpHic\hic_mark_reservation_processed($reservation, $transformedA['transaction_id']);
+
+        $this->assertTrue(\FpHic\Helpers\hic_is_reservation_already_processed($transformedA['transaction_id']));
+
+        delete_option('hic_synced_res_ids');
+        \FpHic\Helpers\hic_clear_option_cache('hic_synced_res_ids');
     }
 
     public function tearDown(): void {
