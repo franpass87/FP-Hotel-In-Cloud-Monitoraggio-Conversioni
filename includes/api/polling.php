@@ -2101,6 +2101,7 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
         if (!in_array($date_type, array('checkin', 'checkout', 'presence'))) {
             return array(
                 'success' => false,
+                'status' => 'failed',
                 'message' => 'Tipo di data non valido. Deve essere "checkin", "checkout" o "presence". Per aggiornamenti recenti usa la funzione updates.',
                 'stats' => array()
             );
@@ -2110,6 +2111,7 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to_date)) {
             return array(
                 'success' => false,
+                'status' => 'failed',
                 'message' => 'Formato date non valido. Usa YYYY-MM-DD.',
                 'stats' => array()
             );
@@ -2119,6 +2121,7 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
         if (strtotime($from_date) > strtotime($to_date)) {
             return array(
                 'success' => false,
+                'status' => 'failed',
                 'message' => 'La data di inizio deve essere precedente alla data di fine.',
                 'stats' => array()
             );
@@ -2129,6 +2132,7 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
         if ($date_diff > 180) {
             return array(
                 'success' => false,
+                'status' => 'failed',
                 'message' => 'Intervallo di date troppo ampio. Massimo 6 mesi.',
                 'stats' => array()
             );
@@ -2142,6 +2146,7 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
         if (!$prop_id || !$email || !$password) {
             return array(
                 'success' => false,
+                'status' => 'failed',
                 'message' => 'Credenziali API mancanti. Configura Property ID, Email e Password.',
                 'stats' => array()
             );
@@ -2151,11 +2156,13 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
         $stats = array(
             'total_found' => 0,
             'total_processed' => 0,
+            'total_successful' => 0,
+            'total_partial' => 0,
             'total_skipped' => 0,
             'total_errors' => 0,
             'execution_time' => 0,
             'date_range' => "$from_date to $to_date",
-            'date_type' => $date_type
+            'date_type' => $date_type,
         );
         
         try {
@@ -2165,14 +2172,16 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
             if (is_wp_error($reservations)) {
                 return array(
                     'success' => false,
+                    'status' => 'failed',
                     'message' => 'Errore API: ' . $reservations->get_error_message(),
                     'stats' => $stats
                 );
             }
-            
+
             if (!is_array($reservations)) {
                 return array(
                     'success' => false,
+                    'status' => 'failed',
                     'message' => 'Risposta API non valida.',
                     'stats' => $stats
                 );
@@ -2193,16 +2202,92 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
                     // Transform and process the reservation
                     $transformed = hic_transform_reservation($reservation);
                     if ($transformed !== false) {
-                        $dispatch_success = hic_dispatch_reservation($transformed, $reservation);
-                        if ($dispatch_success) {
+                        $dispatch_result = hic_dispatch_reservation($transformed, $reservation);
+                        $uid = Helpers\hic_booking_uid($reservation);
+                        if (!is_scalar($uid)) {
+                            $uid = '';
+                        } else {
+                            $uid = trim((string) $uid);
+                        }
+
+                        if (is_array($dispatch_result)) {
+                            $status_value = isset($dispatch_result['status']) ? strtolower((string) $dispatch_result['status']) : '';
+                            if (!in_array($status_value, array('success', 'partial', 'failed'), true)) {
+                                $status_value = 'failed';
+                            }
+
+                            $should_mark_processed = !empty($dispatch_result['should_mark_processed']);
+                            if ($should_mark_processed) {
+                                hic_mark_reservation_processed($reservation);
+                            }
+
+                            $failed_integrations = array();
+                            if (isset($dispatch_result['failed_integrations']) && is_array($dispatch_result['failed_integrations'])) {
+                                foreach ($dispatch_result['failed_integrations'] as $integration) {
+                                    if (is_scalar($integration)) {
+                                        $failed_integrations[] = (string) $integration;
+                                    }
+                                }
+                            }
+
+                            $failed_details = array();
+                            if (isset($dispatch_result['failed_details']) && is_array($dispatch_result['failed_details'])) {
+                                $failed_details = $dispatch_result['failed_details'];
+                            }
+
+                            if ($status_value === 'success') {
+                                $stats['total_processed']++;
+                                $stats['total_successful']++;
+                            } elseif ($status_value === 'partial') {
+                                $stats['total_processed']++;
+                                $stats['total_partial']++;
+
+                                if (!empty($failed_details)) {
+                                    Helpers\hic_queue_integration_retry($uid, $failed_details, array(
+                                        'source' => 'backfill',
+                                        'type' => 'reservation',
+                                        'status' => 'partial',
+                                    ));
+                                }
+
+                                if (!empty($failed_integrations)) {
+                                    $failed_list = implode(', ', $failed_integrations);
+                                    $partial_message = ($uid !== '')
+                                        ? "Backfill: Reservation $uid processed with partial failures"
+                                        : 'Backfill: Reservation processed with partial failures';
+                                    if ($failed_list !== '') {
+                                        $partial_message .= " - Failed integrations: $failed_list";
+                                    }
+                                    hic_log($partial_message, HIC_LOG_LEVEL_WARNING);
+                                }
+                            } else {
+                                $stats['total_errors']++;
+
+                                if (!empty($failed_details)) {
+                                    Helpers\hic_queue_integration_retry($uid, $failed_details, array(
+                                        'source' => 'backfill',
+                                        'type' => 'reservation',
+                                        'status' => 'failed',
+                                    ));
+                                }
+
+                                $fail_message = ($uid !== '')
+                                    ? "Backfill: Dispatch failed for reservation $uid"
+                                    : 'Backfill: Dispatch failed for reservation without UID';
+                                if (!empty($failed_integrations)) {
+                                    $fail_message .= ' - Failed integrations: ' . implode(', ', $failed_integrations);
+                                }
+                                hic_log($fail_message, HIC_LOG_LEVEL_ERROR);
+                            }
+                        } elseif ($dispatch_result) {
                             $stats['total_processed']++;
+                            $stats['total_successful']++;
                         } else {
                             $stats['total_errors']++;
-                            $uid = Helpers\hic_booking_uid($reservation);
-                            if (!empty($uid)) {
-                                hic_log("Backfill: Dispatch failed for reservation $uid");
+                            if ($uid !== '') {
+                                hic_log("Backfill: Dispatch failed for reservation $uid", HIC_LOG_LEVEL_ERROR);
                             } else {
-                                hic_log('Backfill: Dispatch failed for reservation without UID');
+                                hic_log('Backfill: Dispatch failed for reservation without UID', HIC_LOG_LEVEL_ERROR);
                             }
                         }
                     } else {
@@ -2217,12 +2302,41 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
             }
             
             $stats['execution_time'] = round(microtime(true) - $start_time, 2);
-            
-            $message = "Backfill completato: {$stats['total_found']} trovate, {$stats['total_processed']} processate, {$stats['total_skipped']} saltate, {$stats['total_errors']} errori in {$stats['execution_time']}s";
+            $stats['total_processed'] = $stats['total_successful'] + $stats['total_partial'];
+
+            $final_status = 'success';
+            if ($stats['total_partial'] > 0) {
+                $final_status = 'partial';
+            }
+            if ($stats['total_errors'] > 0) {
+                $final_status = $stats['total_processed'] > 0 ? 'partial' : 'failed';
+            }
+
+            $status_labels = array(
+                'success' => 'successo',
+                'partial' => 'parziale',
+                'failed' => 'fallito',
+            );
+            $human_status = isset($status_labels[$final_status]) ? $status_labels[$final_status] : $final_status;
+
+            $message = sprintf(
+                'Backfill completato (stato: %s): %d trovate, %d complete, %d parziali, %d saltate, %d errori in %ss',
+                $human_status,
+                $stats['total_found'],
+                $stats['total_successful'],
+                $stats['total_partial'],
+                $stats['total_skipped'],
+                $stats['total_errors'],
+                $stats['execution_time']
+            );
+
+            $stats['status'] = $final_status;
+
             hic_log("Backfill: $message");
-            
+
             return array(
-                'success' => true,
+                'success' => ($final_status === 'success'),
+                'status' => $final_status,
                 'message' => $message,
                 'stats' => $stats
             );
@@ -2231,9 +2345,10 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
             $stats['execution_time'] = round(microtime(true) - $start_time, 2);
             $error_message = "Errore durante il backfill: " . $e->getMessage();
             hic_log("Backfill: $error_message");
-            
+
             return array(
                 'success' => false,
+                'status' => 'failed',
                 'message' => $error_message,
                 'stats' => $stats
             );
