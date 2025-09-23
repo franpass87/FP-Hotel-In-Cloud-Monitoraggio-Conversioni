@@ -105,7 +105,44 @@ if (!function_exists('current_time')) {
     function current_time($type, $gmt = 0) {
         // Allow tests to override the time
         if (isset($GLOBALS['hic_test_current_time'])) {
-            return $GLOBALS['hic_test_current_time'];
+            $override = $GLOBALS['hic_test_current_time'];
+
+            if (is_array($override)) {
+                $key = null;
+
+                if ($type === 'timestamp') {
+                    $key = $gmt ? 'timestamp_gmt' : 'timestamp_local';
+                } elseif ($type === 'mysql') {
+                    $key = $gmt ? 'mysql_gmt' : 'mysql_local';
+                }
+
+                if ($key !== null && array_key_exists($key, $override)) {
+                    return $override[$key];
+                }
+
+                if ($gmt && array_key_exists('gmt', $override)) {
+                    return $override['gmt'];
+                }
+
+                if (!$gmt && array_key_exists('local', $override)) {
+                    return $override['local'];
+                }
+
+                if (array_key_exists('value', $override)) {
+                    return $override['value'];
+                }
+            }
+
+            return $override;
+        }
+
+        if ($type === 'timestamp') {
+            if ($gmt) {
+                return time();
+            }
+
+            $offset = (float) get_option('gmt_offset', 0);
+            return time() + (int) round($offset * 3600);
         }
 
         $timezone_string = get_option('timezone_string', 'UTC');
@@ -121,7 +158,11 @@ if (!function_exists('current_time')) {
             $datetime->setTimezone(new DateTimeZone('UTC'));
         }
 
-        return $datetime->format($type === 'mysql' ? 'Y-m-d H:i:s' : 'U');
+        if ($type === 'mysql') {
+            return $datetime->format('Y-m-d H:i:s');
+        }
+
+        return $datetime->format('U');
     }
 }
 
