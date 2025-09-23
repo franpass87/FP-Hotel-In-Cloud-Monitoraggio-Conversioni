@@ -283,7 +283,10 @@ class CircuitBreakerManager {
             case self::STATES['OPEN']:
                 // Circuit is open - block the request and use fallback
                 $this->log("Circuit breaker OPEN for {$service_name}, blocking request");
-                $this->queue_for_retry($service_name, 'api_request', $args, 'HIGH');
+                $this->queue_for_retry($service_name, 'api_request', [
+                    'url' => $url,
+                    'args' => $args
+                ], 'HIGH');
                 return $this->get_fallback_response($service_name, $url, $args);
                 
             case self::STATES['HALF_OPEN']:
@@ -501,21 +504,40 @@ class CircuitBreakerManager {
      */
     private function queue_for_retry($service_name, $operation_type, $payload, $priority = 'MEDIUM') {
         global $wpdb;
-        
+
         $table_name = $wpdb->prefix . 'hic_retry_queue';
-        
+
+        if ($operation_type === 'api_request') {
+            if (is_array($payload) && array_key_exists('url', $payload)) {
+                $args = $payload['args'] ?? [];
+                $payload['args'] = is_array($args) ? $args : (array) $args;
+            } else {
+                $legacy_args = is_array($payload) ? $payload : [];
+                $payload = [
+                    'url' => '',
+                    'args' => $legacy_args
+                ];
+
+                $this->log('Queued API retry without explicit URL; legacy payload will be skipped until updated.');
+            }
+        }
+
         // Calculate retry schedule based on priority
         $retry_delay = $this->calculate_retry_delay($priority);
-        
+
+        $encoded_payload = function_exists('wp_json_encode')
+            ? wp_json_encode($payload)
+            : json_encode($payload);
+
         $wpdb->insert($table_name, [
             'service_name' => $service_name,
             'operation_type' => $operation_type,
             'priority' => $priority,
-            'payload' => json_encode($payload),
+            'payload' => $encoded_payload,
             'scheduled_retry_at' => date('Y-m-d H:i:s', time() + $retry_delay),
             'status' => 'queued'
         ]);
-        
+
         $this->log("Queued {$operation_type} for {$service_name} with priority {$priority}");
     }
     
@@ -641,16 +663,26 @@ class CircuitBreakerManager {
      * Retry API request
      */
     private function retry_api_request($service_name, $payload) {
-        // Extract URL and args from payload
-        $url = $payload['url'] ?? '';
-        $args = $payload['args'] ?? [];
-        
-        if (empty($url)) {
+        $url = '';
+        $args = [];
+
+        if (is_array($payload)) {
+            if (array_key_exists('url', $payload)) {
+                $url = (string) $payload['url'];
+                $args = $payload['args'] ?? [];
+                $args = is_array($args) ? $args : (array) $args;
+            } else {
+                $args = $payload;
+            }
+        }
+
+        if ($url === '') {
+            $this->log("Skipping retry for {$service_name}: missing URL in payload");
             return false;
         }
-        
+
         $response = wp_remote_request($url, $args);
-        
+
         if (is_wp_error($response)) {
             return false;
         }
