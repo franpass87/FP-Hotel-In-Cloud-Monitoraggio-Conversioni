@@ -324,7 +324,13 @@ function hic_force_restart_internal_scheduler() {
     $results = array();
     
     // Clear any existing WP-Cron events (cleanup legacy events)
-    $legacy_events = array('hic_api_poll_event', 'hic_api_updates_event', 'hic_retry_failed_notifications_event', 'hic_reliable_poll_event');
+    $legacy_events = array(
+        'hic_api_poll_event',
+        'hic_api_updates_event',
+        'hic_retry_failed_brevo_notifications',
+        'hic_retry_failed_notifications_event',
+        'hic_reliable_poll_event',
+    );
     foreach ($legacy_events as $event) {
         hic_safe_wp_clear_scheduled_hook($event);
         $results['legacy_' . $event . '_cleared'] = 'Cleared all legacy cron events';
