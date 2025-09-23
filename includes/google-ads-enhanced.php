@@ -18,9 +18,113 @@ class GoogleAdsEnhancedConversions {
     
     /** @var array Supported hash algorithms for enhanced conversions */
     private const HASH_ALGORITHMS = ['sha256'];
-    
+
     /** @var int Batch size for enhanced conversion uploads */
     private const BATCH_SIZE = 100;
+
+    /** @var array<string,string> Map ISO country codes to telephone calling codes */
+    private const COUNTRY_CALLING_CODES = [
+        'IT' => '39',
+        'SM' => '378',
+        'VA' => '379',
+        'US' => '1',
+        'CA' => '1',
+        'GB' => '44',
+        'UK' => '44',
+        'IE' => '353',
+        'FR' => '33',
+        'DE' => '49',
+        'ES' => '34',
+        'PT' => '351',
+        'NL' => '31',
+        'BE' => '32',
+        'CH' => '41',
+        'AT' => '43',
+        'DK' => '45',
+        'SE' => '46',
+        'NO' => '47',
+        'FI' => '358',
+        'PL' => '48',
+        'CZ' => '420',
+        'SK' => '421',
+        'HU' => '36',
+        'RO' => '40',
+        'HR' => '385',
+        'SI' => '386',
+        'BG' => '359',
+        'RS' => '381',
+        'GR' => '30',
+        'TR' => '90',
+        'BR' => '55',
+        'AR' => '54',
+        'CL' => '56',
+        'MX' => '52',
+        'AU' => '61',
+        'NZ' => '64',
+        'JP' => '81',
+        'CN' => '86',
+        'IN' => '91',
+        'ZA' => '27',
+        'AE' => '971',
+        'RU' => '7',
+        'UA' => '380',
+        'IL' => '972',
+        'LU' => '352',
+        'IS' => '354',
+        'MT' => '356',
+        'CY' => '357',
+        'EE' => '372',
+        'LV' => '371',
+        'LT' => '370',
+        'LI' => '423',
+        'SG' => '65',
+    ];
+
+    /** @var array<string,string> Map primary language codes to default ISO countries */
+    private const LANGUAGE_COUNTRY_MAP = [
+        'it' => 'IT',
+        'en' => 'GB',
+        'fr' => 'FR',
+        'de' => 'DE',
+        'es' => 'ES',
+        'pt' => 'PT',
+        'nl' => 'NL',
+        'be' => 'BE',
+        'da' => 'DK',
+        'sv' => 'SE',
+        'no' => 'NO',
+        'fi' => 'FI',
+        'pl' => 'PL',
+        'cs' => 'CZ',
+        'sk' => 'SK',
+        'hu' => 'HU',
+        'ro' => 'RO',
+        'hr' => 'HR',
+        'sl' => 'SI',
+        'bg' => 'BG',
+        'sr' => 'RS',
+        'el' => 'GR',
+        'tr' => 'TR',
+        'ru' => 'RU',
+        'uk' => 'UA',
+        'he' => 'IL',
+        'ar' => 'AE',
+        'ja' => 'JP',
+        'zh' => 'CN',
+        'hi' => 'IN',
+        'ptbr' => 'BR',
+        'esmx' => 'MX',
+        'enus' => 'US',
+        'engb' => 'GB',
+        'enau' => 'AU',
+        'ennz' => 'NZ',
+        'frca' => 'CA',
+        'deat' => 'AT',
+        'dech' => 'CH',
+    ];
+
+    /** @var string Default ISO country used when no explicit fallback is configured */
+    private const DEFAULT_PHONE_COUNTRY = 'IT';
     
     public function __construct() {
         if (!$this->is_enhanced_conversions_enabled()) {
@@ -432,7 +536,7 @@ class GoogleAdsEnhancedConversions {
         
         try {
             // Hash customer data
-            $hashed_data = $this->hash_customer_data($customer_data);
+            $hashed_data = $this->hash_customer_data($customer_data, $booking_data);
             
             // Create enhanced conversion record
             $conversion_id = $this->create_enhanced_conversion_record($booking_data, $hashed_data);
@@ -456,21 +560,27 @@ class GoogleAdsEnhancedConversions {
     }
     
     /**
-     * Hash customer data according to Google Ads requirements
+     * Hash customer data according to Google Ads requirements.
+     *
+     * @param array $customer_data Raw customer identifiers.
+     * @param array $booking_data  Booking metadata used as context for normalization.
+     * @return array<string,string> Hashed identifiers ready for storage.
      */
-    private function hash_customer_data($customer_data) {
+    private function hash_customer_data($customer_data, array $booking_data = []) {
         $hashed_data = [];
-        
+
         // Email hashing (normalized and hashed)
         if (!empty($customer_data['email'])) {
             $normalized_email = $this->normalize_email($customer_data['email']);
             $hashed_data['email_hash'] = hash('sha256', $normalized_email);
         }
-        
+
         // Phone number hashing (normalized and hashed)
         if (!empty($customer_data['phone'])) {
-            $normalized_phone = $this->normalize_phone($customer_data['phone']);
-            $hashed_data['phone_hash'] = hash('sha256', $normalized_phone);
+            $normalized_phone = $this->normalize_phone($customer_data['phone'], $customer_data, $booking_data);
+            if (!empty($normalized_phone)) {
+                $hashed_data['phone_hash'] = hash('sha256', $normalized_phone);
+            }
         }
         
         // First name hashing (normalized and hashed)
@@ -518,18 +628,148 @@ class GoogleAdsEnhancedConversions {
     }
     
     /**
-     * Normalize phone number for hashing
+     * Normalize phone number for hashing by building an E.164 string.
+     *
+     * @param mixed $phone          Raw phone value.
+     * @param array $customer_data  Customer fields that may contain locale hints.
+     * @param array $booking_data   Booking context (SID, language, etc.).
+     * @return string|null          Normalized E.164 phone number or null when it cannot be determined.
      */
-    private function normalize_phone($phone) {
-        // Remove all non-digit characters
-        $phone = preg_replace('/\D/', '', $phone);
-        
-        // Add country code if not present (assuming Italian numbers if no country code)
-        if (strlen($phone) === 10 && substr($phone, 0, 1) === '3') {
-            $phone = '39' . $phone; // Add Italy country code
+    private function normalize_phone($phone, array $customer_data = [], array $booking_data = []) {
+        if (!is_scalar($phone)) {
+            return null;
         }
-        
-        return $phone;
+
+        $raw_phone = trim((string) $phone);
+        if ($raw_phone === '') {
+            return null;
+        }
+
+        $helper = '\\FpHic\\Helpers\\hic_detect_phone_language';
+        $helper_phone = null;
+        $detected_language = null;
+
+        if (function_exists($helper)) {
+            $details = $helper($raw_phone);
+            if (is_array($details)) {
+                if (!empty($details['phone']) && is_scalar($details['phone'])) {
+                    $helper_phone = (string) $details['phone'];
+                }
+                if (!empty($details['language']) && is_scalar($details['language'])) {
+                    $detected_language = strtolower((string) $details['language']);
+                }
+            }
+        }
+
+        $normalized_phone = preg_replace('/[^0-9+]/', '', $helper_phone ?? $raw_phone);
+        if ($normalized_phone === '') {
+            return null;
+        }
+
+        if (strpos($normalized_phone, '00') === 0) {
+            $normalized_phone = '+' . substr($normalized_phone, 2);
+        }
+
+        if ($normalized_phone[0] === '+') {
+            $digits = preg_replace('/\D/', '', substr($normalized_phone, 1));
+            return $digits !== '' ? '+' . $digits : null;
+        }
+
+        $numeric_phone = preg_replace('/\D/', '', $normalized_phone);
+        if ($numeric_phone === '') {
+            return null;
+        }
+
+        $country_candidates = [];
+
+        foreach ([$customer_data, $booking_data] as $dataset) {
+            foreach (['country_code', 'country', 'phone_country'] as $field) {
+                if (isset($dataset[$field]) && is_scalar($dataset[$field])) {
+                    $candidate = $this->normalize_country_value((string) $dataset[$field]);
+                    if ($candidate !== null) {
+                        $country_candidates[] = $candidate;
+                    }
+                }
+            }
+        }
+
+        if (!empty($booking_data['sid']) && is_scalar($booking_data['sid'])) {
+            $sid_country = null;
+            if (function_exists('apply_filters')) {
+                $sid_country = apply_filters('hic_google_ads_phone_country_from_sid', null, (string) $booking_data['sid'], $customer_data, $booking_data);
+            }
+            if (is_string($sid_country) && $sid_country !== '') {
+                $candidate = $this->normalize_country_value($sid_country);
+                if ($candidate !== null) {
+                    $country_candidates[] = $candidate;
+                }
+            }
+        }
+
+        $language_sources = [];
+        if ($detected_language !== null) {
+            $language_sources[] = $detected_language;
+        }
+        foreach ([$customer_data, $booking_data] as $dataset) {
+            foreach (['phone_language', 'language', 'locale'] as $field) {
+                if (!empty($dataset[$field]) && is_scalar($dataset[$field])) {
+                    $language_sources[] = (string) $dataset[$field];
+                }
+            }
+        }
+
+        foreach ($language_sources as $language_candidate) {
+            $language_country = $this->map_language_to_country($language_candidate);
+            if ($language_country !== null) {
+                $country_candidates[] = $language_country;
+            }
+        }
+
+        $default_country = $this->get_default_phone_country();
+        if ($default_country !== null) {
+            $country_candidates[] = $default_country;
+        }
+
+        $selected_country = null;
+        $calling_code = null;
+        foreach ($country_candidates as $candidate) {
+            $code = $this->resolve_calling_code($candidate);
+            if ($code !== null) {
+                $selected_country = $candidate;
+                $calling_code = $code;
+                break;
+            }
+        }
+
+        if ($calling_code === null) {
+            $this->log(
+                sprintf('Unable to determine country prefix for phone "%s"; skipping phone hash.', $raw_phone),
+                defined('HIC_LOG_LEVEL_WARNING') ? HIC_LOG_LEVEL_WARNING : 'warning'
+            );
+            return null;
+        }
+
+        if (strpos($numeric_phone, $calling_code) === 0 && strlen($numeric_phone) > strlen($calling_code) + 2) {
+            return '+' . $numeric_phone;
+        }
+
+        $national_number = $numeric_phone;
+        if (!$this->should_retain_trunk_zero($selected_country)) {
+            $trimmed = preg_replace('/^0+/', '', $national_number);
+            if ($trimmed !== '') {
+                $national_number = $trimmed;
+            }
+        }
+
+        if ($national_number === '') {
+            $this->log(
+                sprintf('Normalized phone number became empty for "%s"; skipping phone hash.', $raw_phone),
+                defined('HIC_LOG_LEVEL_WARNING') ? HIC_LOG_LEVEL_WARNING : 'warning'
+            );
+            return null;
+        }
+
+        return '+' . $calling_code . $national_number;
     }
     
     /**
@@ -546,6 +786,302 @@ class GoogleAdsEnhancedConversions {
     private function normalize_address($address) {
         // Remove leading/trailing whitespace, convert to lowercase, remove extra spaces
         return trim(strtolower(preg_replace('/\s+/', ' ', $address)));
+    }
+
+    /**
+     * Retrieve the configured default country for phone normalization.
+     *
+     * @return array{type:string,value:string}|null
+     */
+    private function get_default_phone_country(): ?array {
+        $settings = get_option('hic_google_ads_enhanced_settings', []);
+
+        if (is_array($settings) && array_key_exists('default_phone_country', $settings)) {
+            $stored = $settings['default_phone_country'];
+
+            if (!is_scalar($stored)) {
+                return null;
+            }
+
+            $stored_value = (string) $stored;
+            if ($stored_value === '') {
+                return null;
+            }
+
+            return $this->normalize_country_value($stored_value);
+        }
+
+        return $this->normalize_country_value(self::DEFAULT_PHONE_COUNTRY);
+    }
+
+    /**
+     * Map language or locale hints to a country candidate.
+     *
+     * @param mixed $language Language code or locale.
+     * @return array{type:string,value:string}|null
+     */
+    private function map_language_to_country($language): ?array {
+        if (!is_scalar($language)) {
+            return null;
+        }
+
+        $value = strtolower(trim((string) $language));
+        if ($value === '') {
+            return null;
+        }
+
+        $value = str_replace([' ', '_'], '-', $value);
+        $parts = explode('-', $value);
+
+        if (isset($parts[1])) {
+            $region_candidate = $this->normalize_country_value($parts[1]);
+            if ($region_candidate !== null) {
+                return $region_candidate;
+            }
+        }
+
+        $primary = preg_replace('/[^a-z]/', '', $parts[0]);
+        if ($primary === '') {
+            return null;
+        }
+
+        if (isset(self::LANGUAGE_COUNTRY_MAP[$primary])) {
+            return ['type' => 'country', 'value' => self::LANGUAGE_COUNTRY_MAP[$primary]];
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize country identifiers provided by settings or payloads.
+     *
+     * @param mixed $value Raw country input.
+     * @return array{type:string,value:string}|null
+     */
+    private function normalize_country_value($value): ?array {
+        if (!is_scalar($value)) {
+            return null;
+        }
+
+        $candidate = trim((string) $value);
+        if ($candidate === '') {
+            return null;
+        }
+
+        if (preg_match('/^\+?\d{1,6}$/', $candidate)) {
+            return ['type' => 'code', 'value' => ltrim($candidate, '+')];
+        }
+
+        $upper = strtoupper($candidate);
+
+        if (preg_match('/^[A-Z]{2}$/', $upper)) {
+            if ($upper === 'UK') {
+                $upper = 'GB';
+            }
+
+            return ['type' => 'country', 'value' => $upper];
+        }
+
+        if (preg_match('/^[A-Z]{3}$/', $upper)) {
+            $map = [
+                'ITA' => 'IT',
+                'SMR' => 'SM',
+                'VAT' => 'VA',
+                'USA' => 'US',
+                'GBR' => 'GB',
+                'IRL' => 'IE',
+                'FRA' => 'FR',
+                'DEU' => 'DE',
+                'ESP' => 'ES',
+                'PRT' => 'PT',
+                'NLD' => 'NL',
+                'BEL' => 'BE',
+                'CHE' => 'CH',
+                'AUT' => 'AT',
+                'DNK' => 'DK',
+                'SWE' => 'SE',
+                'NOR' => 'NO',
+                'FIN' => 'FI',
+                'POL' => 'PL',
+                'CZE' => 'CZ',
+                'SVK' => 'SK',
+                'HUN' => 'HU',
+                'ROU' => 'RO',
+                'HRV' => 'HR',
+                'SVN' => 'SI',
+                'BGR' => 'BG',
+                'SRB' => 'RS',
+                'GRC' => 'GR',
+                'TUR' => 'TR',
+                'RUS' => 'RU',
+                'UKR' => 'UA',
+                'BRA' => 'BR',
+                'ARG' => 'AR',
+                'CHL' => 'CL',
+                'MEX' => 'MX',
+                'AUS' => 'AU',
+                'NZL' => 'NZ',
+                'JPN' => 'JP',
+                'CHN' => 'CN',
+                'IND' => 'IN',
+                'ZAF' => 'ZA',
+                'ARE' => 'AE',
+                'ISR' => 'IL',
+                'LUX' => 'LU',
+                'MLT' => 'MT',
+                'CYP' => 'CY',
+                'EST' => 'EE',
+                'LVA' => 'LV',
+                'LTU' => 'LT',
+                'LIE' => 'LI',
+                'CAN' => 'CA',
+                'SGP' => 'SG',
+            ];
+
+            if (isset($map[$upper])) {
+                return ['type' => 'country', 'value' => $map[$upper]];
+            }
+        }
+
+        $normalized = preg_replace('/[^A-Z]/', '', $upper);
+        if ($normalized === '') {
+            return null;
+        }
+
+        $names = [
+            'ITALIA' => 'IT',
+            'ITALY' => 'IT',
+            'ITALIEN' => 'IT',
+            'SANMARINO' => 'SM',
+            'VATICAN' => 'VA',
+            'VATICANCITY' => 'VA',
+            'UNITEDKINGDOM' => 'GB',
+            'REGNOUNITO' => 'GB',
+            'ENGLAND' => 'GB',
+            'SCOTLAND' => 'GB',
+            'WALES' => 'GB',
+            'IRELAND' => 'IE',
+            'IRLANDA' => 'IE',
+            'UNITEDSTATES' => 'US',
+            'STATIUNITI' => 'US',
+            'FRANCE' => 'FR',
+            'GERMANY' => 'DE',
+            'DEUTSCHLAND' => 'DE',
+            'SPAIN' => 'ES',
+            'ESPANA' => 'ES',
+            'PORTUGAL' => 'PT',
+            'PORTOGALLO' => 'PT',
+            'NETHERLANDS' => 'NL',
+            'PAESIBASSI' => 'NL',
+            'BELGIUM' => 'BE',
+            'BELGIO' => 'BE',
+            'SWITZERLAND' => 'CH',
+            'SVIZZERA' => 'CH',
+            'AUSTRIA' => 'AT',
+            'DENMARK' => 'DK',
+            'DANIMARCA' => 'DK',
+            'SWEDEN' => 'SE',
+            'SVEZIA' => 'SE',
+            'NORWAY' => 'NO',
+            'NORVEGIA' => 'NO',
+            'FINLAND' => 'FI',
+            'FINLANDIA' => 'FI',
+            'POLAND' => 'PL',
+            'POLONIA' => 'PL',
+            'CZECHREPUBLIC' => 'CZ',
+            'REPUBBLICACECA' => 'CZ',
+            'SLOVAKIA' => 'SK',
+            'SLOVACCHIA' => 'SK',
+            'HUNGARY' => 'HU',
+            'UNGHERIA' => 'HU',
+            'ROMANIA' => 'RO',
+            'GREECE' => 'GR',
+            'GRECIA' => 'GR',
+            'TURKEY' => 'TR',
+            'TURCHIA' => 'TR',
+            'RUSSIA' => 'RU',
+            'RUSSIANFEDERATION' => 'RU',
+            'UKRAINE' => 'UA',
+            'BRAZIL' => 'BR',
+            'BRASILE' => 'BR',
+            'MEXICO' => 'MX',
+            'MESSICO' => 'MX',
+            'ARGENTINA' => 'AR',
+            'CHILE' => 'CL',
+            'AUSTRALIA' => 'AU',
+            'NUOVAZELANDA' => 'NZ',
+            'NEWZEALAND' => 'NZ',
+            'JAPAN' => 'JP',
+            'GIAPPONE' => 'JP',
+            'CHINA' => 'CN',
+            'CINA' => 'CN',
+            'INDIA' => 'IN',
+            'SOUTHAFRICA' => 'ZA',
+            'SUDAFRICA' => 'ZA',
+            'EMIRATIARABIUNITI' => 'AE',
+            'UNITEDARABEMIRATES' => 'AE',
+            'ISRAEL' => 'IL',
+            'LUXEMBOURG' => 'LU',
+            'LUSSEMBURGO' => 'LU',
+            'MALTA' => 'MT',
+            'CYPRES' => 'CY',
+            'CIPRO' => 'CY',
+            'ESTONIA' => 'EE',
+            'LETTONIA' => 'LV',
+            'LATVIA' => 'LV',
+            'LITUANIA' => 'LT',
+            'LITHUANIA' => 'LT',
+            'LIECHTENSTEIN' => 'LI',
+            'CANADA' => 'CA',
+            'SINGAPORE' => 'SG',
+        ];
+
+        if (isset($names[$normalized])) {
+            return ['type' => 'country', 'value' => $names[$normalized]];
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve the telephone calling code for the provided country hint.
+     *
+     * @param array{type:string,value:string} $country
+     * @return string|null
+     */
+    private function resolve_calling_code(array $country): ?string {
+        if (empty($country['type']) || empty($country['value'])) {
+            return null;
+        }
+
+        if ($country['type'] === 'code') {
+            $digits = preg_replace('/\D/', '', $country['value']);
+            return $digits !== '' ? $digits : null;
+        }
+
+        $iso = strtoupper($country['value']);
+        if (isset(self::COUNTRY_CALLING_CODES[$iso])) {
+            return self::COUNTRY_CALLING_CODES[$iso];
+        }
+
+        return null;
+    }
+
+    /**
+     * Determine whether the national trunk prefix (leading zero) must be preserved.
+     *
+     * @param array{type:string,value:string} $country
+     * @return bool
+     */
+    private function should_retain_trunk_zero(array $country): bool {
+        if (($country['type'] ?? '') === 'code') {
+            return true;
+        }
+
+        $iso = strtoupper($country['value'] ?? '');
+        $retain = ['IT', 'SM', 'VA'];
+
+        return in_array($iso, $retain, true);
     }
 
     /**
@@ -1308,6 +1844,16 @@ class GoogleAdsEnhancedConversions {
         $settings = get_option('hic_google_ads_enhanced_settings', []);
         $enabled = get_option('hic_google_ads_enhanced_enabled', false);
         $has_config = !empty($settings['customer_id']) && !empty($settings['conversion_action_id']);
+
+        $default_phone_country = self::DEFAULT_PHONE_COUNTRY;
+        if (is_array($settings) && array_key_exists('default_phone_country', $settings)) {
+            $stored_country = $settings['default_phone_country'];
+            if (is_scalar($stored_country)) {
+                $default_phone_country = (string) $stored_country;
+            } else {
+                $default_phone_country = '';
+            }
+        }
         
         // Determine status
         if (!$enabled) {
@@ -1411,9 +1957,21 @@ class GoogleAdsEnhancedConversions {
                                 <tr>
                                     <th>Refresh Token</th>
                                     <td>
-                                        <input type="text" name="hic_google_ads_enhanced_settings[refresh_token]" 
-                                               value="<?php echo esc_attr($settings['refresh_token'] ?? ''); ?>" 
+                                        <input type="text" name="hic_google_ads_enhanced_settings[refresh_token]"
+                                               value="<?php echo esc_attr($settings['refresh_token'] ?? ''); ?>"
                                                class="regular-text">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Prefisso telefonico di fallback</th>
+                                    <td>
+                                        <input type="text" name="hic_google_ads_enhanced_settings[default_phone_country]"
+                                               value="<?php echo esc_attr($default_phone_country); ?>"
+                                               class="regular-text" placeholder="IT o +39">
+                                        <p class="description">
+                                            Utilizzato quando il prefisso non è deducibile da SID o lingua. Inserire un codice ISO
+                                            a due lettere (es. IT) oppure un prefisso numerico (es. +39).
+                                        </p>
                                     </td>
                                 </tr>
                             </table>
@@ -1552,26 +2110,58 @@ class GoogleAdsEnhancedConversions {
         if (!is_array($settings)) {
             return [];
         }
-        // Example: sanitize expected fields. Adjust field names/types as needed.
+
         $sanitized = [];
+
         foreach ($settings as $key => $value) {
-            switch ($key) {
-                case 'some_checkbox_field':
-                    $sanitized[$key] = !empty($value) ? 1 : 0;
-                    break;
-                case 'some_text_field':
-                    $sanitized[$key] = sanitize_text_field($value);
-                    break;
-                case 'some_email_field':
-                    $sanitized[$key] = sanitize_email($value);
-                    break;
-                default:
-                    // Default to text field sanitization
-                    $sanitized[$key] = sanitize_text_field($value);
-                    break;
+            if ($key === 'default_phone_country') {
+                $sanitized[$key] = $this->sanitize_default_phone_country($value);
+                continue;
             }
+
+            $sanitized[$key] = $this->sanitize_setting_value($value);
         }
+
         return $sanitized;
+    }
+
+    /**
+     * Sanitize default phone country option.
+     */
+    private function sanitize_default_phone_country($value): string {
+        $candidate = $this->normalize_country_value($value);
+        if ($candidate === null) {
+            return '';
+        }
+
+        return $candidate['value'];
+    }
+
+    /**
+     * Recursively sanitize settings values while preserving arrays.
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    private function sanitize_setting_value($value)
+    {
+        if (is_array($value)) {
+            $sanitized = [];
+            foreach ($value as $k => $v) {
+                $sanitized[$k] = $this->sanitize_setting_value($v);
+            }
+            return $sanitized;
+        }
+
+        if (is_scalar($value)) {
+            if (function_exists('sanitize_text_field')) {
+                return sanitize_text_field((string) $value);
+            }
+
+            return trim((string) $value);
+        }
+
+        return $value;
     }
 
     /**
@@ -1601,10 +2191,17 @@ class GoogleAdsEnhancedConversions {
     /**
      * Log messages with enhanced conversions prefix
      */
-    private function log($message) {
-        if (function_exists('\\FpHic\\Helpers\\hic_log')) {
-            \FpHic\Helpers\hic_log("[Google Ads Enhanced] {$message}");
+    private function log($message, $level = null, array $context = []) {
+        if (!function_exists('\\FpHic\\Helpers\\hic_log')) {
+            return;
         }
+
+        $log_level = $level;
+        if ($log_level === null) {
+            $log_level = defined('HIC_LOG_LEVEL_INFO') ? HIC_LOG_LEVEL_INFO : 'info';
+        }
+
+        \FpHic\Helpers\hic_log("[Google Ads Enhanced] {$message}", $log_level, $context);
     }
 }
 

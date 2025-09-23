@@ -422,6 +422,75 @@ namespace {
             $this->assertStringContainsString('Missing or invalid conversion currency', $last_message);
             $this->assertStringContainsString('defaulting to EUR', $last_message);
         }
+
+        public function test_phone_hash_uses_fallback_country_for_italian_landline(): void
+        {
+            update_option('hic_google_ads_enhanced_settings', [
+                'default_phone_country' => 'IT',
+            ]);
+
+            $enhanced = new GoogleAdsEnhancedConversions();
+
+            $hash_method = new \ReflectionMethod($enhanced, 'hash_customer_data');
+            $hash_method->setAccessible(true);
+
+            $customer = [
+                'phone' => '041 123 4567',
+                'phone_language' => 'it',
+            ];
+
+            $booking = [
+                'language' => 'it_IT',
+            ];
+
+            $hashed = $hash_method->invoke($enhanced, $customer, $booking);
+
+            $this->assertArrayHasKey('phone_hash', $hashed);
+            $this->assertSame(hash('sha256', '+390411234567'), $hashed['phone_hash']);
+        }
+
+        public function test_phone_hash_preserves_international_numbers(): void
+        {
+            update_option('hic_google_ads_enhanced_settings', []);
+
+            $enhanced = new GoogleAdsEnhancedConversions();
+
+            $hash_method = new \ReflectionMethod($enhanced, 'hash_customer_data');
+            $hash_method->setAccessible(true);
+
+            $customer = [
+                'phone' => '+44 20 7946 0958',
+            ];
+
+            $hashed = $hash_method->invoke($enhanced, $customer, []);
+
+            $this->assertArrayHasKey('phone_hash', $hashed);
+            $this->assertSame(hash('sha256', '+442079460958'), $hashed['phone_hash']);
+        }
+
+        public function test_phone_hash_skips_when_prefix_unknown(): void
+        {
+            global $hic_test_logged_messages;
+
+            update_option('hic_google_ads_enhanced_settings', [
+                'default_phone_country' => '',
+            ]);
+
+            $enhanced = new GoogleAdsEnhancedConversions();
+
+            $hash_method = new \ReflectionMethod($enhanced, 'hash_customer_data');
+            $hash_method->setAccessible(true);
+
+            $hashed = $hash_method->invoke($enhanced, [
+                'phone' => '5551234',
+            ], []);
+
+            $this->assertArrayNotHasKey('phone_hash', $hashed, 'Phone hash should be skipped without a known prefix.');
+            $this->assertNotEmpty($hic_test_logged_messages, 'Missing prefix should be logged.');
+            $last_message = end($hic_test_logged_messages);
+            $this->assertIsString($last_message);
+            $this->assertStringContainsString('Unable to determine country prefix', $last_message);
+        }
     }
 }
 
