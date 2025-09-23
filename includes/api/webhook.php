@@ -52,7 +52,14 @@ function hic_webhook_handler(WP_REST_Request $request) {
 
   // Validate Content-Type header
   $content_type = $request->get_header('content-type');
-  if ( stripos($content_type, 'application/json') === false ) {
+
+  if (!is_string($content_type)) {
+    $content_type = '';
+  } else {
+    $content_type = trim($content_type);
+  }
+
+  if ($content_type === '' || stripos($content_type, 'application/json') === false) {
     return new \WP_Error('invalid_content_type', 'Content-Type non supportato', ['status' => 415]);
   }
 
