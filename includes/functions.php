@@ -594,81 +594,104 @@ function hic_store_failed_request($url, $args, $error) {
     }
 
     $table = $wpdb->prefix . 'hic_failed_requests';
+    $max_attempts = 2;
+    $attempt = 0;
+    $table_recreation_attempted = false;
+    $table_recreation_succeeded = false;
 
-    $insert_result = $wpdb->insert(
-        $table,
-        [
-            'endpoint'   => $url,
-            'payload'    => wp_json_encode($args),
-            'attempts'   => 1,
-            'last_error' => $error,
-            'last_try'   => current_time('mysql'),
-        ],
-        ['%s', '%s', '%d', '%s', '%s']
-    );
+    do {
+        $attempt++;
 
-    if (is_wp_error($insert_result)) {
-        $log_result = hic_log(
-            'Failed to store failed request: ' . $insert_result->get_error_message(),
-            HIC_LOG_LEVEL_ERROR,
+        $insert_result = $wpdb->insert(
+            $table,
             [
-                'endpoint' => $url,
-                'error'    => $error,
-            ]
+                'endpoint'   => $url,
+                'payload'    => wp_json_encode($args),
+                'attempts'   => 1,
+                'last_error' => $error,
+                'last_try'   => current_time('mysql'),
+            ],
+            ['%s', '%s', '%d', '%s', '%s']
         );
 
-        if (is_wp_error($log_result)) {
-            error_log('HIC logging failure: ' . $log_result->get_error_message());
+        if (is_wp_error($insert_result)) {
+            $log_result = hic_log(
+                'Failed to store failed request: ' . $insert_result->get_error_message(),
+                HIC_LOG_LEVEL_ERROR,
+                [
+                    'endpoint' => $url,
+                    'error'    => $error,
+                    'attempt'  => $attempt,
+                ]
+            );
+
+            if (is_wp_error($log_result)) {
+                error_log('HIC logging failure: ' . $log_result->get_error_message());
+            }
+
+            return;
         }
 
-        return;
-    }
+        if ($insert_result === false) {
+            $db_error_message = trim((string) $wpdb->last_error);
+            if ($db_error_message === '') {
+                $db_error_message = 'Unknown database error';
+            }
 
-    if ($insert_result === false) {
-        $db_error_message = trim((string) $wpdb->last_error);
-        if ($db_error_message === '') {
-            $db_error_message = 'Unknown database error';
-        }
+            $lower_error = strtolower($db_error_message);
+            $missing_table_indicators = [
+                'no such table',
+                'does not exist',
+                "doesn't exist",
+                'missing table',
+                'unknown table',
+                '1146',
+            ];
 
-        $log_result = hic_log(
-            'Failed to store failed request: ' . $db_error_message,
-            HIC_LOG_LEVEL_ERROR,
-            [
+            $missing_table_detected = false;
+            foreach ($missing_table_indicators as $indicator) {
+                if ($indicator !== '' && strpos($lower_error, $indicator) !== false) {
+                    $missing_table_detected = true;
+                    break;
+                }
+            }
+
+            if ($missing_table_detected && function_exists('\hic_create_failed_requests_table') && !$table_recreation_attempted) {
+                $table_recreation_attempted = true;
+                $table_recreation_succeeded = (bool) \hic_create_failed_requests_table();
+
+                if ($table_recreation_succeeded && $attempt < $max_attempts) {
+                    continue;
+                }
+            }
+
+            $context = [
                 'endpoint' => $url,
                 'error'    => $error,
                 'db_error' => $db_error_message,
                 'table'    => $table,
-            ]
-        );
+                'attempt'  => $attempt,
+            ];
 
-        if (is_wp_error($log_result)) {
-            error_log('HIC logging failure: ' . $log_result->get_error_message());
-        }
-
-        $lower_error = strtolower($db_error_message);
-        $missing_table_indicators = [
-            'no such table',
-            'does not exist',
-            "doesn't exist",
-            'missing table',
-            'unknown table',
-            '1146',
-        ];
-
-        $missing_table_detected = false;
-        foreach ($missing_table_indicators as $indicator) {
-            if ($indicator !== '' && strpos($lower_error, $indicator) !== false) {
-                $missing_table_detected = true;
-                break;
+            if ($table_recreation_attempted) {
+                $context['table_recreation_succeeded'] = $table_recreation_succeeded ? 'yes' : 'no';
             }
+
+            $log_result = hic_log(
+                'Failed to store failed request: ' . $db_error_message,
+                HIC_LOG_LEVEL_ERROR,
+                $context
+            );
+
+            if (is_wp_error($log_result)) {
+                error_log('HIC logging failure: ' . $log_result->get_error_message());
+            }
+
+            return;
         }
 
-        if ($missing_table_detected && function_exists('\hic_create_failed_requests_table')) {
-            \hic_create_failed_requests_table();
-        }
-
-        return;
-    }
+        break;
+    } while ($attempt < $max_attempts);
 
     if (function_exists(__NAMESPACE__ . '\\hic_schedule_failed_request_retry')) {
         \FpHic\Helpers\hic_schedule_failed_request_retry();
@@ -678,6 +701,7 @@ function hic_store_failed_request($url, $args, $error) {
         \FpHic\Helpers\hic_schedule_failed_request_cleanup();
     }
 }
+
 
 /**
  * Create a standardized result array for integration processing.
