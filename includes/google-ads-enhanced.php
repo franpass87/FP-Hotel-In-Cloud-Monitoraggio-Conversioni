@@ -547,7 +547,33 @@ class GoogleAdsEnhancedConversions {
         // Remove leading/trailing whitespace, convert to lowercase, remove extra spaces
         return trim(strtolower(preg_replace('/\s+/', ' ', $address)));
     }
-    
+
+    /**
+     * Normalize currency code to ISO 4217 format
+     */
+    private function normalize_currency_code($currency) {
+        if (!is_scalar($currency)) {
+            return '';
+        }
+
+        $currency_code = (string) $currency;
+
+        if (function_exists('sanitize_text_field')) {
+            $currency_code = sanitize_text_field($currency_code);
+        } else {
+            $currency_code = trim($currency_code);
+        }
+
+        $currency_code = strtoupper($currency_code);
+        $currency_code = preg_replace('/[^A-Z]/', '', $currency_code);
+
+        if (!is_string($currency_code) || strlen($currency_code) !== 3) {
+            return '';
+        }
+
+        return $currency_code;
+    }
+
     /**
      * Create enhanced conversion record in database
      */
@@ -580,6 +606,17 @@ class GoogleAdsEnhancedConversions {
 
         $conversion_value = $this->calculate_conversion_value($booking_data);
 
+        $conversion_currency = 'EUR';
+        foreach (['currency', 'currency_code', 'conversion_currency'] as $currency_field) {
+            if (isset($booking_data[$currency_field])) {
+                $normalized_currency = $this->normalize_currency_code($booking_data[$currency_field]);
+                if ($normalized_currency !== '') {
+                    $conversion_currency = $normalized_currency;
+                    break;
+                }
+            }
+        }
+
         $result = $wpdb->insert($table_name, [
             'booking_id' => $booking_data['booking_id'] ?? '',
             'gclid' => $booking_data['gclid'] ?? '',
@@ -589,6 +626,7 @@ class GoogleAdsEnhancedConversions {
             'customer_last_name_hash' => $hashed_data['last_name_hash'] ?? null,
             'customer_address_hash' => $hashed_data['address_hash'] ?? null,
             'conversion_value' => $conversion_value,
+            'conversion_currency' => $conversion_currency,
             'conversion_action_id' => $conversion_action_id,
             'upload_status' => 'pending',
             'created_at' => function_exists('current_time') ? current_time('mysql') : date('Y-m-d H:i:s')
@@ -889,12 +927,35 @@ class GoogleAdsEnhancedConversions {
 
             $conversion_action = sprintf('customers/%s/conversionActions/%s', $customer_id, $conversion_action_id);
 
+            $currency_code = 'EUR';
+            $currency_is_missing = true;
+
+            if (isset($conversion['conversion_currency'])) {
+                $normalized_currency = $this->normalize_currency_code($conversion['conversion_currency']);
+                if ($normalized_currency !== '') {
+                    $currency_code = $normalized_currency;
+                    $currency_is_missing = false;
+                }
+            }
+
+            if ($currency_is_missing) {
+                $reference_parts = [];
+                if (isset($conversion['id']) && is_scalar($conversion['id'])) {
+                    $reference_parts[] = 'ID ' . (string) $conversion['id'];
+                }
+                if (isset($conversion['gclid']) && is_scalar($conversion['gclid'])) {
+                    $reference_parts[] = 'GCLID ' . (string) $conversion['gclid'];
+                }
+                $reference_context = empty($reference_parts) ? '' : ' (' . implode(', ', $reference_parts) . ')';
+                $this->log('Missing or invalid conversion currency' . $reference_context . ', defaulting to EUR.');
+            }
+
             $api_conversion = [
                 'gclid' => $conversion['gclid'],
                 'conversionAction' => $conversion_action,
                 'conversionDateTime' => $this->format_conversion_datetime($conversion['created_at']),
                 'conversionValue' => floatval($conversion['conversion_value']),
-                'currencyCode' => $conversion['conversion_currency']
+                'currencyCode' => $currency_code
             ];
             
             // Add user identifiers for enhanced conversions
