@@ -9,6 +9,8 @@ use \WP_Error;
 
 if (!defined('ABSPATH')) exit;
 
+require_once __DIR__ . '/polling-cache-helpers.php';
+
 /**
  * Validate and sanitize timestamp for API requests
  * Ensures timestamp is within acceptable range for HIC API
@@ -1988,7 +1990,13 @@ if (!function_exists(__NAMESPACE__ . '\\hic_test_api_connection')) {
         $test_url = add_query_arg($test_args, $endpoint);
 
         // Check for cached response first (for test connections, cache for 5 minutes)
-        $cache_key = "api_test_$endpoint" . md5($email . $password);
+        $cache_key = hic_get_api_test_cache_key($endpoint, (string) $email, (string) $password);
+        $legacy_cache_key = "api_test_$endpoint" . md5((string) $email . (string) $password);
+
+        if ($legacy_cache_key !== $cache_key) {
+            \FpHic\HIC_Cache_Manager::delete($legacy_cache_key);
+        }
+
         $cached_response = \FpHic\HIC_Cache_Manager::get($cache_key);
 
         if ($cached_response !== null) {
