@@ -1057,7 +1057,7 @@ class AutomatedReportingManager {
         
         wp_enqueue_script(
             'hic-reporting',
-            plugins_url('assets/js/reporting.js', dirname(__FILE__, 2)),
+            plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/js/reporting.js',
             ['jquery'],
             '3.1.0',
             true

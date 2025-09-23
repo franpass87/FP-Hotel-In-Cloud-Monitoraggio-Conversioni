@@ -205,18 +205,19 @@ class RealtimeDashboard {
         );
         
         // Enqueue dashboard JavaScript
+        $plugin_base_url = plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php');
         wp_enqueue_script(
             'hic-realtime-dashboard',
-            plugins_url('assets/js/realtime-dashboard.js', dirname(__FILE__, 2)),
+            $plugin_base_url . 'assets/js/realtime-dashboard.js',
             ['jquery', 'chart-js'],
             '3.1.0',
             true
         );
-        
+
         // Enqueue dashboard CSS
         wp_enqueue_style(
             'hic-realtime-dashboard',
-            plugins_url('assets/css/realtime-dashboard.css', dirname(__FILE__, 2)),
+            $plugin_base_url . 'assets/css/realtime-dashboard.css',
             [],
             '3.1.0'
         );
