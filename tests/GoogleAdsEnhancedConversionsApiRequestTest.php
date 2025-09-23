@@ -1,5 +1,21 @@
 <?php declare(strict_types=1);
 
+namespace FpHic\Helpers {
+    if (!function_exists(__NAMESPACE__ . '\\hic_log')) {
+        function hic_log($message, $level = 'info', $context = []) {
+            global $hic_test_logged_messages;
+
+            if (!is_array($hic_test_logged_messages ?? null)) {
+                $hic_test_logged_messages = [];
+            }
+
+            $hic_test_logged_messages[] = $message;
+
+            return true;
+        }
+    }
+}
+
 namespace FpHic\GoogleAdsEnhanced {
     if (!function_exists(__NAMESPACE__ . '\\wp_remote_post')) {
         function wp_remote_post($url, $args = []) {
@@ -39,23 +55,48 @@ namespace {
 
     final class GoogleAdsEnhancedConversionsApiRequestTest extends TestCase
     {
+        private $previous_log_manager;
+
         protected function setUp(): void
         {
             parent::setUp();
 
             global $hic_test_options, $hic_test_option_autoload;
             global $hic_test_google_ads_requests, $hic_test_google_ads_response_code;
+            global $hic_test_logged_messages;
 
             $hic_test_options = [];
             $hic_test_option_autoload = [];
             $hic_test_google_ads_requests = [];
             $hic_test_google_ads_response_code = 200;
+            $hic_test_logged_messages = [];
+
+            $this->previous_log_manager = $GLOBALS['hic_log_manager'] ?? null;
+            $GLOBALS['hic_log_manager'] = new class {
+                public function log($message, $level = 'info', $context = []) {
+                    global $hic_test_logged_messages;
+
+                    if (!is_array($hic_test_logged_messages ?? null)) {
+                        $hic_test_logged_messages = [];
+                    }
+
+                    $hic_test_logged_messages[] = $message;
+
+                    return true;
+                }
+            };
         }
 
         protected function tearDown(): void
         {
             global $hic_test_google_ads_response_code;
             $hic_test_google_ads_response_code = 200;
+
+            if ($this->previous_log_manager !== null) {
+                $GLOBALS['hic_log_manager'] = $this->previous_log_manager;
+            } else {
+                unset($GLOBALS['hic_log_manager']);
+            }
 
             parent::tearDown();
         }
@@ -128,6 +169,47 @@ namespace {
                 '/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{4}/',
                 $conversion_payload['conversionDateTime']
             );
+        }
+
+        public function test_upload_preserves_non_eur_currency(): void
+        {
+            global $hic_test_google_ads_requests, $hic_test_google_ads_response_code;
+
+            $hic_test_google_ads_response_code = 204;
+
+            update_option('hic_google_ads_enhanced_enabled', true);
+            update_option('hic_google_ads_enhanced_settings', [
+                'customer_id' => '123-456-7890',
+                'developer_token' => 'developer-token',
+                'client_id' => 'client-id',
+                'client_secret' => 'client-secret',
+                'refresh_token' => 'refresh-token',
+                'conversion_action_id' => '987654321',
+            ]);
+            update_option('timezone_string', 'UTC');
+
+            $conversion = [
+                'id' => 2,
+                'gclid' => 'non-eur-gclid',
+                'conversion_action_id' => '987654321',
+                'created_at' => '2024-01-11 15:00:00',
+                'conversion_value' => 250.75,
+                'conversion_currency' => 'USD',
+            ];
+
+            $enhanced = new GoogleAdsEnhancedConversions();
+
+            $method = new \ReflectionMethod($enhanced, 'upload_enhanced_conversions_to_google_ads');
+            $method->setAccessible(true);
+            $result = $method->invoke($enhanced, [$conversion]);
+
+            $this->assertTrue($result['success']);
+            $this->assertCount(2, $hic_test_google_ads_requests, 'Token and upload requests should be captured');
+
+            $payload = json_decode($hic_test_google_ads_requests[1]['args']['body'], true);
+            $this->assertIsArray($payload);
+            $this->assertSame('USD', $payload['conversions'][0]['currencyCode']);
+            $this->assertEquals(250.75, $payload['conversions'][0]['conversionValue']);
         }
 
         public function test_get_google_ads_access_token_aborts_when_credentials_missing(): void
@@ -298,6 +380,47 @@ namespace {
                 'customers/1234567890/conversionActions/123456789',
                 $formatted[0]['conversionAction']
             );
+        }
+
+        public function test_format_conversions_for_api_defaults_currency_when_missing(): void
+        {
+            global $hic_test_logged_messages;
+
+            update_option('hic_google_ads_enhanced_enabled', true);
+            update_option('hic_google_ads_enhanced_settings', [
+                'customer_id' => '123-456-7890',
+                'developer_token' => 'developer-token',
+                'client_id' => 'client-id',
+                'client_secret' => 'client-secret',
+                'refresh_token' => 'refresh-token',
+                'conversion_action_id' => 'fallback-id',
+            ]);
+
+            $enhanced = new GoogleAdsEnhancedConversions();
+
+            $format_conversions = new \ReflectionMethod($enhanced, 'format_conversions_for_api');
+            $format_conversions->setAccessible(true);
+
+            $conversions = [
+                [
+                    'id' => 10,
+                    'gclid' => 'missing-currency',
+                    'conversion_action_id' => '123456789',
+                    'created_at' => '2024-01-10 12:00:00',
+                    'conversion_value' => 180.0,
+                ],
+            ];
+
+            $formatted = $format_conversions->invoke($enhanced, $conversions);
+
+            $this->assertCount(1, $formatted, 'Valid conversions should still be formatted.');
+            $this->assertSame('EUR', $formatted[0]['currencyCode'], 'Missing currency should fall back to EUR.');
+
+            $this->assertNotEmpty($hic_test_logged_messages, 'Fallback should trigger a log entry.');
+            $last_message = end($hic_test_logged_messages);
+            $this->assertIsString($last_message);
+            $this->assertStringContainsString('Missing or invalid conversion currency', $last_message);
+            $this->assertStringContainsString('defaulting to EUR', $last_message);
         }
     }
 }
