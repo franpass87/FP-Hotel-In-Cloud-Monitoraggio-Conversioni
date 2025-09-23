@@ -761,7 +761,7 @@ class GoogleAdsEnhancedConversions {
         $url = self::GOOGLE_ADS_API_ENDPOINT . "/{$customer_id}/conversionUploads:uploadClickConversions";
         
         $request_data = [
-            'conversions' => $this->format_conversions_for_api($conversions),
+            'conversions' => $this->format_conversions_for_api($conversions, $settings),
             'partialFailureEnabled' => true
         ];
         
@@ -790,13 +790,35 @@ class GoogleAdsEnhancedConversions {
     /**
      * Format conversions for Google Ads API
      */
-    private function format_conversions_for_api($conversions) {
+    private function format_conversions_for_api($conversions, $settings = null) {
         $formatted_conversions = [];
-        
+
+        if (!is_array($settings)) {
+            $settings = get_option('hic_google_ads_enhanced_settings', []);
+        }
+
+        $customer_id = '';
+        if (isset($settings['customer_id']) && is_scalar($settings['customer_id'])) {
+            $customer_id = trim(str_replace('-', '', (string) $settings['customer_id']));
+        }
+
+        if ($customer_id === '') {
+            $legacy_customer_id = get_option('hic_google_ads_customer_id');
+            if (is_scalar($legacy_customer_id) && $legacy_customer_id !== '') {
+                $customer_id = trim(str_replace('-', '', (string) $legacy_customer_id));
+            }
+        }
+
+        if ($customer_id === '') {
+            $this->log('Missing Google Ads customer ID while formatting conversions for API upload.');
+        }
+
         foreach ($conversions as $conversion) {
+            $conversion_action = sprintf('customers/%s/conversionActions/%s', $customer_id, $conversion['conversion_action_id']);
+
             $api_conversion = [
                 'gclid' => $conversion['gclid'],
-                'conversionAction' => 'customers/' . str_replace('-', '', get_option('hic_google_ads_customer_id')) . '/conversionActions/' . $conversion['conversion_action_id'],
+                'conversionAction' => $conversion_action,
                 'conversionDateTime' => $this->format_conversion_datetime($conversion['created_at']),
                 'conversionValue' => floatval($conversion['conversion_value']),
                 'currencyCode' => $conversion['conversion_currency']
