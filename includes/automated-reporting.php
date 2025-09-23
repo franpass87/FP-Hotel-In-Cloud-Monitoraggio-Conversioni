@@ -1035,12 +1035,38 @@ class AutomatedReportingManager {
             wp_send_json_error('Insufficient permissions');
         }
         
-        $report_type = sanitize_text_field($_POST['report_type'] ?? 'weekly');
-        $formats = array_map('sanitize_text_field', $_POST['formats'] ?? ['csv']);
+        $allowed_report_types = array_keys(self::REPORT_TYPES);
+        $default_report_type = 'weekly';
+
+        $report_type = $default_report_type;
+        if (isset($_POST['report_type'])) {
+            $raw_report_type = wp_unslash($_POST['report_type']);
+            if (!is_string($raw_report_type)) {
+                wp_send_json_error('Invalid report type');
+            }
+
+            $submitted_report_type = sanitize_text_field($raw_report_type);
+            if ($submitted_report_type === '') {
+                $submitted_report_type = $default_report_type;
+            }
+
+            if (!in_array($submitted_report_type, $allowed_report_types, true)) {
+                wp_send_json_error('Invalid report type');
+            }
+
+            $report_type = $submitted_report_type;
+        }
+
+        $collector_method = 'collect_' . $report_type . '_data';
+        if (!method_exists($this, $collector_method)) {
+            wp_send_json_error('Report type handler not available');
+        }
+
+        $formats = array_map('sanitize_text_field', (array) wp_unslash($_POST['formats'] ?? ['csv']));
         $send_email = !empty($_POST['send_email']);
-        
+
         try {
-            $report_data = $this->{'collect_' . $report_type . '_data'}();
+            $report_data = $this->{$collector_method}();
             $report_id = $this->create_report_record($report_type, 'manual');
             
             $files = [];
