@@ -8,7 +8,14 @@ if (!defined('WP_CONTENT_DIR')) {
 // Basic WordPress stubs for autoloaded files
 if (!function_exists('add_action')) {
     function add_action($hook, $callback, $priority = 10, $accepted_args = 1) {
-        $GLOBALS['hic_test_hooks'][$hook][] = $callback;
+        if (!isset($GLOBALS['hic_test_hooks'][$hook])) {
+            $GLOBALS['hic_test_hooks'][$hook] = [];
+        }
+
+        $GLOBALS['hic_test_hooks'][$hook][$priority][] = [
+            'function' => $callback,
+            'accepted_args' => $accepted_args,
+        ];
     }
 }
 // Basic filter system for testing
@@ -100,9 +107,16 @@ if (!function_exists('wp_localize_script')) { function wp_localize_script(...$ar
 if (!function_exists('wp_add_inline_script')) { function wp_add_inline_script(...$args) {} }
 if (!function_exists('do_action')) {
     function do_action($hook, ...$args) {
-        if (!empty($GLOBALS['hic_test_hooks'][$hook])) {
-            foreach ($GLOBALS['hic_test_hooks'][$hook] as $callback) {
-                \call_user_func_array($callback, $args);
+        if (empty($GLOBALS['hic_test_hooks'][$hook])) {
+            return;
+        }
+
+        ksort($GLOBALS['hic_test_hooks'][$hook]);
+
+        foreach ($GLOBALS['hic_test_hooks'][$hook] as $callbacks) {
+            foreach ($callbacks as $callback) {
+                $params = array_slice($args, 0, $callback['accepted_args']);
+                \call_user_func_array($callback['function'], $params);
             }
         }
     }
@@ -195,6 +209,11 @@ if (!function_exists('delete_option')) {
 
         if (is_array($hic_test_option_autoload ?? null)) {
             unset($hic_test_option_autoload[$option]);
+        }
+
+        if (function_exists('do_action')) {
+            do_action('delete_option', $option);
+            do_action('deleted_option', $option);
         }
 
         return true;

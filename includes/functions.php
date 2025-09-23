@@ -32,6 +32,10 @@ function hic_clear_option_cache($key = null) {
         return;
     }
 
+    if (!is_string($key) || $key === '') {
+        return;
+    }
+
     if (strpos($key, 'hic_') === 0) {
         $key = substr($key, 4);
     }
@@ -80,7 +84,9 @@ function hic_safe_add_hook($type, $hook, $function, $priority = 10, $accepted_ar
  */
 function hic_init_helper_hooks() {
     // Trigger any deferred hook registrations
+    hic_safe_add_hook('action', 'added_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
     hic_safe_add_hook('action', 'updated_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
+    hic_safe_add_hook('action', 'deleted_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
 
     if (function_exists('add_action') && function_exists('add_filter')) {
         add_filter('wp_privacy_personal_data_exporters', __NAMESPACE__ . '\\hic_register_exporter');
