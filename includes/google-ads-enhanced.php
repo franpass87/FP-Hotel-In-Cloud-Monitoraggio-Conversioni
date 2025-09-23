@@ -1002,14 +1002,40 @@ class GoogleAdsEnhancedConversions {
      */
     private function get_google_ads_access_token() {
         $settings = get_option('hic_google_ads_enhanced_settings', []);
-        
-        $token_data = [
-            'client_id' => $settings['client_id'],
-            'client_secret' => $settings['client_secret'],
-            'refresh_token' => $settings['refresh_token'],
-            'grant_type' => 'refresh_token'
-        ];
-        
+
+        if (!is_array($settings)) {
+            $this->log('Google Ads settings are invalid; expected array with credentials.');
+            return false;
+        }
+
+        $required_fields = ['client_id', 'client_secret', 'refresh_token'];
+        $token_data = ['grant_type' => 'refresh_token'];
+        $missing_fields = [];
+
+        foreach ($required_fields as $field) {
+            if (!array_key_exists($field, $settings) || !is_string($settings[$field])) {
+                $missing_fields[] = $field;
+                continue;
+            }
+
+            $value = trim($settings[$field]);
+
+            if ($value === '') {
+                $missing_fields[] = $field;
+                continue;
+            }
+
+            $token_data[$field] = $value;
+        }
+
+        if (!empty($missing_fields)) {
+            $this->log(sprintf(
+                'Google Ads credentials missing or invalid: %s.',
+                implode(', ', $missing_fields)
+            ));
+            return false;
+        }
+
         $response = wp_remote_post('https://oauth2.googleapis.com/token', [
             'body' => $token_data,
             'timeout' => 30
