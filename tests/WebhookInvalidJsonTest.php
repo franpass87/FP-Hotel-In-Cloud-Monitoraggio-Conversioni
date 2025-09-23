@@ -138,6 +138,31 @@ final class WebhookInvalidJsonTest extends TestCase {
         $this->assertSame(400, $error_data['status']);
     }
 
+    public function test_returns_wp_error_when_content_type_missing(): void {
+        stream_wrapper_unregister('php');
+        stream_wrapper_register('php', MockPhpStreamFailure::class);
+
+        $request = new WP_REST_Request([
+            'token' => 'secret',
+        ]);
+
+        $result = null;
+
+        try {
+            $result = hic_webhook_handler($request);
+        } finally {
+            stream_wrapper_restore('php');
+        }
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame('invalid_content_type', $result->get_error_code());
+
+        $error_data = $result->get_error_data();
+        $this->assertIsArray($error_data);
+        $this->assertArrayHasKey('status', $error_data);
+        $this->assertSame(415, $error_data['status']);
+    }
+
 
     public function test_webhook_allows_missing_email_payload(): void {
         $logFile = sys_get_temp_dir() . '/hic-webhook-missing-email.log';
