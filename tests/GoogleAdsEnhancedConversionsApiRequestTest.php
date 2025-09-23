@@ -150,6 +150,155 @@ namespace {
             $this->assertFalse($result);
             $this->assertSame([], $hic_test_google_ads_requests, 'Token request should not be made when credentials are incomplete');
         }
+
+        public function test_conversion_action_id_configuration_and_queueing_behaviour(): void
+        {
+            global $wpdb;
+
+            update_option('hic_google_ads_enhanced_enabled', true);
+
+            $previous_wpdb = $wpdb ?? null;
+            $wpdb = new class {
+                public $prefix = 'wp_';
+                public $insert_calls = 0;
+                public $inserted_rows = [];
+                public $insert_id = 0;
+
+                public function insert($table, $data)
+                {
+                    $this->insert_calls++;
+                    $this->inserted_rows[] = ['table' => $table, 'data' => $data];
+                    $this->insert_id = 1000 + $this->insert_calls;
+
+                    return true;
+                }
+            };
+
+            try {
+                $enhanced = new GoogleAdsEnhancedConversions();
+
+                $get_conversion_action_id = new \ReflectionMethod($enhanced, 'get_conversion_action_id');
+                $get_conversion_action_id->setAccessible(true);
+
+                update_option('hic_google_ads_enhanced_settings', [
+                    'conversion_action_id' => 'fallback-id',
+                    'conversion_actions' => [
+                        'booking_completed' => ['action_id' => 'specific-id'],
+                    ],
+                ]);
+
+                $this->assertSame('specific-id', $get_conversion_action_id->invoke($enhanced, 'booking_completed'));
+
+                update_option('hic_google_ads_enhanced_settings', [
+                    'conversion_action_id' => 'fallback-id',
+                    'conversion_actions' => [
+                        'booking_completed' => ['action_id' => ''],
+                    ],
+                ]);
+
+                $this->assertSame('fallback-id', $get_conversion_action_id->invoke($enhanced, 'booking_completed'));
+
+                update_option('hic_google_ads_enhanced_settings', []);
+
+                $this->assertNull($get_conversion_action_id->invoke($enhanced, 'booking_completed'));
+
+                delete_option('hic_enhanced_conversions_queue');
+
+                $enhanced->process_enhanced_conversion(
+                    [
+                        'booking_id' => 'skip-booking',
+                        'gclid' => 'skip-gclid',
+                        'total_amount' => 199.99,
+                    ],
+                    [
+                        'email' => 'skip@example.com',
+                    ]
+                );
+
+                $this->assertSame([], get_option('hic_enhanced_conversions_queue', []));
+                $this->assertSame(0, $wpdb->insert_calls, 'Database insert should not be attempted without a conversion action ID.');
+
+                update_option('hic_google_ads_enhanced_settings', [
+                    'conversion_action_id' => 'fallback-id',
+                ]);
+
+                $enhanced->process_enhanced_conversion(
+                    [
+                        'booking_id' => 'valid-booking',
+                        'gclid' => 'valid-gclid',
+                        'total_amount' => 299.99,
+                    ],
+                    [
+                        'email' => 'valid@example.com',
+                    ]
+                );
+
+                $queue = get_option('hic_enhanced_conversions_queue', []);
+                $this->assertSame([1001], $queue, 'Conversion should be queued once a valid action ID is configured.');
+
+                $this->assertSame(1, $wpdb->insert_calls, 'Conversion record should be written when the action ID is configured.');
+                $this->assertSame('fallback-id', $wpdb->inserted_rows[0]['data']['conversion_action_id']);
+            } finally {
+                if ($previous_wpdb !== null) {
+                    $wpdb = $previous_wpdb;
+                } else {
+                    unset($GLOBALS['wpdb']);
+                }
+            }
+        }
+
+        public function test_format_conversions_for_api_skips_entries_without_conversion_action_id(): void
+        {
+            update_option('hic_google_ads_enhanced_enabled', true);
+            update_option('hic_google_ads_enhanced_settings', [
+                'customer_id' => '123-456-7890',
+                'developer_token' => 'developer-token',
+                'client_id' => 'client-id',
+                'client_secret' => 'client-secret',
+                'refresh_token' => 'refresh-token',
+                'conversion_action_id' => 'fallback-id',
+            ]);
+
+            $enhanced = new GoogleAdsEnhancedConversions();
+
+            $format_conversions = new \ReflectionMethod($enhanced, 'format_conversions_for_api');
+            $format_conversions->setAccessible(true);
+
+            $conversions = [
+                [
+                    'id' => 1,
+                    'gclid' => 'retain-gclid',
+                    'conversion_action_id' => '123456789',
+                    'created_at' => '2024-01-10 12:00:00',
+                    'conversion_value' => 150.0,
+                    'conversion_currency' => 'EUR',
+                ],
+                [
+                    'id' => 2,
+                    'gclid' => 'missing-id',
+                    'created_at' => '2024-01-10 12:00:00',
+                    'conversion_value' => 180.0,
+                    'conversion_currency' => 'EUR',
+                ],
+                [
+                    'id' => 3,
+                    'gclid' => 'empty-id',
+                    'conversion_action_id' => '',
+                    'created_at' => '2024-01-10 12:00:00',
+                    'conversion_value' => 200.0,
+                    'conversion_currency' => 'EUR',
+                ],
+            ];
+
+            $formatted = $format_conversions->invoke($enhanced, $conversions);
+
+            $this->assertCount(1, $formatted, 'Only conversions with a valid action ID should be formatted for upload.');
+            $this->assertSame('retain-gclid', $formatted[0]['gclid']);
+            $this->assertSame(
+                'customers/1234567890/conversionActions/123456789',
+                $formatted[0]['conversionAction']
+            );
+        }
     }
 }
 
