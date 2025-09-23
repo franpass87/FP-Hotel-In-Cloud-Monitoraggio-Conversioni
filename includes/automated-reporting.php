@@ -93,7 +93,13 @@ class AutomatedReportingManager {
         $this->log('Initializing Automated Reporting Manager');
 
         // Create exports directory
-        $this->ensure_export_directory();
+        try {
+            $this->ensure_export_directory();
+        } catch (\RuntimeException $exception) {
+            $this->log('Export directory initialization failed: ' . $exception->getMessage());
+            $this->add_admin_error_notice('Automated Reporting error: ' . $exception->getMessage());
+            return;
+        }
 
         // Create reports history table
         $this->create_reports_history_table();
@@ -112,15 +118,54 @@ class AutomatedReportingManager {
      */
     private function ensure_export_directory() {
         if (!is_dir($this->export_dir)) {
-            wp_mkdir_p($this->export_dir);
-            
-            // Add .htaccess for security
-            $htaccess_content = "Order deny,allow\nDeny from all\n";
-            file_put_contents($this->export_dir . '.htaccess', $htaccess_content);
-            
-            // Add index.php for additional security
-            file_put_contents($this->export_dir . 'index.php', '<?php // Silence is golden');
+            $directory_created = false;
+
+            if (function_exists('wp_mkdir_p')) {
+                $directory_created = wp_mkdir_p($this->export_dir);
+            } else {
+                $directory_created = @mkdir($this->export_dir, 0755, true);
+            }
+
+            if (!$directory_created && !is_dir($this->export_dir)) {
+                $message = sprintf('Failed to create export directory at %s. Please verify the directory permissions.', $this->export_dir);
+                $this->log($message);
+                throw new \RuntimeException($message);
+            }
         }
+
+        $htaccess_path = $this->export_dir . '.htaccess';
+        if (!file_exists($htaccess_path)) {
+            $htaccess_content = "Order deny,allow\nDeny from all\n";
+            if (@file_put_contents($htaccess_path, $htaccess_content) === false) {
+                $message = sprintf('Failed to write .htaccess file for export directory at %s. Please verify the directory permissions.', $htaccess_path);
+                $this->log($message);
+                throw new \RuntimeException($message);
+            }
+        }
+
+        $index_path = $this->export_dir . 'index.php';
+        if (!file_exists($index_path)) {
+            if (@file_put_contents($index_path, '<?php // Silence is golden') === false) {
+                $message = sprintf('Failed to write index.php file for export directory at %s. Please verify the directory permissions.', $index_path);
+                $this->log($message);
+                throw new \RuntimeException($message);
+            }
+        }
+    }
+
+    private function add_admin_error_notice($message) {
+        $notice_message = $message;
+
+        if (function_exists('esc_html')) {
+            $notice_message = esc_html($notice_message);
+        }
+
+        $notice_callback = static function () use ($notice_message) {
+            echo '<div class="notice notice-error"><p>' . $notice_message . '</p></div>';
+        };
+
+        add_action('admin_notices', $notice_callback);
+        add_action('network_admin_notices', $notice_callback);
     }
     
     /**
