@@ -424,7 +424,13 @@ class AutomatedReportingManager {
         global $wpdb;
         
         $main_table = $wpdb->prefix . 'hic_gclids';
-        
+
+        $current_timestamp = function_exists('current_time')
+            ? (int) current_time('timestamp')
+            : time();
+        $seconds_per_day = defined('DAY_IN_SECONDS') ? (int) DAY_IN_SECONDS : 86400;
+        $weekly_start = date('Y-m-d H:i:s', $current_timestamp - (7 * $seconds_per_day));
+
         $data = [
             'period' => 'weekly',
             'date_range' => date('Y-m-d', strtotime('-7 days')) . ' to ' . date('Y-m-d'),
@@ -436,46 +442,90 @@ class AutomatedReportingManager {
         ];
         
         // Weekly summary
-        $data['summary'] = $wpdb->get_row("
-            SELECT 
-                COUNT(*) as total_bookings,
-                COUNT(DISTINCT gclid) as google_conversions,
-                COUNT(DISTINCT fbclid) as facebook_conversions,
-                COUNT(DISTINCT CASE WHEN utm_source = '' OR utm_source IS NULL THEN sid END) as direct_conversions,
-                COUNT(*) * 150 as estimated_revenue,
-                ROUND(AVG(COUNT(*)) OVER (), 2) as avg_daily_bookings
-            FROM {$main_table} 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-        ", ARRAY_A);
+        $weekly_summary_sql = $wpdb->prepare(
+            "
+            SELECT
+                totals.total_bookings,
+                totals.google_conversions,
+                totals.facebook_conversions,
+                totals.direct_conversions,
+                totals.estimated_revenue,
+                ROUND(IFNULL(avg_stats.avg_bookings, 0), 2) as avg_daily_bookings
+            FROM (
+                SELECT
+                    COUNT(*) as total_bookings,
+                    COUNT(DISTINCT gclid) as google_conversions,
+                    COUNT(DISTINCT fbclid) as facebook_conversions,
+                    COUNT(DISTINCT CASE WHEN utm_source = '' OR utm_source IS NULL THEN sid END) as direct_conversions,
+                    COUNT(*) * 150 as estimated_revenue
+                FROM {$main_table}
+                WHERE created_at >= %s
+            ) as totals
+            CROSS JOIN (
+                SELECT AVG(day_bookings) AS avg_bookings
+                FROM (
+                    SELECT COUNT(*) AS day_bookings
+                    FROM {$main_table}
+                    WHERE created_at >= %s
+                    GROUP BY DATE(created_at)
+                ) AS per_day
+            ) AS avg_stats
+        ",
+            $weekly_start,
+            $weekly_start
+        );
+        $data['summary'] = $wpdb->get_row($weekly_summary_sql, ARRAY_A);
         
         // Daily breakdown for the week
-        $data['daily_breakdown'] = $wpdb->get_results("
-            SELECT 
-                DATE(created_at) as date,
-                DAYNAME(created_at) as day_name,
-                COUNT(*) as bookings,
-                COUNT(*) * 150 as revenue
-            FROM {$main_table} 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-            GROUP BY DATE(created_at)
-            ORDER BY date
-        ", ARRAY_A);
+        $data['daily_breakdown'] = $wpdb->get_results(
+            $wpdb->prepare(
+                "
+                SELECT
+                    DATE(created_at) as date,
+                    DAYNAME(created_at) as day_name,
+                    COUNT(*) as bookings,
+                    COUNT(*) * 150 as revenue
+                FROM {$main_table}
+                WHERE created_at >= %s
+                GROUP BY DATE(created_at)
+                ORDER BY date
+            ",
+                $weekly_start
+            ),
+            ARRAY_A
+        );
         
         // Top performing campaigns
-        $data['by_campaign'] = $wpdb->get_results("
-            SELECT 
-                utm_campaign as campaign,
-                utm_source as source,
-                COUNT(*) as bookings,
-                COUNT(*) * 150 as revenue,
-                ROUND((COUNT(*) / SUM(COUNT(*)) OVER ()) * 100, 2) as percentage
-            FROM {$main_table} 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-            AND utm_campaign IS NOT NULL AND utm_campaign != ''
-            GROUP BY utm_campaign, utm_source
-            ORDER BY bookings DESC
-            LIMIT 10
-        ", ARRAY_A);
+        $data['by_campaign'] = $wpdb->get_results(
+            $wpdb->prepare(
+                "
+                SELECT
+                    utm_campaign as campaign,
+                    utm_source as source,
+                    COUNT(*) as bookings,
+                    COUNT(*) * 150 as revenue,
+                    CASE
+                        WHEN totals.total_bookings > 0 THEN ROUND((COUNT(*) * 100.0) / totals.total_bookings, 2)
+                        ELSE 0
+                    END as percentage
+                FROM {$main_table}
+                CROSS JOIN (
+                    SELECT COUNT(*) as total_bookings
+                    FROM {$main_table}
+                    WHERE created_at >= %s
+                    AND utm_campaign IS NOT NULL AND utm_campaign != ''
+                ) as totals
+                WHERE created_at >= %s
+                AND utm_campaign IS NOT NULL AND utm_campaign != ''
+                GROUP BY utm_campaign, utm_source
+                ORDER BY bookings DESC
+                LIMIT 10
+            ",
+                $weekly_start,
+                $weekly_start
+            ),
+            ARRAY_A
+        );
         
         return $data;
     }
@@ -487,7 +537,13 @@ class AutomatedReportingManager {
         global $wpdb;
         
         $main_table = $wpdb->prefix . 'hic_gclids';
-        
+
+        $current_timestamp = function_exists('current_time')
+            ? (int) current_time('timestamp')
+            : time();
+        $seconds_per_day = defined('DAY_IN_SECONDS') ? (int) DAY_IN_SECONDS : 86400;
+        $monthly_start = date('Y-m-d H:i:s', $current_timestamp - (30 * $seconds_per_day));
+
         $data = [
             'period' => 'monthly',
             'date_range' => date('Y-m-d', strtotime('-30 days')) . ' to ' . date('Y-m-d'),
@@ -498,29 +554,56 @@ class AutomatedReportingManager {
         ];
         
         // Monthly summary with growth rates
-        $data['summary'] = $wpdb->get_row("
-            SELECT 
-                COUNT(*) as total_bookings,
-                COUNT(DISTINCT gclid) as google_conversions,
-                COUNT(DISTINCT fbclid) as facebook_conversions,
-                COUNT(*) * 150 as estimated_revenue,
-                ROUND(AVG(COUNT(*)) OVER (), 2) as avg_daily_bookings
-            FROM {$main_table} 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-        ", ARRAY_A);
+        $monthly_summary_sql = $wpdb->prepare(
+            "
+            SELECT
+                totals.total_bookings,
+                totals.google_conversions,
+                totals.facebook_conversions,
+                totals.estimated_revenue,
+                ROUND(IFNULL(avg_stats.avg_bookings, 0), 2) as avg_daily_bookings
+            FROM (
+                SELECT
+                    COUNT(*) as total_bookings,
+                    COUNT(DISTINCT gclid) as google_conversions,
+                    COUNT(DISTINCT fbclid) as facebook_conversions,
+                    COUNT(*) * 150 as estimated_revenue
+                FROM {$main_table}
+                WHERE created_at >= %s
+            ) as totals
+            CROSS JOIN (
+                SELECT AVG(day_bookings) AS avg_bookings
+                FROM (
+                    SELECT COUNT(*) AS day_bookings
+                    FROM {$main_table}
+                    WHERE created_at >= %s
+                    GROUP BY DATE(created_at)
+                ) AS per_day
+            ) AS avg_stats
+        ",
+            $monthly_start,
+            $monthly_start
+        );
+        $data['summary'] = $wpdb->get_row($monthly_summary_sql, ARRAY_A);
         
         // Weekly breakdown for trend analysis
-        $data['weekly_breakdown'] = $wpdb->get_results("
-            SELECT 
-                WEEK(created_at, 1) as week_number,
-                CONCAT('Week ', WEEK(created_at, 1)) as week_label,
-                COUNT(*) as bookings,
-                COUNT(*) * 150 as revenue
-            FROM {$main_table} 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY WEEK(created_at, 1)
-            ORDER BY week_number
-        ", ARRAY_A);
+        $data['weekly_breakdown'] = $wpdb->get_results(
+            $wpdb->prepare(
+                "
+                SELECT
+                    WEEK(created_at, 1) as week_number,
+                    CONCAT('Week ', WEEK(created_at, 1)) as week_label,
+                    COUNT(*) as bookings,
+                    COUNT(*) * 150 as revenue
+                FROM {$main_table}
+                WHERE created_at >= %s
+                GROUP BY WEEK(created_at, 1)
+                ORDER BY week_number
+            ",
+                $monthly_start
+            ),
+            ARRAY_A
+        );
         
         return $data;
     }
