@@ -582,7 +582,7 @@ class AutomatedReportingManager {
     private function generate_csv_report($data, $report_type) {
         $filename = sprintf('hic-%s-report-%s.csv', $report_type, date('Y-m-d-H-i-s'));
         $filepath = $this->export_dir . $filename;
-        
+
         $file = @fopen($filepath, 'w');
 
         if ($file === false) {
@@ -590,12 +590,16 @@ class AutomatedReportingManager {
             throw new \RuntimeException('Unable to open export file for writing. Please verify the export directory is writable.');
         }
 
-        try {
-            // Add CSV headers based on report type
-            $this->write_csv_headers($file, $report_type);
+        [$headers, $rows] = $this->get_report_table_rows($data, $report_type);
 
-            // Write data based on report type
-            $this->write_csv_data($file, $data, $report_type);
+        try {
+            if (!empty($headers)) {
+                fputcsv($file, $headers);
+            }
+
+            foreach ($rows as $row) {
+                fputcsv($file, $row);
+            }
         } finally {
             if (is_resource($file)) {
                 fclose($file);
@@ -606,23 +610,41 @@ class AutomatedReportingManager {
 
         return $filepath;
     }
-    
+
     /**
      * Generate Excel report using PhpSpreadsheet
      */
     private function generate_excel_report($data, $report_type) {
-        // Check if PhpSpreadsheet is available
         if (!class_exists('PhpOffice\\PhpSpreadsheet\\Spreadsheet')) {
             $this->log('PhpSpreadsheet not available, skipping Excel generation');
             return null;
         }
-        
+
         $filename = sprintf('hic-%s-report-%s.xlsx', $report_type, date('Y-m-d-H-i-s'));
         $filepath = $this->export_dir . $filename;
-        
-        // Implementation would use PhpSpreadsheet to create Excel file
-        // For now, return CSV as fallback
-        return $this->generate_csv_report($data, $report_type);
+
+        [$headers, $rows] = $this->get_report_table_rows($data, $report_type);
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $current_row = 1;
+
+        if (!empty($headers)) {
+            $sheet->fromArray($headers, null, 'A' . $current_row);
+            $current_row++;
+        }
+
+        if (!empty($rows)) {
+            $sheet->fromArray($rows, null, 'A' . $current_row);
+        }
+
+        $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $writer->save($filepath);
+
+        $this->log("Excel report generated: {$filename}");
+
+        return $filepath;
     }
     
     /**
@@ -648,15 +670,24 @@ class AutomatedReportingManager {
     private function send_email_report($report_type, $data, $attachments = []) {
         $settings = get_option('hic_reporting_settings', []);
         $recipients = $settings['email_recipients'] ?? [get_option('admin_email')];
-        
+
         if (empty($recipients)) {
             $this->log('No email recipients configured for reports');
             return false;
         }
-        
+
+        if (!empty($attachments)) {
+            $attachments = array_values(array_filter(
+                $attachments,
+                static function ($attachment) {
+                    return is_string($attachment) && $attachment !== '';
+                }
+            ));
+        }
+
         $subject = $this->get_email_subject($report_type, $data);
         $message = $this->get_email_message($report_type, $data);
-        
+
         $headers = [
             'Content-Type: text/html; charset=UTF-8',
             'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>'
@@ -678,60 +709,63 @@ class AutomatedReportingManager {
     }
     
     /**
-     * Write CSV headers
+     * Build table rows for report exports
      */
-    private function write_csv_headers($file, $report_type) {
+    private function get_report_table_rows($data, $report_type) {
+        $headers = [];
+        $rows = [];
+
         switch ($report_type) {
             case 'daily':
-                fputcsv($file, ['Hour', 'Bookings', 'Revenue', 'Source', 'Campaign']);
+                $headers = ['Hour', 'Bookings', 'Revenue', 'Source', 'Campaign'];
+
+                if (!empty($data['by_hour']) && is_array($data['by_hour'])) {
+                    foreach ($data['by_hour'] as $hour_data) {
+                        $rows[] = [
+                            isset($hour_data['hour']) ? $hour_data['hour'] . ':00' : '',
+                            $hour_data['bookings'] ?? 0,
+                            '€' . number_format((float)($hour_data['revenue'] ?? 0), 2),
+                            '', // Source placeholder
+                            '' // Campaign placeholder
+                        ];
+                    }
+                }
+
                 break;
             case 'weekly':
-                fputcsv($file, ['Date', 'Day', 'Bookings', 'Revenue', 'Growth %']);
+                $headers = ['Date', 'Day', 'Bookings', 'Revenue', 'Growth %'];
+
+                if (!empty($data['daily_breakdown']) && is_array($data['daily_breakdown'])) {
+                    foreach ($data['daily_breakdown'] as $day_data) {
+                        $rows[] = [
+                            $day_data['date'] ?? '',
+                            $day_data['day_name'] ?? '',
+                            $day_data['bookings'] ?? 0,
+                            '€' . number_format((float)($day_data['revenue'] ?? 0), 2),
+                            '' // Growth placeholder
+                        ];
+                    }
+                }
+
                 break;
             case 'monthly':
-                fputcsv($file, ['Week', 'Bookings', 'Revenue', 'Trend']);
+                $headers = ['Week', 'Bookings', 'Revenue', 'Trend'];
+
+                if (!empty($data['weekly_breakdown']) && is_array($data['weekly_breakdown'])) {
+                    foreach ($data['weekly_breakdown'] as $week_data) {
+                        $rows[] = [
+                            $week_data['week_label'] ?? '',
+                            $week_data['bookings'] ?? 0,
+                            '€' . number_format((float)($week_data['revenue'] ?? 0), 2),
+                            '' // Trend placeholder
+                        ];
+                    }
+                }
+
                 break;
         }
-    }
-    
-    /**
-     * Write CSV data
-     */
-    private function write_csv_data($file, $data, $report_type) {
-        switch ($report_type) {
-            case 'daily':
-                foreach ($data['by_hour'] as $hour_data) {
-                    fputcsv($file, [
-                        $hour_data['hour'] . ':00',
-                        $hour_data['bookings'],
-                        '€' . number_format($hour_data['revenue'], 2),
-                        '', // Source placeholder
-                        '' // Campaign placeholder
-                    ]);
-                }
-                break;
-            case 'weekly':
-                foreach ($data['daily_breakdown'] as $day_data) {
-                    fputcsv($file, [
-                        $day_data['date'],
-                        $day_data['day_name'],
-                        $day_data['bookings'],
-                        '€' . number_format($day_data['revenue'], 2),
-                        '' // Growth placeholder
-                    ]);
-                }
-                break;
-            case 'monthly':
-                foreach ($data['weekly_breakdown'] as $week_data) {
-                    fputcsv($file, [
-                        $week_data['week_label'],
-                        $week_data['bookings'],
-                        '€' . number_format($week_data['revenue'], 2),
-                        '' // Trend placeholder
-                    ]);
-                }
-                break;
-        }
+
+        return [$headers, $rows];
     }
     
     /**
