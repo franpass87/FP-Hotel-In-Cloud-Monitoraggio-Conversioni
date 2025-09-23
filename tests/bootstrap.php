@@ -27,16 +27,56 @@ if (!function_exists('get_option')) {
     }
 }
 
-if (!function_exists('update_option')) {
-    function update_option($option, $value, $autoload = null) {
+if (!function_exists('add_option')) {
+    function add_option($option, $value = '', $deprecated = '', $autoload = 'yes') {
         global $hic_test_options, $hic_test_option_autoload;
+
+        if (!is_array($hic_test_options ?? null)) {
+            $hic_test_options = [];
+        }
+
+        if (array_key_exists($option, $hic_test_options)) {
+            return false;
+        }
+
+        $hic_test_options[$option] = $value;
 
         if (!is_array($hic_test_option_autoload ?? null)) {
             $hic_test_option_autoload = [];
         }
-
-        $hic_test_options[$option] = $value;
         $hic_test_option_autoload[$option] = $autoload;
+
+        if (function_exists('do_action')) {
+            do_action('add_option', $option, $value);
+            do_action('added_option', $option, $value);
+        }
+
+        return true;
+    }
+}
+
+if (!function_exists('update_option')) {
+    function update_option($option, $value, $autoload = null) {
+        global $hic_test_options, $hic_test_option_autoload;
+
+        $option_exists = is_array($hic_test_options ?? null) && array_key_exists($option, $hic_test_options);
+
+        if (!$option_exists) {
+            return add_option($option, $value, '', $autoload);
+        }
+
+        $old_value = $hic_test_options[$option];
+        $hic_test_options[$option] = $value;
+
+        if (!is_array($hic_test_option_autoload ?? null)) {
+            $hic_test_option_autoload = [];
+        }
+        $hic_test_option_autoload[$option] = $autoload;
+
+        if (function_exists('do_action')) {
+            do_action('update_option', $option, $value, $old_value);
+            do_action('updated_option', $option, $old_value, $value);
+        }
 
         return true;
     }
@@ -47,6 +87,11 @@ if (!function_exists('delete_option')) {
         global $hic_test_options, $hic_test_option_autoload;
 
         unset($hic_test_options[$option], $hic_test_option_autoload[$option]);
+
+        if (function_exists('do_action')) {
+            do_action('delete_option', $option);
+            do_action('deleted_option', $option);
+        }
 
         return true;
     }
