@@ -129,6 +129,27 @@ namespace {
                 $conversion_payload['conversionDateTime']
             );
         }
+
+        public function test_get_google_ads_access_token_aborts_when_credentials_missing(): void
+        {
+            global $hic_test_google_ads_requests;
+
+            update_option('hic_google_ads_enhanced_settings', [
+                'client_id' => '',
+                'client_secret' => '',
+                'refresh_token' => null,
+            ]);
+
+            $enhanced = new GoogleAdsEnhancedConversions();
+
+            $method = new \ReflectionMethod($enhanced, 'get_google_ads_access_token');
+            $method->setAccessible(true);
+
+            $result = $method->invoke($enhanced);
+
+            $this->assertFalse($result);
+            $this->assertSame([], $hic_test_google_ads_requests, 'Token request should not be made when credentials are incomplete');
+        }
     }
 }
 
