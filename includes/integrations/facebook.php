@@ -61,7 +61,7 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gb
   }
 
   if ($fbclid) {
-    $fbc = 'fb.1.' . current_time('timestamp') . '.' . $fbclid;
+    $fbc = 'fb.1.' . current_time('timestamp', true) . '.' . $fbclid;
     $user_data['fbc'] = [$fbc];
   }
   if (!empty($_COOKIE['_fbp'])) {
@@ -97,7 +97,7 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gb
   $payload = [
     'data' => [[
       'event_name'       => 'Purchase',      // evento standard Meta
-      'event_time'       => current_time('timestamp'),
+      'event_time'       => current_time('timestamp', true),
       'event_id'         => $event_id,
       'action_source'    => 'website',
       'event_source_url' => home_url(),
@@ -212,7 +212,7 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '',
   }
 
   if ($fbclid) {
-    $fbc = 'fb.1.' . current_time('timestamp') . '.' . $fbclid;
+    $fbc = 'fb.1.' . current_time('timestamp', true) . '.' . $fbclid;
     $user_data['fbc'] = [$fbc];
   }
   if (!empty($_COOKIE['_fbp'])) {
@@ -247,7 +247,7 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '',
   $payload = [
     'data' => [[
       'event_name'       => 'Refund',
-      'event_time'       => current_time('timestamp'),
+      'event_time'       => current_time('timestamp', true),
       'event_id'         => $event_id,
       'action_source'    => 'website',
       'event_source_url' => home_url(),
@@ -378,7 +378,7 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
     $user_data['ph'] = [hash('sha256', preg_replace('/\D/', '', $data['phone']))];
   }
   if ($fbclid) {
-    $fbc = 'fb.1.' . current_time('timestamp') . '.' . $fbclid;
+    $fbc = 'fb.1.' . current_time('timestamp', true) . '.' . $fbclid;
     $user_data['fbc'] = [$fbc];
   }
   if (!empty($_COOKIE['_fbp'])) {
@@ -429,7 +429,7 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
   $payload = [
     'data' => [[
       'event_name' => 'Purchase',
-      'event_time' => current_time('timestamp'),
+      'event_time' => current_time('timestamp', true),
       'event_id' => $transaction_id,
       'action_source' => 'website',
       'event_source_url' => home_url(),
