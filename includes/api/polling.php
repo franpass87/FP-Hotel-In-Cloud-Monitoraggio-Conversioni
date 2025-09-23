@@ -316,7 +316,8 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
                             }
                         } else {
                             if (!empty($dispatch_result['should_mark_processed'])) {
-                                hic_mark_reservation_processed($reservation);
+                                $processed_ids = $dispatch_result['processed_ids'] ?? ($dispatch_result['transaction_id'] ?? null);
+                                hic_mark_reservation_processed($reservation, $processed_ids);
                             }
                             $processed_count++;
 
@@ -585,16 +586,13 @@ function hic_transform_reservation($reservation) {
         }
     }
     
-    // Get transaction_id using flexible ID resolution
-    $transaction_id = Helpers\hic_booking_uid($reservation);
-    if (empty($transaction_id)) {
-        // Fallback to first available scalar field if no standard ID found
-        foreach ($reservation as $key => $value) {
-            if (is_scalar($value) && !empty($value)) {
-                $transaction_id = (string) $value;
-                hic_log("Using fallback transaction_id from field '$key': $transaction_id");
-                break;
-            }
+    // Determine initial transaction ID from canonical fields
+    $raw_transaction_id = Helpers\hic_booking_uid($reservation);
+    $transaction_id = '';
+    if (is_scalar($raw_transaction_id)) {
+        $transaction_id = trim((string) $raw_transaction_id);
+        if ($transaction_id !== '') {
+            $transaction_id = \sanitize_text_field($transaction_id);
         }
     }
     
@@ -727,6 +725,50 @@ function hic_transform_reservation($reservation) {
     $from = $reservation['from_date'] ?? $reservation['checkin'] ?? '';
     $to   = $reservation['to_date']   ?? $reservation['checkout'] ?? '';
 
+    if ($transaction_id === '') {
+        if ($sid !== '') {
+            $transaction_id = $sid;
+            hic_log('Using SID fallback transaction_id: ' . $transaction_id);
+        } else {
+            $hash_components = array();
+
+            if ($email !== '') {
+                $hash_components[] = strtolower($email);
+            }
+            if ($from !== '') {
+                $hash_components[] = strtolower((string) $from);
+            }
+            if ($to !== '') {
+                $hash_components[] = strtolower((string) $to);
+            }
+            if ($accommodation_id !== '') {
+                $hash_components[] = strtolower((string) $accommodation_id);
+            }
+            if ($value > 0) {
+                $hash_components[] = number_format($value, 2, '.', '');
+            }
+            if ($guests > 0) {
+                $hash_components[] = (string) $guests;
+            }
+            $name_component = trim($first . ' ' . $last);
+            if ($name_component !== '') {
+                $hash_components[] = strtolower($name_component);
+            }
+
+            if (!empty($hash_components)) {
+                $hash_input = implode('|', $hash_components);
+                $transaction_id = 'HIC-' . strtoupper(substr(hash('sha256', $hash_input), 0, 20));
+                hic_log('Generated deterministic fallback transaction_id: ' . $transaction_id);
+            }
+        }
+    }
+
+    if ($transaction_id !== '') {
+        $transaction_id = \sanitize_text_field($transaction_id);
+    } else {
+        hic_log('Reservation fallback: unable to determine transaction_id from payload', HIC_LOG_LEVEL_WARNING);
+    }
+
     return array(
         'transaction_id' => $transaction_id,
         'reservation_code' => isset($reservation['reservation_code']) ? $reservation['reservation_code'] : '',
@@ -757,15 +799,42 @@ function hic_transform_reservation($reservation) {
  */
 function hic_dispatch_reservation($transformed, $original) {
     $canonical_uid = Helpers\hic_booking_uid($original);
+    if (!is_scalar($canonical_uid)) {
+        $canonical_uid = '';
+    } else {
+        $canonical_uid = trim((string) $canonical_uid);
+        if ($canonical_uid !== '') {
+            $canonical_uid = \sanitize_text_field($canonical_uid);
+        }
+    }
+
+    $transaction_id = '';
+    $normalized_transaction_id = '';
+    if (is_array($transformed) && isset($transformed['transaction_id']) && is_scalar($transformed['transaction_id'])) {
+        $transaction_id = trim((string) $transformed['transaction_id']);
+        if ($transaction_id !== '') {
+            $transaction_id = \sanitize_text_field($transaction_id);
+            $normalized_transaction_id = Helpers\hic_normalize_reservation_id($transaction_id);
+        } else {
+            $transaction_id = '';
+        }
+    }
+
     $aliases = is_array($original)
         ? Helpers\hic_collect_reservation_ids($original)
         : array();
     if (empty($aliases) && $canonical_uid !== '') {
-        $sanitized_uid = \sanitize_text_field((string) $canonical_uid);
-        $sanitized_uid = trim($sanitized_uid);
-        if ($sanitized_uid !== '') {
-            $aliases[] = $sanitized_uid;
+        $normalized_canonical = Helpers\hic_normalize_reservation_id($canonical_uid);
+        if ($normalized_canonical !== '') {
+            $aliases[] = $normalized_canonical;
         }
+    }
+    if ($normalized_transaction_id !== '' && !in_array($normalized_transaction_id, $aliases, true)) {
+        $aliases[] = $normalized_transaction_id;
+    }
+
+    if ($canonical_uid === '' && $transaction_id !== '') {
+        $canonical_uid = $transaction_id;
     }
 
     $processed_alias = is_array($original)
@@ -774,6 +843,9 @@ function hic_dispatch_reservation($transformed, $original) {
     $uid = $processed_alias ?? $canonical_uid;
     if ($uid === '' && !empty($aliases)) {
         $uid = $aliases[0];
+    }
+    if ($uid === '' && $transaction_id !== '') {
+        $uid = $transaction_id;
     }
 
     $is_status_update = Helpers\hic_is_reservation_already_processed($aliases);
@@ -802,6 +874,11 @@ function hic_dispatch_reservation($transformed, $original) {
         $result = Helpers\hic_create_integration_result([
             'uid' => $uid,
         ]);
+        $result['transaction_id'] = $transaction_id;
+        $result['processed_ids'] = $aliases;
+        if ($normalized_transaction_id !== '') {
+            $result['normalized_transaction_id'] = $normalized_transaction_id;
+        }
         $result['context'] = array(
             'connection_type' => $connection_type,
             'tracking_mode' => $tracking_mode,
@@ -977,6 +1054,11 @@ function hic_dispatch_reservation($transformed, $original) {
         }
 
         $result = Helpers\hic_finalize_integration_result($result);
+        $result['transaction_id'] = $transaction_id;
+        $result['processed_ids'] = $aliases;
+        if ($normalized_transaction_id !== '') {
+            $result['normalized_transaction_id'] = $normalized_transaction_id;
+        }
 
         $summary_parts = array();
         foreach ($result['integrations'] as $integration => $details) {
@@ -1048,27 +1130,50 @@ function hic_dispatch_reservation($transformed, $original) {
  * Deduplication functions
  */
 
-function hic_mark_reservation_processed($reservation) {
-    if (!is_array($reservation)) {
-        $uid = Helpers\hic_booking_uid($reservation);
-        if ($uid === '') {
+function hic_mark_reservation_processed($reservation, $fallback_ids = null) {
+    $normalized_ids = array();
+
+    $collect = static function ($candidate) use (&$normalized_ids): void {
+        if (!is_scalar($candidate)) {
             return;
         }
 
-        Helpers\hic_mark_reservation_processed_by_id($uid);
+        $sanitized = Helpers\hic_normalize_reservation_id((string) $candidate);
+        if ($sanitized === '') {
+            return;
+        }
+
+        $normalized_ids[$sanitized] = true;
+    };
+
+    if (is_array($reservation)) {
+        $ids = Helpers\hic_collect_reservation_ids($reservation);
+        foreach ($ids as $candidate) {
+            $collect($candidate);
+        }
+
+        $uid = Helpers\hic_booking_uid($reservation);
+        $collect($uid);
+    } else {
+        $uid = Helpers\hic_booking_uid($reservation);
+        $collect($uid);
+    }
+
+    if ($fallback_ids !== null) {
+        if (is_array($fallback_ids)) {
+            foreach ($fallback_ids as $candidate) {
+                $collect($candidate);
+            }
+        } else {
+            $collect($fallback_ids);
+        }
+    }
+
+    if (empty($normalized_ids)) {
         return;
     }
 
-    $ids = Helpers\hic_collect_reservation_ids($reservation);
-    if (empty($ids)) {
-        $uid = Helpers\hic_booking_uid($reservation);
-        if ($uid === '') {
-            return;
-        }
-        $ids = array($uid);
-    }
-
-    Helpers\hic_mark_reservation_processed_by_id($ids);
+    Helpers\hic_mark_reservation_processed_by_id(array_keys($normalized_ids));
 }
 
 // Wrapper function - now simplified to use continuous polling by default
@@ -1347,7 +1452,8 @@ function hic_process_reservations_batch($reservations) {
                                 }
 
                                 if ($status_value === 'success' || ($status_value === 'partial' && !empty($status_result['should_mark_processed']))) {
-                                    hic_mark_reservation_processed($reservation);
+                                    $processed_ids = $status_result['processed_ids'] ?? ($status_result['transaction_id'] ?? null);
+                                    hic_mark_reservation_processed($reservation, $processed_ids);
                                 }
                             }
                         } finally {
@@ -1382,7 +1488,8 @@ function hic_process_reservations_batch($reservations) {
                     hic_log("Reservation $dedup_uid: dispatch failed, will retry");
                 } else {
                     if (!empty($process_result['should_mark_processed'])) {
-                        hic_mark_reservation_processed($reservation);
+                        $processed_ids = $process_result['processed_ids'] ?? ($process_result['transaction_id'] ?? null);
+                        hic_mark_reservation_processed($reservation, $processed_ids);
                     }
 
                     $new_count++;
@@ -2226,7 +2333,8 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
 
                             $should_mark_processed = !empty($dispatch_result['should_mark_processed']);
                             if ($should_mark_processed) {
-                                hic_mark_reservation_processed($reservation);
+                                $processed_ids = $dispatch_result['processed_ids'] ?? ($dispatch_result['transaction_id'] ?? null);
+                                hic_mark_reservation_processed($reservation, $processed_ids);
                             }
 
                             $failed_integrations = array();
