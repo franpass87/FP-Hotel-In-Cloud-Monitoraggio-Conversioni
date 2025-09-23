@@ -885,7 +885,10 @@ function hic_ajax_download_latest_bookings() {
 
     try {
         // Get latest bookings (with duplicate prevention)
-        $result = hic_get_latest_bookings(5, true);
+        $result = apply_filters('hic_diagnostics_manual_bookings', null);
+        if ($result === null) {
+            $result = hic_get_latest_bookings(5, true);
+        }
 
         if (is_wp_error($result)) {
             wp_send_json_error( [ 'message' => sprintf( __( 'Errore nel recupero prenotazioni: %s', 'hotel-in-cloud' ), $result->get_error_message() ) ] );
@@ -909,11 +912,16 @@ function hic_ajax_download_latest_bookings() {
         $success_count = 0;
         $error_count = 0;
         $booking_ids = array();
+        $booking_ids_to_mark = array();
+        $skipped_booking_ids = array();
+        $skipped_bookings = array();
 
         foreach ($result as $booking) {
             // Extract booking ID for tracking
-            if (isset($booking['id']) && !empty($booking['id'])) {
-                $booking_ids[] = $booking['id'];
+            $booking_id = null;
+            if (isset($booking['id']) && $booking['id'] !== '' && $booking['id'] !== null) {
+                $booking_id = (string) $booking['id'];
+                $booking_ids[] = $booking_id;
             }
 
             // Convert API booking format to processor format
@@ -932,17 +940,32 @@ function hic_ajax_download_latest_bookings() {
 
             $status = isset($processing_result['status']) ? (string) $processing_result['status'] : 'failed';
             $processed_successfully = in_array($status, ['success', 'partial'], true);
+            $should_mark_processed = !empty($processing_result['should_mark_processed']);
+            $mark_booking_as_downloaded = $booking_id !== null && ($processed_successfully || $should_mark_processed);
+
+            $raw_messages = $processing_result['messages'] ?? array();
+            if (!is_array($raw_messages)) {
+                $raw_messages = array($raw_messages);
+            }
+
+            $raw_failed_integrations = $processing_result['failed_integrations'] ?? array();
+            if (!is_array($raw_failed_integrations)) {
+                $raw_failed_integrations = array($raw_failed_integrations);
+            }
+            $normalized_failed_integrations = array_values($raw_failed_integrations);
+            $normalized_messages = array_values(array_map('strval', $raw_messages));
 
             $processing_results[] = array(
                 'booking_id' => $booking['id'] ?? 'N/A',
                 'email' => $processed_data['email'] ?? 'N/A',
                 'success' => $processed_successfully,
                 'status' => $status,
-                'should_mark_processed' => !empty($processing_result['should_mark_processed']),
-                'failed_integrations' => $processing_result['failed_integrations'] ?? array(),
+                'should_mark_processed' => $should_mark_processed,
+                'marked_processed' => $mark_booking_as_downloaded,
+                'failed_integrations' => $normalized_failed_integrations,
                 'failed_details' => $processing_result['failed_details'] ?? array(),
                 'successful_integrations' => $processing_result['successful_integrations'] ?? array(),
-                'messages' => $processing_result['messages'] ?? array(),
+                'messages' => $normalized_messages,
                 'summary' => $processing_result['summary'] ?? '',
                 'amount' => $processed_data['amount'] ?? 'N/A'
             );
@@ -952,11 +975,28 @@ function hic_ajax_download_latest_bookings() {
             } else {
                 $error_count++;
             }
+
+            if ($mark_booking_as_downloaded) {
+                $booking_ids_to_mark[] = $booking_id;
+            } else {
+                $skip_identifier = $booking_id ?? ($booking['id'] ?? 'N/A');
+                if ($booking_id !== null) {
+                    $skipped_booking_ids[] = $booking_id;
+                }
+
+                $skipped_bookings[] = array(
+                    'booking_id' => $skip_identifier,
+                    'status' => $status,
+                    'should_mark_processed' => $should_mark_processed,
+                    'messages' => $normalized_messages,
+                    'failed_integrations' => $normalized_failed_integrations,
+                );
+            }
         }
 
         // Mark these bookings as processed
-        if (!empty($booking_ids)) {
-            hic_mark_bookings_as_downloaded($booking_ids);
+        if (!empty($booking_ids_to_mark)) {
+            hic_mark_bookings_as_downloaded($booking_ids_to_mark);
         }
 
         // Get integration status for report
@@ -972,6 +1012,9 @@ function hic_ajax_download_latest_bookings() {
             'success_count' => $success_count,
             'error_count' => $error_count,
             'booking_ids' => $booking_ids,
+            'marked_booking_ids' => $booking_ids_to_mark,
+            'skipped_booking_ids' => $skipped_booking_ids,
+            'skipped_bookings' => $skipped_bookings,
             'integration_status' => $integration_status,
             'processing_results' => $processing_results
         ) );
