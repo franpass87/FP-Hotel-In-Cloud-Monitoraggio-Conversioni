@@ -641,7 +641,7 @@ class GoogleAdsEnhancedConversions {
             $queue = array_slice($queue, -1000);
         }
         
-        update_option('hic_enhanced_conversions_queue', $queue);
+        update_option('hic_enhanced_conversions_queue', $queue, false);
         
         $this->log("Queued enhanced conversion {$conversion_id} for batch upload");
     }
@@ -669,7 +669,7 @@ class GoogleAdsEnhancedConversions {
         }
         
         $batch = array_splice($queue, 0, $batch_size);
-        update_option('hic_enhanced_conversions_queue', $queue);
+        update_option('hic_enhanced_conversions_queue', $queue, false);
         
         $this->log("Processing batch of " . count($batch) . " enhanced conversions");
         

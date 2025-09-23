@@ -19,6 +19,7 @@ if (file_exists('/tmp/wordpress-tests-lib/includes/functions.php')) {
 // Mock WordPress options handling for basic testing
 if (!function_exists('get_option')) {
     $GLOBALS['hic_test_options'] = [];
+    $GLOBALS['hic_test_option_autoload'] = [];
 
     function get_option($option, $default = false) {
         global $hic_test_options;
@@ -28,8 +29,25 @@ if (!function_exists('get_option')) {
 
 if (!function_exists('update_option')) {
     function update_option($option, $value, $autoload = null) {
-        global $hic_test_options;
+        global $hic_test_options, $hic_test_option_autoload;
+
+        if (!is_array($hic_test_option_autoload ?? null)) {
+            $hic_test_option_autoload = [];
+        }
+
         $hic_test_options[$option] = $value;
+        $hic_test_option_autoload[$option] = $autoload;
+
+        return true;
+    }
+}
+
+if (!function_exists('delete_option')) {
+    function delete_option($option) {
+        global $hic_test_options, $hic_test_option_autoload;
+
+        unset($hic_test_options[$option], $hic_test_option_autoload[$option]);
+
         return true;
     }
 }

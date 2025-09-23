@@ -187,7 +187,19 @@ if (!function_exists('delete_transient')) {
     }
 }
 
-if (!function_exists('delete_option')) { function delete_option($option) { global $hic_test_options; unset($hic_test_options[$option]); return true; } }
+if (!function_exists('delete_option')) {
+    function delete_option($option) {
+        global $hic_test_options, $hic_test_option_autoload;
+
+        unset($hic_test_options[$option]);
+
+        if (is_array($hic_test_option_autoload ?? null)) {
+            unset($hic_test_option_autoload[$option]);
+        }
+
+        return true;
+    }
+}
 if (!function_exists('wp_upload_dir')) { function wp_upload_dir($path = null) { return ['basedir' => sys_get_temp_dir(), 'baseurl' => '']; } }
 if (!function_exists('plugin_basename')) { function plugin_basename($file) { return $file; } }
 if (!function_exists('sanitize_text_field')) {
