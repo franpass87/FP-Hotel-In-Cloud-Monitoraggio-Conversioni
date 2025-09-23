@@ -693,20 +693,36 @@ class CircuitBreakerManager {
     
     /**
      * Retry booking sync
+     *
+     * Allows custom handlers to process queued booking synchronization payloads.
+     * The `hic_retry_booking_sync` filter should return `true` when the retry
+     * completed successfully or `false` to keep the item queued for another
+     * attempt. If no callbacks are registered the retry is treated as successful.
+     *
+     * @param mixed $payload Stored payload for the booking sync retry.
+     * @return bool True when the retry is considered completed.
      */
     private function retry_booking_sync($payload) {
-        // Implementation depends on your booking sync logic
-        // This is a placeholder
-        return do_action('hic_retry_booking_sync', $payload);
+        $result = apply_filters('hic_retry_booking_sync', true, $payload);
+
+        return (bool) $result;
     }
-    
+
     /**
      * Retry analytics event
+     *
+     * Allows custom handlers to process queued analytics payloads. The
+     * `hic_retry_analytics_event` filter should return `true` when the retry
+     * completed successfully or `false` to keep the event queued. Without
+     * registered callbacks the retry defaults to success.
+     *
+     * @param mixed $payload Stored payload for the analytics retry.
+     * @return bool True when the analytics retry is completed successfully.
      */
     private function retry_analytics_event($payload) {
-        // Implementation depends on your analytics integration
-        // This is a placeholder
-        return do_action('hic_retry_analytics_event', $payload);
+        $result = apply_filters('hic_retry_analytics_event', true, $payload);
+
+        return (bool) $result;
     }
     
     /**
