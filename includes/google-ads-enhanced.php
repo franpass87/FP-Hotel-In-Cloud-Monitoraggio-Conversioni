@@ -1289,7 +1289,7 @@ class GoogleAdsEnhancedConversions {
         
         wp_enqueue_script(
             'hic-enhanced-conversions',
-            plugins_url('assets/js/enhanced-conversions.js', dirname(__FILE__, 2)),
+            plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/js/enhanced-conversions.js',
             ['jquery'],
             '3.1.0',
             true
