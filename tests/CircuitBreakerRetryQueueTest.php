@@ -201,5 +201,91 @@ namespace {
             $this->assertSame($url, $circuit_breaker_http_calls[0]['url']);
             $this->assertSame($args, $circuit_breaker_http_calls[0]['args']);
         }
+
+        public function test_booking_sync_retry_filter_controls_queue_progress(): void {
+            global $wpdb;
+
+            $wpdb->circuit_states['hic_api'] = 'closed';
+
+            $attempts = 0;
+            $callback = function ($success, $payload) use (&$attempts) {
+                $attempts++;
+
+                return $attempts >= 2;
+            };
+
+            add_filter('hic_retry_booking_sync', $callback, 10, 2);
+
+            try {
+                $wpdb->retry_rows[] = [
+                    'id' => 1,
+                    'service_name' => 'hic_api',
+                    'operation_type' => 'booking_sync',
+                    'priority' => 'HIGH',
+                    'payload' => json_encode(['reservation_id' => 'R-123']),
+                    'scheduled_retry_at' => '2000-01-01 00:00:00',
+                    'status' => 'queued',
+                    'retry_count' => 0,
+                    'max_retries' => 3,
+                ];
+
+                $this->manager->process_retry_queue();
+
+                $this->assertSame(1, $attempts, 'First attempt should invoke the retry filter.');
+                $this->assertSame('queued', $wpdb->retry_rows[0]['status']);
+                $this->assertSame(1, $wpdb->retry_rows[0]['retry_count']);
+
+                $this->manager->process_retry_queue();
+
+                $this->assertSame(2, $attempts, 'Second attempt should also invoke the retry filter.');
+                $this->assertSame('completed', $wpdb->retry_rows[0]['status']);
+                $this->assertSame(1, $wpdb->retry_rows[0]['retry_count']);
+                $this->assertSame('2099-01-01 00:00:00', $wpdb->retry_rows[0]['completion_time']);
+            } finally {
+                remove_filter('hic_retry_booking_sync', $callback, 10);
+            }
+        }
+
+        public function test_analytics_event_retry_filter_controls_queue_progress(): void {
+            global $wpdb;
+
+            $attempts = 0;
+            $callback = function ($success, $payload) use (&$attempts) {
+                $attempts++;
+
+                return $attempts >= 2;
+            };
+
+            add_filter('hic_retry_analytics_event', $callback, 10, 2);
+
+            try {
+                $wpdb->retry_rows[] = [
+                    'id' => 1,
+                    'service_name' => 'google_analytics',
+                    'operation_type' => 'analytics_event',
+                    'priority' => 'MEDIUM',
+                    'payload' => json_encode(['event' => 'purchase']),
+                    'scheduled_retry_at' => '2000-01-01 00:00:00',
+                    'status' => 'queued',
+                    'retry_count' => 0,
+                    'max_retries' => 3,
+                ];
+
+                $this->manager->process_retry_queue();
+
+                $this->assertSame(1, $attempts, 'First attempt should invoke the analytics retry filter.');
+                $this->assertSame('queued', $wpdb->retry_rows[0]['status']);
+                $this->assertSame(1, $wpdb->retry_rows[0]['retry_count']);
+
+                $this->manager->process_retry_queue();
+
+                $this->assertSame(2, $attempts, 'Second attempt should also invoke the analytics retry filter.');
+                $this->assertSame('completed', $wpdb->retry_rows[0]['status']);
+                $this->assertSame(1, $wpdb->retry_rows[0]['retry_count']);
+                $this->assertSame('2099-01-01 00:00:00', $wpdb->retry_rows[0]['completion_time']);
+            } finally {
+                remove_filter('hic_retry_analytics_event', $callback, 10);
+            }
+        }
     }
 }
