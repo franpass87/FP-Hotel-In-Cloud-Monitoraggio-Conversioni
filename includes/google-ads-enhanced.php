@@ -552,13 +552,34 @@ class GoogleAdsEnhancedConversions {
      * Create enhanced conversion record in database
      */
     private function create_enhanced_conversion_record($booking_data, $hashed_data) {
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'hic_enhanced_conversions';
-        
-        $conversion_value = $this->calculate_conversion_value($booking_data);
         $conversion_action_id = $this->get_conversion_action_id('booking_completed');
-        
+
+        if ($conversion_action_id === null || $conversion_action_id === '') {
+            $booking_reference = '';
+
+            if (isset($booking_data['booking_id']) && is_scalar($booking_data['booking_id']) && $booking_data['booking_id'] !== '') {
+                $booking_reference = (string) $booking_data['booking_id'];
+            } elseif (isset($booking_data['gclid']) && is_scalar($booking_data['gclid']) && $booking_data['gclid'] !== '') {
+                $booking_reference = 'GCLID ' . (string) $booking_data['gclid'];
+            }
+
+            $context = $booking_reference !== '' ? sprintf(' for %s', $booking_reference) : '';
+            $this->log(sprintf('Skipping enhanced conversion record creation%s: missing conversion action ID.', $context));
+
+            return false;
+        }
+
+        global $wpdb;
+
+        if (!isset($wpdb) || !is_object($wpdb)) {
+            $this->log('Skipping enhanced conversion record creation: database connection is not available.');
+            return false;
+        }
+
+        $table_name = $wpdb->prefix . 'hic_enhanced_conversions';
+
+        $conversion_value = $this->calculate_conversion_value($booking_data);
+
         $result = $wpdb->insert($table_name, [
             'booking_id' => $booking_data['booking_id'] ?? '',
             'gclid' => $booking_data['gclid'] ?? '',
@@ -572,7 +593,7 @@ class GoogleAdsEnhancedConversions {
             'upload_status' => 'pending',
             'created_at' => function_exists('current_time') ? current_time('mysql') : date('Y-m-d H:i:s')
         ]);
-        
+
         return $result ? $wpdb->insert_id : false;
     }
     
@@ -605,13 +626,46 @@ class GoogleAdsEnhancedConversions {
      */
     private function get_conversion_action_id($action_type) {
         $settings = get_option('hic_google_ads_enhanced_settings', []);
-        
+
+        $candidate = null;
+
         if (isset($settings['conversion_actions'][$action_type]['action_id'])) {
-            return $settings['conversion_actions'][$action_type]['action_id'];
+            $value = $settings['conversion_actions'][$action_type]['action_id'];
+            if (is_scalar($value)) {
+                $candidate = $this->sanitize_conversion_action_id((string) $value);
+            }
         }
-        
-        // Return default or placeholder
-        return 'AUTO_GENERATED_' . strtoupper($action_type);
+
+        if (($candidate === null || $candidate === '')
+            && isset($settings['conversion_action_id'])
+            && is_scalar($settings['conversion_action_id'])) {
+            $candidate = $this->sanitize_conversion_action_id((string) $settings['conversion_action_id']);
+        }
+
+        if ($candidate === null || $candidate === '') {
+            return null;
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * Sanitize conversion action identifiers sourced from settings.
+     */
+    private function sanitize_conversion_action_id(string $value): string {
+        $value = trim($value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (function_exists('sanitize_text_field')) {
+            $value = sanitize_text_field($value);
+        } else {
+            $value = preg_replace('/[^A-Za-z0-9_\-]/', '', $value);
+        }
+
+        return trim((string) $value);
     }
     
     /**
@@ -815,7 +869,25 @@ class GoogleAdsEnhancedConversions {
         }
 
         foreach ($conversions as $conversion) {
-            $conversion_action = sprintf('customers/%s/conversionActions/%s', $customer_id, $conversion['conversion_action_id']);
+            if (!isset($conversion['conversion_action_id']) || !is_scalar($conversion['conversion_action_id'])) {
+                $this->log(sprintf(
+                    'Skipping conversion record without conversion action ID for GCLID %s.',
+                    isset($conversion['gclid']) && is_scalar($conversion['gclid']) ? (string) $conversion['gclid'] : 'unknown'
+                ));
+                continue;
+            }
+
+            $conversion_action_id = $this->sanitize_conversion_action_id((string) $conversion['conversion_action_id']);
+
+            if ($conversion_action_id === '') {
+                $this->log(sprintf(
+                    'Skipping conversion record with empty conversion action ID for GCLID %s.',
+                    isset($conversion['gclid']) && is_scalar($conversion['gclid']) ? (string) $conversion['gclid'] : 'unknown'
+                ));
+                continue;
+            }
+
+            $conversion_action = sprintf('customers/%s/conversionActions/%s', $customer_id, $conversion_action_id);
 
             $api_conversion = [
                 'gclid' => $conversion['gclid'],
