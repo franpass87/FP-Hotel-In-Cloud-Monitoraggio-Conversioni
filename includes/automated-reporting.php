@@ -538,18 +538,27 @@ class AutomatedReportingManager {
         $filename = sprintf('hic-%s-report-%s.csv', $report_type, date('Y-m-d-H-i-s'));
         $filepath = $this->export_dir . $filename;
         
-        $file = fopen($filepath, 'w');
-        
-        // Add CSV headers based on report type
-        $this->write_csv_headers($file, $report_type);
-        
-        // Write data based on report type
-        $this->write_csv_data($file, $data, $report_type);
-        
-        fclose($file);
-        
+        $file = @fopen($filepath, 'w');
+
+        if ($file === false) {
+            $this->log('Failed to open report file for writing: ' . $filepath);
+            throw new \RuntimeException('Unable to open export file for writing. Please verify the export directory is writable.');
+        }
+
+        try {
+            // Add CSV headers based on report type
+            $this->write_csv_headers($file, $report_type);
+
+            // Write data based on report type
+            $this->write_csv_data($file, $data, $report_type);
+        } finally {
+            if (is_resource($file)) {
+                fclose($file);
+            }
+        }
+
         $this->log("CSV report generated: {$filename}");
-        
+
         return $filepath;
     }
     
