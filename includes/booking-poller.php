@@ -1547,19 +1547,46 @@ function hic_init_booking_poller() {
  */
 function hic_deactivate(): void {
     $hooks = array(
+        // Core booking poller events
         'hic_continuous_poll_event',
         'hic_deep_check_event',
         'hic_fallback_poll_event',
+        'hic_cleanup_event',
+        'hic_booking_events_cleanup',
         'hic_self_healing_recovery',
+        'hic_retry_failed_brevo_notifications',
+        'hic_scheduler_restart',
+
+        // Monitoring and performance systems
         'hic_health_monitor_event',
         'hic_performance_cleanup',
-        'hic_reliable_poll_event',
+        'hic_refresh_dashboard_data',
+        'hic_process_retry_queue',
+        'hic_check_circuit_breaker_recovery',
+        'hic_intelligent_poll_event',
+        'hic_cleanup_connection_pool',
+        'hic_enhanced_conversions_batch_upload',
+        'hic_daily_reconciliation',
+        'hic_health_check',
+        'hic_cleanup_exports',
+        'hic_daily_report',
+        'hic_weekly_report',
+        'hic_monthly_report',
+        'hic_daily_database_maintenance',
+        'hic_weekly_database_optimization',
+        'hic_retry_failed_requests',
+        'hic_cleanup_failed_requests',
+    );
+
+    // Legacy hooks kept for backward compatibility cleanup
+    $legacy_hooks = array(
         'hic_api_poll_event',
         'hic_api_updates_event',
         'hic_retry_failed_notifications_event',
+        'hic_reliable_poll_event',
     );
 
-    foreach ($hooks as $hook) {
+    foreach (array_merge($hooks, $legacy_hooks) as $hook) {
         wp_clear_scheduled_hook($hook);
     }
 
