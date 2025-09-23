@@ -569,7 +569,8 @@ class GoogleAdsEnhancedConversions {
             'customer_address_hash' => $hashed_data['address_hash'] ?? null,
             'conversion_value' => $conversion_value,
             'conversion_action_id' => $conversion_action_id,
-            'upload_status' => 'pending'
+            'upload_status' => 'pending',
+            'created_at' => function_exists('current_time') ? current_time('mysql') : date('Y-m-d H:i:s')
         ]);
         
         return $result ? $wpdb->insert_id : false;
@@ -865,10 +866,135 @@ class GoogleAdsEnhancedConversions {
     }
     
     /**
-     * Format conversion datetime for API
+     * Format conversion datetime for Google Ads API requests.
+     *
+     * Google Ads expects localized timestamps with a numeric timezone offset.
+     * Callers should provide booking timestamps already normalized to the
+     * property/WordPress timezone (e.g. values produced via current_time()).
+     *
+     * @param string|int|\DateTimeInterface|null $datetime Datetime to convert.
      */
     private function format_conversion_datetime($datetime) {
-        return date('Y-m-d H:i:s', strtotime($datetime)) . ' Europe/Rome';
+        $timezone = $this->get_conversion_timezone();
+
+        try {
+            if ($datetime instanceof \DateTimeInterface) {
+                $date = new \DateTimeImmutable($datetime->format('Y-m-d H:i:s'), $timezone);
+            } elseif (is_numeric($datetime)) {
+                $date = (new \DateTimeImmutable('@' . (string) (int) $datetime))->setTimezone($timezone);
+            } elseif (is_string($datetime) && trim($datetime) !== '') {
+                $date = new \DateTimeImmutable($datetime, $timezone);
+            } else {
+                $date = new \DateTimeImmutable('now', $timezone);
+            }
+        } catch (\Exception $exception) {
+            $this->log(sprintf(
+                'Failed to parse conversion datetime "%s": %s',
+                is_scalar($datetime) ? (string) $datetime : gettype($datetime),
+                $exception->getMessage()
+            ));
+            $date = new \DateTimeImmutable('now', $timezone);
+        }
+
+        return $date->setTimezone($timezone)->format('Y-m-d H:i:sO');
+    }
+
+    /**
+     * Determine which timezone should be used for conversion exports.
+     */
+    private function get_conversion_timezone(): \DateTimeZone {
+        $timezone_string = '';
+
+        if (defined('HIC_PROPERTY_TIMEZONE') && is_string(HIC_PROPERTY_TIMEZONE) && HIC_PROPERTY_TIMEZONE !== '') {
+            $timezone_string = trim((string) HIC_PROPERTY_TIMEZONE);
+        }
+
+        if ($timezone_string === '') {
+            if (function_exists('\\FpHic\\Helpers\\hic_get_option')) {
+                $option = \FpHic\Helpers\hic_get_option('property_timezone', '');
+            } elseif (function_exists('get_option')) {
+                $option = get_option('hic_property_timezone', '');
+            } else {
+                $option = '';
+            }
+
+            if (is_string($option)) {
+                $timezone_string = trim($option);
+            }
+        }
+
+        if ($timezone_string !== '') {
+            try {
+                return new \DateTimeZone($timezone_string);
+            } catch (\Exception $exception) {
+                $this->log(sprintf(
+                    'Invalid property timezone "%s": %s',
+                    $timezone_string,
+                    $exception->getMessage()
+                ));
+            }
+        }
+
+        return $this->get_wordpress_timezone();
+    }
+
+    /**
+     * Retrieve the active WordPress timezone configuration.
+     */
+    private function get_wordpress_timezone(): \DateTimeZone {
+        if (function_exists('wp_timezone')) {
+            $wp_timezone = wp_timezone();
+            if ($wp_timezone instanceof \DateTimeZone) {
+                return $wp_timezone;
+            }
+        }
+
+        $timezone_string = '';
+        if (function_exists('get_option')) {
+            $timezone_option = get_option('timezone_string', '');
+            if (is_string($timezone_option)) {
+                $timezone_string = trim($timezone_option);
+            }
+        }
+
+        if ($timezone_string !== '') {
+            try {
+                return new \DateTimeZone($timezone_string);
+            } catch (\Exception $exception) {
+                $this->log(sprintf(
+                    'Invalid WordPress timezone "%s": %s',
+                    $timezone_string,
+                    $exception->getMessage()
+                ));
+            }
+        }
+
+        $gmt_offset = 0.0;
+        if (function_exists('get_option')) {
+            $offset_option = get_option('gmt_offset', 0);
+            if (is_numeric($offset_option)) {
+                $gmt_offset = (float) $offset_option;
+            }
+        }
+
+        if ($gmt_offset !== 0.0) {
+            $hours = (int) $gmt_offset;
+            $minutes = (int) round(abs($gmt_offset - $hours) * 60);
+            $sign = $gmt_offset < 0 ? '-' : '+';
+            $formatted_offset = sprintf('%s%02d:%02d', $sign, abs($hours), $minutes);
+
+            try {
+                return new \DateTimeZone($formatted_offset);
+            } catch (\Exception $exception) {
+                $this->log(sprintf(
+                    'Invalid GMT offset "%s": %s',
+                    (string) $gmt_offset,
+                    $exception->getMessage()
+                ));
+            }
+        }
+
+        return new \DateTimeZone('UTC');
     }
     
     /**
