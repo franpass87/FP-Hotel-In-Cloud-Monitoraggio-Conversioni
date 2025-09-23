@@ -767,10 +767,10 @@ class GoogleAdsEnhancedConversions {
         ];
         
         $headers = [
-            'Authorization: Bearer ' . $access_token,
-            'Content-Type: application/json',
-            'developer-token: ' . $settings['developer_token'],
-            'login-customer-id: ' . $customer_id
+            'Authorization' => 'Bearer ' . $access_token,
+            'Content-Type' => 'application/json',
+            'developer-token' => $settings['developer_token'],
+            'login-customer-id' => $customer_id,
         ];
         
         $response = $this->make_google_ads_api_request($url, $request_data, $headers);
@@ -1037,7 +1037,7 @@ class GoogleAdsEnhancedConversions {
     private function make_google_ads_api_request($url, $data, $headers) {
         $response = wp_remote_post($url, [
             'headers' => $headers,
-            'body' => json_encode($data),
+            'body' => wp_json_encode($data),
             'timeout' => 60
         ]);
         
