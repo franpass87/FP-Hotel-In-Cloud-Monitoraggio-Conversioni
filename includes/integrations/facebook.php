@@ -29,8 +29,13 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gb
   // Generate event ID using consistent extraction
   $event_id = Helpers\hic_extract_reservation_id($data);
   if (empty($event_id)) {
-    $event_id = uniqid('fb_');
+    $sid = '';
+    if (!empty($data['sid']) && is_scalar($data['sid'])) {
+      $sid = sanitize_text_field((string) $data['sid']);
+    }
+    $event_id = hic_ga4_resolve_transaction_id($data, $sid);
   }
+  $event_id = sanitize_text_field((string) $event_id);
 
   // Validate and sanitize amount
   $amount = 0;
@@ -192,8 +197,13 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '',
 
   $event_id = Helpers\hic_extract_reservation_id($data);
   if (empty($event_id)) {
-    $event_id = uniqid('fb_refund_');
+    $sid = '';
+    if (!empty($data['sid']) && is_scalar($data['sid'])) {
+      $sid = sanitize_text_field((string) $data['sid']);
+    }
+    $event_id = hic_ga4_resolve_transaction_id($data, $sid);
   }
+  $event_id = sanitize_text_field((string) $event_id);
 
   $amount = 0;
   $amount_source = null;
