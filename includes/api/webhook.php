@@ -35,6 +35,86 @@ function hic_get_webhook_route_args(): array {
 }
 }
 
+/**
+ * Retrieve the raw webhook payload without triggering PHP notices.
+ *
+ * Tests replace the php:// stream wrapper to simulate errors. PHP would
+ * normally emit warnings or create dynamic properties on those mock
+ * classes, which pollutes the output and is deprecated on PHP 8.2+.
+ * This helper captures those notices, logs them when appropriate and
+ * converts fatal conditions into WP_Error instances so the handler can
+ * fail gracefully.
+ *
+ * @param mixed $request The REST request instance.
+ * @return string|\WP_Error Raw request body or WP_Error on failure.
+ */
+function hic_get_raw_webhook_body($request)
+{
+  if (is_object($request)) {
+    if (method_exists($request, 'get_body')) {
+      $body = $request->get_body();
+      if (is_string($body)) {
+        return $body;
+      }
+    }
+
+    // Support tests or custom requests providing a pre-parsed body.
+    if (method_exists($request, 'get_content')) {
+      $body = $request->get_content();
+      if (is_string($body)) {
+        return $body;
+      }
+    }
+  }
+
+  $errors = [];
+  $error_handler = static function (int $errno, string $errstr) use (&$errors): bool {
+    $errors[] = ['type' => $errno, 'message' => $errstr];
+    return true; // Prevent PHP from outputting the notice/warning.
+  };
+
+  $handled_levels = E_WARNING | E_DEPRECATED;
+  set_error_handler($error_handler, $handled_levels);
+
+  $stream = fopen('php://input', 'rb');
+  $raw = '';
+  $open_failed = ($stream === false);
+
+  if (!$open_failed) {
+    $raw = stream_get_contents($stream);
+    if ($raw === false) {
+      $open_failed = true;
+    }
+  }
+
+  if (is_resource($stream)) {
+    fclose($stream);
+  }
+
+  restore_error_handler();
+
+  foreach ($errors as $captured_error) {
+    if (($captured_error['type'] & E_WARNING) === E_WARNING) {
+      $message = $captured_error['message'];
+      hic_log('Webhook body read warning: ' . $message, HIC_LOG_LEVEL_WARNING);
+    } elseif (($captured_error['type'] & E_DEPRECATED) === E_DEPRECATED) {
+      hic_log('Webhook stream deprecation notice: ' . $captured_error['message'], HIC_LOG_LEVEL_DEBUG);
+    }
+  }
+
+  if ($open_failed) {
+    hic_log('Webhook body read failed: unable to access php://input');
+    return new \WP_Error('invalid_body', 'Corpo della richiesta non leggibile', ['status' => 400]);
+  }
+
+  if (!is_string($raw)) {
+    hic_log('Webhook body read failed: raw payload is not a string');
+    return new \WP_Error('invalid_body', 'Corpo della richiesta non leggibile', ['status' => 400]);
+  }
+
+  return $raw;
+}
+
 $hic_register_webhook_route = static function (): void {
   if (!in_array(hic_get_connection_type(), ['webhook', 'hybrid'], true)) {
     return;
@@ -80,11 +160,10 @@ function hic_webhook_handler(WP_REST_Request $request) {
   }
 
   // Get raw body and validate size
-  $raw = file_get_contents('php://input');
+  $raw = hic_get_raw_webhook_body($request);
 
-  if (!is_string($raw)) {
-    hic_log('Webhook body read failed: unable to access php://input');
-    return new \WP_Error('invalid_body', 'Corpo della richiesta non leggibile', ['status' => 400]);
+  if (is_wp_error($raw)) {
+    return $raw;
   }
 
   if (strlen($raw) > HIC_WEBHOOK_MAX_PAYLOAD_SIZE) {
