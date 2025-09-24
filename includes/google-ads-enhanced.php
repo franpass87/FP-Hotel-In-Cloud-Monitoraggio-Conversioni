@@ -871,15 +871,100 @@ class GoogleAdsEnhancedConversions {
         foreach ($grouped_conversions as $gclid => $group_conversions) {
             try {
                 $upload_result = $this->upload_enhanced_conversions_to_google_ads($group_conversions);
-                
-                if ($upload_result['success']) {
-                    $success_count += count($group_conversions);
-                    $this->mark_conversions_as_uploaded($group_conversions, $upload_result['response']);
-                } else {
+                if (!($upload_result['success'] ?? false)) {
                     $failed_count += count($group_conversions);
-                    $this->mark_conversions_as_failed($group_conversions, $upload_result['error']);
+                    $error_message = isset($upload_result['error']) && is_string($upload_result['error'])
+                        ? $upload_result['error']
+                        : 'Failed to upload conversions to Google Ads.';
+                    $this->mark_conversions_as_failed($group_conversions, $error_message);
+                    continue;
                 }
-                
+
+                $response_body = $upload_result['response'] ?? [];
+                $uploaded_ids = isset($upload_result['uploaded_ids']) && is_array($upload_result['uploaded_ids'])
+                    ? array_values(array_unique(array_map('intval', $upload_result['uploaded_ids'])))
+                    : [];
+                $failed_errors = isset($upload_result['failed_errors']) && is_array($upload_result['failed_errors'])
+                    ? $upload_result['failed_errors']
+                    : [];
+                $pending_ids_from_response = isset($upload_result['pending_ids']) && is_array($upload_result['pending_ids'])
+                    ? array_values(array_unique(array_map('intval', $upload_result['pending_ids'])))
+                    : [];
+                $general_errors = isset($upload_result['general_errors']) && is_array($upload_result['general_errors'])
+                    ? $upload_result['general_errors']
+                    : [];
+
+                $conversion_map = [];
+                foreach ($group_conversions as $conversion) {
+                    if (isset($conversion['id'])) {
+                        $conversion_map[(int) $conversion['id']] = $conversion;
+                    }
+                }
+
+                $uploaded_conversions = [];
+                foreach ($uploaded_ids as $uploaded_id) {
+                    if (isset($conversion_map[$uploaded_id])) {
+                        $uploaded_conversions[] = $conversion_map[$uploaded_id];
+                    }
+                }
+
+                if (!empty($uploaded_conversions)) {
+                    $success_count += count($uploaded_conversions);
+                    $this->mark_conversions_as_uploaded($uploaded_conversions, $response_body);
+                }
+
+                foreach ($failed_errors as $failed_id => $message) {
+                    $failed_id = (int) $failed_id;
+                    if (!isset($conversion_map[$failed_id])) {
+                        continue;
+                    }
+
+                    $failed_message = is_string($message) && $message !== ''
+                        ? $message
+                        : 'Conversion upload failed due to an unknown error.';
+
+                    $failed_count++;
+                    $this->mark_conversions_as_failed([$conversion_map[$failed_id]], $failed_message);
+                    unset($conversion_map[$failed_id]);
+                }
+
+                $processed_ids = $uploaded_ids;
+                foreach (array_keys($failed_errors) as $failed_id) {
+                    $processed_ids[] = (int) $failed_id;
+                }
+                $processed_ids = array_values(array_unique(array_map('intval', $processed_ids)));
+
+                $pending_ids = $pending_ids_from_response;
+
+                foreach ($group_conversions as $conversion) {
+                    if (!isset($conversion['id'])) {
+                        continue;
+                    }
+
+                    $conversion_id = (int) $conversion['id'];
+                    if (in_array($conversion_id, $processed_ids, true)) {
+                        continue;
+                    }
+
+                    if (!in_array($conversion_id, $pending_ids, true)) {
+                        $pending_ids[] = $conversion_id;
+                    }
+                }
+
+                if (!empty($pending_ids)) {
+                    $pending_ids = array_values(array_unique($pending_ids));
+                    foreach ($pending_ids as $conversion_id) {
+                        $this->queue_for_batch_upload($conversion_id);
+                    }
+                }
+
+                if (!empty($general_errors)) {
+                    foreach ($general_errors as $message) {
+                        if (is_string($message) && $message !== '') {
+                            $this->log('Google Ads partial failure: ' . $message);
+                        }
+                    }
+                }
             } catch (\Exception $e) {
                 $failed_count += count($group_conversions);
                 $this->mark_conversions_as_failed($group_conversions, $e->getMessage());
@@ -912,13 +997,14 @@ class GoogleAdsEnhancedConversions {
      */
     private function upload_enhanced_conversions_to_google_ads($conversions) {
         $settings = get_option('hic_google_ads_enhanced_settings', []);
-        
+
         if (!$this->validate_google_ads_credentials()) {
             throw new \Exception('Google Ads credentials not properly configured');
         }
-        
+
         try {
-            $formatted_conversions = $this->format_conversions_for_api($conversions, $settings);
+            $formatted_conversion_map = [];
+            $formatted_conversions = $this->format_conversions_for_api($conversions, $settings, $formatted_conversion_map);
         } catch (\RuntimeException $exception) {
             return [
                 'success' => false,
@@ -958,18 +1044,94 @@ class GoogleAdsEnhancedConversions {
         ];
         
         $response = $this->make_google_ads_api_request($url, $request_data, $headers);
-        
-        if ($response['success']) {
-            return [
-                'success' => true,
-                'response' => $response['data']
-            ];
-        } else {
+
+        if (!$response['success']) {
             return [
                 'success' => false,
                 'error' => $response['error']
             ];
         }
+
+        $decoded_body = [];
+        if (isset($response['decoded_body']) && is_array($response['decoded_body'])) {
+            $decoded_body = $response['decoded_body'];
+        } elseif (isset($response['data']) && is_array($response['data'])) {
+            $decoded_body = $response['data'];
+        }
+
+        $partial_failure_data = $this->extract_partial_failure_errors($decoded_body['partialFailureError'] ?? null);
+        $indexed_errors = $partial_failure_data['indexed'];
+        $general_errors = $partial_failure_data['general'];
+
+        $failed_errors = [];
+        foreach ($indexed_errors as $index => $messages) {
+            if (!array_key_exists($index, $formatted_conversion_map)) {
+                continue;
+            }
+
+            $conversion = $formatted_conversion_map[$index];
+            if (!isset($conversion['id'])) {
+                continue;
+            }
+
+            $message_list = array_values(array_filter(array_map('strval', (array) $messages)));
+            if (empty($message_list)) {
+                $message_list = ['Conversion upload failed due to an unknown error.'];
+            }
+
+            $failed_errors[(int) $conversion['id']] = implode(' | ', array_unique($message_list));
+        }
+
+        $results = [];
+        if (isset($decoded_body['results']) && is_array($decoded_body['results'])) {
+            $results = $decoded_body['results'];
+        }
+
+        $uploaded_ids = [];
+        foreach ($results as $index => $result) {
+            if (!array_key_exists($index, $formatted_conversion_map)) {
+                continue;
+            }
+
+            if (array_key_exists($index, $indexed_errors)) {
+                continue;
+            }
+
+            if ($result === null) {
+                continue;
+            }
+
+            if (!isset($formatted_conversion_map[$index]['id'])) {
+                continue;
+            }
+
+            $uploaded_ids[] = (int) $formatted_conversion_map[$index]['id'];
+        }
+
+        $uploaded_ids = array_values(array_unique($uploaded_ids));
+
+        $included_ids = [];
+        foreach ($formatted_conversion_map as $conversion) {
+            if (isset($conversion['id'])) {
+                $included_ids[] = (int) $conversion['id'];
+            }
+        }
+
+        $failed_ids = array_map('intval', array_keys($failed_errors));
+        $pending_ids = array_values(array_diff($included_ids, $uploaded_ids, $failed_ids));
+
+        if (!empty($general_errors) && empty($uploaded_ids) && empty($failed_errors)) {
+            $pending_ids = $included_ids;
+        }
+
+        return [
+            'success' => true,
+            'response' => $decoded_body,
+            'uploaded_ids' => $uploaded_ids,
+            'failed_errors' => $failed_errors,
+            'pending_ids' => $pending_ids,
+            'general_errors' => $general_errors,
+        ];
     }
     
     /**
@@ -995,8 +1157,9 @@ class GoogleAdsEnhancedConversions {
     /**
      * Format conversions for Google Ads API
      */
-    private function format_conversions_for_api($conversions, $settings = null) {
+    private function format_conversions_for_api($conversions, $settings = null, &$conversion_map = null) {
         $formatted_conversions = [];
+        $included_conversions = [];
 
         if (!is_array($settings)) {
             $settings = get_option('hic_google_ads_enhanced_settings', []);
@@ -1097,8 +1260,13 @@ class GoogleAdsEnhancedConversions {
             }
             
             $formatted_conversions[] = $api_conversion;
+            $included_conversions[] = $conversion;
         }
-        
+
+        if (func_num_args() >= 3) {
+            $conversion_map = $included_conversions;
+        }
+
         return $formatted_conversions;
     }
     
@@ -1303,30 +1471,133 @@ class GoogleAdsEnhancedConversions {
             'body' => wp_json_encode($data),
             'timeout' => 60
         ]);
-        
+
         if (is_wp_error($response)) {
             return [
                 'success' => false,
                 'error' => $response->get_error_message()
             ];
         }
-        
+
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body = wp_remote_retrieve_body($response);
-        
+
+        $decoded_body = null;
+        if (is_string($response_body) && $response_body !== '') {
+            $decoded = json_decode($response_body, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $decoded_body = $decoded;
+            }
+        }
+
         if ($response_code >= 200 && $response_code < 300) {
             return [
                 'success' => true,
-                'data' => json_decode($response_body, true)
-            ];
-        } else {
-            return [
-                'success' => false,
-                'error' => "HTTP {$response_code}: {$response_body}"
+                'data' => $decoded_body,
+                'decoded_body' => $decoded_body,
+                'raw_body' => $response_body
             ];
         }
+
+        return [
+            'success' => false,
+            'error' => "HTTP {$response_code}: {$response_body}",
+            'decoded_body' => $decoded_body,
+            'raw_body' => $response_body
+        ];
     }
-    
+
+    /**
+     * Extract partial failure errors from a Google Ads API response.
+     */
+    private function extract_partial_failure_errors($partial_failure_error) {
+        $indexed_errors = [];
+        $general_errors = [];
+
+        if (!is_array($partial_failure_error)) {
+            return [
+                'indexed' => $indexed_errors,
+                'general' => $general_errors,
+            ];
+        }
+
+        $general_message = '';
+        if (isset($partial_failure_error['message']) && is_string($partial_failure_error['message'])) {
+            $general_message = trim($partial_failure_error['message']);
+        }
+
+        if (isset($partial_failure_error['details']) && is_array($partial_failure_error['details'])) {
+            foreach ($partial_failure_error['details'] as $detail) {
+                if (!is_array($detail) || !isset($detail['errors']) || !is_array($detail['errors'])) {
+                    continue;
+                }
+
+                foreach ($detail['errors'] as $error) {
+                    if (!is_array($error)) {
+                        continue;
+                    }
+
+                    $message = '';
+                    if (isset($error['message']) && is_string($error['message'])) {
+                        $message = trim($error['message']);
+                    } elseif ($general_message !== '') {
+                        $message = $general_message;
+                    } else {
+                        $message = 'Conversion upload failed due to an unknown error.';
+                    }
+
+                    $index = $this->extract_partial_failure_index($error['location'] ?? null);
+
+                    if ($index !== null) {
+                        if (!isset($indexed_errors[$index])) {
+                            $indexed_errors[$index] = [];
+                        }
+
+                        $indexed_errors[$index][] = $message;
+                    } else {
+                        $general_errors[] = $message;
+                    }
+                }
+            }
+        }
+
+        if (empty($indexed_errors) && empty($general_errors) && $general_message !== '') {
+            $general_errors[] = $general_message;
+        }
+
+        return [
+            'indexed' => $indexed_errors,
+            'general' => array_values(array_unique($general_errors)),
+        ];
+    }
+
+    /**
+     * Extract the conversion index reference from a partial failure error location.
+     */
+    private function extract_partial_failure_index($location) {
+        if (!is_array($location)) {
+            return null;
+        }
+
+        if (isset($location['fieldPathElements']) && is_array($location['fieldPathElements'])) {
+            foreach ($location['fieldPathElements'] as $element) {
+                if (!is_array($element)) {
+                    continue;
+                }
+
+                if (array_key_exists('index', $element)) {
+                    return (int) $element['index'];
+                }
+            }
+        }
+
+        if (array_key_exists('index', $location) && is_numeric($location['index'])) {
+            return (int) $location['index'];
+        }
+
+        return null;
+    }
+
     /**
      * Mark conversions as uploaded
      */
