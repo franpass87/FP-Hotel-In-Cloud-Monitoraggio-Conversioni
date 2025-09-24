@@ -1,0 +1,273 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: FP HIC Monitor\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-09-24 20:47+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: FP HIC make-pot.php\n"
+
+#: includes/admin/diagnostics.php:1833
+msgid "Test connettività Brevo fallito"
+msgstr ""
+
+#: includes/admin/admin-settings.php:596
+msgid "Il token protegge l'endpoint pubblico di health check. Condividilo solo con i sistemi di monitoraggio di fiducia."
+msgstr ""
+
+#: includes/admin/diagnostics.php:781
+msgid "Alcune tabelle potrebbero non essere state create."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1233
+msgid "Non hai i permessi necessari per accedere a questa pagina."
+msgstr ""
+
+#: includes/admin/diagnostics.php:900
+msgid "Errore nel recupero prenotazioni: %s"
+msgstr ""
+
+#: includes/helpers-tracking.php:11
+#: includes/helpers-tracking.php:19
+#: includes/helpers-tracking.php:95
+msgid "Dati di tracciamento HIC"
+msgstr ""
+
+#: includes/realtime-dashboard.php:235
+msgid "Conversioni"
+msgstr ""
+
+#: includes/admin/diagnostics.php:689
+#: includes/admin/diagnostics.php:717
+#: includes/admin/diagnostics.php:736
+#: includes/admin/diagnostics.php:749
+#: includes/admin/diagnostics.php:804
+#: includes/admin/diagnostics.php:889
+#: includes/admin/diagnostics.php:1038
+#: includes/admin/diagnostics.php:1059
+#: includes/admin/diagnostics.php:1116
+#: includes/admin/diagnostics.php:1163
+#: includes/admin/diagnostics.php:1205
+#: includes/admin/diagnostics.php:1739
+#: includes/admin/diagnostics.php:1762
+#: includes/admin/diagnostics.php:1816
+#: includes/admin/diagnostics.php:1855
+#: includes/admin/diagnostics.php:1910
+msgid "Nonce non valido"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1923
+msgid "Errore durante recupero statistiche: %s"
+msgstr ""
+
+#: includes/realtime-dashboard.php:236
+msgid "Revenue"
+msgstr ""
+
+#: includes/admin/diagnostics.php:837
+msgid "Tipo di data non valido. Deve essere \"checkin\", \"checkout\" o \"presence\"."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1773
+msgid "File di log non leggibile"
+msgstr ""
+
+#: includes/site-health.php:35
+msgid "La configurazione GA4 è completa."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1897
+msgid "Errore fatale durante test traffico web: %s"
+msgstr ""
+
+#: includes/site-health.php:14
+#: includes/site-health.php:42
+msgid "Configurazione GA4"
+msgstr ""
+
+#: includes/intelligent-polling-manager.php:60
+msgid "Every 5 minutes (Intelligent)"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1192
+msgid "Errore fatale durante il reset dei timestamp: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1189
+msgid "Errore durante il reset dei timestamp: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:707
+msgid "Errore fatale durante il caricamento diagnostiche: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1821
+msgid "API key Brevo mancante. Configura prima l'API key nelle impostazioni."
+msgstr ""
+
+#: includes/realtime-dashboard.php:237
+msgid "Prenotazioni"
+msgstr ""
+
+#: includes/admin/diagnostics.php:781
+msgid "Tutte le tabelle sono state create/verificate con successo."
+msgstr ""
+
+#: includes/site-health.php:19
+#: includes/site-health.php:57
+msgid "Ping Webhook"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1046
+msgid "Tracking degli invii resettato con successo. Ora puoi inviare nuovamente tutte le prenotazioni alle integrazioni."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1222
+msgid "Errore nel recupero dello stato: %s"
+msgstr ""
+
+#: includes/site-health.php:62
+msgid "Token health non configurato."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1181
+msgid "Timestamp reset completed successfully - all timestamps reset and scheduler restarted"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1840
+msgid "Test connettività Brevo completato"
+msgstr ""
+
+#: includes/intelligent-polling-manager.php:56
+msgid "Every 2 minutes (Intelligent)"
+msgstr ""
+
+#: includes/realtime-dashboard.php:234
+msgid "Nessun dato disponibile"
+msgstr ""
+
+#: includes/intelligent-polling-manager.php:68
+msgid "Every 30 minutes (Intelligent)"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1016
+msgid "Prenotazioni inviate alle integrazioni configurate"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1068
+msgid "Classe HIC_Booking_Poller non trovata"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1049
+msgid "Errore durante il reset: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:907
+msgid "Nessuna prenotazione trovata nell'API"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1150
+msgid "Errore fatale durante l'esecuzione del watchdog: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:704
+msgid "Errore durante il caricamento diagnostiche: %s"
+msgstr ""
+
+#: includes/site-health.php:74
+msgid "Webhook non raggiungibile o token non valido."
+msgstr ""
+
+#: includes/intelligent-polling-manager.php:64
+msgid "Every 15 minutes (Intelligent)"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1185
+msgid "Classe HIC_Booking_Poller non disponibile"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1147
+msgid "Errore durante l'esecuzione del watchdog: %s"
+msgstr ""
+
+#: includes/realtime-dashboard.php:233
+msgid "Errore nel caricamento dei dati"
+msgstr ""
+
+#: includes/admin/admin-settings.php:594
+msgid "Genera nuovo token"
+msgstr ""
+
+#: includes/realtime-dashboard.php:232
+msgid "Caricamento..."
+msgstr ""
+
+#: includes/admin/diagnostics.php:791
+msgid "Errore durante la creazione delle tabelle. Controlla i log per maggiori dettagli."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1138
+msgid "Watchdog check completed successfully"
+msgstr ""
+
+#: includes/admin/diagnostics.php:685
+#: includes/admin/diagnostics.php:713
+#: includes/admin/diagnostics.php:732
+#: includes/admin/diagnostics.php:745
+#: includes/admin/diagnostics.php:800
+#: includes/admin/diagnostics.php:885
+#: includes/admin/diagnostics.php:1034
+#: includes/admin/diagnostics.php:1055
+#: includes/admin/diagnostics.php:1112
+#: includes/admin/diagnostics.php:1159
+#: includes/admin/diagnostics.php:1201
+#: includes/admin/diagnostics.php:1735
+#: includes/admin/diagnostics.php:1758
+#: includes/admin/diagnostics.php:1812
+#: includes/admin/diagnostics.php:1851
+#: includes/admin/diagnostics.php:1906
+msgid "Permessi insufficienti"
+msgstr ""
+
+#: includes/admin/diagnostics.php:842
+msgid "Date di inizio e fine sono obbligatorie"
+msgstr ""
+
+#: includes/admin/diagnostics.php:312
+#: includes/admin/diagnostics.php:794
+#: includes/admin/diagnostics.php:1028
+msgid "Errore: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1103
+msgid "Errore durante l'esecuzione del polling: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:910
+msgid "Tutte le ultime 5 prenotazioni sono già state inviate. Usa il bottone \"Reset Download Tracking\" per reinviarle."
+msgstr ""
+
+#: includes/intelligent-polling-manager.php:52
+msgid "Every 1 minute (Intelligent)"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1918
+msgid "Statistiche traffico web recuperate"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1879
+msgid "Test monitoraggio traffico web completato"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1894
+msgid "Errore durante test traffico web: %s"
+msgstr ""
+
+#: includes/site-health.php:38
+msgid "GA4 non è configurato correttamente."
+msgstr ""
+
+#: includes/site-health.php:71
+msgid "Webhook risponde correttamente."
+msgstr ""
