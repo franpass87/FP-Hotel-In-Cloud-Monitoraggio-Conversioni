@@ -9,7 +9,7 @@ use function FpHic\hic_process_booking_data;
 if (!defined('ABSPATH')) exit;
 
 // Check if WP-CLI is available
-if (defined('WP_CLI') && WP_CLI) {
+if ((defined('WP_CLI') && WP_CLI) || (defined('HIC_FORCE_CLI_LOADER') && HIC_FORCE_CLI_LOADER)) {
     
     /**
      * HIC Plugin CLI Commands
@@ -350,6 +350,134 @@ if (defined('WP_CLI') && WP_CLI) {
                 WP_CLI::success('Configuration valid with warnings');
             } else {
                 WP_CLI::success('Configuration valid');
+            }
+        }
+
+        /**
+         * Execute the plugin health check and display diagnostics.
+         *
+         * ## OPTIONS
+         *
+         * [--level=<level>]
+         * : Livello di diagnostica (basic, detailed, full). Default: basic.
+         *
+         * [--format=<format>]
+         * : Formato di output (table, json). Default: table.
+         *
+         * [--details]
+         * : Mostra i dettagli completi dei controlli.
+         *
+         * [--metrics]
+         * : Includi le metriche disponibili nel report.
+         *
+         * ## EXAMPLES
+         *
+         *     wp hic health
+         *     wp hic health --level=full --details --metrics
+         *     wp hic health --format=json
+         *
+         * @param array $args       Positional arguments (unused).
+         * @param array $assoc_args Opzioni associative fornite dal CLI.
+         */
+        public function health($args, $assoc_args) {
+            if (function_exists('hic_init_health_monitor')) {
+                hic_init_health_monitor();
+            }
+
+            $monitor = function_exists('hic_get_health_monitor') ? hic_get_health_monitor() : null;
+
+            if ((!is_object($monitor) || !method_exists($monitor, 'check_health')) && class_exists('HIC_Health_Monitor')) {
+                $monitor = new HIC_Health_Monitor();
+            }
+
+            if (!is_object($monitor) || !method_exists($monitor, 'check_health')) {
+                WP_CLI::error('Health monitor not available');
+                return;
+            }
+
+            $allowed_levels = [HIC_DIAGNOSTIC_BASIC, HIC_DIAGNOSTIC_DETAILED, HIC_DIAGNOSTIC_FULL];
+            $level = isset($assoc_args['level']) ? sanitize_text_field((string) $assoc_args['level']) : HIC_DIAGNOSTIC_BASIC;
+
+            if (!in_array($level, $allowed_levels, true)) {
+                WP_CLI::warning('Livello non valido. Valori consentiti: basic, detailed, full.');
+                $level = HIC_DIAGNOSTIC_BASIC;
+            }
+
+            $format = isset($assoc_args['format']) ? strtolower(sanitize_text_field((string) $assoc_args['format'])) : 'table';
+            if (!in_array($format, ['table', 'json'], true)) {
+                WP_CLI::warning('Formato non valido. Utilizzo formato "table".');
+                $format = 'table';
+            }
+
+            $show_details = isset($assoc_args['details']) ? (bool) $assoc_args['details'] : false;
+            $show_metrics = isset($assoc_args['metrics']) ? (bool) $assoc_args['metrics'] : false;
+
+            $health_data = $monitor->check_health($level);
+
+            if ($format === 'json') {
+                WP_CLI::line(wp_json_encode($health_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                return;
+            }
+
+            $status = strtoupper((string) ($health_data['status'] ?? 'unknown'));
+            $timestamp = $health_data['timestamp'] ?? 'unknown';
+            $version = $health_data['version'] ?? (defined('HIC_PLUGIN_VERSION') ? HIC_PLUGIN_VERSION : 'unknown');
+
+            WP_CLI::log('=== HIC Health Check ===');
+            WP_CLI::log('Status: ' . $status);
+            WP_CLI::log('Timestamp: ' . $timestamp);
+            WP_CLI::log('Plugin version: ' . $version);
+
+            if (!empty($health_data['checks']) && is_array($health_data['checks'])) {
+                WP_CLI::log('');
+                WP_CLI::log('Checks:');
+
+                foreach ($health_data['checks'] as $name => $check) {
+                    $label = ucwords(str_replace(['_', '-'], ' ', (string) $name));
+                    $check_status = strtoupper((string) ($check['status'] ?? 'unknown'));
+                    $message = isset($check['message']) && is_string($check['message']) ? $check['message'] : '';
+
+                    $line = sprintf('- %s: %s', $label, $check_status);
+                    if ($message !== '') {
+                        $line .= ' - ' . $message;
+                    }
+
+                    WP_CLI::log($line);
+
+                    if ($show_details && !empty($check['details']) && is_array($check['details'])) {
+                        WP_CLI::log('  Details: ' . wp_json_encode($check['details']));
+                    }
+                }
+            }
+
+            if ($show_metrics && !empty($health_data['metrics']) && is_array($health_data['metrics'])) {
+                WP_CLI::log('');
+                WP_CLI::log('Metrics:');
+
+                foreach ($health_data['metrics'] as $metric => $value) {
+                    $metric_label = ucwords(str_replace(['_', '-'], ' ', (string) $metric));
+                    if (is_scalar($value)) {
+                        WP_CLI::log(sprintf('- %s: %s', $metric_label, (string) $value));
+                    } else {
+                        WP_CLI::log(sprintf('- %s: %s', $metric_label, wp_json_encode($value)));
+                    }
+                }
+            }
+
+            if (!empty($health_data['alerts']) && is_array($health_data['alerts'])) {
+                WP_CLI::log('');
+                WP_CLI::log('Alerts:');
+
+                foreach ($health_data['alerts'] as $alert) {
+                    if (is_string($alert)) {
+                        WP_CLI::warning('- ' . $alert);
+                        continue;
+                    }
+
+                    if (is_array($alert) && isset($alert['message']) && is_string($alert['message'])) {
+                        WP_CLI::warning('- ' . $alert['message']);
+                    }
+                }
             }
         }
 
