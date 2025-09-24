@@ -110,12 +110,52 @@ function hic_default_log_message_filter($message, $level) {
     return $message;
 }
 
-if (function_exists('add_filter')) {
-    add_filter('hic_log_message', __NAMESPACE__ . '\\hic_default_log_message_filter', 10, 2);
+function hic_is_log_filter_registered(): bool
+{
+    if (function_exists('has_filter')) {
+        return has_filter('hic_log_message', __NAMESPACE__ . '\\hic_default_log_message_filter') !== false;
+    }
+
+    if (isset($GLOBALS['hic_test_filters']['hic_log_message'])) {
+        foreach ($GLOBALS['hic_test_filters']['hic_log_message'] as $callbacks) {
+            if (!is_array($callbacks)) {
+                continue;
+            }
+
+            foreach ($callbacks as $callback) {
+                if (!is_array($callback) || !isset($callback['function'])) {
+                    continue;
+                }
+
+                if ($callback['function'] === __NAMESPACE__ . '\\hic_default_log_message_filter') {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
 }
+
+function hic_ensure_log_filter_registered(): void
+{
+    if (hic_is_log_filter_registered()) {
+        return;
+    }
+
+    if (function_exists(__NAMESPACE__ . '\\hic_safe_add_hook')) {
+        hic_safe_add_hook('filter', 'hic_log_message', __NAMESPACE__ . '\\hic_default_log_message_filter', 10, 2);
+    } elseif (function_exists('\\add_filter')) {
+        \add_filter('hic_log_message', __NAMESPACE__ . '\\hic_default_log_message_filter', 10, 2);
+    }
+}
+
+hic_ensure_log_filter_registered();
 
 function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
     static $log_manager = null;
+
+    hic_ensure_log_filter_registered();
 
     if (null === $log_manager && function_exists('\\hic_get_log_manager')) {
         $log_manager = \hic_get_log_manager();

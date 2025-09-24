@@ -26,7 +26,7 @@ function hic_register_eraser($erasers) {
  * Export tracking data associated with an email address.
  */
 function hic_export_tracking_data($email_address, $page = 1) {
-    global $wpdb;
+    $wpdb = hic_get_wpdb_instance(['get_var', 'prepare', 'get_results']);
 
     if (!$wpdb) {
         return ['data' => [], 'done' => true];
@@ -107,7 +107,7 @@ function hic_export_tracking_data($email_address, $page = 1) {
  * Erase tracking data associated with an email address.
  */
 function hic_erase_tracking_data($email_address, $page = 1) {
-    global $wpdb;
+    $wpdb = hic_get_wpdb_instance(['get_var', 'prepare', 'get_results', 'delete']);
 
     if (!$wpdb) {
         return ['items_removed' => false, 'items_retained' => false, 'messages' => [], 'done' => true];
@@ -175,7 +175,7 @@ function hic_get_tracking_ids_by_sid($sid) {
         return $cache[$sid];
     }
 
-    global $wpdb;
+    $wpdb = hic_get_wpdb_instance(['get_var', 'prepare', 'get_row']);
     if (!$wpdb) {
         hic_log('hic_get_tracking_ids_by_sid: wpdb is not available');
         return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
@@ -237,7 +237,7 @@ function hic_get_utm_params_by_sid($sid) {
         return $cache[$sid];
     }
 
-    global $wpdb;
+    $wpdb = hic_get_wpdb_instance(['get_var', 'prepare']);
     if (!$wpdb) {
         hic_log('hic_get_utm_params_by_sid: wpdb is not available');
         return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];

@@ -312,7 +312,7 @@ function hic_register_gtm_rest_routes() {
         return;
     }
 
-    register_rest_route('hic/v1', '/gtm-events', [
+    $route_args = [
         'methods'             => \WP_REST_Server::READABLE,
         'callback'            => __NAMESPACE__ . '\hic_handle_gtm_events_request',
         'permission_callback' => '__return_true',
@@ -323,7 +323,10 @@ function hic_register_gtm_rest_routes() {
                 'description'       => 'Session ID associato alla prenotazione',
             ],
         ],
-    ]);
+    ];
+
+    register_rest_route('hic/v1', '/gtm-events', $route_args);
+    \FpHic\Helpers\hic_register_rest_route_fallback('hic/v1', '/gtm-events', $route_args);
 }
 
 /**

@@ -18,19 +18,48 @@ function hic_safe_log($message, $level = null) {
     }
 }
 
+/**
+ * Retrieve the wpdb instance when available and supporting the required methods.
+ *
+ * @param string[] $required_methods
+ * @return object|null
+ */
+function hic_get_wpdb(array $required_methods = [])
+{
+    if (function_exists('FpHic\\Helpers\\hic_get_wpdb_instance')) {
+        $wpdb = \FpHic\Helpers\hic_get_wpdb_instance($required_methods);
+        if ($wpdb) {
+            return $wpdb;
+        }
+    }
+
+    global $wpdb;
+
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        return null;
+    }
+
+    foreach ($required_methods as $method) {
+        if (!method_exists($wpdb, $method)) {
+            return null;
+        }
+    }
+
+    return $wpdb;
+}
+
 /* ============ DB: tabella sid↔gclid/fbclid ============ */
 function hic_create_database_table(){
-  global $wpdb;
-  
-  // Check if wpdb is available
+  $wpdb = hic_get_wpdb(['get_charset_collate', 'get_var', 'prepare']);
+
   if (!$wpdb) {
     hic_log('hic_create_database_table: wpdb is not available');
     return false;
   }
-  
+
   $table = $wpdb->prefix . 'hic_gclids';
   $charset = $wpdb->get_charset_collate();
-  
+
   $sql = "CREATE TABLE IF NOT EXISTS $table (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     gclid        VARCHAR(255),
@@ -59,34 +88,46 @@ function hic_create_database_table(){
     KEY utm_content (utm_content(100)),
     KEY utm_term (utm_term(100))
   ) $charset;";
-  
-  require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-  
+
+  $upgrade_file = ABSPATH . 'wp-admin/includes/upgrade.php';
+  if (!function_exists('dbDelta')) {
+    if (is_readable($upgrade_file)) {
+      require_once $upgrade_file;
+    } else {
+      hic_log('hic_create_database_table: dbDelta unavailable');
+      return false;
+    }
+  }
+
+  if (!function_exists('dbDelta')) {
+    hic_log('hic_create_database_table: dbDelta function missing');
+    return false;
+  }
+
   $result = dbDelta($sql);
-  
+
   if ($result === false) {
     hic_log('hic_create_database_table: Failed to create table ' . $table);
     return false;
   }
-  
+
   // Verify table was created
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     hic_log('hic_create_database_table: Table creation verification failed for ' . $table);
     return false;
   }
-  
+
   hic_log('DB ready: '.$table);
-  
+
   // Create real-time sync state table
   return hic_create_realtime_sync_table();
 }
 
 /* ============ DB: tabella stati sync real-time per Brevo ============ */
 function hic_create_realtime_sync_table(){
-  global $wpdb;
-  
-  // Check if wpdb is available
+  $wpdb = hic_get_wpdb(['get_charset_collate', 'get_var', 'prepare']);
+
   if (!$wpdb) {
     hic_log('hic_create_realtime_sync_table: wpdb is not available');
     return false;
@@ -110,8 +151,21 @@ function hic_create_realtime_sync_table(){
     KEY first_seen_idx (first_seen)
   ) $charset;";
   
-  require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-  
+  $upgrade_file = ABSPATH . 'wp-admin/includes/upgrade.php';
+  if (!function_exists('dbDelta')) {
+    if (is_readable($upgrade_file)) {
+      require_once $upgrade_file;
+    } else {
+      hic_log('hic_create_realtime_sync_table: dbDelta unavailable');
+      return false;
+    }
+  }
+
+  if (!function_exists('dbDelta')) {
+    hic_log('hic_create_realtime_sync_table: dbDelta function missing');
+    return false;
+  }
+
   $result = dbDelta($sql);
   
   if ($result === false) {
@@ -134,9 +188,8 @@ function hic_create_realtime_sync_table(){
 
 /* ============ DB: tabella queue eventi prenotazioni ============ */
 function hic_create_booking_events_table(){
-  global $wpdb;
-  
-  // Check if wpdb is available
+  $wpdb = hic_get_wpdb(['get_charset_collate', 'get_var', 'prepare']);
+
   if (!$wpdb) {
     hic_log('hic_create_booking_events_table: wpdb is not available');
     return false;
@@ -161,8 +214,21 @@ function hic_create_booking_events_table(){
     KEY processed_idx (processed)
   ) $charset;";
   
-  require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-  
+  $upgrade_file = ABSPATH . 'wp-admin/includes/upgrade.php';
+  if (!function_exists('dbDelta')) {
+    if (is_readable($upgrade_file)) {
+      require_once $upgrade_file;
+    } else {
+      hic_log('hic_create_booking_events_table: dbDelta unavailable');
+      return false;
+    }
+  }
+
+  if (!function_exists('dbDelta')) {
+    hic_log('hic_create_booking_events_table: dbDelta function missing');
+    return false;
+  }
+
   $result = dbDelta($sql);
   
   if ($result === false) {
@@ -183,9 +249,8 @@ function hic_create_booking_events_table(){
 
 /* ============ DB: tabella richieste HTTP fallite ============ */
 function hic_create_failed_requests_table(){
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_charset_collate', 'get_var', 'prepare']);
 
-  // Check if wpdb is available
   if (!$wpdb) {
     hic_log('hic_create_failed_requests_table: wpdb is not available');
     return false;
@@ -204,7 +269,15 @@ function hic_create_failed_requests_table(){
     KEY endpoint_idx (endpoint(191))
   ) $charset;";
 
-  require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+  $upgrade_file = ABSPATH . 'wp-admin/includes/upgrade.php';
+  if (!function_exists('dbDelta')) {
+    if (is_readable($upgrade_file)) {
+      require_once $upgrade_file;
+    } else {
+      hic_log('hic_create_database_table: dbDelta unavailable');
+      return false;
+    }
+  }
 
   $result = dbDelta($sql);
 
@@ -229,7 +302,7 @@ function hic_create_failed_requests_table(){
  * This function checks and adds missing UTM columns dynamically
  */
 function hic_ensure_utm_columns_exist() {
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_var', 'prepare', 'get_results', 'query']);
 
   if (!$wpdb) {
     hic_log('hic_ensure_utm_columns_exist: wpdb is not available');
@@ -270,9 +343,8 @@ function hic_ensure_utm_columns_exist() {
 
 /* ============ DB: migrations ============ */
 function hic_maybe_upgrade_db() {
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_results', 'prepare', 'query']);
 
-  // Ensure wpdb is available
   if (!$wpdb) {
     hic_safe_log('hic_maybe_upgrade_db: wpdb is not available');
     return;
@@ -404,9 +476,8 @@ function hic_maybe_upgrade_db() {
  * @return true|WP_Error True on success, WP_Error on failure
  */
 function hic_store_tracking_id($type, $value, $existing_sid) {
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_var', 'prepare', 'update', 'insert']);
 
-  // Ensure wpdb is available
   if (!$wpdb) {
     return new \WP_Error('no_db', 'wpdb is not available');
   }
@@ -509,9 +580,8 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
 }
 /* ============ Cattura gclid/fbclid → cookie + DB ============ */
 function hic_capture_tracking_params(){
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_var', 'prepare', 'insert', 'update']);
 
-  // Check if wpdb is available
   if (!$wpdb) {
     hic_log('hic_capture_tracking_params: wpdb is not available', HIC_LOG_LEVEL_ERROR);
     return false;
@@ -702,10 +772,9 @@ function hic_is_reservation_new_for_realtime($reservation_id) {
   }
 
   $reservation_id = $normalized_reservation_id;
-  
-  global $wpdb;
-  
-  // Check if wpdb is available
+
+  $wpdb = hic_get_wpdb(['get_var', 'prepare']);
+
   if (!$wpdb) {
     hic_log('hic_is_reservation_new_for_realtime: wpdb is not available');
     return false;
@@ -749,10 +818,9 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
   }
 
   $reservation_id = $normalized_reservation_id;
-  
-  global $wpdb;
-  
-  // Check if wpdb is available
+
+  $wpdb = hic_get_wpdb(['get_var', 'prepare', 'query']);
+
   if (!$wpdb) {
     hic_log('hic_mark_reservation_new_for_realtime: wpdb is not available');
     return false;
@@ -800,7 +868,13 @@ function hic_mark_reservation_notified_to_brevo($reservation_id) {
 
   $reservation_id = $normalized_reservation_id;
 
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['update']);
+
+  if (!$wpdb) {
+    hic_log('hic_mark_reservation_notified_to_brevo: wpdb is not available');
+    return false;
+  }
+
   $table = $wpdb->prefix . 'hic_realtime_sync';
 
   $result = $wpdb->update(
@@ -838,7 +912,13 @@ function hic_mark_reservation_notification_failed($reservation_id, $error_messag
 
   $reservation_id = $normalized_reservation_id;
 
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_row', 'prepare', 'update']);
+
+  if (!$wpdb) {
+    hic_log('hic_mark_reservation_notification_failed: wpdb is not available');
+    return false;
+  }
+
   $table = $wpdb->prefix . 'hic_realtime_sync';
 
   // Get current attempt count
@@ -900,7 +980,13 @@ function hic_mark_reservation_notification_permanent_failure($reservation_id, $e
 
   $reservation_id = $normalized_reservation_id;
 
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['update']);
+
+  if (!$wpdb) {
+    hic_log('hic_mark_reservation_notification_permanent_failure: wpdb is not available');
+    return false;
+  }
+
   $table = $wpdb->prefix . 'hic_realtime_sync';
   
   $result = $wpdb->update(
@@ -923,7 +1009,13 @@ function hic_mark_reservation_notification_permanent_failure($reservation_id, $e
  * Get failed reservations that need retry
  */
 function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_minutes = 30) {
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_results', 'prepare']);
+
+  if (!$wpdb) {
+    hic_log('hic_get_failed_reservations_for_retry: wpdb is not available');
+    return array();
+  }
+
   $table = $wpdb->prefix . 'hic_realtime_sync';
 
   $retry_time = wp_date('Y-m-d H:i:s', strtotime("-{$retry_delay_minutes} minutes", current_time('timestamp')));
@@ -970,7 +1062,7 @@ function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_m
  * @return array{normalized:int,deleted:int}
  */
 function hic_reindex_realtime_sync_reservations() {
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_var', 'prepare', 'get_results', 'delete', 'query']);
 
   if (!$wpdb) {
     hic_log('hic_reindex_realtime_sync_reservations: wpdb is not available');
@@ -1205,9 +1297,8 @@ function hic_reindex_realtime_sync_reservations() {
 function hic_cleanup_old_gclids($days = 90) {
   if ($days <= 0) return 0;
 
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_var', 'prepare', 'query']);
 
-  // Check if wpdb is available
   if (!$wpdb) {
     hic_log('hic_cleanup_old_gclids: wpdb is not available');
     return false;
@@ -1244,9 +1335,8 @@ function hic_cleanup_old_gclids($days = 90) {
 function hic_cleanup_booking_events($days = 30) {
   if ($days <= 0) return 0;
 
-  global $wpdb;
+  $wpdb = hic_get_wpdb(['get_var', 'prepare', 'query']);
 
-  // Check if wpdb is available
   if (!$wpdb) {
     hic_log('hic_cleanup_booking_events: wpdb is not available');
     return false;

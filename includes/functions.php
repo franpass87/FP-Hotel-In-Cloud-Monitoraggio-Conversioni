@@ -13,6 +13,29 @@ if (!defined('ABSPATH')) {
 
 const HIC_PHONE_DEFAULT_COUNTRY = 'IT';
 
+/**
+ * Retrieve the global wpdb instance when available and supporting the required methods.
+ *
+ * @param string[] $required_methods
+ * @return object|null
+ */
+function hic_get_wpdb_instance(array $required_methods = [])
+{
+    global $wpdb;
+
+    if (!isset($wpdb) || !is_object($wpdb)) {
+        return null;
+    }
+
+    foreach ($required_methods as $method) {
+        if (!method_exists($wpdb, $method)) {
+            return null;
+        }
+    }
+
+    return $wpdb;
+}
+
 /* ================= CONFIG FUNCTIONS ================= */
 function &hic_option_cache() {
     static $cache = [];
@@ -126,6 +149,62 @@ function hic_generate_sid(): string {
     }
 
     return $sid;
+}
+
+/**
+ * Store REST route registrations in non-WordPress environments so that
+ * automated tests can introspect the registered endpoints.
+ */
+function hic_register_rest_route_fallback(string $namespace, string $route, array $args): void {
+    if (!defined('HIC_REST_API_FALLBACK')) {
+        return;
+    }
+
+    if (!isset($GLOBALS['hic_rest_route_registry']) || !is_array($GLOBALS['hic_rest_route_registry'])) {
+        $GLOBALS['hic_rest_route_registry'] = [];
+    }
+
+    $normalized_namespace = trim($namespace, '/');
+    $normalized_route = '/' . $normalized_namespace . '/' . ltrim($route, '/');
+    $normalized_route = preg_replace('#/+#', '/', $normalized_route ?? '');
+
+    $GLOBALS['hic_rest_route_registry'][$normalized_route] = [
+        'namespace' => $namespace,
+        'route'     => $route,
+        'args'      => $args,
+    ];
+}
+
+/**
+ * Retrieve the list of REST routes captured by the fallback registry.
+ *
+ * @return array<string,array<string,mixed>>
+ */
+function hic_get_registered_rest_routes(): array {
+    if (!isset($GLOBALS['hic_rest_route_registry']) || !is_array($GLOBALS['hic_rest_route_registry'])) {
+        return [];
+    }
+
+    return $GLOBALS['hic_rest_route_registry'];
+}
+
+/**
+ * Reset the fallback REST route registry.
+ */
+function hic_reset_registered_rest_routes(): void {
+    $GLOBALS['hic_rest_route_registry'] = [];
+}
+
+if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK) {
+    foreach ([
+        __DIR__ . '/api/webhook.php',
+        __DIR__ . '/health-monitor.php',
+        __DIR__ . '/integrations/gtm.php',
+    ] as $fallback_include) {
+        if (is_string($fallback_include) && file_exists($fallback_include)) {
+            require_once $fallback_include;
+        }
+    }
 }
 
 // Helper functions to get configuration values
@@ -2504,6 +2583,33 @@ function hic_get_processing_statistics() {
 
 // Global wrappers for backward compatibility
 namespace {
+
+    if (!function_exists('rest_get_server')) {
+        if (!defined('HIC_REST_API_FALLBACK')) {
+            define('HIC_REST_API_FALLBACK', true);
+        }
+
+        function rest_get_server()
+        {
+            static $server = null;
+
+            if ($server === null) {
+                $server = new class {
+                    public function get_routes(): array
+                    {
+                        return \FpHic\Helpers\hic_get_registered_rest_routes();
+                    }
+
+                    public function reset_registrations(): void
+                    {
+                        \FpHic\Helpers\hic_reset_registered_rest_routes();
+                    }
+                };
+            }
+
+            return $server;
+        }
+    }
     function hic_http_request($url, $args = array(), $suppress_failed_storage = false) { return \FpHic\Helpers\hic_http_request($url, $args, $suppress_failed_storage); }
     function hic_get_option($key, $default = '') { return \FpHic\Helpers\hic_get_option($key, $default); }
     function hic_clear_option_cache($key = null) { return \FpHic\Helpers\hic_clear_option_cache($key); }
