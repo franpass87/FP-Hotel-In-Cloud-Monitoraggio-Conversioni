@@ -28,6 +28,7 @@ final class BrevoReservationFieldsTest extends TestCase {
             'room_name' => 'Room 1',
             'offer' => 'OFF1',
             'valid' => 1,
+            'currency' => 'usd',
             'relocations' => [['from' => '2024-01-01', 'to' => '2024-01-05']]
         ];
 
@@ -44,6 +45,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('OFF1', $payload['attributes']['HIC_OFFER']);
         $this->assertSame(1, $payload['attributes']['HIC_VALID']);
         $this->assertSame(wp_json_encode($data['relocations']), $payload['attributes']['HIC_RELOCATIONS']);
+        $this->assertSame('USD', $payload['attributes']['CURRENCY']);
     }
 
     public function testReservationCreatedEventSendsFields() {
@@ -54,7 +56,7 @@ final class BrevoReservationFieldsTest extends TestCase {
             'email' => 'tag@example.com',
             'transaction_id' => 'R1',
             'original_price' => 100,
-            'currency' => 'EUR',
+            'currency' => 'eur',
             'presence' => 1,
             'unpaid_balance' => 50.5,
             'tags' => ['vip', 'promo'],
@@ -85,6 +87,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame('Rossi', $payload['properties']['guest_last_name']);
         $this->assertSame(1, $payload['properties']['valid']);
         $this->assertSame(wp_json_encode($reservation['relocations']), $payload['properties']['relocations']);
+        $this->assertSame('EUR', $payload['properties']['currency']);
     }
 
     public function testPhoneAndWhatsappSeparated() {
@@ -153,7 +156,7 @@ final class BrevoReservationFieldsTest extends TestCase {
             'email' => 'empty@example.com',
             'transaction_id' => 'E1',
             'original_price' => 10,
-            'currency' => 'EUR',
+            'currency' => 'eur',
             'tags' => []
         ];
 
@@ -164,6 +167,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertSame([], $payload['tags']);
         $this->assertArrayHasKey('tags', $payload['properties']);
         $this->assertSame('', $payload['properties']['tags']);
+        $this->assertSame('EUR', $payload['properties']['currency']);
     }
 
     public function testReservationCreatedEventSynthesizesMissingId() {
@@ -173,7 +177,7 @@ final class BrevoReservationFieldsTest extends TestCase {
         $webhook = [
             'email' => 'deterministic@example.com',
             'amount' => 120,
-            'currency' => 'EUR',
+            'currency' => 'eur',
             'date' => '2024-05-01',
         ];
 

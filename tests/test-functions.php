@@ -554,43 +554,49 @@ class HICFunctionsTest {
         global $hic_last_request;
 
         // GA4 room name + SID usage
-        $data = ['room' => 'Camera Deluxe', 'currency' => 'EUR', 'amount' => 100];
+        $data = ['room' => 'Camera Deluxe', 'currency' => 'eur', 'amount' => 100];
         $sid = 'sid123';
         \FpHic\hic_send_to_ga4($data, null, null, null, null, null, null, $sid);
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Camera Deluxe', 'GA4 should use room name');
         assert($payload['client_id'] === $sid, 'GA4 should use SID as client_id');
         assert($payload['events'][0]['params']['transaction_id'] === $sid, 'GA4 should use SID as transaction_id');
+        assert($payload['events'][0]['params']['currency'] === 'EUR', 'GA4 should normalize currency codes');
 
         // GA4 accommodation_name fallback
-        $data = ['accommodation_name' => 'Suite', 'currency' => 'EUR', 'amount' => 100];
+        $data = ['accommodation_name' => 'Suite', 'currency' => 'eur', 'amount' => 100];
         \FpHic\hic_send_to_ga4($data, null, null, null, null, null, null, $sid);
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Suite', 'GA4 should use accommodation name');
+        assert($payload['events'][0]['params']['currency'] === 'EUR', 'GA4 should keep normalized currency');
 
         // GA4 default
-        $data = ['currency' => 'EUR', 'amount' => 100];
+        $data = ['currency' => 'eur', 'amount' => 100];
         \FpHic\hic_send_to_ga4($data, null, null, null, null, null, null, $sid);
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['events'][0]['params']['items'][0]['item_name'] === 'Prenotazione', 'GA4 should default to Prenotazione');
+        assert($payload['events'][0]['params']['currency'] === 'EUR', 'GA4 should default to EUR when missing or invalid');
 
         // FB room name
-        $data = ['email' => 'user@example.com', 'room' => 'Camera Deluxe', 'currency' => 'EUR', 'amount' => 100];
+        $data = ['email' => 'user@example.com', 'room' => 'Camera Deluxe', 'currency' => 'eur', 'amount' => 100];
         \FpHic\hic_send_to_fb($data, null, null, null, null);
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['data'][0]['custom_data']['content_name'] === 'Camera Deluxe', 'FB should use room name');
+        assert($payload['data'][0]['custom_data']['currency'] === 'EUR', 'FB should normalize currency codes');
 
         // FB accommodation_name fallback
-        $data = ['email' => 'user@example.com', 'accommodation_name' => 'Suite', 'currency' => 'EUR', 'amount' => 100];
+        $data = ['email' => 'user@example.com', 'accommodation_name' => 'Suite', 'currency' => 'eur', 'amount' => 100];
         \FpHic\hic_send_to_fb($data, null, null, null, null);
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['data'][0]['custom_data']['content_name'] === 'Suite', 'FB should use accommodation name');
+        assert($payload['data'][0]['custom_data']['currency'] === 'EUR', 'FB should keep normalized currency');
 
         // FB default
-        $data = ['email' => 'user@example.com', 'currency' => 'EUR', 'amount' => 100];
+        $data = ['email' => 'user@example.com', 'currency' => 'eur', 'amount' => 100];
         \FpHic\hic_send_to_fb($data, null, null, null, null);
         $payload = json_decode($hic_last_request['args']['body'], true);
         assert($payload['data'][0]['custom_data']['content_name'] === 'Prenotazione', 'FB should default to Prenotazione');
+        assert($payload['data'][0]['custom_data']['currency'] === 'EUR', 'FB should default to EUR when missing or invalid');
 
         echo "✅ Event room name fallback tests passed\n";
     }

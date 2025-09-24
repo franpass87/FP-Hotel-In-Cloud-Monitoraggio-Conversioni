@@ -311,18 +311,85 @@ function hic_normalize_price($value) {
     }
 
     $result = floatval($normalized);
-    
+
     // Validate reasonable price range
     if ($result < 0) {
         hic_log('hic_normalize_price: Negative price detected: ' . $result . ' (original: ' . $value . ')');
         return 0.0;
     }
-    
+
     if ($result > 999999.99) {
         hic_log('hic_normalize_price: Unusually high price detected: ' . $result . ' (original: ' . $value . ')');
     }
-    
+
     return $result;
+}
+
+/**
+ * Retrieve the list of supported ISO 4217 currency codes.
+ *
+ * @return string[]
+ */
+function hic_get_iso4217_currency_codes(): array {
+    static $cache = null;
+
+    if (is_array($cache)) {
+        return $cache;
+    }
+
+    if (function_exists('get_woocommerce_currencies')) {
+        $currencies = array_keys((array) get_woocommerce_currencies());
+        $cache = array_map('strtoupper', $currencies);
+        return $cache;
+    }
+
+    $cache = [
+        'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN',
+        'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BOV',
+        'BRL', 'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHE', 'CHF',
+        'CHW', 'CLF', 'CLP', 'CNY', 'COP', 'COU', 'CRC', 'CUC', 'CUP', 'CVE',
+        'CZK', 'DJF', 'DKK', 'DOP', 'DZD', 'EGP', 'ERN', 'ETB', 'EUR', 'FJD',
+        'FKP', 'GBP', 'GEL', 'GHS', 'GIP', 'GMD', 'GNF', 'GTQ', 'GYD', 'HKD',
+        'HNL', 'HRK', 'HTG', 'HUF', 'IDR', 'ILS', 'INR', 'IQD', 'IRR', 'ISK',
+        'JMD', 'JOD', 'JPY', 'KES', 'KGS', 'KHR', 'KMF', 'KPW', 'KRW', 'KWD',
+        'KYD', 'KZT', 'LAK', 'LBP', 'LKR', 'LRD', 'LSL', 'LYD', 'MAD', 'MDL',
+        'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRU', 'MUR', 'MVR', 'MWK', 'MXN',
+        'MXV', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'OMR',
+        'PAB', 'PEN', 'PGK', 'PHP', 'PKR', 'PLN', 'PYG', 'QAR', 'RON', 'RSD',
+        'RUB', 'RWF', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP', 'SLE',
+        'SLL', 'SOS', 'SRD', 'SSP', 'STN', 'SVC', 'SYP', 'SZL', 'THB', 'TJS', 'TMT',
+        'TND', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH', 'UGX', 'USD', 'USN',
+        'UYI', 'UYU', 'UYW', 'UZS', 'VED', 'VES', 'VND', 'VUV', 'WST', 'XAF',
+        'XAG', 'XAU', 'XBA', 'XBB', 'XBC', 'XBD', 'XCD', 'XDR', 'XOF', 'XPD',
+        'XPF', 'XPT', 'XSU', 'XTS', 'XUA', 'XXX', 'YER', 'ZAR', 'ZMW', 'ZWL',
+    ];
+
+    return $cache;
+}
+
+/**
+ * Normalize a currency code to a valid ISO 4217 representation.
+ *
+ * @param mixed $currency Raw currency input.
+ */
+function hic_normalize_currency_code($currency): string {
+    $fallback = 'EUR';
+
+    if (!is_scalar($currency)) {
+        return $fallback;
+    }
+
+    $normalized = strtoupper(sanitize_text_field((string) $currency));
+
+    if ($normalized === '' || !preg_match('/^[A-Z]{3}$/', $normalized)) {
+        return $fallback;
+    }
+
+    if (!in_array($normalized, hic_get_iso4217_currency_codes(), true)) {
+        return $fallback;
+    }
+
+    return $normalized;
 }
 
 function hic_is_valid_email($email) {

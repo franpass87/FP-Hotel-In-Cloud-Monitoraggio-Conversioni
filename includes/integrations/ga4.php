@@ -225,9 +225,11 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $g
     $client_id = $transaction_id;
   }
 
+  $currency_code = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
+
   $params = [
     'transaction_id' => $transaction_id,
-    'currency'       => sanitize_text_field($data['currency'] ?? 'EUR'),
+    'currency'       => $currency_code,
     'value'          => $amount,
     'items'          => [[
       'item_name' => sanitize_text_field($data['room'] ?? $data['accommodation_name'] ?? 'Prenotazione'),
@@ -349,9 +351,11 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
     $client_id = $transaction_id;
   }
 
+  $currency_code = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
+
   $params = [
     'transaction_id' => $transaction_id,
-    'currency'       => sanitize_text_field($data['currency'] ?? 'EUR'),
+    'currency'       => $currency_code,
     'value'          => $amount,
     'items'          => [[
       'item_name' => sanitize_text_field($data['room'] ?? $data['accommodation_name'] ?? 'Prenotazione'),
@@ -483,7 +487,7 @@ function hic_dispatch_ga4_reservation($data, $sid = '') {
   }
 
   $value = Helpers\hic_normalize_price($data['value']);
-  $currency = sanitize_text_field($data['currency']);
+  $currency = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
 
   // Get tracking IDs for bucket normalization if available
   $gclid = '';
