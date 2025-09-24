@@ -55,9 +55,19 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gb
   if (!empty($data['last_name']) && is_string($data['last_name'])) {
     $user_data['ln'] = [ hash('sha256', strtolower(trim($data['last_name']))) ];
   }
-  $phone = $data['whatsapp'] ?? $data['phone'] ?? '';
-  if (!empty($phone) && is_string($phone)) {
-    $user_data['ph'] = [ hash('sha256', preg_replace('/\D/','', $phone)) ];
+  $phone_source = $data['whatsapp'] ?? $data['phone'] ?? '';
+  if ($phone_source !== '' && is_scalar($phone_source)) {
+    $phone_context = [
+      'customer_data' => $data,
+      'booking_data'  => $data,
+    ];
+    if (!empty($data['sid']) && is_scalar($data['sid'])) {
+      $phone_context['sid'] = (string) $data['sid'];
+    }
+    $phone_hash = Helpers\hic_hash_normalized_phone($phone_source, $phone_context);
+    if ($phone_hash !== null) {
+      $user_data['ph'] = [$phone_hash];
+    }
   }
 
   if ($fbclid) {
@@ -206,9 +216,19 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '',
   if (!empty($data['last_name']) && is_string($data['last_name'])) {
     $user_data['ln'] = [ hash('sha256', strtolower(trim($data['last_name']))) ];
   }
-  $phone = $data['whatsapp'] ?? $data['phone'] ?? '';
-  if (!empty($phone) && is_string($phone)) {
-    $user_data['ph'] = [ hash('sha256', preg_replace('/\D/','', $phone)) ];
+  $phone_source = $data['whatsapp'] ?? $data['phone'] ?? '';
+  if ($phone_source !== '' && is_scalar($phone_source)) {
+    $phone_context = [
+      'customer_data' => $data,
+      'booking_data'  => $data,
+    ];
+    if (!empty($data['sid']) && is_scalar($data['sid'])) {
+      $phone_context['sid'] = (string) $data['sid'];
+    }
+    $phone_hash = Helpers\hic_hash_normalized_phone($phone_source, $phone_context);
+    if ($phone_hash !== null) {
+      $user_data['ph'] = [$phone_hash];
+    }
   }
 
   if ($fbclid) {
@@ -374,8 +394,22 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
   if (!empty($data['guest_last_name']) && is_string($data['guest_last_name'])) {
     $user_data['ln'] = [hash('sha256', strtolower(trim($data['guest_last_name'])))];
   }
-  if (!empty($data['phone']) && is_string($data['phone'])) {
-    $user_data['ph'] = [hash('sha256', preg_replace('/\D/', '', $data['phone']))];
+  if (!empty($data['phone']) && is_scalar($data['phone'])) {
+    $booking_context = is_array($data) ? $data : [];
+    if ($sid !== '') {
+      $booking_context['sid'] = $sid;
+    }
+    $phone_context = [
+      'customer_data' => $data,
+      'booking_data'  => $booking_context,
+    ];
+    if ($sid !== '') {
+      $phone_context['sid'] = $sid;
+    }
+    $phone_hash = Helpers\hic_hash_normalized_phone($data['phone'], $phone_context);
+    if ($phone_hash !== null) {
+      $user_data['ph'] = [$phone_hash];
+    }
   }
   if ($fbclid) {
     $fbc = 'fb.1.' . current_time('timestamp', true) . '.' . $fbclid;

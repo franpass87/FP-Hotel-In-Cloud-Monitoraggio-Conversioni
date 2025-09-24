@@ -3,6 +3,10 @@
  * Unit Tests for HIC Core Functions
  */
 
+if (file_exists(dirname(__DIR__) . '/vendor/autoload.php')) {
+    require_once dirname(__DIR__) . '/vendor/autoload.php';
+}
+
 require_once __DIR__ . '/bootstrap.php';
 
 use FpHic\Helpers as Helpers;
@@ -380,6 +384,58 @@ class HICFunctionsTest {
         echo "✅ Brevo reservation_created phone language override tests passed\n";
     }
 
+    public function testFacebookPhoneHashNormalization() {
+        if (!function_exists('home_url')) { function home_url() { return 'https://example.com'; } }
+        if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
+
+        update_option('hic_fb_pixel_id', 'FBTEST');
+        update_option('hic_fb_access_token', 'FBTOKEN');
+        Helpers\hic_clear_option_cache();
+
+        global $hic_last_request;
+
+        // Italian mobile number without explicit prefix
+        $hic_last_request = null;
+        $mobile = [
+            'email' => 'mobile@example.com',
+            'phone' => '333 123 4567',
+            'country' => 'IT',
+            'sid' => 'sid-mobile'
+        ];
+        \FpHic\hic_send_to_fb($mobile, null, null);
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        $mobile_hash = $payload['data'][0]['user_data']['ph'][0] ?? '';
+        assert($mobile_hash === hash('sha256', '+393331234567'), 'Italian mobile phone should include +39 prefix before hashing');
+
+        // Italian landline retaining the trunk zero
+        $hic_last_request = null;
+        $landline = [
+            'email' => 'landline@example.com',
+            'phone' => '031 234567',
+            'country' => 'IT',
+            'sid' => 'sid-landline'
+        ];
+        \FpHic\hic_send_to_fb($landline, null, null);
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        $landline_hash = $payload['data'][0]['user_data']['ph'][0] ?? '';
+        assert($landline_hash === hash('sha256', '+39031234567'), 'Italian landline should retain leading zero in E.164 hash');
+
+        // Foreign number with explicit prefix
+        $hic_last_request = null;
+        $uk = [
+            'email' => 'uk@example.com',
+            'phone' => '+44 20 7946 0958',
+            'country' => 'GB',
+            'sid' => 'sid-uk'
+        ];
+        \FpHic\hic_send_to_fb($uk, null, null);
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        $uk_hash = $payload['data'][0]['user_data']['ph'][0] ?? '';
+        assert($uk_hash === hash('sha256', '+442079460958'), 'Foreign phone should keep its country prefix when hashed');
+
+        echo "✅ Facebook phone hash normalization tests passed\n";
+    }
+
     public function testGa4TransactionIdFallbackIsStable() {
         if (!function_exists('home_url')) { function home_url() { return 'https://example.com'; } }
         if (!function_exists('wp_generate_uuid4')) { function wp_generate_uuid4() { return 'uuid-4'; } }
@@ -531,7 +587,16 @@ class HICFunctionsTest {
 }
 
 // Run tests if called directly
-if (basename(__FILE__) === basename($_SERVER['SCRIPT_NAME'])) {
+$script_filename = $_SERVER['SCRIPT_FILENAME'] ?? null;
+$should_run = false;
+
+if (is_string($script_filename) && $script_filename !== '') {
+    $should_run = realpath(__FILE__) === realpath($script_filename);
+} else {
+    $should_run = basename(__FILE__) === basename($_SERVER['SCRIPT_NAME'] ?? '');
+}
+
+if ($should_run) {
     $test = new HICFunctionsTest();
     $test->runAll();
 }
