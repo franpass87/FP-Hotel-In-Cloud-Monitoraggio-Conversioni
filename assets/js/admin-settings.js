@@ -81,4 +81,36 @@ jQuery(function($){
             resultDiv.html('<div style="color: red;">Errore nella richiesta: ' + error + '</div>');
         });
     });
+
+    $('#hic-generate-health-token').on('click', function(){
+        var $button = $(this);
+        var $input = $('#hic_health_token');
+        var $status = $('#hic-health-token-status');
+
+        $button.prop('disabled', true);
+        $status.text('Generazione token in corso...');
+
+        var data = {
+            action: 'hic_generate_health_token',
+            nonce: hicAdminSettings.health_nonce
+        };
+
+        $.post(ajaxurl, data, function(response){
+            var message = 'Impossibile generare un nuovo token.';
+            if (response && response.success && response.data) {
+                if (response.data.token) {
+                    $input.val(response.data.token);
+                }
+                message = response.data.message || 'Nuovo token generato. Ricorda di salvare le impostazioni.';
+            } else if (response && response.data && response.data.message) {
+                message = response.data.message;
+            }
+
+            $status.text(message);
+        }, 'json').fail(function(){
+            $status.text('Errore durante la generazione del token. Riprova.');
+        }).always(function(){
+            $button.prop('disabled', false);
+        });
+    });
 });

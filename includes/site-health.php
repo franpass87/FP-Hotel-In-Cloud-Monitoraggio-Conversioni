@@ -56,7 +56,7 @@ function hic_site_health_webhook_ping(array $result): array
 {
     $result['label'] = __('Ping Webhook', 'hotel-in-cloud');
 
-    $token = get_option('hic_health_token');
+    $token = Helpers\hic_get_health_token();
     if (empty($token)) {
         $result['status']      = 'recommended';
         $result['description'] = __('Token health non configurato.', 'hotel-in-cloud');

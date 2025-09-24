@@ -17,6 +17,9 @@ add_action('wp_ajax_hic_test_api_connection', 'hic_ajax_test_api_connection');
 // Add AJAX handler for email configuration test
 add_action('wp_ajax_hic_test_email_ajax', 'hic_ajax_test_email');
 
+// Add AJAX handler for health token generation
+add_action('wp_ajax_hic_generate_health_token', 'hic_ajax_generate_health_token');
+
 function hic_ajax_test_email() {
     // Verify nonce for security
     if (!check_ajax_referer('hic_test_email', 'nonce', false)) {
@@ -91,6 +94,36 @@ function hic_ajax_test_api_connection() {
     }
 }
 
+function hic_ajax_generate_health_token() {
+    if (!check_ajax_referer('hic_generate_health_token', 'nonce', false)) {
+        wp_send_json_error(array(
+            'message' => 'Nonce di sicurezza non valido.'
+        ));
+    }
+
+    if (!current_user_can('hic_manage')) {
+        wp_send_json_error(array(
+            'message' => 'Permessi insufficienti.'
+        ));
+    }
+
+    $token = hic_generate_health_token_value();
+
+    if ($token === '') {
+        wp_send_json_error(array(
+            'message' => 'Impossibile generare un token sicuro.'
+        ));
+    }
+
+    update_option('hic_health_token', $token);
+    \FpHic\Helpers\hic_clear_option_cache('health_token');
+
+    wp_send_json_success(array(
+        'token' => $token,
+        'message' => 'Token rigenerato con successo. Ricorda di salvare le impostazioni.'
+    ));
+}
+
 function hic_add_admin_menu() {
     add_menu_page(
         'HIC Monitoring Settings',
@@ -122,6 +155,7 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_fb_access_token', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_webhook_token', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_webhook_secret', array('sanitize_callback' => 'hic_sanitize_webhook_secret'));
+    register_setting('hic_settings', 'hic_health_token', array('sanitize_callback' => 'hic_sanitize_health_token'));
     register_setting('hic_settings', 'hic_admin_email', array(
         'sanitize_callback' => 'hic_validate_admin_email'
     ));
@@ -197,6 +231,7 @@ function hic_settings_init() {
     add_settings_field('hic_connection_type', 'Tipo Connessione', 'hic_connection_type_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_webhook_token', 'Webhook Token', 'hic_webhook_token_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_webhook_secret', 'Webhook Secret', 'hic_webhook_secret_render', 'hic_settings', 'hic_hic_section');
+    add_settings_field('hic_health_token', 'Health Check Token', 'hic_health_token_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_api_url', 'API URL', 'hic_api_url_render', 'hic_settings', 'hic_hic_section');
     // Basic Auth settings
     add_settings_field('hic_api_email', 'API Email', 'hic_api_email_render', 'hic_settings', 'hic_hic_section');
@@ -257,6 +292,7 @@ function hic_admin_enqueue_scripts($hook) {
             'ajax_url' => admin_url('admin-ajax.php'),
             'api_nonce' => wp_create_nonce('hic_test_api_nonce'),
             'email_nonce' => wp_create_nonce('hic_test_email'),
+            'health_nonce' => wp_create_nonce('hic_generate_health_token'),
         ));
     }
 
@@ -348,6 +384,68 @@ function hic_sanitize_webhook_secret($value) {
 
     // Allow hexadecimal and base64 characters plus separators used by common formats.
     return preg_replace('/[^A-Za-z0-9=+\/_-]/', '', $sanitized);
+}
+
+function hic_sanitize_health_token($value) {
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $sanitized = trim($value);
+
+    if ($sanitized === '') {
+        return '';
+    }
+
+    $sanitized = preg_replace('/[^A-Za-z0-9_-]/', '', $sanitized);
+    if ($sanitized === null) {
+        $sanitized = '';
+    }
+
+    if ($sanitized === '') {
+        return '';
+    }
+
+    if (strlen($sanitized) > 128) {
+        $sanitized = substr($sanitized, 0, 128);
+    }
+
+    if (strlen($sanitized) < 24) {
+        add_settings_error(
+            'hic_health_token',
+            'health_token_short',
+            'Il token di health check deve contenere almeno 24 caratteri alfanumerici.',
+            'error'
+        );
+
+        return \FpHic\Helpers\hic_get_health_token();
+    }
+
+    return $sanitized;
+}
+
+function hic_generate_health_token_value($length = 48) {
+    $length = (int) $length;
+    if ($length < 24) {
+        $length = 24;
+    }
+    if ($length > 128) {
+        $length = 128;
+    }
+
+    if (function_exists('wp_generate_password')) {
+        $token = wp_generate_password($length, false, false);
+        return hic_sanitize_health_token($token);
+    }
+
+    try {
+        $bytes = random_bytes((int) ceil($length / 2));
+        $token = substr(bin2hex($bytes), 0, $length);
+    } catch (\Exception $e) {
+        $token = substr(hash('sha256', uniqid('', true)), 0, $length);
+    }
+
+    return hic_sanitize_health_token($token);
 }
 
 // Render functions for settings fields
@@ -486,6 +584,17 @@ function hic_webhook_secret_render() {
     echo 'Chiave condivisa usata per validare la firma HMAC del webhook (<code>' . esc_html($header_name) . '</code>). ';
     echo 'Rigenera questo valore in caso di compromissione.';
     echo '</p>';
+}
+
+function hic_health_token_render() {
+    $token = \FpHic\Helpers\hic_get_health_token();
+
+    echo '<div class="hic-health-token-control">';
+    echo '<input type="text" name="hic_health_token" id="hic_health_token" value="' . esc_attr($token) . '" class="regular-text" autocomplete="off" />';
+    echo '<button type="button" class="button" id="hic-generate-health-token">' . esc_html__('Genera nuovo token', 'hotel-in-cloud') . '</button>';
+    echo '</div>';
+    echo '<p class="description">' . esc_html__('Il token protegge l\'endpoint pubblico di health check. Condividilo solo con i sistemi di monitoraggio di fiducia.', 'hotel-in-cloud') . '</p>';
+    echo '<p id="hic-health-token-status" class="description"></p>';
 }
 
 function hic_api_url_render() {
