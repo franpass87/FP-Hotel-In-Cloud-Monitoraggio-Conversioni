@@ -847,20 +847,26 @@ class HIC_Booking_Poller {
      */
     public function execute_continuous_polling() {
         hic_log("Scheduler: Executing continuous polling (30-second interval)");
-        
+
         // CRITICAL FIX: Self-healing check at the start of each execution
         $this->perform_self_healing_check();
-        
-        $result = false;
+
+        $result = null;
+        $success = false;
+
         try {
             if (function_exists('\FpHic\hic_api_poll_bookings_continuous')) {
                 $result = \FpHic\hic_api_poll_bookings_continuous();
             } elseif (function_exists('\FpHic\hic_api_poll_bookings')) {
                 // Fallback to existing function if new one doesn't exist yet
                 $result = \FpHic\hic_api_poll_bookings();
-            } else {
-                $result = null;
             }
+
+            if ($result === false || $result === null) {
+                // Explicit skip or no-op. Do not update timestamps.
+                return $result;
+            }
+
             if (is_wp_error($result)) {
                 $error_message = $result->get_error_message();
                 $error_code    = $result->get_error_code();
@@ -900,14 +906,20 @@ class HIC_Booking_Poller {
 
                 hic_log('Continuous polling error: ' . $error_message, HIC_LOG_LEVEL_ERROR);
                 $this->increment_failure_counter('hic_continuous_poll_failures');
+            } else {
+                $success = true;
             }
         } catch (\Throwable $e) {
             hic_log('Continuous polling error: ' . $e->getMessage(), HIC_LOG_LEVEL_ERROR);
             $this->increment_failure_counter('hic_continuous_poll_failures');
+            return $result;
         } finally {
-            update_option('hic_last_continuous_poll', time(), false);
-            \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
+            if ($success) {
+                update_option('hic_last_continuous_poll', time(), false);
+                \FpHic\Helpers\hic_clear_option_cache('hic_last_continuous_poll');
+            }
         }
+
         return $result;
     }
     

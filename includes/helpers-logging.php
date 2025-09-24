@@ -157,6 +157,22 @@ function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
 
     hic_ensure_log_filter_registered();
 
+    if ($log_manager instanceof \HIC_Log_Manager) {
+        $current_log_file = hic_get_log_file();
+        if (is_string($current_log_file) && $current_log_file !== ''
+            && $log_manager->get_log_file_path() !== $current_log_file
+        ) {
+            unset($GLOBALS['hic_log_manager']);
+            $log_manager = null;
+        }
+    }
+
+    if (!isset($GLOBALS['hic_log_manager'])) {
+        $log_manager = null;
+    } elseif ($log_manager !== $GLOBALS['hic_log_manager']) {
+        $log_manager = $GLOBALS['hic_log_manager'];
+    }
+
     if (null === $log_manager && function_exists('\\hic_get_log_manager')) {
         $log_manager = \hic_get_log_manager();
     }

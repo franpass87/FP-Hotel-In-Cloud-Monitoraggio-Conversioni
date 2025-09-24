@@ -12,31 +12,44 @@ if (!defined('ABSPATH')) exit;
 /* Configura in Hotel in Cloud:
    https://www.villadianella.it/wp-json/hic/v1/conversion?token=hic2025ga4
 */
-add_action('rest_api_init', function () {
-  // Registra webhook se siamo in modalità webhook O hybrid
-  if (in_array(hic_get_connection_type(), ['webhook', 'hybrid'])) {
-    $route_args = [
-      'methods'             => 'POST',
-      'callback'            => 'hic_webhook_handler',
-      'permission_callback' => '__return_true',
-      'args'                => [
-        'token' => [
-          'required'          => true,
-          'sanitize_callback' => 'sanitize_text_field',
-          'description'       => 'Token di sicurezza per autenticare la richiesta',
-        ],
-        'email' => [
-          'required'          => false,
-          'sanitize_callback' => 'sanitize_email',
-          'description'       => 'Email del cliente associata alla prenotazione',
-        ],
-        ],
-    ];
 
-    register_rest_route('hic/v1', '/conversion', $route_args);
-    \FpHic\Helpers\hic_register_rest_route_fallback('hic/v1', '/conversion', $route_args);
+if (!function_exists('hic_get_webhook_route_args')) {
+function hic_get_webhook_route_args(): array {
+  return [
+    'methods'             => 'POST',
+    'callback'            => 'hic_webhook_handler',
+    'permission_callback' => '__return_true',
+    'args'                => [
+      'token' => [
+        'required'          => true,
+        'sanitize_callback' => 'sanitize_text_field',
+        'description'       => 'Token di sicurezza per autenticare la richiesta',
+      ],
+      'email' => [
+        'required'          => false,
+        'sanitize_callback' => 'sanitize_email',
+        'description'       => 'Email del cliente associata alla prenotazione',
+      ],
+    ],
+  ];
+}
+}
+
+$hic_register_webhook_route = static function (): void {
+  if (!in_array(hic_get_connection_type(), ['webhook', 'hybrid'], true)) {
+    return;
   }
-});
+
+  $route_args = hic_get_webhook_route_args();
+  register_rest_route('hic/v1', '/conversion', $route_args);
+  \FpHic\Helpers\hic_register_rest_route_fallback('hic/v1', '/conversion', $route_args);
+};
+
+add_action('rest_api_init', $hic_register_webhook_route);
+
+if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK && function_exists('get_option')) {
+  $hic_register_webhook_route();
+}
 
 function hic_webhook_handler(WP_REST_Request $request) {
   // Validate token
