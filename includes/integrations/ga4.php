@@ -167,7 +167,20 @@ function hic_ga4_resolve_transaction_id(array $data, $sid = ''): string {
     return 'hic_tx_' . $hash;
   }
 
-  return 'hic_tx_' . substr(hash('sha256', 'hic_ga4_fallback'), 0, 32);
+  $serialized_payload = function_exists('maybe_serialize')
+    ? maybe_serialize($normalized_payload)
+    : serialize($normalized_payload);
+
+  if (is_string($serialized_payload) && $serialized_payload !== '') {
+    $hash = substr(hash('sha256', $serialized_payload), 0, 32);
+    $fallback = 'hic_tx_' . $hash;
+
+    // The prefix and hexadecimal digest survive sanitize_text_field(), so this cannot become empty.
+    return sanitize_text_field($fallback);
+  }
+
+  $fallback_hash = substr(hash('sha256', 'hic_ga4_fallback'), 0, 32);
+  return sanitize_text_field('hic_tx_' . $fallback_hash);
 }
 
 /* ============ GA4 (purchase + bucket) ============ */

@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__ . '/../includes/api/webhook.php';
 require_once __DIR__ . '/../includes/api/polling.php';
 require_once __DIR__ . '/../includes/input-validator.php';
+require_once __DIR__ . '/../includes/integrations/ga4.php';
 
 if (!class_exists('WP_REST_Response')) {
     class WP_REST_Response {
@@ -568,6 +569,37 @@ final class ReservationCodeDeduplicationTest extends TestCase
         delete_option('hic_integration_retry_queue');
         delete_option('hic_integration_retry_queue_normalized');
         Helpers\hic_clear_option_cache('hic_integration_retry_queue');
+    }
+
+    public function test_ga4_transaction_id_fallback_serializes_unencodable_payload(): void
+    {
+        $basePayload = [
+            'details' => [
+                'guests' => 2,
+            ],
+            'meta' => [
+                'source' => 'test-suite',
+                'total' => NAN,
+            ],
+        ];
+
+        $firstEvent = $basePayload;
+        $firstEvent['details']['trace'] = 'first-attempt';
+
+        $secondEvent = $basePayload;
+        $secondEvent['details']['trace'] = 'second-attempt';
+
+        $firstAttempt = \FpHic\hic_ga4_resolve_transaction_id($firstEvent);
+        $firstRetry = \FpHic\hic_ga4_resolve_transaction_id($firstEvent);
+        $secondAttempt = \FpHic\hic_ga4_resolve_transaction_id($secondEvent);
+        $secondRetry = \FpHic\hic_ga4_resolve_transaction_id($secondEvent);
+
+        $this->assertSame($firstAttempt, $firstRetry, 'Fallback hash must be stable for identical payloads.');
+        $this->assertSame($secondAttempt, $secondRetry, 'Fallback hash must be stable for identical payloads.');
+        $this->assertNotSame($firstAttempt, $secondAttempt, 'Distinct payloads must yield unique fallback hashes.');
+
+        $this->assertStringStartsWith('hic_tx_', $firstAttempt);
+        $this->assertStringStartsWith('hic_tx_', $secondAttempt);
     }
 
     /**
