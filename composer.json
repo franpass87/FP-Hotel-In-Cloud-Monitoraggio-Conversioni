@@ -42,7 +42,8 @@
         ],
         "quality:fix": [
             "@lint:fix"
-        ]
+        ],
+        "i18n:pot": "php tools/make-pot.php"
     },
     "archive": {
         "exclude": [
