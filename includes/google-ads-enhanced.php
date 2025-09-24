@@ -917,17 +917,36 @@ class GoogleAdsEnhancedConversions {
             throw new \Exception('Google Ads credentials not properly configured');
         }
         
+        try {
+            $formatted_conversions = $this->format_conversions_for_api($conversions, $settings);
+        } catch (\RuntimeException $exception) {
+            return [
+                'success' => false,
+                'error' => $exception->getMessage()
+            ];
+        }
+
+        $customer_id = $this->resolve_google_ads_customer_id($settings);
+
+        if ($customer_id === '') {
+            $message = 'Missing Google Ads customer ID while preparing conversions for API upload.';
+            $this->log($message);
+            return [
+                'success' => false,
+                'error' => $message
+            ];
+        }
+
         $access_token = $this->get_google_ads_access_token();
-        
+
         if (!$access_token) {
             throw new \Exception('Failed to obtain Google Ads access token');
         }
-        
-        $customer_id = str_replace('-', '', $settings['customer_id']);
+
         $url = self::GOOGLE_ADS_API_ENDPOINT . "/{$customer_id}/conversionUploads:uploadClickConversions";
-        
+
         $request_data = [
-            'conversions' => $this->format_conversions_for_api($conversions, $settings),
+            'conversions' => $formatted_conversions,
             'partialFailureEnabled' => true
         ];
         
@@ -954,17 +973,12 @@ class GoogleAdsEnhancedConversions {
     }
     
     /**
-     * Format conversions for Google Ads API
+     * Normalize Google Ads customer ID from settings or legacy configuration.
      */
-    private function format_conversions_for_api($conversions, $settings = null) {
-        $formatted_conversions = [];
-
-        if (!is_array($settings)) {
-            $settings = get_option('hic_google_ads_enhanced_settings', []);
-        }
-
+    private function resolve_google_ads_customer_id($settings) {
         $customer_id = '';
-        if (isset($settings['customer_id']) && is_scalar($settings['customer_id'])) {
+
+        if (is_array($settings) && isset($settings['customer_id']) && is_scalar($settings['customer_id'])) {
             $customer_id = trim(str_replace('-', '', (string) $settings['customer_id']));
         }
 
@@ -975,8 +989,25 @@ class GoogleAdsEnhancedConversions {
             }
         }
 
+        return $customer_id;
+    }
+
+    /**
+     * Format conversions for Google Ads API
+     */
+    private function format_conversions_for_api($conversions, $settings = null) {
+        $formatted_conversions = [];
+
+        if (!is_array($settings)) {
+            $settings = get_option('hic_google_ads_enhanced_settings', []);
+        }
+
+        $customer_id = $this->resolve_google_ads_customer_id($settings);
+
         if ($customer_id === '') {
-            $this->log('Missing Google Ads customer ID while formatting conversions for API upload.');
+            $message = 'Missing Google Ads customer ID while formatting conversions for API upload.';
+            $this->log($message);
+            throw new \RuntimeException($message);
         }
 
         foreach ($conversions as $conversion) {

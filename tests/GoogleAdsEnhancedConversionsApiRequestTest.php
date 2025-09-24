@@ -213,6 +213,57 @@ namespace {
             $this->assertEquals(250.75, $payload['conversions'][0]['conversionValue']);
         }
 
+        public function test_upload_marks_batch_as_failed_when_customer_id_missing(): void
+        {
+            global $hic_test_google_ads_requests, $hic_test_logged_messages;
+
+            update_option('hic_google_ads_enhanced_enabled', true);
+            update_option('hic_google_ads_enhanced_settings', [
+                'customer_id' => '   ',
+                'developer_token' => 'developer-token',
+                'client_id' => 'client-id',
+                'client_secret' => 'client-secret',
+                'refresh_token' => 'refresh-token',
+                'conversion_action_id' => '987654321',
+            ]);
+            update_option('timezone_string', 'UTC');
+
+            $conversion = [
+                'id' => 3,
+                'gclid' => 'gclid-missing-id',
+                'conversion_action_id' => '987654321',
+                'created_at' => '2024-01-11 16:00:00',
+                'conversion_value' => 100.0,
+            ];
+
+            $enhanced = new GoogleAdsEnhancedConversions();
+
+            $method = new \ReflectionMethod($enhanced, 'upload_enhanced_conversions_to_google_ads');
+            $method->setAccessible(true);
+            $result = $method->invoke($enhanced, [$conversion]);
+
+            $this->assertFalse($result['success']);
+            $this->assertSame(
+                'Missing Google Ads customer ID while formatting conversions for API upload.',
+                $result['error']
+            );
+            $this->assertSame(
+                [],
+                $hic_test_google_ads_requests,
+                'No Google Ads API calls should be performed when the customer ID is missing.'
+            );
+            $this->assertNotEmpty(
+                $hic_test_logged_messages,
+                'Missing customer ID should be logged for troubleshooting.'
+            );
+            $last_message = end($hic_test_logged_messages);
+            $this->assertIsString($last_message);
+            $this->assertStringContainsString(
+                'Missing Google Ads customer ID while formatting conversions for API upload.',
+                $last_message
+            );
+        }
+
         public function test_get_google_ads_access_token_aborts_when_credentials_missing(): void
         {
             global $hic_test_google_ads_requests;
@@ -422,6 +473,57 @@ namespace {
             $this->assertIsString($last_message);
             $this->assertStringContainsString('Missing or invalid conversion currency', $last_message);
             $this->assertStringContainsString('defaulting to EUR', $last_message);
+        }
+
+        public function test_format_conversions_for_api_throws_when_customer_id_missing(): void
+        {
+            global $hic_test_logged_messages;
+
+            update_option('hic_google_ads_enhanced_enabled', true);
+            update_option('hic_google_ads_enhanced_settings', [
+                'customer_id' => '   ',
+                'developer_token' => 'developer-token',
+                'client_id' => 'client-id',
+                'client_secret' => 'client-secret',
+                'refresh_token' => 'refresh-token',
+                'conversion_action_id' => 'fallback-id',
+            ]);
+
+            $enhanced = new GoogleAdsEnhancedConversions();
+
+            $format_conversions = new \ReflectionMethod($enhanced, 'format_conversions_for_api');
+            $format_conversions->setAccessible(true);
+
+            $conversions = [
+                [
+                    'id' => 42,
+                    'gclid' => 'missing-customer-id',
+                    'conversion_action_id' => '123456789',
+                    'created_at' => '2024-01-12 09:00:00',
+                    'conversion_value' => 120.0,
+                ],
+            ];
+
+            try {
+                $format_conversions->invoke($enhanced, $conversions);
+                $this->fail('Expected RuntimeException when the Google Ads customer ID is missing.');
+            } catch (\RuntimeException $exception) {
+                $this->assertSame(
+                    'Missing Google Ads customer ID while formatting conversions for API upload.',
+                    $exception->getMessage()
+                );
+            }
+
+            $this->assertNotEmpty(
+                $hic_test_logged_messages,
+                'An error log should be recorded when the customer ID is missing.'
+            );
+            $last_message = end($hic_test_logged_messages);
+            $this->assertIsString($last_message);
+            $this->assertStringContainsString(
+                'Missing Google Ads customer ID while formatting conversions for API upload.',
+                $last_message
+            );
         }
 
         public function test_phone_hash_uses_fallback_country_for_italian_landline(): void
