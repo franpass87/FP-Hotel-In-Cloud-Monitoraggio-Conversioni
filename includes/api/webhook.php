@@ -357,31 +357,11 @@ function hic_webhook_handler(WP_REST_Request $request) {
  * @return true|WP_Error
  */
 function hic_validate_webhook_payload($payload) {
-  if (!is_array($payload)) {
-    return new \WP_Error('invalid_payload', 'Payload non valido', ['status' => 400]);
-  }
+  $validation = \FpHic\HIC_Input_Validator::validate_webhook_payload($payload);
 
-  // Email validation (optional field)
-  if (array_key_exists('email', $payload)) {
-    $email_value = $payload['email'];
-
-    if (is_string($email_value)) {
-      $email_value = trim($email_value);
-    }
-
-    if ($email_value !== '' && $email_value !== null) {
-      if (!is_scalar($email_value)) {
-        hic_log('Webhook payload: email non valida');
-        return new \WP_Error('invalid_email', 'Campo email non valido', ['status' => 400]);
-      }
-
-      $sanitized_email = sanitize_email((string) $email_value);
-
-      if ($sanitized_email === '' || !hic_is_valid_email($sanitized_email)) {
-        hic_log('Webhook payload: email non valida');
-        return new \WP_Error('invalid_email', 'Campo email non valido', ['status' => 400]);
-      }
-    }
+  if (is_wp_error($validation)) {
+    hic_log('Webhook payload validation failed: ' . $validation->get_error_message(), HIC_LOG_LEVEL_WARNING);
+    return $validation;
   }
 
   return true;
