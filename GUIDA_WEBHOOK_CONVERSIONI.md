@@ -39,12 +39,13 @@ Il sistema funziona in questo modo:
 ### 1. Configurazione in WordPress
 
 1. **Accedi a:** WordPress Admin → Impostazioni → HIC Monitoring
-2. **Imposta Modalità:** 
+2. **Imposta Modalità:**
    - `Webhook` per solo webhook
    - `Hybrid` per webhook + API polling (CONSIGLIATO per massima affidabilità)
 3. **Configura Token:** Inserisci un token sicuro (es. `hic2025ga4_TUOSITO`)
-4. **Se modalità Hybrid:** Configura anche credenziali API (URL, email, password, property ID)
-5. **Salva configurazione**
+4. **Imposta Webhook Secret:** Genera una chiave casuale (almeno 32 caratteri) che verrà condivisa solo con Hotel in Cloud per firmare ogni chiamata.
+5. **Se modalità Hybrid:** Configura anche credenziali API (URL, email, password, property ID)
+6. **Salva configurazione**
 
 ### 2. URL Webhook per Hotel in Cloud
 
@@ -65,6 +66,7 @@ https://www.villadianella.it/wp-json/hic/v1/conversion?token=hic2025ga4
 - **URL:** `https://tuosito.com/wp-json/hic/v1/conversion?token=IL_TUO_TOKEN`
 - **Metodo:** `POST`
 - **Content-Type:** `application/json`
+- **Header di sicurezza:** `X-HIC-Signature: sha256=<firma>` dove `<firma>` è la HMAC-SHA256 del corpo JSON calcolata usando il Webhook Secret condiviso (formula: `hash_hmac('sha256', $body, $secret)`)
 - **Trigger:** Su ogni nuova prenotazione confermata
 
 ## Payload Webhook
@@ -154,9 +156,10 @@ Dopo la configurazione, testa l'endpoint:
 ```bash
 curl -X POST "https://tuosito.com/wp-json/hic/v1/conversion?token=IL_TUO_TOKEN" \
   -H "Content-Type: application/json" \
+  -H "X-HIC-Signature: sha256=FIRMA_CALCOLATA" \
   -d '{
     "email": "test@example.com",
-    "reservation_id": "TEST123", 
+    "reservation_id": "TEST123",
     "amount": 100.00,
     "currency": "EUR"
   }'

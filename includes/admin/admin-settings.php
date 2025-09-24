@@ -120,6 +120,7 @@ function hic_settings_init() {
     register_setting('hic_settings', 'hic_fb_pixel_id', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_fb_access_token', array('sanitize_callback' => 'sanitize_text_field'));
     register_setting('hic_settings', 'hic_webhook_token', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('hic_settings', 'hic_webhook_secret', array('sanitize_callback' => 'hic_sanitize_webhook_secret'));
     register_setting('hic_settings', 'hic_admin_email', array(
         'sanitize_callback' => 'hic_validate_admin_email'
     ));
@@ -194,6 +195,7 @@ function hic_settings_init() {
     // Hotel in Cloud settings
     add_settings_field('hic_connection_type', 'Tipo Connessione', 'hic_connection_type_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_webhook_token', 'Webhook Token', 'hic_webhook_token_render', 'hic_settings', 'hic_hic_section');
+    add_settings_field('hic_webhook_secret', 'Webhook Secret', 'hic_webhook_secret_render', 'hic_settings', 'hic_hic_section');
     add_settings_field('hic_api_url', 'API URL', 'hic_api_url_render', 'hic_settings', 'hic_hic_section');
     // Basic Auth settings
     add_settings_field('hic_api_email', 'API Email', 'hic_api_email_render', 'hic_settings', 'hic_hic_section');
@@ -327,6 +329,26 @@ function hic_options_page() {
     <?php
 }
 
+function hic_sanitize_webhook_secret($value) {
+    if (!is_string($value)) {
+        return '';
+    }
+
+    $sanitized = trim($value);
+
+    if ($sanitized === '') {
+        return '';
+    }
+
+    // Limit to reasonable length to avoid accidental huge values.
+    if (strlen($sanitized) > 255) {
+        $sanitized = substr($sanitized, 0, 255);
+    }
+
+    // Allow hexadecimal and base64 characters plus separators used by common formats.
+    return preg_replace('/[^A-Za-z0-9=+\/_-]/', '', $sanitized);
+}
+
 // Render functions for settings fields
 function hic_admin_email_render() {
     $current_email = \FpHic\Helpers\hic_get_admin_email();
@@ -451,6 +473,18 @@ function hic_connection_type_render() {
 function hic_webhook_token_render() {
     echo '<input type="text" name="hic_webhook_token" value="' . esc_attr(\FpHic\Helpers\hic_get_webhook_token()) . '" class="regular-text" />';
     echo '<p class="description">Token per autenticare il webhook</p>';
+}
+
+function hic_webhook_secret_render() {
+    $secret = \FpHic\Helpers\hic_get_webhook_secret();
+
+    echo '<input type="password" name="hic_webhook_secret" value="' . esc_attr($secret) . '" class="regular-text" autocomplete="off" />';
+    $header_name = defined('HIC_WEBHOOK_SIGNATURE_HEADER') ? HIC_WEBHOOK_SIGNATURE_HEADER : 'X-HIC-Signature';
+
+    echo '<p class="description">';
+    echo 'Chiave condivisa usata per validare la firma HMAC del webhook (<code>' . esc_html($header_name) . '</code>). ';
+    echo 'Rigenera questo valore in caso di compromissione.';
+    echo '</p>';
 }
 
 function hic_api_url_render() {
