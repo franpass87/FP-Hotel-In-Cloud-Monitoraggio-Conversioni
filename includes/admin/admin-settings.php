@@ -9,6 +9,7 @@ if (!defined('ABSPATH')) exit;
 add_action('admin_menu', 'hic_add_admin_menu');
 add_action('admin_init', 'hic_settings_init');
 add_action('admin_enqueue_scripts', 'hic_admin_enqueue_scripts');
+add_filter('wp_headers', 'hic_filter_admin_security_headers', 10, 2);
 
 // Add AJAX handler for API connection test
 add_action('wp_ajax_hic_test_api_connection', 'hic_ajax_test_api_connection');
@@ -697,4 +698,83 @@ function hic_validate_admin_email($input) {
     }
 
     return $sanitized_email;
+}
+
+/* ============ Admin Security Headers ============ */
+/**
+ * Determine if the current request targets one of the plugin admin screens.
+ */
+function hic_is_plugin_admin_request(): bool {
+    if ((defined('DOING_AJAX') && DOING_AJAX) || (defined('REST_REQUEST') && REST_REQUEST)) {
+        return false;
+    }
+
+    $page = '';
+    if (isset($_GET['page'])) {
+        $raw_page = wp_unslash($_GET['page']);
+        if (is_string($raw_page)) {
+            $page = strtolower(preg_replace('/[^a-z0-9_-]/', '', $raw_page) ?? '');
+        }
+    }
+
+    if ($page === '') {
+        return false;
+    }
+
+    $allowed_pages = ['hic-monitoring', 'hic-diagnostics'];
+    if (!in_array($page, $allowed_pages, true)) {
+        return false;
+    }
+
+    if (function_exists('is_admin') && is_admin()) {
+        return true;
+    }
+
+    if (defined('WP_ADMIN') && WP_ADMIN) {
+        return true;
+    }
+
+    $script_name = $_SERVER['PHP_SELF'] ?? '';
+    if (is_string($script_name) && $script_name !== '') {
+        $normalized = strtolower($script_name);
+        if (strpos($normalized, 'wp-admin/') !== false) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Inject security-focused HTTP headers when rendering plugin admin pages.
+ *
+ * @param array<string,string> $headers Existing response headers.
+ * @param mixed                $wp      Optional WP instance.
+ * @return array<string,string> Modified headers for secure delivery.
+ */
+function hic_filter_admin_security_headers(array $headers, $wp = null): array {
+    if (!hic_is_plugin_admin_request()) {
+        return $headers;
+    }
+
+    $headers['X-Frame-Options'] = 'SAMEORIGIN';
+    $headers['X-Content-Type-Options'] = 'nosniff';
+
+    if (!isset($headers['Referrer-Policy'])) {
+        $headers['Referrer-Policy'] = 'no-referrer-when-downgrade';
+    }
+
+    if (!isset($headers['Permissions-Policy'])) {
+        $headers['Permissions-Policy'] = "geolocation=(), microphone=(), camera=()";
+    }
+
+    if (!isset($headers['Content-Security-Policy'])) {
+        $headers['Content-Security-Policy'] = "frame-ancestors 'self'";
+    }
+
+    if (!isset($headers['Strict-Transport-Security']) && function_exists('is_ssl') && is_ssl()) {
+        $headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+    }
+
+    return $headers;
 }

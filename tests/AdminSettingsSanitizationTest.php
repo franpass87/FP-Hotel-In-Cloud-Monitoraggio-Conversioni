@@ -57,4 +57,30 @@ final class AdminSettingsSanitizationTest extends TestCase {
         update_option('hic_api_password', $sanitized);
         $this->assertSame('p&ssw%rd<secure>', get_option('hic_api_password'));
     }
+
+    public function testSecurityHeadersAppliedOnPluginPage(): void {
+        $_GET['page'] = 'hic-monitoring';
+        $_SERVER['PHP_SELF'] = '/wp-admin/admin.php';
+
+        $headers = hic_filter_admin_security_headers([]);
+
+        $this->assertSame('SAMEORIGIN', $headers['X-Frame-Options']);
+        $this->assertSame('nosniff', $headers['X-Content-Type-Options']);
+        $this->assertArrayHasKey('Referrer-Policy', $headers);
+        $this->assertArrayHasKey('Permissions-Policy', $headers);
+        $this->assertArrayHasKey('Content-Security-Policy', $headers);
+
+        unset($_GET['page'], $_SERVER['PHP_SELF']);
+    }
+
+    public function testSecurityHeadersNotAppliedOutsidePluginPages(): void {
+        $_GET['page'] = 'another-page';
+        $_SERVER['PHP_SELF'] = '/wp-admin/admin.php';
+
+        $headers = hic_filter_admin_security_headers([]);
+
+        $this->assertArrayNotHasKey('X-Frame-Options', $headers);
+
+        unset($_GET['page'], $_SERVER['PHP_SELF']);
+    }
 }
