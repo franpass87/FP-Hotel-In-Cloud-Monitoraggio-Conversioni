@@ -24,21 +24,30 @@ class HIC_Input_Validator {
      */
     public static function validate_email($email) {
         $email = sanitize_email($email);
-        
+
         if (!$email || !is_email($email)) {
-            return new \WP_Error('invalid_email', 'Email non valido');
+            return new \WP_Error('invalid_email', 'Email non valida', [
+                'status' => 400,
+                'field'  => 'email',
+            ]);
         }
-        
+
         // Check email length (RFC 5321)
         if (strlen($email) > HIC_EMAIL_MAX_LENGTH) {
-            return new \WP_Error('email_too_long', 'Email troppo lungo');
+            return new \WP_Error('email_too_long', 'Email troppo lunga', [
+                'status' => 400,
+                'field'  => 'email',
+            ]);
         }
-        
+
         // Check for suspicious patterns
         if (self::is_suspicious_email($email)) {
-            return new \WP_Error('suspicious_email', 'Email sospetto');
+            return new \WP_Error('suspicious_email', 'Email sospetta', [
+                'status' => 400,
+                'field'  => 'email',
+            ]);
         }
-        
+
         return $email;
     }
     
@@ -65,7 +74,7 @@ class HIC_Input_Validator {
             } else {
                 $email_validation = self::validate_email($email_value);
                 if (is_wp_error($email_validation)) {
-                    $errors[] = $email_validation->get_error_message();
+                    $errors[] = $email_validation;
                 } else {
                     $data['email'] = $email_validation;
                 }
@@ -76,34 +85,34 @@ class HIC_Input_Validator {
         if (isset($data['amount'])) {
             $amount_validation = self::validate_amount($data['amount']);
             if (is_wp_error($amount_validation)) {
-                $errors[] = $amount_validation->get_error_message();
+                $errors[] = $amount_validation;
             } else {
                 $data['amount'] = $amount_validation;
             }
         }
-        
+
         // Currency validation
         if (isset($data['currency'])) {
             $currency_validation = self::validate_currency($data['currency']);
             if (is_wp_error($currency_validation)) {
-                $errors[] = $currency_validation->get_error_message();
+                $errors[] = $currency_validation;
             } else {
                 $data['currency'] = $currency_validation;
             }
         }
-        
+
         // Date validation
         if (isset($data['checkin'])) {
-            $date_validation = self::validate_date($data['checkin']);
+            $date_validation = self::validate_date($data['checkin'], 'checkin');
             if (is_wp_error($date_validation)) {
-                $errors[] = "Data checkin non valida: " . $date_validation->get_error_message();
+                $errors[] = $date_validation;
             }
         }
-        
+
         if (isset($data['checkout'])) {
-            $date_validation = self::validate_date($data['checkout']);
+            $date_validation = self::validate_date($data['checkout'], 'checkout');
             if (is_wp_error($date_validation)) {
-                $errors[] = "Data checkout non valida: " . $date_validation->get_error_message();
+                $errors[] = $date_validation;
             }
         }
         
@@ -158,19 +167,75 @@ class HIC_Input_Validator {
         if ($sid_value !== null) {
             $sid_validation = self::validate_sid($sid_value);
             if (is_wp_error($sid_validation)) {
-                $errors[] = $sid_validation->get_error_message();
+                $errors[] = self::prefix_field_error($sid_validation, 'sid');
             } else {
                 $data['sid'] = $sid_validation;
             }
         }
 
         if (!empty($errors)) {
-            return new \WP_Error('validation_failed', implode('; ', $errors));
+            if (count($errors) === 1 && $errors[0] instanceof \WP_Error) {
+                return $errors[0];
+            }
+
+            $messages = [];
+            $error_data = ['errors' => [], 'status' => 400];
+
+            foreach ($errors as $error) {
+                if ($error instanceof \WP_Error) {
+                    $messages[] = $error->get_error_message();
+                    $error_data['errors'][] = [
+                        'code'    => $error->get_error_code(),
+                        'message' => $error->get_error_message(),
+                        'data'    => $error->get_error_data(),
+                    ];
+                } elseif (is_string($error) && $error !== '') {
+                    $messages[] = $error;
+                }
+            }
+
+            $joined_messages = implode('; ', array_filter($messages, 'strlen'));
+
+            if ($joined_messages === '') {
+                $joined_messages = 'Dati non validi';
+            }
+
+            return new \WP_Error('validation_failed', $joined_messages, $error_data);
         }
 
         return $data;
     }
-    
+
+    /**
+     * Ensure a validation error contains field metadata.
+     */
+    private static function prefix_field_error(\WP_Error $error, string $field): \WP_Error
+    {
+        $field = strtolower((string) $field);
+        $field = str_replace('-', '_', $field);
+        $field = preg_replace('/[^a-z0-9_]/', '', $field ?? '') ?? '';
+
+        if ($field === '') {
+            $field = 'field';
+        }
+
+        $data  = $error->get_error_data();
+
+        if (!is_array($data)) {
+            $data = [];
+        }
+
+        if (!isset($data['field'])) {
+            $data['field'] = $field;
+        }
+
+        if (!isset($data['status'])) {
+            $data['status'] = 400;
+        }
+
+        return new \WP_Error($error->get_error_code(), $error->get_error_message(), $data);
+    }
+
     /**
      * Validate monetary amount
      */
@@ -181,19 +246,28 @@ class HIC_Input_Validator {
         }
         
         if (!is_numeric($amount)) {
-            return new \WP_Error('invalid_amount', 'Importo non valido');
+            return new \WP_Error('invalid_amount', 'Importo non valido', [
+                'status' => 400,
+                'field'  => 'amount',
+            ]);
         }
-        
+
         $amount = floatval($amount);
-        
+
         if ($amount < 0) {
-            return new \WP_Error('negative_amount', 'Importo non può essere negativo');
+            return new \WP_Error('negative_amount', 'Importo non può essere negativo', [
+                'status' => 400,
+                'field'  => 'amount',
+            ]);
         }
-        
+
         if ($amount > 999999.99) {
-            return new \WP_Error('amount_too_large', 'Importo troppo elevato');
+            return new \WP_Error('amount_too_large', 'Importo troppo elevato', [
+                'status' => 400,
+                'field'  => 'amount',
+            ]);
         }
-        
+
         return round($amount, 2);
     }
     
@@ -202,19 +276,28 @@ class HIC_Input_Validator {
      */
     public static function validate_currency($currency) {
         if (!is_scalar($currency)) {
-            return new \WP_Error('invalid_currency', 'Codice valuta non valido');
+            return new \WP_Error('invalid_currency', 'Codice valuta non valido', [
+                'status' => 400,
+                'field'  => 'currency',
+            ]);
         }
 
         $currency = strtoupper(sanitize_text_field((string) $currency));
 
         if ($currency === '' || !preg_match('/^[A-Z]{3}$/', $currency)) {
-            return new \WP_Error('invalid_currency', 'Codice valuta non valido');
+            return new \WP_Error('invalid_currency', 'Codice valuta non valido', [
+                'status' => 400,
+                'field'  => 'currency',
+            ]);
         }
 
         $valid_currencies = self::get_iso_4217_currency_codes();
 
         if (!in_array($currency, $valid_currencies, true)) {
-            return new \WP_Error('invalid_currency', 'Codice valuta non valido');
+            return new \WP_Error('invalid_currency', 'Codice valuta non valido', [
+                'status' => 400,
+                'field'  => 'currency',
+            ]);
         }
 
         return $currency;
@@ -238,12 +321,12 @@ class HIC_Input_Validator {
     /**
      * Validate date string
      */
-    public static function validate_date($date_string) {
+    public static function validate_date($date_string, string $field = 'date') {
         $date_string = sanitize_text_field($date_string);
-        
+
         // Try multiple date formats
         $formats = ['Y-m-d', 'Y-m-d H:i:s', 'd/m/Y', 'm/d/Y'];
-        
+
         foreach ($formats as $format) {
             $date = \DateTime::createFromFormat($format, $date_string);
             if ($date && $date->format($format) === $date_string) {
@@ -253,14 +336,20 @@ class HIC_Input_Validator {
                 $max_date = (clone $now)->add(new \DateInterval('P5Y')); // 5 years ahead
                 
                 if ($date < $min_date || $date > $max_date) {
-                    return new \WP_Error('date_out_of_range', 'Data fuori intervallo valido');
+                    return new \WP_Error('date_out_of_range', 'Data fuori intervallo valido', [
+                        'status' => 400,
+                        'field'  => $field,
+                    ]);
                 }
-                
+
                 return $date->format('Y-m-d');
             }
         }
-        
-        return new \WP_Error('invalid_date_format', 'Formato data non riconosciuto');
+
+        return new \WP_Error('invalid_date_format', 'Formato data non riconosciuto', [
+            'status' => 400,
+            'field'  => $field,
+        ]);
     }
     
     /**
@@ -285,16 +374,22 @@ class HIC_Input_Validator {
      */
     public static function validate_sid($sid) {
         $sid = sanitize_text_field($sid);
-        
+
         if (strlen($sid) < HIC_SID_MIN_LENGTH || strlen($sid) > HIC_SID_MAX_LENGTH) {
-            return new \WP_Error('invalid_sid_length', 'Lunghezza SID non valida');
+            return new \WP_Error('invalid_sid_length', 'Lunghezza SID non valida', [
+                'status' => 400,
+                'field'  => 'sid',
+            ]);
         }
-        
+
         // Check for valid characters (alphanumeric and some symbols)
         if (!preg_match('/^[a-zA-Z0-9._-]+$/', $sid)) {
-            return new \WP_Error('invalid_sid_format', 'Formato SID non valido');
+            return new \WP_Error('invalid_sid_format', 'Formato SID non valido', [
+                'status' => 400,
+                'field'  => 'sid',
+            ]);
         }
-        
+
         return $sid;
     }
     
@@ -365,15 +460,15 @@ class HIC_Input_Validator {
         
         // Date validation
         if (isset($params['from_date'])) {
-            $date_validation = self::validate_date($params['from_date']);
+            $date_validation = self::validate_date($params['from_date'], 'from_date');
             if (is_wp_error($date_validation)) {
                 return $date_validation;
             }
             $validated['from_date'] = $date_validation;
         }
-        
+
         if (isset($params['to_date'])) {
-            $date_validation = self::validate_date($params['to_date']);
+            $date_validation = self::validate_date($params['to_date'], 'to_date');
             if (is_wp_error($date_validation)) {
                 return $date_validation;
             }
