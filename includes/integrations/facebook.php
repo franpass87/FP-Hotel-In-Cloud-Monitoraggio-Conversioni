@@ -83,8 +83,10 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gb
     $user_data['fbp'] = [sanitize_text_field( wp_unslash( $_COOKIE['_fbp'] ) )];
   }
 
+  $currency_code = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
+
   $custom_data = [
-    'currency'     => sanitize_text_field($data['currency'] ?? 'EUR'),
+    'currency'     => $currency_code,
     'value'        => $amount,
     'order_id'     => $event_id,
     'bucket'       => $bucket,           // per creare custom conversions per fbads/organic/gads
@@ -249,8 +251,10 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '',
     $user_data['fbp'] = [sanitize_text_field( wp_unslash( $_COOKIE['_fbp'] ) )];
   }
 
+  $currency_code = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
+
   $custom_data = [
-    'currency'     => sanitize_text_field($data['currency'] ?? 'EUR'),
+    'currency'     => $currency_code,
     'value'        => $amount,
     'order_id'     => $event_id,
     'bucket'       => $bucket,
@@ -366,7 +370,7 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
   
   $transaction_id = sanitize_text_field($data['transaction_id']);
   $value = Helpers\hic_normalize_price($data['value']);
-  $currency = sanitize_text_field($data['currency']);
+  $currency = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
 
   $sid = !empty($sid) ? \sanitize_text_field((string) $sid) : '';
   if ($sid === '' && !empty($data['sid']) && is_scalar($data['sid'])) {

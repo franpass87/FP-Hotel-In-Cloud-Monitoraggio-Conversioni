@@ -159,37 +159,48 @@ final class CurrencyPropagationTest extends TestCase
         $transformed = \FpHic\hic_transform_reservation($reservation);
         $this->assertSame('CHF', $transformed['currency']);
 
+        $ga_payload_source = $transformed;
+        $ga_payload_source['currency'] = strtolower($ga_payload_source['currency']);
+
         // GA4 dispatch
         $hic_last_request = null;
-        $this->assertTrue(\FpHic\hic_dispatch_ga4_reservation($transformed));
+        $this->assertTrue(\FpHic\hic_dispatch_ga4_reservation($ga_payload_source));
         $this->assertNotNull($hic_last_request);
         $ga_payload = json_decode($hic_last_request['args']['body'], true);
         $this->assertSame('CHF', $ga_payload['events'][0]['params']['currency']);
 
         // GTM dispatch
         update_option('hic_gtm_queued_events', []);
-        $this->assertTrue(\FpHic\hic_dispatch_gtm_reservation($transformed));
+        $gtm_payload_source = $transformed;
+        $gtm_payload_source['currency'] = strtolower($gtm_payload_source['currency']);
+        $this->assertTrue(\FpHic\hic_dispatch_gtm_reservation($gtm_payload_source));
         $gtm_events = get_option('hic_gtm_queued_events', []);
         $this->assertNotEmpty($gtm_events);
         $this->assertSame('CHF', $gtm_events[0]['ecommerce']['currency']);
 
         // Meta Pixel dispatch
         $hic_last_request = null;
-        $this->assertTrue(\FpHic\hic_dispatch_pixel_reservation($transformed));
+        $pixel_payload_source = $transformed;
+        $pixel_payload_source['currency'] = strtolower($pixel_payload_source['currency']);
+        $this->assertTrue(\FpHic\hic_dispatch_pixel_reservation($pixel_payload_source));
         $this->assertNotNull($hic_last_request);
         $fb_payload = json_decode($hic_last_request['args']['body'], true);
         $this->assertSame('CHF', $fb_payload['data'][0]['custom_data']['currency']);
 
         // Brevo contact dispatch
         $hic_last_request = null;
-        $this->assertTrue(\FpHic\hic_dispatch_brevo_reservation($transformed));
+        $brevo_contact_source = $transformed;
+        $brevo_contact_source['currency'] = strtolower($brevo_contact_source['currency']);
+        $this->assertTrue(\FpHic\hic_dispatch_brevo_reservation($brevo_contact_source));
         $this->assertNotNull($hic_last_request);
         $brevo_contact_payload = json_decode($hic_last_request['args']['body'], true);
         $this->assertSame('CHF', $brevo_contact_payload['attributes']['CURRENCY']);
 
         // Brevo reservation_created event
         $hic_last_request = null;
-        $result = \FpHic\hic_send_brevo_reservation_created_event($transformed);
+        $brevo_event_source = $transformed;
+        $brevo_event_source['currency'] = strtolower($brevo_event_source['currency']);
+        $result = \FpHic\hic_send_brevo_reservation_created_event($brevo_event_source);
         $this->assertTrue($result['success']);
         $this->assertNotNull($hic_last_request);
         $brevo_event_payload = json_decode($hic_last_request['args']['body'], true);

@@ -53,6 +53,8 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
     $amount = Helpers\hic_normalize_price($amount_source);
   }
 
+  $currency_code = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
+
   $body = array(
     'email' => $email,
     'attributes' => array(
@@ -68,7 +70,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
       'WBRAID'    => isset($wbraid) ? $wbraid : '',
       'DATE'      => isset($data['date']) ? $data['date'] : wp_date('Y-m-d'),
       'AMOUNT'    => $amount,
-      'CURRENCY'  => isset($data['currency']) ? $data['currency'] : 'EUR',
+      'CURRENCY'  => $currency_code,
       'WHATSAPP'  => $normalized_phone,
       'LANGUAGE'  => $lang,
       // Legacy alias for LANGUAGE
@@ -130,13 +132,15 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
     $amount = Helpers\hic_normalize_price($amount_source);
   }
 
+  $currency_code = Helpers\hic_normalize_currency_code($reservation['currency'] ?? null);
+
   $event_data = array(
     'event' => 'purchase', // puoi rinominare in 'hic_booking' se preferisci
     'email' => isset($reservation['email']) ? $reservation['email'] : '',
     'properties' => array(
       'reservation_id' => isset($reservation['reservation_id']) ? $reservation['reservation_id'] : (isset($reservation['id']) ? $reservation['id'] : ''),
       'amount'         => $amount,
-      'currency'       => isset($reservation['currency']) ? $reservation['currency'] : 'EUR',
+      'currency'       => $currency_code,
       'date'           => isset($reservation['date']) ? $reservation['date'] : wp_date('Y-m-d'),
       'phone'          => isset($reservation['phone']) ? $reservation['phone'] : '',
       'language'       => isset($reservation['language']) ? $reservation['language'] : '',
@@ -206,13 +210,15 @@ function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '
     $amount = -abs(Helpers\hic_normalize_price($amount_source));
   }
 
+  $currency_code = Helpers\hic_normalize_currency_code($reservation['currency'] ?? null);
+
   $event_data = array(
     'event' => 'refund',
     'email' => isset($reservation['email']) ? $reservation['email'] : '',
     'properties' => array(
       'reservation_id' => isset($reservation['reservation_id']) ? $reservation['reservation_id'] : (isset($reservation['id']) ? $reservation['id'] : ''),
       'amount'         => $amount,
-      'currency'       => isset($reservation['currency']) ? $reservation['currency'] : 'EUR',
+      'currency'       => $currency_code,
       'date'           => isset($reservation['date']) ? $reservation['date'] : wp_date('Y-m-d'),
       'phone'          => isset($reservation['phone']) ? $reservation['phone'] : '',
       'language'       => isset($reservation['language']) ? $reservation['language'] : '',
@@ -344,6 +350,8 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     if (empty($wbraid))  { $wbraid  = $tracking['wbraid'] ?? ''; }
   }
 
+  $currency_code = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
+
   $attributes = array(
     // Standard contact attributes (shared)
     'FIRSTNAME' => isset($data['guest_first_name']) ? $data['guest_first_name'] : '',
@@ -378,7 +386,7 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
     'WBRAID' => $wbraid,
     'DATE' => isset($data['from_date']) ? $data['from_date'] : wp_date('Y-m-d'),
     'AMOUNT' => isset($data['original_price']) ? Helpers\hic_normalize_price($data['original_price']) : 0,
-    'CURRENCY' => isset($data['currency']) ? $data['currency'] : 'EUR',
+    'CURRENCY' => $currency_code,
     'WHATSAPP' => $data['whatsapp'] ?? '',
     'LINGUA' => $language
   );
@@ -615,7 +623,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'reservation_id' => isset($data['transaction_id']) ? $data['transaction_id'] : '',
       'reservation_code' => isset($data['reservation_code']) ? $data['reservation_code'] : '',
       'amount' => isset($data['original_price']) ? Helpers\hic_normalize_price($data['original_price']) : 0,
-      'currency' => isset($data['currency']) ? $data['currency'] : 'EUR',
+      'currency' => $currency_code,
       'from_date' => isset($data['from_date']) ? $data['from_date'] : '',
       'to_date' => isset($data['to_date']) ? $data['to_date'] : '',
       'guests' => isset($data['guests']) ? $data['guests'] : '',
@@ -1037,6 +1045,8 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
     }
   }
 
+  $currency_code = Helpers\hic_normalize_currency_code($webhook_data['currency'] ?? null);
+
   $transformed = array(
     'transaction_id' => hic_resolve_brevo_transaction_id($webhook_data, $sid),
     'reservation_code' => isset($webhook_data['reservation_code']) ? $webhook_data['reservation_code'] : '',
@@ -1045,7 +1055,7 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
     'guest_last_name' => $last ?? '',
     'phone' => isset($webhook_data['whatsapp']) ? $webhook_data['whatsapp'] : (isset($webhook_data['phone']) ? $webhook_data['phone'] : ''),
     'original_price' => isset($webhook_data['amount']) ? Helpers\hic_normalize_price($webhook_data['amount']) : 0,
-    'currency' => isset($webhook_data['currency']) ? $webhook_data['currency'] : 'EUR',
+    'currency' => $currency_code,
     'from_date' => $webhook_data['date'] ?? $webhook_data['checkin'] ?? '',
     'to_date'   => $webhook_data['to_date'] ?? $webhook_data['checkout'] ?? '',
     'accommodation_name' => isset($webhook_data['room']) ? $webhook_data['room'] : '',

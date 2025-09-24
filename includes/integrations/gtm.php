@@ -78,7 +78,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttcli
             'transaction_id' => $transaction_id,
             'affiliation' => 'HotelInCloud',
             'value' => $amount,
-            'currency' => sanitize_text_field($data['currency'] ?? 'EUR'),
+            'currency' => Helpers\hic_normalize_currency_code($data['currency'] ?? null),
             'items' => [[
                 'item_id' => $item_id,
                 'item_name' => $item_name,
@@ -393,7 +393,7 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
     }
     $data['transaction_id'] = $transaction_id;
     $value = Helpers\hic_normalize_price($data['value']);
-    $currency = sanitize_text_field($data['currency']);
+    $currency = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
 
     $sid = !empty($sid) ? \sanitize_text_field((string) $sid) : '';
     if ($sid === '' && !empty($data['sid']) && is_scalar($data['sid'])) {
