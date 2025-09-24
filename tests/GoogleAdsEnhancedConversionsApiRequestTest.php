@@ -19,7 +19,7 @@ namespace FpHic\Helpers {
 namespace FpHic\GoogleAdsEnhanced {
     if (!function_exists(__NAMESPACE__ . '\\wp_remote_post')) {
         function wp_remote_post($url, $args = []) {
-            global $hic_test_google_ads_requests, $hic_test_google_ads_response_code;
+            global $hic_test_google_ads_requests, $hic_test_google_ads_response_code, $hic_test_google_ads_response_body;
 
             if (!is_array($hic_test_google_ads_requests ?? null)) {
                 $hic_test_google_ads_requests = [];
@@ -39,8 +39,23 @@ namespace FpHic\GoogleAdsEnhanced {
 
             $status_code = $hic_test_google_ads_response_code ?? 200;
 
+            $body = $hic_test_google_ads_response_body;
+            if ($body === null) {
+                $results = [];
+                if (isset($args['body'])) {
+                    $payload = json_decode((string) $args['body'], true);
+                    if (isset($payload['conversions']) && is_array($payload['conversions'])) {
+                        foreach ($payload['conversions'] as $_conversion) {
+                            $results[] = ['status' => 'SUCCESS'];
+                        }
+                    }
+                }
+
+                $body = \wp_json_encode(['results' => $results]);
+            }
+
             return [
-                'body' => \wp_json_encode(['uploadResults' => []]),
+                'body' => $body,
                 'response' => ['code' => $status_code],
             ];
         }
@@ -50,6 +65,10 @@ namespace FpHic\GoogleAdsEnhanced {
 namespace {
     use FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions;
     use PHPUnit\Framework\TestCase;
+
+    if (!defined('ARRAY_A')) {
+        define('ARRAY_A', 'ARRAY_A');
+    }
 
     require_once __DIR__ . '/../includes/google-ads-enhanced.php';
 
@@ -62,13 +81,14 @@ namespace {
             parent::setUp();
 
             global $hic_test_options, $hic_test_option_autoload;
-            global $hic_test_google_ads_requests, $hic_test_google_ads_response_code;
+            global $hic_test_google_ads_requests, $hic_test_google_ads_response_code, $hic_test_google_ads_response_body;
             global $hic_test_logged_messages;
 
             $hic_test_options = [];
             $hic_test_option_autoload = [];
             $hic_test_google_ads_requests = [];
             $hic_test_google_ads_response_code = 200;
+            $hic_test_google_ads_response_body = null;
             $hic_test_logged_messages = [];
 
             $this->previous_log_manager = $GLOBALS['hic_log_manager'] ?? null;
@@ -89,8 +109,9 @@ namespace {
 
         protected function tearDown(): void
         {
-            global $hic_test_google_ads_response_code;
+            global $hic_test_google_ads_response_code, $hic_test_google_ads_response_body;
             $hic_test_google_ads_response_code = 200;
+            $hic_test_google_ads_response_body = null;
 
             if ($this->previous_log_manager !== null) {
                 $GLOBALS['hic_log_manager'] = $this->previous_log_manager;
@@ -134,6 +155,9 @@ namespace {
             $result = $method->invoke($enhanced, [$conversion]);
 
             $this->assertTrue($result['success']);
+            $this->assertSame([1], $result['uploaded_ids']);
+            $this->assertSame([], $result['failed_errors']);
+            $this->assertSame([], $result['pending_ids']);
             $this->assertCount(2, $hic_test_google_ads_requests, 'Token and upload requests should be captured');
 
             $api_request = $hic_test_google_ads_requests[1];
@@ -205,6 +229,9 @@ namespace {
             $result = $method->invoke($enhanced, [$conversion]);
 
             $this->assertTrue($result['success']);
+            $this->assertSame([2], $result['uploaded_ids']);
+            $this->assertSame([], $result['failed_errors']);
+            $this->assertSame([], $result['pending_ids']);
             $this->assertCount(2, $hic_test_google_ads_requests, 'Token and upload requests should be captured');
 
             $payload = json_decode($hic_test_google_ads_requests[1]['args']['body'], true);
@@ -262,6 +289,164 @@ namespace {
                 'Missing Google Ads customer ID while formatting conversions for API upload.',
                 $last_message
             );
+        }
+
+        public function test_partial_failure_marks_failed_and_requeues_pending_conversions(): void
+        {
+            global $hic_test_google_ads_response_body, $hic_test_google_ads_requests, $wpdb;
+
+            $partial_failure_response = [
+                'partialFailureError' => [
+                    'code' => 3,
+                    'message' => 'Partial failure occurred.',
+                    'details' => [
+                        [
+                            '@type' => 'type.googleapis.com/google.ads.googleads.v14.errors.GoogleAdsFailure',
+                            'errors' => [
+                                [
+                                    'message' => 'Conversion marked as duplicate.',
+                                    'location' => [
+                                        'fieldPathElements' => [
+                                            ['fieldName' => 'conversions', 'index' => 1],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'results' => [
+                    [
+                        'gclid' => 'shared-gclid',
+                        'conversionAction' => 'customers/1234567890/conversionActions/987654321',
+                    ],
+                ],
+            ];
+
+            $hic_test_google_ads_response_body = \wp_json_encode($partial_failure_response);
+
+            update_option('hic_google_ads_enhanced_enabled', true);
+            update_option('hic_google_ads_enhanced_settings', [
+                'customer_id' => '123-456-7890',
+                'developer_token' => 'developer-token',
+                'client_id' => 'client-id',
+                'client_secret' => 'client-secret',
+                'refresh_token' => 'refresh-token',
+                'conversion_action_id' => '987654321',
+            ]);
+            update_option('timezone_string', 'UTC');
+
+            $conversions = [
+                [
+                    'id' => 11,
+                    'gclid' => 'shared-gclid',
+                    'conversion_action_id' => '987654321',
+                    'created_at' => '2024-02-10 09:00:00',
+                    'conversion_value' => 150.0,
+                    'conversion_currency' => 'EUR',
+                ],
+                [
+                    'id' => 12,
+                    'gclid' => 'shared-gclid',
+                    'conversion_action_id' => '987654321',
+                    'created_at' => '2024-02-10 09:05:00',
+                    'conversion_value' => 175.0,
+                    'conversion_currency' => 'EUR',
+                ],
+                [
+                    'id' => 13,
+                    'gclid' => 'shared-gclid',
+                    'conversion_action_id' => '987654321',
+                    'created_at' => '2024-02-10 09:10:00',
+                    'conversion_value' => 190.0,
+                    'conversion_currency' => 'EUR',
+                ],
+            ];
+
+            $fake_wpdb = new class($conversions) {
+                public $prefix = 'wp_';
+                public $get_results_return;
+                public $uploaded_updates = [];
+                public $failed_updates = [];
+                private $pending_upload_args = [];
+                private $pending_failure_args = [];
+
+                public function __construct($results)
+                {
+                    $this->get_results_return = $results;
+                }
+
+                public function prepare($query, ...$args)
+                {
+                    if (strpos($query, "SET upload_status = 'uploaded'") !== false) {
+                        $this->pending_upload_args = $args;
+                    } elseif (strpos($query, "SET upload_status = 'failed'") !== false) {
+                        $this->pending_failure_args = $args;
+                    }
+
+                    return $query;
+                }
+
+                public function get_results($query, $output = ARRAY_A)
+                {
+                    return $this->get_results_return;
+                }
+
+                public function query($query)
+                {
+                    if (strpos($query, "SET upload_status = 'uploaded'") !== false) {
+                        if (!empty($this->pending_upload_args)) {
+                            $args = $this->pending_upload_args;
+                            $response = array_shift($args);
+                            $ids = array_map('intval', $args);
+                            $this->uploaded_updates[] = ['ids' => $ids, 'response' => $response];
+                            $this->pending_upload_args = [];
+                        }
+                    } elseif (strpos($query, "SET upload_status = 'failed'") !== false) {
+                        if (!empty($this->pending_failure_args)) {
+                            $args = $this->pending_failure_args;
+                            $message = array_shift($args);
+                            $ids = array_map('intval', $args);
+                            $this->failed_updates[] = ['ids' => $ids, 'message' => $message];
+                            $this->pending_failure_args = [];
+                        }
+                    }
+
+                    return true;
+                }
+            };
+
+            $previous_wpdb = $wpdb ?? null;
+            $wpdb = $fake_wpdb;
+
+            update_option('hic_enhanced_conversions_queue', [11, 12, 13]);
+
+            try {
+                $enhanced = new GoogleAdsEnhancedConversions();
+                $enhanced->batch_upload_enhanced_conversions();
+            } finally {
+                if ($previous_wpdb !== null) {
+                    $wpdb = $previous_wpdb;
+                } else {
+                    unset($GLOBALS['wpdb']);
+                }
+
+                $hic_test_google_ads_response_body = null;
+            }
+
+            $this->assertCount(1, $fake_wpdb->uploaded_updates);
+            $this->assertSame([11], $fake_wpdb->uploaded_updates[0]['ids']);
+
+            $this->assertCount(1, $fake_wpdb->failed_updates);
+            $this->assertSame([12], $fake_wpdb->failed_updates[0]['ids']);
+            $this->assertStringContainsString('duplicate', strtolower($fake_wpdb->failed_updates[0]['message']));
+
+            $queue_after_processing = get_option('hic_enhanced_conversions_queue', []);
+            $this->assertSame([13], $queue_after_processing);
+
+            $this->assertCount(2, $hic_test_google_ads_requests, 'Token and upload requests should still be captured.');
+
+            delete_option('hic_enhanced_conversions_queue');
         }
 
         public function test_get_google_ads_access_token_aborts_when_credentials_missing(): void
