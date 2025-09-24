@@ -626,6 +626,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   $data['language'] = $phone_data['language'] ?? ($data['language'] ?? '');
 
   $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $currency_code = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
 
   $body = array(
     'event' => 'reservation_created',

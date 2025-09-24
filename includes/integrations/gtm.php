@@ -146,12 +146,7 @@ function hic_queue_gtm_event($event_data, $sid = '') {
     }
 
     $sid = !empty($sid) ? sanitize_text_field((string) $sid) : '';
-    if ($sid === '') {
-        hic_log('GTM queue: evento ignorato perché SID mancante o non valido', HIC_LOG_LEVEL_DEBUG);
-        return;
-    }
-
-    $option_key = hic_get_gtm_queue_option_key($sid);
+    $option_key = $sid === '' ? 'hic_gtm_queued_events' : hic_get_gtm_queue_option_key($sid);
     if ($option_key === '') {
         return;
     }
@@ -192,11 +187,8 @@ function hic_get_gtm_queue_option_key(string $sid): string {
  */
 function hic_get_and_clear_gtm_events_for_sid($sid) {
     $sid = !empty($sid) ? sanitize_text_field((string) $sid) : '';
-    if ($sid === '') {
-        return [];
-    }
 
-    $option_key = hic_get_gtm_queue_option_key($sid);
+    $option_key = $sid === '' ? 'hic_gtm_queued_events' : hic_get_gtm_queue_option_key($sid);
     if ($option_key === '') {
         return [];
     }

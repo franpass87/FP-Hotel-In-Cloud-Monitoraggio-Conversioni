@@ -14,6 +14,27 @@ class HIC_Log_Manager {
     private int $retention_days;
     private string $log_level;
 
+    /**
+     * Call a helper function from either the global namespace or the FpHic\Helpers namespace.
+     *
+     * @param string $function Function name without namespace prefix.
+     * @param array<int,mixed> $args Arguments to pass to the helper.
+     * @return mixed|null
+     */
+    private function call_helper(string $function, array $args = []) {
+        $namespaced = '\\FpHic\\Helpers\\' . $function;
+
+        if (function_exists($function)) {
+            return $function(...$args);
+        }
+
+        if (function_exists($namespaced)) {
+            return $namespaced(...$args);
+        }
+
+        return null;
+    }
+
     public function __construct() {
         // Initialize defaults
         $this->log_file = '';
@@ -21,14 +42,23 @@ class HIC_Log_Manager {
         $this->retention_days = (int) HIC_LOG_RETENTION_DAYS;
         $this->log_level = (string) HIC_LOG_LEVEL_INFO;
 
-        // Ensure WordPress functions are available
-        if (!function_exists('hic_get_log_file')) {
-            return;
+        $log_file = $this->call_helper('hic_get_log_file');
+        if (is_string($log_file) && $log_file !== '') {
+            $this->log_file = $log_file;
         }
 
-        $this->log_file = (string) hic_get_log_file();
-        $this->retention_days = (int) (function_exists('apply_filters') ? apply_filters('hic_log_retention_days', HIC_LOG_RETENTION_DAYS) : HIC_LOG_RETENTION_DAYS);
-        $this->log_level = function_exists('hic_get_option') ? (string) hic_get_option('log_level', HIC_LOG_LEVEL_INFO) : (string) HIC_LOG_LEVEL_INFO;
+        $retention = $this->retention_days;
+        if (function_exists('apply_filters')) {
+            $retention = apply_filters('hic_log_retention_days', $retention);
+        }
+        if (is_numeric($retention)) {
+            $this->retention_days = (int) $retention;
+        }
+
+        $log_level_option = $this->call_helper('hic_get_option', ['log_level', HIC_LOG_LEVEL_INFO]);
+        if (is_string($log_level_option) && $log_level_option !== '') {
+            $this->log_level = $log_level_option;
+        }
 
         // Hook into WordPress shutdown to clean up logs (only if add_action exists)
         if (function_exists('add_action')) {
@@ -63,7 +93,9 @@ class HIC_Log_Manager {
          * @param string $message Original log message.
          * @param string $level   Log level for the message.
          */
-        $message = apply_filters('hic_log_message', $message, $level);
+        if (function_exists('apply_filters')) {
+            $message = apply_filters('hic_log_message', $message, $level);
+        }
 
         // Format log entry
         $formatted_message = $this->format_log_entry($message, $level, $context);
@@ -158,7 +190,7 @@ class HIC_Log_Manager {
         // Rotate log based on file age
         if (function_exists('get_option') && function_exists('update_option')) {
             $created = (int) get_option('hic_log_created', 0);
-            $rotation_days = apply_filters('hic_log_rotation_days', 7);
+            $rotation_days = function_exists('apply_filters') ? apply_filters('hic_log_rotation_days', 7) : 7;
             $day_in_seconds = defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400;
             $max_age = $rotation_days * $day_in_seconds;
 
@@ -479,18 +511,40 @@ class HIC_Log_Manager {
         
         return false;
     }
+
+    /**
+     * Expose the active log file path for cache coordination.
+     */
+    public function get_log_file_path(): string
+    {
+        return $this->log_file;
+    }
 }
 
 /**
  * Get or create global HIC_Log_Manager instance
  */
 function hic_get_log_manager() {
-    if (!isset($GLOBALS['hic_log_manager'])) {
-        // Only instantiate if WordPress is loaded and functions are available
-        if (function_exists('get_option') && function_exists('add_action')) {
-            $GLOBALS['hic_log_manager'] = new HIC_Log_Manager();
+    $current_log_file = null;
+    if (function_exists('FpHic\\Helpers\\hic_get_log_file')) {
+        $maybe_log_file = \FpHic\Helpers\hic_get_log_file();
+        if (is_string($maybe_log_file)) {
+            $current_log_file = $maybe_log_file;
         }
     }
+
+    if (isset($GLOBALS['hic_log_manager']) && $GLOBALS['hic_log_manager'] instanceof HIC_Log_Manager) {
+        if ($current_log_file !== null && $GLOBALS['hic_log_manager']->get_log_file_path() !== $current_log_file) {
+            unset($GLOBALS['hic_log_manager']);
+        }
+    } elseif (isset($GLOBALS['hic_log_manager']) && !($GLOBALS['hic_log_manager'] instanceof HIC_Log_Manager)) {
+        unset($GLOBALS['hic_log_manager']);
+    }
+
+    if (!isset($GLOBALS['hic_log_manager']) && function_exists('get_option')) {
+        $GLOBALS['hic_log_manager'] = new HIC_Log_Manager();
+    }
+
     return isset($GLOBALS['hic_log_manager']) ? $GLOBALS['hic_log_manager'] : null;
 }
 

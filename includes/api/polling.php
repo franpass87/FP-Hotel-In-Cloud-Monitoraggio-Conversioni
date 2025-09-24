@@ -797,7 +797,7 @@ function hic_transform_reservation($reservation) {
 /**
  * Dispatch transformed reservation to all services
  */
-function hic_dispatch_reservation($transformed, $original) {
+function hic_dispatch_reservation($transformed, $original, $return_details = false) {
     $canonical_uid = Helpers\hic_booking_uid($original);
     if (!is_scalar($canonical_uid)) {
         $canonical_uid = '';
@@ -1092,7 +1092,7 @@ function hic_dispatch_reservation($transformed, $original) {
                 $message .= " - Summary: $summary";
             }
             hic_log($message, HIC_LOG_LEVEL_ERROR);
-            return $result;
+            return $return_details ? $result : false;
         }
 
         if ($result['status'] === 'partial') {
@@ -1107,7 +1107,7 @@ function hic_dispatch_reservation($transformed, $original) {
                 $message .= " - Skipped: " . implode(', ', $skipped_messages);
             }
             hic_log($message, HIC_LOG_LEVEL_WARNING);
-            return $result;
+            return $return_details ? $result : true;
         }
 
         $message = "Reservation $uid dispatched successfully (mode: $connection_type)";
@@ -1119,7 +1119,7 @@ function hic_dispatch_reservation($transformed, $original) {
         }
         hic_log($message);
 
-        return $result;
+        return $return_details ? $result : true;
     } catch (\Exception $e) {
         hic_log("Error dispatching reservation $uid: " . $e->getMessage());
         throw $e;
@@ -1543,7 +1543,7 @@ function hic_process_single_reservation($reservation) {
     $transformed = hic_transform_reservation($reservation);
 
     if ($transformed !== false && is_array($transformed)) {
-        $dispatch_result = hic_dispatch_reservation($transformed, $reservation);
+        $dispatch_result = hic_dispatch_reservation($transformed, $reservation, true);
 
         if (is_array($dispatch_result)) {
             return $dispatch_result;
@@ -2317,7 +2317,7 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
                     // Transform and process the reservation
                     $transformed = hic_transform_reservation($reservation);
                     if ($transformed !== false) {
-                        $dispatch_result = hic_dispatch_reservation($transformed, $reservation);
+                        $dispatch_result = hic_dispatch_reservation($transformed, $reservation, true);
                         $uid = Helpers\hic_booking_uid($reservation);
                         if (!is_scalar($uid)) {
                             $uid = '';

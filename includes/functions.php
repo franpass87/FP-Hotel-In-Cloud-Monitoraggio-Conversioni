@@ -181,6 +181,29 @@ function hic_register_rest_route_fallback(string $namespace, string $route, arra
  * @return array<string,array<string,mixed>>
  */
 function hic_get_registered_rest_routes(): array {
+    if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK) {
+        hic_include_rest_route_fallback_files();
+
+        if (!isset($GLOBALS['hic_rest_route_registry']) || !is_array($GLOBALS['hic_rest_route_registry'])) {
+            $GLOBALS['hic_rest_route_registry'] = [];
+        }
+
+        if (function_exists('hic_get_webhook_route_args')) {
+            $normalized_route = '/hic/v1/conversion';
+            if (in_array(hic_get_connection_type(), ['webhook', 'hybrid'], true)) {
+                $GLOBALS['hic_rest_route_registry'][$normalized_route] = [
+                    'namespace' => 'hic/v1',
+                    'route'     => '/conversion',
+                    'args'      => hic_get_webhook_route_args(),
+                ];
+            } else {
+                unset($GLOBALS['hic_rest_route_registry'][$normalized_route]);
+            }
+        }
+
+        return $GLOBALS['hic_rest_route_registry'];
+    }
+
     if (!isset($GLOBALS['hic_rest_route_registry']) || !is_array($GLOBALS['hic_rest_route_registry'])) {
         return [];
     }
@@ -195,7 +218,18 @@ function hic_reset_registered_rest_routes(): void {
     $GLOBALS['hic_rest_route_registry'] = [];
 }
 
-if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK) {
+/**
+ * Include REST-related files when the fallback mode is active.
+ */
+function hic_include_rest_route_fallback_files(): void {
+    static $included = false;
+
+    if ($included) {
+        return;
+    }
+
+    $included = true;
+
     foreach ([
         __DIR__ . '/api/webhook.php',
         __DIR__ . '/health-monitor.php',
@@ -205,6 +239,10 @@ if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK) {
             require_once $fallback_include;
         }
     }
+}
+
+if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK) {
+    hic_include_rest_route_fallback_files();
 }
 
 // Helper functions to get configuration values
@@ -1378,7 +1416,7 @@ function hic_http_request($url, $args = [], bool $suppress_failed_storage = fals
 }
 
 function hic_store_failed_request($url, $args, $error) {
-    global $wpdb;
+    $wpdb = hic_get_wpdb_instance(['insert']);
     if (!$wpdb) {
         return;
     }
@@ -2588,6 +2626,8 @@ namespace {
         if (!defined('HIC_REST_API_FALLBACK')) {
             define('HIC_REST_API_FALLBACK', true);
         }
+
+        \FpHic\Helpers\hic_include_rest_route_fallback_files();
 
         function rest_get_server()
         {
