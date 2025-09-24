@@ -57,7 +57,7 @@ final class GtmDataLayerItemFallbackTest extends TestCase
      * @param array<string, mixed> $data
      * @return array<string, mixed>
      */
-    private function dispatchAndRetrieveItem(array $data, string $sid): array
+    private function dispatchAndRetrieveEvent(array $data, string $sid): array
     {
         $queue_key = \FpHic\hic_get_gtm_queue_option_key($sid);
         if ($queue_key !== '') {
@@ -69,12 +69,24 @@ final class GtmDataLayerItemFallbackTest extends TestCase
 
         $events = \FpHic\hic_get_and_clear_gtm_events_for_sid($sid);
         $this->assertNotEmpty($events, 'Expected GTM queue to store the dispatched event.');
+        $this->assertIsArray($events[0], 'Expected the stored GTM event to be an array.');
 
-        $this->assertArrayHasKey('ecommerce', $events[0]);
-        $this->assertArrayHasKey('items', $events[0]['ecommerce']);
-        $this->assertNotEmpty($events[0]['ecommerce']['items']);
+        return $events[0];
+    }
 
-        $item = $events[0]['ecommerce']['items'][0];
+    /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
+     */
+    private function dispatchAndRetrieveItem(array $data, string $sid): array
+    {
+        $event = $this->dispatchAndRetrieveEvent($data, $sid);
+
+        $this->assertArrayHasKey('ecommerce', $event);
+        $this->assertArrayHasKey('items', $event['ecommerce']);
+        $this->assertNotEmpty($event['ecommerce']['items']);
+
+        $item = $event['ecommerce']['items'][0];
         $this->assertIsArray($item, 'Expected the ecommerce item payload to be present.');
 
         return $item;
@@ -132,5 +144,41 @@ final class GtmDataLayerItemFallbackTest extends TestCase
 
         $this->assertSame('Prenotazione', $item['item_name']);
         $this->assertSame('TRANS-DEFAULT-1', $item['item_id']);
+    }
+
+    public function test_ga4_and_gtm_share_transaction_id_when_missing_reservation(): void
+    {
+        $sid = 'shared-sid-123';
+        $payload = [
+            'value' => 218.5,
+            'currency' => 'EUR',
+            'email' => 'ospite@example.com',
+            'from_date' => '2024-09-10',
+        ];
+
+        $expected_transaction_id = \FpHic\hic_ga4_resolve_transaction_id($payload, $sid);
+        $this->assertNotSame('', $expected_transaction_id, 'Expected GA4 resolver to provide a transaction ID.');
+
+        $event = $this->dispatchAndRetrieveEvent($payload, $sid);
+        $this->assertArrayHasKey('ecommerce', $event);
+        $this->assertSame($expected_transaction_id, $event['ecommerce']['transaction_id']);
+        $this->assertArrayHasKey('transaction_id', $event);
+        $this->assertSame($expected_transaction_id, $event['transaction_id']);
+        $this->assertArrayHasKey('items', $event['ecommerce']);
+        $this->assertNotEmpty($event['ecommerce']['items']);
+        $this->assertSame($expected_transaction_id, $event['ecommerce']['items'][0]['item_id']);
+
+        $queue_key = \FpHic\hic_get_gtm_queue_option_key($sid);
+        if ($queue_key !== '') {
+            delete_option($queue_key);
+        }
+
+        $this->assertTrue(\FpHic\hic_dispatch_gtm_reservation($payload, $sid), 'Expected GTM dispatcher fallback to succeed.');
+
+        $dispatch_events = \FpHic\hic_get_and_clear_gtm_events_for_sid($sid);
+        $this->assertNotEmpty($dispatch_events, 'Expected GTM dispatcher to queue an event.');
+        $this->assertSame($expected_transaction_id, $dispatch_events[0]['ecommerce']['transaction_id']);
+        $this->assertArrayHasKey('transaction_id', $dispatch_events[0]);
+        $this->assertSame($expected_transaction_id, $dispatch_events[0]['transaction_id']);
     }
 }
