@@ -165,4 +165,28 @@ final class BrevoReservationFieldsTest extends TestCase {
         $this->assertArrayHasKey('tags', $payload['properties']);
         $this->assertSame('', $payload['properties']['tags']);
     }
+
+    public function testReservationCreatedEventSynthesizesMissingId() {
+        global $hic_last_request;
+        $hic_last_request = null;
+
+        $webhook = [
+            'email' => 'deterministic@example.com',
+            'amount' => 120,
+            'currency' => 'EUR',
+            'date' => '2024-05-01',
+        ];
+
+        $expectedId = \FpHic\hic_ga4_resolve_transaction_id($webhook);
+
+        $transformed = \FpHic\hic_transform_webhook_data_for_brevo($webhook);
+        $this->assertSame($expectedId, $transformed['transaction_id']);
+
+        $result = \FpHic\hic_send_brevo_reservation_created_event($transformed);
+        $this->assertTrue($result['success']);
+        $this->assertNotNull($hic_last_request);
+
+        $payload = json_decode($hic_last_request['args']['body'], true);
+        $this->assertSame($expectedId, $payload['properties']['reservation_id']);
+    }
 }
