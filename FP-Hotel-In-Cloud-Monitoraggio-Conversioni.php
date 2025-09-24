@@ -48,6 +48,7 @@ require_once __DIR__ . '/includes/helpers-logging.php';
 require_once __DIR__ . '/includes/helpers-tracking.php';
 require_once __DIR__ . '/includes/helpers-scheduling.php';
 require_once __DIR__ . '/includes/database.php';
+require_once __DIR__ . '/includes/uninstall.php';
 
 // Log vendor autoloader status after all includes are loaded
 if (!$vendor_available) {
@@ -56,6 +57,10 @@ if (!$vendor_available) {
 
 // Initialize helper hooks immediately after loading core files
 Helpers\hic_init_helper_hooks();
+
+if (\function_exists('register_uninstall_hook')) {
+    \register_uninstall_hook(__FILE__, __NAMESPACE__ . '\\hic_uninstall_plugin');
+}
 
 // Plugin activation handler
 function hic_activate($network_wide)
