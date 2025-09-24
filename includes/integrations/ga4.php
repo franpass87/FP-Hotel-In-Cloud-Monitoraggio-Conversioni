@@ -179,8 +179,10 @@ function hic_ga4_resolve_transaction_id(array $data, $sid = ''): string {
     return sanitize_text_field($fallback);
   }
 
-  $fallback_hash = substr(hash('sha256', 'hic_ga4_fallback'), 0, 32);
-  return sanitize_text_field('hic_tx_' . $fallback_hash);
+  $exported_payload = var_export($normalized_payload, true);
+  $hash = substr(hash('sha256', $exported_payload), 0, 32);
+
+  return sanitize_text_field('hic_tx_' . $hash);
 }
 
 /* ============ GA4 (purchase + bucket) ============ */
