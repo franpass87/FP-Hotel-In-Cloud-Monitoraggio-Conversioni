@@ -99,12 +99,126 @@ if (!function_exists('wp_schedule_single_event')) {
         return true;
     }
 }
+if (!function_exists('is_multisite')) { function is_multisite() { return false; } }
+if (!function_exists('get_sites')) { function get_sites(...$args) { return []; } }
+if (!function_exists('switch_to_blog')) {
+    function switch_to_blog($site_id)
+    {
+        if (!isset($GLOBALS['hic_switched_blog'])) {
+            $GLOBALS['hic_switched_blog'] = [];
+        }
+
+        $GLOBALS['hic_switched_blog'][] = $site_id;
+    }
+}
+if (!function_exists('restore_current_blog')) {
+    function restore_current_blog()
+    {
+        if (!empty($GLOBALS['hic_switched_blog'])) {
+            array_pop($GLOBALS['hic_switched_blog']);
+        }
+    }
+}
 if (!function_exists('is_admin')) { function is_admin() { return false; } }
 if (!function_exists('admin_url')) { function admin_url($path = '') { return $path; } }
 if (!function_exists('wp_enqueue_script')) { function wp_enqueue_script(...$args) {} }
 if (!function_exists('wp_enqueue_style')) { function wp_enqueue_style(...$args) {} }
 if (!function_exists('wp_localize_script')) { function wp_localize_script(...$args) {} }
 if (!function_exists('wp_add_inline_script')) { function wp_add_inline_script(...$args) {} }
+if (!class_exists('WP_Role')) {
+    class WP_Role {
+        /** @var string */
+        public $name;
+
+        /** @var array<string,bool> */
+        public $capabilities = [];
+
+        /**
+         * @param array<string,bool> $capabilities
+         */
+        public function __construct(string $name, array $capabilities = [])
+        {
+            $this->name = $name;
+
+            foreach ($capabilities as $capability => $grant) {
+                if ($grant) {
+                    $this->capabilities[$capability] = true;
+                }
+            }
+        }
+
+        public function has_cap(string $cap): bool
+        {
+            return !empty($this->capabilities[$cap]);
+        }
+
+        public function add_cap(string $cap): void
+        {
+            $this->capabilities[$cap] = true;
+        }
+
+        public function remove_cap(string $cap): void
+        {
+            unset($this->capabilities[$cap]);
+        }
+    }
+}
+
+if (!class_exists('WP_Roles')) {
+    class WP_Roles {
+        /** @var array<string,array<string,mixed>> */
+        public $roles = [];
+
+        /** @var array<string,WP_Role> */
+        public $role_objects = [];
+
+        public function __construct()
+        {
+            $this->add_role('administrator', [
+                'read'     => true,
+                'level_10' => true,
+            ]);
+        }
+
+        /**
+         * @param array<string,bool> $capabilities
+         */
+        public function add_role(string $role, array $capabilities = []): void
+        {
+            $this->roles[$role] = [
+                'capabilities' => $capabilities,
+            ];
+
+            $this->role_objects[$role] = new WP_Role($role, $capabilities);
+        }
+
+        public function get_role(string $role): ?WP_Role
+        {
+            return $this->role_objects[$role] ?? null;
+        }
+    }
+}
+
+if (!function_exists('wp_roles')) {
+    function wp_roles(): WP_Roles
+    {
+        global $wp_roles;
+
+        if (!($wp_roles instanceof WP_Roles)) {
+            $wp_roles = new WP_Roles();
+        }
+
+        return $wp_roles;
+    }
+}
+
+if (!function_exists('get_role')) {
+    function get_role(string $role): ?WP_Role
+    {
+        return wp_roles()->get_role($role);
+    }
+}
+
 if (!function_exists('do_action')) {
     function do_action($hook, ...$args) {
         if (empty($GLOBALS['hic_test_hooks'][$hook])) {
