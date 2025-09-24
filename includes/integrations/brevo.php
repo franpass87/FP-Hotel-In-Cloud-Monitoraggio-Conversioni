@@ -450,6 +450,64 @@ function hic_dispatch_brevo_reservation($data, $is_enrichment = false, $gclid = 
 }
 
 /**
+ * Resolve a deterministic transaction ID for Brevo payloads.
+ *
+ * @param array<string,mixed> $source Reservation data used to determine the identifier.
+ * @param string              $sid    Optional sanitized session identifier.
+ */
+function hic_resolve_brevo_transaction_id(array $source, string $sid = ''): string {
+  $transaction_id = Helpers\hic_extract_reservation_id($source);
+  if (is_string($transaction_id) || is_numeric($transaction_id)) {
+    $transaction_id = \sanitize_text_field((string) $transaction_id);
+  } else {
+    $transaction_id = '';
+  }
+
+  if ($transaction_id !== '') {
+    return $transaction_id;
+  }
+
+  $normalized_sid = '';
+  if ($sid !== '') {
+    $normalized_sid = \sanitize_text_field($sid);
+  } elseif (!empty($source['sid']) && is_scalar($source['sid'])) {
+    $normalized_sid = \sanitize_text_field((string) $source['sid']);
+  }
+
+  if (function_exists(__NAMESPACE__ . '\hic_ga4_resolve_transaction_id')) {
+    $resolved = hic_ga4_resolve_transaction_id($source, $normalized_sid);
+    if (is_string($resolved) || is_numeric($resolved)) {
+      $resolved = \sanitize_text_field((string) $resolved);
+      if ($resolved !== '') {
+        return $resolved;
+      }
+    }
+  }
+
+  $booking_uid = Helpers\hic_booking_uid($source);
+  if (is_string($booking_uid) || is_numeric($booking_uid)) {
+    $booking_uid = \sanitize_text_field((string) $booking_uid);
+    if ($booking_uid !== '') {
+      return $booking_uid;
+    }
+  }
+
+  $payload_for_hash = $source;
+  if (function_exists(__NAMESPACE__ . '\hic_ga4_normalize_value_for_hash')) {
+    $payload_for_hash = hic_ga4_normalize_value_for_hash($source);
+  }
+
+  $encoded = wp_json_encode($payload_for_hash);
+  if (is_string($encoded) && $encoded !== '') {
+    $hash = substr(hash('sha256', $encoded), 0, 32);
+    return \sanitize_text_field('hic_tx_' . $hash);
+  }
+
+  $fallback_hash = substr(hash('sha256', 'hic_brevo_fallback'), 0, 32);
+  return \sanitize_text_field('hic_tx_' . $fallback_hash);
+}
+
+/**
  * Send reservation_created event to Brevo for real-time notifications
  *
  * @param array  $data   Transformed reservation data
@@ -495,6 +553,23 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
     );
   }
 
+  $sid = '';
+  if (!empty($data['sid']) && is_scalar($data['sid'])) {
+    $sid = \sanitize_text_field((string) $data['sid']);
+    $data['sid'] = $sid;
+  }
+
+  $transaction_id = '';
+  if (isset($data['transaction_id']) && is_scalar($data['transaction_id'])) {
+    $transaction_id = \sanitize_text_field((string) $data['transaction_id']);
+  }
+
+  if ($transaction_id === '') {
+    $transaction_id = hic_resolve_brevo_transaction_id(is_array($data) ? $data : array(), $sid);
+  }
+
+  $data['transaction_id'] = $transaction_id;
+
   // Validate essential data fields
   $validation_errors = array();
   if (empty($data['transaction_id'])) {
@@ -513,8 +588,6 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
       'skipped' => true,
     );
   }
-
-  $sid = !empty($data['sid']) && is_scalar($data['sid']) ? \sanitize_text_field((string) $data['sid']) : '';
 
   // Get tracking IDs for bucket normalization if available
   $lookup_id = $sid !== '' ? $sid : ($data['transaction_id'] ?? '');
@@ -965,7 +1038,7 @@ function hic_transform_webhook_data_for_brevo($webhook_data) {
   }
 
   $transformed = array(
-    'transaction_id' => Helpers\hic_extract_reservation_id($webhook_data),
+    'transaction_id' => hic_resolve_brevo_transaction_id($webhook_data, $sid),
     'reservation_code' => isset($webhook_data['reservation_code']) ? $webhook_data['reservation_code'] : '',
     'email' => isset($webhook_data['email']) ? $webhook_data['email'] : '',
     'guest_first_name' => $first ?? '',
