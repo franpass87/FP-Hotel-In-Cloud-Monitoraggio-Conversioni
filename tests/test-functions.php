@@ -436,6 +436,46 @@ class HICFunctionsTest {
         echo "✅ Facebook phone hash normalization tests passed\n";
     }
 
+    public function testFacebookEventIdFallbackIsStable() {
+        if (!function_exists('home_url')) { function home_url() { return 'https://example.com'; } }
+        if (!function_exists('wp_json_encode')) { function wp_json_encode($data) { return json_encode($data); } }
+        if (!function_exists('wp_remote_retrieve_response_code')) { function wp_remote_retrieve_response_code($res) { return $res['response']['code'] ?? 0; } }
+        if (!function_exists('wp_remote_retrieve_body')) { function wp_remote_retrieve_body($res) { return $res['body'] ?? ''; } }
+        if (!function_exists('is_wp_error')) { function is_wp_error($thing) { return false; } }
+
+        update_option('hic_fb_pixel_id', 'FBTEST');
+        update_option('hic_fb_access_token', 'FBTOKEN');
+        Helpers\hic_clear_option_cache();
+
+        global $hic_last_request;
+
+        $data = [
+            'email' => 'guest@example.com',
+            'from_date' => '2024-05-01',
+            'amount' => 150,
+            'currency' => 'EUR'
+        ];
+
+        $hic_last_request = null;
+        \FpHic\hic_send_to_fb($data, null, null);
+        $payload1 = json_decode($hic_last_request['args']['body'], true);
+        $event_id1 = $payload1['data'][0]['event_id'] ?? '';
+        $order_id1 = $payload1['data'][0]['custom_data']['order_id'] ?? '';
+
+        $hic_last_request = null;
+        \FpHic\hic_send_to_fb($data, null, null);
+        $payload2 = json_decode($hic_last_request['args']['body'], true);
+        $event_id2 = $payload2['data'][0]['event_id'] ?? '';
+        $order_id2 = $payload2['data'][0]['custom_data']['order_id'] ?? '';
+
+        assert($event_id1 === $event_id2, 'Facebook fallback should reuse event_id for identical payloads');
+        assert($event_id1 === $order_id1, 'Facebook event_id should mirror order_id');
+        assert($event_id2 === $order_id2, 'Facebook order_id should match event_id on subsequent calls');
+        assert($event_id1 !== '', 'Facebook fallback event_id should not be empty');
+
+        echo "✅ Facebook event_id fallback stability tests passed\n";
+    }
+
     public function testGa4TransactionIdFallbackIsStable() {
         if (!function_exists('home_url')) { function home_url() { return 'https://example.com'; } }
         if (!function_exists('wp_generate_uuid4')) { function wp_generate_uuid4() { return 'uuid-4'; } }
@@ -572,6 +612,8 @@ class HICFunctionsTest {
             $this->testBrevoLanguageListFiltering();
             $this->testBrevoRoomNamePropagation();
             $this->testBrevoReservationCreatedPhoneLanguageOverride();
+            $this->testFacebookPhoneHashNormalization();
+            $this->testFacebookEventIdFallbackIsStable();
             $this->testGa4TransactionIdFallbackIsStable();
             $this->testEventRoomNameFallback();
 
