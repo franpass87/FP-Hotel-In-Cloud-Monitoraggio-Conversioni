@@ -186,8 +186,18 @@ function hic_get_tracking_ids_by_sid($sid) {
     // Ensure table exists before querying
     $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if (!$table_exists) {
-        hic_log('hic_get_tracking_ids_by_sid: Table does not exist: ' . $table);
-        return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
+        static $rebuild_attempted = false;
+
+        if (!$rebuild_attempted && function_exists('\\hic_create_database_table')) {
+            $rebuild_attempted = true;
+            \hic_create_database_table();
+            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+        }
+
+        if (!$table_exists) {
+            hic_log('hic_get_tracking_ids_by_sid: Table does not exist: ' . $table);
+            return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
+        }
     }
     $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid, msclkid, ttclid, gbraid, wbraid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
 
@@ -238,8 +248,18 @@ function hic_get_utm_params_by_sid($sid) {
     // Ensure table exists before querying
     $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
     if (!$table_exists) {
-        hic_log('hic_get_utm_params_by_sid: Table does not exist: ' . $table);
-        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
+        static $utm_rebuild_attempted = false;
+
+        if (!$utm_rebuild_attempted && function_exists('\\hic_create_database_table')) {
+            $utm_rebuild_attempted = true;
+            \hic_create_database_table();
+            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+        }
+
+        if (!$table_exists) {
+            hic_log('hic_get_utm_params_by_sid: Table does not exist: ' . $table);
+            return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
+        }
     }
 
     $row = $wpdb->get_row($wpdb->prepare("SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));

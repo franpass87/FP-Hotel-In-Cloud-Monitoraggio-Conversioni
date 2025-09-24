@@ -193,4 +193,31 @@ final class BrevoReservationFieldsTest extends TestCase {
         $payload = json_decode($hic_last_request['args']['body'], true);
         $this->assertSame($expectedId, $payload['properties']['reservation_id']);
     }
+
+    public function testResolveBrevoTransactionIdRemainsDeterministicWhenJsonEncodingFails(): void
+    {
+        $base = [
+            'amount' => NAN,
+            'currency' => 'usd',
+            'guest_first_name' => 'Test',
+        ];
+
+        $firstPayload = $base;
+        $firstPayload['trace'] = 'first';
+
+        $secondPayload = $base;
+        $secondPayload['trace'] = 'second';
+
+        $firstId = \FpHic\hic_resolve_brevo_transaction_id($firstPayload);
+        $firstRetry = \FpHic\hic_resolve_brevo_transaction_id($firstPayload);
+        $secondId = \FpHic\hic_resolve_brevo_transaction_id($secondPayload);
+        $secondRetry = \FpHic\hic_resolve_brevo_transaction_id($secondPayload);
+
+        $this->assertSame($firstId, $firstRetry, 'Brevo fallback ID must be stable for identical payloads.');
+        $this->assertSame($secondId, $secondRetry, 'Brevo fallback ID must be stable for identical payloads.');
+        $this->assertNotSame($firstId, $secondId, 'Distinct payloads must produce distinct Brevo fallback IDs.');
+
+        $this->assertStringStartsWith('hic_tx_', $firstId);
+        $this->assertStringStartsWith('hic_tx_', $secondId);
+    }
 }

@@ -511,8 +511,19 @@ function hic_resolve_brevo_transaction_id(array $source, string $sid = ''): stri
     return \sanitize_text_field('hic_tx_' . $hash);
   }
 
-  $fallback_hash = substr(hash('sha256', 'hic_brevo_fallback'), 0, 32);
-  return \sanitize_text_field('hic_tx_' . $fallback_hash);
+  $serialized_payload = function_exists('maybe_serialize')
+    ? maybe_serialize($payload_for_hash)
+    : serialize($payload_for_hash);
+
+  if (is_string($serialized_payload) && $serialized_payload !== '') {
+    $hash = substr(hash('sha256', $serialized_payload), 0, 32);
+    return \sanitize_text_field('hic_tx_' . $hash);
+  }
+
+  $exported_payload = var_export($payload_for_hash, true);
+  $hash = substr(hash('sha256', $exported_payload), 0, 32);
+
+  return \sanitize_text_field('hic_tx_' . $hash);
 }
 
 /**
