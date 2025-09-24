@@ -92,6 +92,30 @@ function hic_webhook_handler(WP_REST_Request $request) {
     return new \WP_Error('payload_too_large', 'Payload troppo grande', ['status' => 413]);
   }
 
+  $signature_header = $request->get_header(HIC_WEBHOOK_SIGNATURE_HEADER);
+  if (!is_string($signature_header)) {
+    $signature_header = '';
+  }
+  $signature_header = trim($signature_header);
+
+  $webhook_secret = hic_get_webhook_secret();
+
+  if (is_string($webhook_secret)) {
+    $webhook_secret = trim($webhook_secret);
+  }
+
+  if (!empty($webhook_secret)) {
+    if ($signature_header === '') {
+      hic_log('Webhook rifiutato: firma mancante', HIC_LOG_LEVEL_WARNING);
+      return new \WP_Error('missing_signature', 'Firma webhook mancante', ['status' => 401]);
+    }
+
+    if (!hic_verify_webhook_signature($raw, $signature_header, $webhook_secret)) {
+      hic_log('Webhook rifiutato: firma non valida', HIC_LOG_LEVEL_WARNING);
+      return new \WP_Error('invalid_signature', 'Firma webhook non valida', ['status' => 401]);
+    }
+  }
+
   // Decode JSON data
   $data = json_decode($raw, true);
 
@@ -282,4 +306,56 @@ function hic_validate_webhook_payload($payload) {
   }
 
   return true;
+}
+
+if (!function_exists('hic_generate_webhook_signature')) {
+  function hic_generate_webhook_signature(string $payload, string $secret): string
+  {
+    return hash_hmac('sha256', $payload, $secret);
+  }
+}
+
+if (!function_exists('hic_verify_webhook_signature')) {
+  function hic_verify_webhook_signature(string $payload, string $provided_signature, string $secret): bool
+  {
+    if ($secret === '') {
+      return true;
+    }
+
+    $trimmed_signature = trim($provided_signature);
+
+    if ($trimmed_signature === '') {
+      return false;
+    }
+
+    if (stripos($trimmed_signature, 'sha256=') === 0) {
+      $trimmed_signature = substr($trimmed_signature, 7);
+    }
+
+    $trimmed_signature = trim($trimmed_signature);
+
+    if ($trimmed_signature === '') {
+      return false;
+    }
+
+    $expected_hex = hic_generate_webhook_signature($payload, $secret);
+
+    // Compare against lowercase hexadecimal representation.
+    $hex_candidate = strtolower($trimmed_signature);
+    if (strlen($hex_candidate) === strlen($expected_hex) && hash_equals($expected_hex, $hex_candidate)) {
+      return true;
+    }
+
+    // Fallback: accept base64 encoded signature.
+    $binary_signature = hex2bin($expected_hex);
+    if ($binary_signature !== false) {
+      $expected_base64 = base64_encode($binary_signature);
+
+      if (hash_equals($expected_base64, $trimmed_signature)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 }

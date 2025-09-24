@@ -55,6 +55,12 @@ Schema campi principali:
 - `language` *(stringa)* – lingua dell'utente
 - `sid` *(stringa)* – identificatore utente opzionale per il tracciamento
 
+#### Sicurezza del Webhook
+
+- Configura un **Webhook Token** e un **Webhook Secret** dalle impostazioni del plugin. Il token protegge l'URL, mentre il secret viene utilizzato per firmare il payload.
+- Ogni chiamata deve includere l'header `X-HIC-Signature` con la firma HMAC-SHA256 del corpo raw (`sha256=<firma_esadecimale>` oppure la versione Base64 della firma).
+- Le richieste senza firma o con firma non valida vengono rifiutate con HTTP 401 e registrate nei log di sicurezza del plugin.
+
 #### 🎯 Webhook: La Soluzione per il Tracciamento Senza Redirect
 
 **Problema comune:** Il sistema di prenotazione di Hotel in Cloud non permette redirect al sito dopo la prenotazione, quindi la thank you page rimane nel dominio esterno di HIC.

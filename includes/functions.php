@@ -315,6 +315,17 @@ function hic_connection_uses_api($type = null) {
     return in_array($normalized, ['api', 'hybrid'], true);
 }
 function hic_get_webhook_token() { return hic_get_option('webhook_token', ''); }
+
+function hic_get_webhook_secret(): string
+{
+    $secret = hic_get_option('webhook_secret', '');
+
+    if (!is_string($secret)) {
+        return '';
+    }
+
+    return trim($secret);
+}
 function hic_get_api_url() { return hic_get_option('api_url', ''); }
 function hic_get_api_key() { return hic_get_option('api_key', ''); }
 
@@ -2679,6 +2690,7 @@ namespace {
     function hic_normalize_connection_type($type = null) { return \FpHic\Helpers\hic_normalize_connection_type($type); }
     function hic_connection_uses_api($type = null) { return \FpHic\Helpers\hic_connection_uses_api($type); }
     function hic_get_webhook_token() { return \FpHic\Helpers\hic_get_webhook_token(); }
+    function hic_get_webhook_secret(): string { return \FpHic\Helpers\hic_get_webhook_secret(); }
     function hic_get_api_url() { return \FpHic\Helpers\hic_get_api_url(); }
     function hic_get_api_key() { return \FpHic\Helpers\hic_get_api_key(); }
     function hic_get_api_email() { return \FpHic\Helpers\hic_get_api_email(); }
