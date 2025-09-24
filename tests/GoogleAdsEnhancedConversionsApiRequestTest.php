@@ -116,7 +116,7 @@ namespace {
                 'refresh_token' => 'refresh-token',
                 'conversion_action_id' => '987654321',
             ]);
-            update_option('timezone_string', 'UTC');
+            update_option('timezone_string', 'Europe/Rome');
 
             $conversion = [
                 'id' => 1,
@@ -166,9 +166,10 @@ namespace {
             $this->assertSame('EUR', $conversion_payload['currencyCode']);
             $this->assertEquals(199.99, $conversion_payload['conversionValue']);
             $this->assertMatchesRegularExpression(
-                '/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{4}/',
+                '/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}/',
                 $conversion_payload['conversionDateTime']
             );
+            $this->assertSame('2024-01-10 12:00:00+01:00', $conversion_payload['conversionDateTime']);
         }
 
         public function test_upload_preserves_non_eur_currency(): void

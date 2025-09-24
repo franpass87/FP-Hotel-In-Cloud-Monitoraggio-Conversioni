@@ -33,9 +33,9 @@ final class GoogleAdsEnhancedConversionsDateFormattingTest extends TestCase
 
         $formatted = $method->invoke($enhanced, '2024-03-01 10:00:00');
 
-        $this->assertSame('2024-03-01 10:00:00+0100', $formatted);
-        $parsed = DateTime::createFromFormat('Y-m-d H:i:sO', $formatted);
+        $this->assertSame('2024-03-01 10:00:00+01:00', $formatted);
+        $parsed = DateTime::createFromFormat('Y-m-d H:i:sP', $formatted);
         $this->assertInstanceOf(DateTime::class, $parsed);
-        $this->assertSame('+0100', $parsed->format('O'));
+        $this->assertSame('+01:00', $parsed->format('P'));
     }
 }

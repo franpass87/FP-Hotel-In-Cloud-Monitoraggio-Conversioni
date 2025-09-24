@@ -1102,7 +1102,7 @@ class GoogleAdsEnhancedConversions {
             $date = new \DateTimeImmutable('now', $timezone);
         }
 
-        return $date->setTimezone($timezone)->format('Y-m-d H:i:sO');
+        return $date->setTimezone($timezone)->format('Y-m-d H:i:sP');
     }
 
     /**
