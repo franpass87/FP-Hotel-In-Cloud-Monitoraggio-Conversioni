@@ -175,7 +175,17 @@ class HIC_Input_Validator {
 
         if (!empty($errors)) {
             if (count($errors) === 1 && $errors[0] instanceof \WP_Error) {
-                return $errors[0];
+                $single_error = $errors[0];
+                $error_data = $single_error->get_error_data();
+                $field = '';
+
+                if (is_array($error_data) && isset($error_data['field'])) {
+                    $field = strtolower((string) $error_data['field']);
+                }
+
+                if ($field !== 'sid') {
+                    return $single_error;
+                }
             }
 
             $messages = [];
