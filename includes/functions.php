@@ -255,6 +255,7 @@ function hic_get_brevo_list_default() { return hic_get_option('brevo_list_defaul
 function hic_get_brevo_optin_default() { return hic_get_option('brevo_optin_default', '0') === '1'; }
 function hic_is_brevo_enabled() { return hic_get_option('brevo_enabled', '0') === '1'; }
 function hic_is_debug_verbose() { return hic_get_option('debug_verbose', '0') === '1'; }
+function hic_get_health_token() { return hic_get_option('health_token', ''); }
 
 // New email enrichment settings
 function hic_updates_enrich_contacts() { return hic_get_option('updates_enrich_contacts', '1') === '1'; }
@@ -2673,6 +2674,7 @@ namespace {
     function hic_get_brevo_optin_default() { return \FpHic\Helpers\hic_get_brevo_optin_default(); }
     function hic_is_brevo_enabled() { return \FpHic\Helpers\hic_is_brevo_enabled(); }
     function hic_is_debug_verbose() { return \FpHic\Helpers\hic_is_debug_verbose(); }
+    function hic_get_health_token() { return \FpHic\Helpers\hic_get_health_token(); }
     function hic_updates_enrich_contacts() { return \FpHic\Helpers\hic_updates_enrich_contacts(); }
     function hic_get_brevo_list_alias() { return \FpHic\Helpers\hic_get_brevo_list_alias(); }
     function hic_brevo_double_optin_on_enrich() { return \FpHic\Helpers\hic_brevo_double_optin_on_enrich(); }

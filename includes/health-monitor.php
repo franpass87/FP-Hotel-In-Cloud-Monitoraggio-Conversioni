@@ -453,7 +453,7 @@ class HIC_Health_Monitor {
      * Validate public health check token
      */
     private function validate_health_token($token) {
-        $saved = get_option('hic_health_token');
+        $saved = \FpHic\Helpers\hic_get_health_token();
         return !empty($token) && !empty($saved) && hash_equals($saved, $token);
     }
 

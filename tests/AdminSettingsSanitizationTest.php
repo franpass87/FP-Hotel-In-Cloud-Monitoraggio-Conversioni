@@ -17,6 +17,25 @@ if (!function_exists('rest_sanitize_boolean')) {
         return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 }
+if (!function_exists('check_ajax_referer')) {
+    function check_ajax_referer($action, $arg = false, $die = true) {
+        return true;
+    }
+}
+if (!function_exists('wp_send_json_success')) {
+    function wp_send_json_success($data) {
+        $response = ['success' => true, 'data' => $data];
+        $GLOBALS['hic_last_json_response'] = $response;
+        $GLOBALS['ajax_response'] = $response;
+    }
+}
+if (!function_exists('wp_send_json_error')) {
+    function wp_send_json_error($data) {
+        $response = ['success' => false, 'data' => $data];
+        $GLOBALS['hic_last_json_response'] = $response;
+        $GLOBALS['ajax_response'] = $response;
+    }
+}
 
 final class AdminSettingsSanitizationTest extends TestCase {
     protected function setUp(): void {
@@ -56,6 +75,49 @@ final class AdminSettingsSanitizationTest extends TestCase {
         $sanitized = call_user_func($hic_registered_settings['hic_api_password'], $raw);
         update_option('hic_api_password', $sanitized);
         $this->assertSame('p&ssw%rd<secure>', get_option('hic_api_password'));
+    }
+
+    public function testHealthTokenSanitizeRequiresMinimumLength(): void {
+        global $hic_registered_settings, $hic_settings_errors;
+        $hic_settings_errors = [];
+
+        update_option('hic_health_token', 'existingtokenvalueforhealthcheck123');
+
+        $sanitized = call_user_func($hic_registered_settings['hic_health_token'], 'short');
+
+        $this->assertSame('existingtokenvalueforhealthcheck123', $sanitized);
+        $this->assertNotEmpty($hic_settings_errors);
+        $this->assertSame('health_token_short', $hic_settings_errors[0]['code']);
+    }
+
+    public function testHealthTokenSanitizeStripsInvalidCharacters(): void {
+        global $hic_registered_settings;
+
+        $raw = '  token-VALID_value_1234567890!@#$  ';
+        $sanitized = call_user_func($hic_registered_settings['hic_health_token'], $raw);
+
+        $this->assertSame('token-VALID_value_1234567890', $sanitized);
+    }
+
+    public function testAjaxHealthTokenGeneration(): void {
+        global $hic_last_json_response;
+
+        $hic_last_json_response = null;
+        $_POST['nonce'] = 'test';
+
+        hic_ajax_generate_health_token();
+
+        $this->assertIsArray($hic_last_json_response);
+        $this->assertTrue($hic_last_json_response['success']);
+        $this->assertArrayHasKey('token', $hic_last_json_response['data']);
+
+        $token = $hic_last_json_response['data']['token'];
+
+        $this->assertSame($token, get_option('hic_health_token'));
+        $this->assertGreaterThanOrEqual(24, strlen($token));
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9_-]+$/', $token);
+
+        unset($_POST['nonce'], $GLOBALS['hic_last_json_response']);
     }
 
     public function testSecurityHeadersAppliedOnPluginPage(): void {
