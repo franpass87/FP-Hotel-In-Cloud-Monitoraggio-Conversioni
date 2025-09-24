@@ -8,6 +8,20 @@
 
 if (!defined('ABSPATH')) exit;
 
+// Provide fallbacks for WordPress time constants when the plugin is loaded
+// in non-WordPress environments (e.g. automated tests).
+if (!defined('MINUTE_IN_SECONDS')) {
+    define('MINUTE_IN_SECONDS', 60);
+}
+
+if (!defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 60 * MINUTE_IN_SECONDS);
+}
+
+if (!defined('DAY_IN_SECONDS')) {
+    define('DAY_IN_SECONDS', 24 * HOUR_IN_SECONDS);
+}
+
 // === POLLING INTERVALS ===
 define('HIC_CONTINUOUS_POLLING_INTERVAL', 30);    // 30 seconds for near real-time polling (optimized for limited hosting)
 define('HIC_DEEP_CHECK_INTERVAL', 1800);          // 30 minutes for deep check (re-enabled for safety)

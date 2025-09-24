@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) exit;
 add_action('rest_api_init', function () {
   // Registra webhook se siamo in modalità webhook O hybrid
   if (in_array(hic_get_connection_type(), ['webhook', 'hybrid'])) {
-    register_rest_route('hic/v1', '/conversion', [
+    $route_args = [
       'methods'             => 'POST',
       'callback'            => 'hic_webhook_handler',
       'permission_callback' => '__return_true',
@@ -30,8 +30,11 @@ add_action('rest_api_init', function () {
           'sanitize_callback' => 'sanitize_email',
           'description'       => 'Email del cliente associata alla prenotazione',
         ],
-      ],
-    ]);
+        ],
+    ];
+
+    register_rest_route('hic/v1', '/conversion', $route_args);
+    \FpHic\Helpers\hic_register_rest_route_fallback('hic/v1', '/conversion', $route_args);
   }
 });
 

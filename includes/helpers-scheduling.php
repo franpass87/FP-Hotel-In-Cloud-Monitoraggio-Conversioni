@@ -22,8 +22,7 @@ function hic_should_schedule_retry_event() {
  * Determine if there are failed requests waiting to be retried
  */
 function hic_has_failed_requests_to_retry() {
-    global $wpdb;
-
+    $wpdb = hic_get_wpdb_instance(['get_var']);
     if (!$wpdb) {
         return false;
     }
@@ -111,7 +110,7 @@ function hic_schedule_failed_request_retry() {
 }
 
 function hic_retry_failed_requests() {
-    global $wpdb;
+    $wpdb = hic_get_wpdb_instance(['get_results', 'delete', 'update']);
     if (!$wpdb) {
         return;
     }
@@ -173,7 +172,7 @@ function hic_cleanup_failed_requests($days = 30) {
         return 0;
     }
 
-    global $wpdb;
+    $wpdb = hic_get_wpdb_instance(['query', 'prepare']);
     if (!$wpdb) {
         hic_log('hic_cleanup_failed_requests: wpdb is not available');
         return false;

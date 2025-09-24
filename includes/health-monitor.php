@@ -38,7 +38,7 @@ class HIC_Health_Monitor {
      * Register REST API endpoint for health checks
      */
     public function register_health_endpoint() {
-        register_rest_route('hic/v1', '/health', [
+        $route_args = [
             'methods' => 'GET',
             'callback' => [$this, 'rest_health_check'],
             'permission_callback' => [$this, 'rest_token_permission'],
@@ -48,7 +48,10 @@ class HIC_Health_Monitor {
                     'type' => 'string'
                 ],
             ]
-        ]);
+        ];
+
+        register_rest_route('hic/v1', '/health', $route_args);
+        \FpHic\Helpers\hic_register_rest_route_fallback('hic/v1', '/health', $route_args);
     }
     
     /**

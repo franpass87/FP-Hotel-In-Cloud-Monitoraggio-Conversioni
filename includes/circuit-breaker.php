@@ -66,6 +66,37 @@ class CircuitBreakerManager {
     }
 
     /**
+     * Retrieve the global wpdb instance when available and supporting the required methods.
+     *
+     * @param string   $context           Context string used for debug logging when unavailable.
+     * @param string[] $required_methods  List of wpdb methods that must be present.
+     * @return object|null                The wpdb instance or null when not available.
+     */
+    private function get_wpdb_instance(string $context, array $required_methods = [])
+    {
+        global $wpdb;
+
+        if (!isset($wpdb) || !is_object($wpdb)) {
+            $this->log($context . ': wpdb not available; skipping database operation');
+            return null;
+        }
+
+        foreach ($required_methods as $method) {
+            if (!method_exists($wpdb, $method)) {
+                $this->log($context . ': wpdb::' . $method . ' unavailable; skipping database operation');
+                return null;
+            }
+        }
+
+        if (!isset($wpdb->prefix)) {
+            $this->log($context . ': wpdb prefix not set; skipping database operation');
+            return null;
+        }
+
+        return $wpdb;
+    }
+
+    /**
      * Perform one-time setup tasks during plugin activation.
      */
     public static function activate() {
@@ -100,11 +131,24 @@ class CircuitBreakerManager {
      * Create circuit breaker status tracking table
      */
     private function create_circuit_breaker_table() {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['get_charset_collate']);
+        if (!$wpdb) {
+            return;
+        }
+
+        $upgrade_file = ABSPATH . 'wp-admin/includes/upgrade.php';
+        if (!function_exists('\dbDelta')) {
+            if (is_readable($upgrade_file)) {
+                require_once $upgrade_file;
+            } else {
+                $this->log(__METHOD__ . ': dbDelta unavailable; skipping table creation');
+                return;
+            }
+        }
+
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
         $charset = $wpdb->get_charset_collate();
-        
+
         $sql = "CREATE TABLE IF NOT EXISTS {$table_name} (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             service_name VARCHAR(100) NOT NULL UNIQUE,
@@ -124,21 +168,33 @@ class CircuitBreakerManager {
             INDEX idx_last_failure_time (last_failure_time)
         ) {$charset};";
         
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
-        
+
         $this->log('Circuit breaker table created/verified');
     }
-    
+
     /**
      * Create retry queue table
      */
     private function create_retry_queue_table() {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['get_charset_collate']);
+        if (!$wpdb) {
+            return;
+        }
+
+        $upgrade_file = ABSPATH . 'wp-admin/includes/upgrade.php';
+        if (!function_exists('\dbDelta')) {
+            if (is_readable($upgrade_file)) {
+                require_once $upgrade_file;
+            } else {
+                $this->log(__METHOD__ . ': dbDelta unavailable; skipping table creation');
+                return;
+            }
+        }
+
         $table_name = $wpdb->prefix . 'hic_retry_queue';
         $charset = $wpdb->get_charset_collate();
-        
+
         $sql = "CREATE TABLE IF NOT EXISTS {$table_name} (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             service_name VARCHAR(100) NOT NULL,
@@ -160,9 +216,8 @@ class CircuitBreakerManager {
             INDEX idx_retry_count (retry_count)
         ) {$charset};";
         
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
-        
+
         $this->log('Retry queue table created/verified');
     }
     
@@ -212,15 +267,18 @@ class CircuitBreakerManager {
      * Ensure circuit breaker exists for a service
      */
     private function ensure_circuit_breaker_exists($service_name, $config) {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['prepare', 'get_row', 'insert']);
+        if (!$wpdb) {
+            return;
+        }
+
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
-        
+
         $existing = $wpdb->get_row($wpdb->prepare(
             "SELECT id FROM {$table_name} WHERE service_name = %s",
             $service_name
         ));
-        
+
         if (!$existing) {
             $wpdb->insert($table_name, [
                 'service_name' => $service_name,
@@ -356,15 +414,18 @@ class CircuitBreakerManager {
      * Get circuit breaker state for a service
      */
     private function get_circuit_state($service_name) {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['prepare', 'get_row']);
+        if (!$wpdb) {
+            return self::STATES['CLOSED'];
+        }
+
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
-        
+
         $circuit = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$table_name} WHERE service_name = %s",
             $service_name
         ), ARRAY_A);
-        
+
         return $circuit ? $circuit['state'] : self::STATES['CLOSED'];
     }
     
@@ -372,19 +433,22 @@ class CircuitBreakerManager {
      * Record API failure
      */
     private function record_failure($service_name, $error_message) {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['prepare', 'get_row', 'update']);
+        if (!$wpdb) {
+            return;
+        }
+
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
-        
+
         $circuit = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$table_name} WHERE service_name = %s",
             $service_name
         ), ARRAY_A);
-        
+
         if (!$circuit) {
             return;
         }
-        
+
         $new_failure_count = $circuit['failure_count'] + 1;
         $new_state = $circuit['state'];
         
@@ -405,7 +469,7 @@ class CircuitBreakerManager {
             'last_failure_time' => current_time('mysql'),
             'state' => $new_state
         ], ['service_name' => $service_name]);
-        
+
         $this->log("Recorded failure for {$service_name}: {$error_message}");
     }
     
@@ -413,19 +477,22 @@ class CircuitBreakerManager {
      * Record API success
      */
     private function record_success($service_name) {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['prepare', 'get_row', 'update']);
+        if (!$wpdb) {
+            return;
+        }
+
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
-        
+
         $circuit = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM {$table_name} WHERE service_name = %s",
             $service_name
         ), ARRAY_A);
-        
+
         if (!$circuit) {
             return;
         }
-        
+
         $new_success_count = $circuit['success_count'] + 1;
         $new_state = $circuit['state'];
         
@@ -454,7 +521,7 @@ class CircuitBreakerManager {
             'last_success_time' => current_time('mysql'),
             'state' => $new_state
         ], ['service_name' => $service_name]);
-        
+
         $this->log("Recorded success for {$service_name}");
     }
     
@@ -503,7 +570,10 @@ class CircuitBreakerManager {
      * Queue operation for retry
      */
     private function queue_for_retry($service_name, $operation_type, $payload, $priority = 'MEDIUM') {
-        global $wpdb;
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['insert']);
+        if (!$wpdb) {
+            return;
+        }
 
         $table_name = $wpdb->prefix . 'hic_retry_queue';
 
@@ -558,14 +628,17 @@ class CircuitBreakerManager {
      * Process retry queue
      */
     public function process_retry_queue() {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['prepare', 'get_results']);
+        if (!$wpdb) {
+            return;
+        }
+
         $table_name = $wpdb->prefix . 'hic_retry_queue';
-        
+
         // Get items ready for retry, ordered by priority and scheduled time
         $retry_items = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$table_name} 
-             WHERE status = 'queued' 
+            "SELECT * FROM {$table_name}
+             WHERE status = 'queued'
              AND scheduled_retry_at <= %s 
              AND retry_count < max_retries
              ORDER BY 
@@ -594,8 +667,11 @@ class CircuitBreakerManager {
      * Process individual retry item
      */
     private function process_retry_item($item) {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['update']);
+        if (!$wpdb) {
+            return;
+        }
+
         $table_name = $wpdb->prefix . 'hic_retry_queue';
         
         // Check if circuit is still open
@@ -729,8 +805,11 @@ class CircuitBreakerManager {
      * Handle retry failure
      */
     private function handle_retry_failure($item, $error_message = null) {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['update']);
+        if (!$wpdb) {
+            return;
+        }
+
         $table_name = $wpdb->prefix . 'hic_retry_queue';
         $new_retry_count = $item['retry_count'] + 1;
         
@@ -766,8 +845,11 @@ class CircuitBreakerManager {
      * Check for circuit breaker recovery
      */
     public function check_circuit_recovery() {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['prepare', 'get_results']);
+        if (!$wpdb) {
+            return;
+        }
+
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
         
         // Get all open circuits that might be ready for recovery testing
@@ -787,17 +869,20 @@ class CircuitBreakerManager {
      * Transition circuit to half-open state
      */
     private function transition_to_half_open($service_name) {
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['update']);
+        if (!$wpdb) {
+            return;
+        }
+
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
-        
+
         $wpdb->update($table_name, [
             'state' => self::STATES['HALF_OPEN'],
             'success_count' => 0
         ], ['service_name' => $service_name]);
-        
+
         $this->log("Circuit breaker transitioned to HALF_OPEN for {$service_name}");
-        
+
         do_action('hic_circuit_breaker_half_open', $service_name);
     }
     
@@ -949,10 +1034,13 @@ class CircuitBreakerManager {
             wp_send_json_error('Invalid nonce');
         }
 
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['get_results']);
+        if (!$wpdb) {
+            wp_send_json_success([]);
+        }
+
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
-        
+
         $circuits = $wpdb->get_results(
             "SELECT * FROM {$table_name} ORDER BY service_name",
             ARRAY_A
@@ -979,10 +1067,13 @@ class CircuitBreakerManager {
             wp_send_json_error('Service name required');
         }
         
-        global $wpdb;
-        
+        $wpdb = $this->get_wpdb_instance(__METHOD__, ['update']);
+        if (!$wpdb) {
+            wp_send_json_error('Database not available');
+        }
+
         $table_name = $wpdb->prefix . 'hic_circuit_breakers';
-        
+
         $updated = $wpdb->update($table_name, [
             'state' => self::STATES['CLOSED'],
             'failure_count' => 0,
