@@ -37,11 +37,12 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttcli
         $amount = Helpers\hic_normalize_price($amount_source);
     }
 
-    // Generate transaction ID using consistent extraction
+    // Generate transaction ID using consistent extraction shared with GA4
     $transaction_id = Helpers\hic_extract_reservation_id($data);
     if (empty($transaction_id)) {
-        $transaction_id = uniqid('hic_gtm_');
+        $transaction_id = hic_ga4_resolve_transaction_id($data, $sid);
     }
+    $transaction_id = sanitize_text_field((string) $transaction_id);
 
     // Determine item name with fallbacks matching booking processor normalization
     $item_name = '';
@@ -59,7 +60,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttcli
     }
 
     // Prefer item identifiers from payload when available to mirror reservation dispatch
-    $item_id = sanitize_text_field((string) $transaction_id);
+    $item_id = $transaction_id;
     foreach (['accommodation_id', 'room_id'] as $id_field) {
         if (!empty($data[$id_field]) && is_scalar($data[$id_field])) {
             $candidate_id = sanitize_text_field((string) $data[$id_field]);
@@ -86,6 +87,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttcli
                 'price' => $amount
             ]]
         ],
+        'transaction_id' => $transaction_id,
         // Custom dimensions for attribution
         'bucket' => $bucket,
         'vertical' => 'hotel',
@@ -370,7 +372,7 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
     }
 
     // Validate required fields
-    $required_fields = ['transaction_id', 'value', 'currency'];
+    $required_fields = ['value', 'currency'];
     foreach ($required_fields as $field) {
         if (!isset($data[$field])) {
             hic_log("GTM dispatch: Missing required field '$field'");
@@ -378,7 +380,18 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
         }
     }
 
-    $transaction_id = sanitize_text_field($data['transaction_id']);
+    $transaction_id = '';
+    if (isset($data['transaction_id']) && is_scalar($data['transaction_id'])) {
+        $transaction_id = sanitize_text_field((string) $data['transaction_id']);
+    }
+    if ($transaction_id === '') {
+        $transaction_id = sanitize_text_field((string) hic_ga4_resolve_transaction_id($data, $sid));
+    }
+    if ($transaction_id === '') {
+        hic_log('GTM dispatch: Unable to determine transaction_id');
+        return false;
+    }
+    $data['transaction_id'] = $transaction_id;
     $value = Helpers\hic_normalize_price($data['value']);
     $currency = sanitize_text_field($data['currency']);
 
@@ -423,6 +436,7 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
                 'price' => $value
             ]]
         ],
+        'transaction_id' => $transaction_id,
         // Custom properties
         'checkin' => sanitize_text_field($data['from_date'] ?? ''),
         'checkout' => sanitize_text_field($data['to_date'] ?? ''),
