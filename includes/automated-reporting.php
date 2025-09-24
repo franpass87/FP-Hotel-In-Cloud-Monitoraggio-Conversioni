@@ -1323,7 +1323,7 @@ class AutomatedReportingManager {
     public function handle_download_export() {
         $filename = sanitize_file_name($_GET['file'] ?? '');
 
-        if (empty($filename)) {
+        if ($filename === '') {
             wp_die('Invalid file');
         }
 
@@ -1335,6 +1335,14 @@ class AutomatedReportingManager {
             wp_send_json_error('Insufficient permissions');
         }
 
+        $allowed_extensions = array('csv', 'xlsx');
+        $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+
+        if ($extension === '' || !in_array($extension, $allowed_extensions, true)) {
+            $this->log('Blocked export download due to invalid extension: ' . $filename);
+            wp_die('File not found');
+        }
+
         $base_path = realpath($this->export_dir);
 
         if ($base_path === false) {
@@ -1342,7 +1350,14 @@ class AutomatedReportingManager {
             wp_die('File not found');
         }
 
-        $filepath = realpath($this->export_dir . $filename);
+        $raw_filepath = $this->export_dir . $filename;
+
+        if (is_link($raw_filepath)) {
+            $this->log('Blocked export download for symbolic link: ' . $raw_filepath);
+            wp_die('File not found');
+        }
+
+        $filepath = realpath($raw_filepath);
 
         if ($filepath === false) {
             $this->log('Requested export file could not be resolved: ' . $filename);
@@ -1351,12 +1366,20 @@ class AutomatedReportingManager {
 
         $base_prefix = rtrim($base_path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
-        if (strpos($filepath, $base_prefix) !== 0 || !file_exists($filepath)) {
+        if (strpos($filepath, $base_prefix) !== 0 || !is_file($filepath)) {
             $this->log('Blocked export download outside export directory: ' . $filepath);
             wp_die('File not found');
         }
 
-        header('Content-Type: application/octet-stream');
+        nocache_headers();
+        header('X-Content-Type-Options: nosniff');
+
+        if ($extension === 'csv') {
+            header('Content-Type: text/csv; charset=utf-8');
+        } else {
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        }
+
         header('Content-Disposition: attachment; filename="' . basename($filepath) . '"');
         header('Content-Length: ' . filesize($filepath));
         readfile($filepath);
