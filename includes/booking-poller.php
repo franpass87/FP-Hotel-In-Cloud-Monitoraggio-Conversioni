@@ -1555,6 +1555,69 @@ function hic_init_booking_poller() {
 }
 
 /**
+ * Remove plugin capabilities from the current site's roles.
+ */
+function hic_remove_plugin_capabilities_for_current_site(): void
+{
+    $capabilities = ['hic_manage', 'hic_view_logs'];
+
+    if (!function_exists('wp_roles')) {
+        return;
+    }
+
+    $roles_object = wp_roles();
+
+    if (!($roles_object instanceof \WP_Roles)) {
+        global $wp_roles;
+
+        if (!($wp_roles instanceof \WP_Roles)) {
+            return;
+        }
+
+        $roles_object = $wp_roles;
+    }
+
+    foreach (array_keys($roles_object->roles) as $role_key) {
+        $role = $roles_object->get_role($role_key);
+
+        if (!($role instanceof \WP_Role)) {
+            continue;
+        }
+
+        foreach ($capabilities as $capability) {
+            if ($role->has_cap($capability)) {
+                $role->remove_cap($capability);
+            }
+        }
+    }
+}
+
+/**
+ * Remove plugin capabilities for all sites when running in multisite.
+ */
+function hic_remove_plugin_capabilities_network_wide(): void
+{
+    if (
+        is_multisite()
+        && function_exists('get_sites')
+        && function_exists('switch_to_blog')
+        && function_exists('restore_current_blog')
+    ) {
+        $sites = get_sites(['fields' => 'ids']);
+
+        foreach ($sites as $site_id) {
+            switch_to_blog((int) $site_id);
+            hic_remove_plugin_capabilities_for_current_site();
+            restore_current_blog();
+        }
+
+        return;
+    }
+
+    hic_remove_plugin_capabilities_for_current_site();
+}
+
+/**
  * Clean up scheduled events and temporary data on plugin deactivation
  */
 function hic_deactivate(): void {
@@ -1624,6 +1687,8 @@ function hic_deactivate(): void {
     delete_option('hic_api_calls_today');
     delete_option('hic_successful_bookings_today');
     delete_option('hic_failed_bookings_today');
+
+    hic_remove_plugin_capabilities_network_wide();
 }
 
 // Initialize booking poller when WordPress is ready (safe hook registration)
