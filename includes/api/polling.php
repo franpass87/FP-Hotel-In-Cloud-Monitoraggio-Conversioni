@@ -140,7 +140,59 @@ function hic_emergency_polling_recovery() {
  */
 function hic_handle_api_response($response, $context = 'API call') {
   if (is_wp_error($response)) {
-    hic_log("$context failed: " . $response->get_error_message());
+    $error_code = $response->get_error_code();
+    $error_message = $response->get_error_message();
+    $error_data = $response->get_error_data();
+
+    if ($error_code === 'http_error' && is_array($error_data) && isset($error_data['status']) && (int) $error_data['status'] === 400) {
+      $body_raw = $error_data['body'] ?? '';
+      if (is_array($body_raw) || is_object($body_raw)) {
+        $body_raw = json_encode($body_raw);
+      }
+      if (!is_string($body_raw)) {
+        $body_raw = (string) $body_raw;
+      }
+
+      $timestamp_error_patterns = [
+        "timestamp can't be older than seven days",
+        "the timestamp can't be older than seven days",
+        'timestamp cannot be older than seven days',
+        'the timestamp cannot be older than seven days',
+        'timestamp troppo vecchio',
+        'timestamp too old',
+        'updated_after',
+        'invalid timestamp',
+        'timestamp non valido',
+      ];
+
+      $body_lower = strtolower($body_raw);
+      $message_lower = strtolower($error_message);
+      $context_lower = strtolower($context);
+
+      $is_timestamp_error = false;
+      foreach ($timestamp_error_patterns as $pattern) {
+        $pattern_lower = strtolower($pattern);
+        if (strpos($body_lower, $pattern_lower) !== false || strpos($message_lower, $pattern_lower) !== false) {
+          $is_timestamp_error = true;
+          break;
+        }
+      }
+
+      if (!$is_timestamp_error && strpos($context_lower, 'updates') !== false) {
+        hic_log("$context: HTTP 400 detected via secure wrapper - treating as potential timestamp error. Body: " . substr($body_raw, 0, 200));
+        $is_timestamp_error = true;
+      }
+
+      if ($is_timestamp_error) {
+        hic_log("$context: HTTP 400 detected via secure wrapper - timestamp too old. Body: " . substr($body_raw, 0, 200));
+        return new WP_Error('hic_timestamp_too_old', "HTTP 400 - Il timestamp è troppo vecchio (oltre 7 giorni). Il sistema resetterà automaticamente il timestamp per la prossima richiesta.");
+      }
+
+      hic_log("$context: HTTP 400 response detected via secure wrapper. Body: " . substr($body_raw, 0, 200));
+      return new WP_Error('hic_http', "HTTP 400 - Richiesta non valida. Verifica i parametri: date_type deve essere checkin, checkout o presence per /reservations. Usa /reservations_updates con updated_after per modifiche recenti.");
+    }
+
+    hic_log("$context failed: " . $error_message);
     return $response;
   }
   
@@ -306,6 +358,20 @@ function hic_fetch_reservations($prop_id, $date_type, $from_date, $to_date, $lim
                     try {
                         $dispatch_result = $normalize_fetch_result(hic_process_single_reservation($reservation), $uid);
                         $status_value = isset($dispatch_result['status']) ? (string) $dispatch_result['status'] : 'failed';
+
+                        if ($status_value === 'skipped') {
+                            $skipped_count++;
+                            $reason = '';
+                            if (isset($dispatch_result['skipped_reason']) && is_scalar($dispatch_result['skipped_reason'])) {
+                                $reason = trim((string) $dispatch_result['skipped_reason']);
+                            }
+                            $skip_message = "Reservation $uid: skipped during fetch";
+                            if ($reason !== '') {
+                                $skip_message .= " ($reason)";
+                            }
+                            hic_log($skip_message);
+                            continue;
+                        }
 
                         if ($status_value === 'failed') {
                             $dispatch_failures++;
@@ -1431,7 +1497,18 @@ function hic_process_reservations_batch($reservations) {
                             $status_result = $normalize_result(hic_process_single_reservation($reservation), $dedup_uid);
                             $status_value = isset($status_result['status']) ? (string) $status_result['status'] : 'failed';
 
-                            if ($status_value === 'failed') {
+                            if ($status_value === 'skipped') {
+                                $skipped_count++;
+                                $reason = '';
+                                if (isset($status_result['skipped_reason']) && is_scalar($status_result['skipped_reason'])) {
+                                    $reason = trim((string) $status_result['skipped_reason']);
+                                }
+                                $message = "Reservation $dedup_uid: status update skipped";
+                                if ($reason !== '') {
+                                    $message .= " ($reason)";
+                                }
+                                hic_log($message);
+                            } elseif ($status_value === 'failed') {
                                 $error_count++;
                                 hic_log("Reservation $dedup_uid: status update failed");
                             } else {
@@ -1483,7 +1560,18 @@ function hic_process_reservations_batch($reservations) {
                 $process_result = $normalize_result(hic_process_single_reservation($reservation), $dedup_uid);
                 $status_value = isset($process_result['status']) ? (string) $process_result['status'] : 'failed';
 
-                if ($status_value === 'failed') {
+                if ($status_value === 'skipped') {
+                    $skipped_count++;
+                    $reason = '';
+                    if (isset($process_result['skipped_reason']) && is_scalar($process_result['skipped_reason'])) {
+                        $reason = trim((string) $process_result['skipped_reason']);
+                    }
+                    $message = "Reservation $dedup_uid: skipped";
+                    if ($reason !== '') {
+                        $message .= " ($reason)";
+                    }
+                    hic_log($message);
+                } elseif ($status_value === 'failed') {
                     $error_count++;
                     hic_log("Reservation $dedup_uid: dispatch failed, will retry");
                 } else {
@@ -1539,6 +1627,32 @@ function hic_process_single_reservation($reservation) {
     $result = Helpers\hic_create_integration_result([
         'uid' => $uid,
     ]);
+
+    $valid_flag = isset($reservation['valid']) ? (int) $reservation['valid'] : 1;
+    if ($valid_flag === 0 && !Helpers\hic_process_invalid()) {
+        $aliases = array();
+        if (is_array($reservation)) {
+            $aliases = Helpers\hic_collect_reservation_ids($reservation);
+        }
+
+        $log_uid = $uid;
+        if ($log_uid === '' && !empty($aliases)) {
+            $log_uid = $aliases[0];
+        }
+        if ($log_uid === '') {
+            $log_uid = 'unknown';
+        }
+
+        hic_log("Reservation $log_uid dispatch skipped: valid=0 and process_invalid=false");
+
+        $result['status'] = 'skipped';
+        $result['messages'][] = 'invalid_reservation';
+        $result['skipped_reason'] = 'invalid_reservation';
+        $result['should_mark_processed'] = false;
+        $result['processed_ids'] = array();
+
+        return $result;
+    }
 
     $transformed = hic_transform_reservation($reservation);
 
@@ -2327,7 +2441,7 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
 
                         if (is_array($dispatch_result)) {
                             $status_value = isset($dispatch_result['status']) ? strtolower((string) $dispatch_result['status']) : '';
-                            if (!in_array($status_value, array('success', 'partial', 'failed'), true)) {
+                            if (!in_array($status_value, array('success', 'partial', 'failed', 'skipped'), true)) {
                                 $status_value = 'failed';
                             }
 
@@ -2376,6 +2490,19 @@ if (!function_exists(__NAMESPACE__ . '\\hic_backfill_reservations')) {
                                     }
                                     hic_log($partial_message, HIC_LOG_LEVEL_WARNING);
                                 }
+                            } elseif ($status_value === 'skipped') {
+                                $stats['total_skipped']++;
+                                $skip_reason = '';
+                                if (isset($dispatch_result['skipped_reason']) && is_scalar($dispatch_result['skipped_reason'])) {
+                                    $skip_reason = trim((string) $dispatch_result['skipped_reason']);
+                                }
+                                $skip_message = ($uid !== '')
+                                    ? "Backfill: Reservation $uid skipped"
+                                    : 'Backfill: Reservation skipped';
+                                if ($skip_reason !== '') {
+                                    $skip_message .= " ($skip_reason)";
+                                }
+                                hic_log($skip_message);
                             } else {
                                 $stats['total_errors']++;
 

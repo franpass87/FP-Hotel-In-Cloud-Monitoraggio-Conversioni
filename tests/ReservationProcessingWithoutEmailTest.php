@@ -162,6 +162,41 @@ final class ReservationProcessingWithoutEmailTest extends TestCase
         $this->assertNull($enrichmentLog, 'Email enrichment should be skipped when email is missing.');
     }
 
+    public function testInvalidReservationSkipsAdminEmail(): void
+    {
+        update_option('hic_process_invalid', '0');
+        Helpers\hic_clear_option_cache('process_invalid');
+
+        update_option('hic_admin_email', 'admin@example.com');
+        Helpers\hic_clear_option_cache('admin_email');
+
+        $reservation = [
+            'id' => 'INVALID-1',
+            'from_date' => '2024-03-01',
+            'to_date' => '2024-03-05',
+            'price' => 150.0,
+            'currency' => 'EUR',
+            'guest_first_name' => 'Luca',
+            'guest_last_name' => 'Bianchi',
+            'accommodation_id' => 'ROOM-5',
+            'accommodation_name' => 'Suite',
+            'sid' => 'SID-INVALID',
+            'valid' => 0,
+        ];
+
+        $result = \FpHic\hic_process_single_reservation($reservation);
+
+        $this->assertIsArray($result, 'Result should be an array for skipped reservations.');
+        $this->assertArrayHasKey('status', $result);
+        $this->assertSame('skipped', $result['status'], 'Invalid reservations should return skipped status.');
+
+        $skipLog = self::findLogContaining('Reservation INVALID-1 dispatch skipped: valid=0 and process_invalid=false');
+        $this->assertNotNull($skipLog, 'Skip reason should be logged for invalid reservations.');
+
+        $emailAttemptLog = self::findLogContaining('hic_send_admin_email:');
+        $this->assertNull($emailAttemptLog, 'Admin email dispatch should not be attempted for invalid reservations.');
+    }
+
     public static function captureLogMessage($message, $level): mixed
     {
         if (is_array($message) || is_object($message)) {
