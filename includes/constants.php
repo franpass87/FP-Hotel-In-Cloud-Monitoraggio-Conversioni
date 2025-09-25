@@ -131,7 +131,7 @@ define('HIC_DIAGNOSTIC_DETAILED', 'detailed');
 define('HIC_DIAGNOSTIC_FULL', 'full');
 
 // === VERSION INFO ===
-define('HIC_PLUGIN_VERSION', '3.2.0');
+define('HIC_PLUGIN_VERSION', '3.3.0');
 define('HIC_API_VERSION', 'v1');
 define('HIC_MIN_PHP_VERSION', '7.4');
 define('HIC_MIN_WP_VERSION', '5.8');

@@ -1,6 +1,6 @@
 # HIC Plugin Tests
 
-> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+> **Versione plugin:** 3.3.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
 
 
 This directory contains automated tests for the HIC Plugin. Le innovazioni per release sono documentate nel [CHANGELOG](../CHANGELOG.md) così da collegare i test alle funzionalità introdotte.

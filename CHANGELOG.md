@@ -1,8 +1,16 @@
 # Changelog
 
-> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+> **Versione plugin:** 3.3.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
 
 Tutte le modifiche degne di nota del plugin FP HIC Monitor sono documentate qui, in ordine cronologico inverso.
+
+## [3.3.0] - 2025-05-20
+### Documentazione
+- Aggiornati README, guide operative e quick start con intestazioni allineate alla nuova versione 3.3.0 e riferimenti di supporto aggiornati.
+- Aggiornato il workflow di rilascio con esempi di tagging e pacchetti coerenti con la versione 3.3.0.
+
+### Manutenzione
+- Sincronizzate costanti di versione, header del plugin e test CLI per riflettere la release 3.3.0 e prevenire falsi positivi nei controlli di health check.
 
 ## [3.2.0] - 2025-02-14
 ### Documentazione
