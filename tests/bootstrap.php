@@ -507,6 +507,7 @@ require_once dirname(__DIR__) . '/includes/functions.php';
 require_once dirname(__DIR__) . '/includes/helpers-logging.php';
 require_once dirname(__DIR__) . '/includes/log-manager.php';
 require_once dirname(__DIR__) . '/includes/booking-processor.php';
+require_once dirname(__DIR__) . '/includes/rate-limiter.php';
 require_once dirname(__DIR__) . '/includes/integrations/ga4.php';
 require_once dirname(__DIR__) . '/includes/integrations/gtm.php';
 require_once dirname(__DIR__) . '/includes/integrations/facebook.php';
