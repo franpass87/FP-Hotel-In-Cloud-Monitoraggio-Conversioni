@@ -55,10 +55,46 @@ class AutomatedReportingManager {
         add_action('hic_cleanup_exports', [self::class, 'handle_cleanup_exports']);
     }
 
+    /**
+     * Register additional cron schedules required by the reporting system.
+     *
+     * WordPress exposes only hourly, twice daily and daily intervals by
+     * default. The automated reports rely on dedicated weekly and monthly
+     * frequencies; without registering them the related wp_schedule_event()
+     * calls would simply be ignored and the reports would never run.
+     *
+     * @param array<string, array<string, mixed>> $schedules
+     * @return array<string, array<string, mixed>>
+     */
+    public static function register_cron_schedules($schedules)
+    {
+        $day_seconds = defined('DAY_IN_SECONDS') ? \DAY_IN_SECONDS : 86400;
+
+        if (!isset($schedules['weekly'])) {
+            $schedules['weekly'] = [
+                'interval' => defined('WEEK_IN_SECONDS') ? \WEEK_IN_SECONDS : 7 * $day_seconds,
+                'display'  => \__('Weekly (HIC Reports)', 'hotel-in-cloud'),
+            ];
+        }
+
+        if (!isset($schedules['monthly'])) {
+            $month_interval = defined('MONTH_IN_SECONDS') ? \MONTH_IN_SECONDS : 30 * $day_seconds;
+
+            $schedules['monthly'] = [
+                'interval' => $month_interval,
+                'display'  => \__('Monthly (HIC Reports)', 'hotel-in-cloud'),
+            ];
+        }
+
+        return $schedules;
+    }
+
     public function __construct() {
         if (null === self::$instance) {
             self::$instance = $this;
         }
+
+        add_filter('cron_schedules', [self::class, 'register_cron_schedules']);
 
         add_action('init', [$this, 'initialize_reporting'], 30);
 
