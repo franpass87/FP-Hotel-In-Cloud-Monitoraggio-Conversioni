@@ -1,0 +1,535 @@
+/**
+ * Shared admin styles for FP HIC Monitor admin pages
+ */
+:root {
+    --hic-color-bg: #f5f7fb;
+    --hic-color-card-bg: #ffffff;
+    --hic-color-card-muted: #f9fbff;
+    --hic-color-border: #dfe3eb;
+    --hic-color-border-strong: #c7d0df;
+    --hic-color-text: #1d2327;
+    --hic-color-text-muted: #5c6470;
+    --hic-color-heading: #101828;
+    --hic-color-primary: #1c7ed6;
+    --hic-color-primary-hover: #1864ab;
+    --hic-color-secondary: #495057;
+    --hic-color-secondary-hover: #343a40;
+    --hic-color-success: #2f9e44;
+    --hic-color-warning: #f59f00;
+    --hic-color-danger: #e03131;
+    --hic-shadow-sm: 0 8px 18px rgba(15, 23, 42, 0.08);
+    --hic-shadow-xs: 0 2px 6px rgba(15, 23, 42, 0.08);
+    --hic-radius-lg: 16px;
+    --hic-radius-md: 12px;
+    --hic-radius-sm: 8px;
+    --hic-spacing-xs: 8px;
+    --hic-spacing-sm: 12px;
+    --hic-spacing-md: 16px;
+    --hic-spacing-lg: 24px;
+    --hic-spacing-xl: 32px;
+    --hic-font-stack: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+}
+
+body.wp-admin[class*="hic-monitoring"] {
+    background: var(--hic-color-bg);
+}
+
+body.wp-admin[class*="hic-monitoring"] #wpbody-content,
+body.wp-admin[class*="hic-monitoring"] #wpbody-content .wrap {
+    background: transparent;
+}
+
+.hic-admin-page {
+    font-family: var(--hic-font-stack);
+    color: var(--hic-color-text);
+    margin-top: 0;
+    padding-bottom: var(--hic-spacing-xl);
+}
+
+.hic-admin-page h1,
+.hic-admin-page h2,
+.hic-admin-page h3,
+.hic-admin-page h4 {
+    font-family: var(--hic-font-stack);
+    color: var(--hic-color-heading);
+}
+
+.hic-page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--hic-spacing-md);
+    margin-bottom: var(--hic-spacing-xl);
+}
+
+.hic-page-header__title {
+    margin: 0;
+    font-size: 28px;
+    line-height: 1.25;
+    font-weight: 700;
+}
+
+.hic-page-header__subtitle {
+    margin: 4px 0 0;
+    color: var(--hic-color-text-muted);
+    font-size: 14px;
+    max-width: 720px;
+}
+
+.hic-page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hic-spacing-sm);
+    align-items: center;
+}
+
+.hic-card {
+    background: var(--hic-color-card-bg);
+    border-radius: var(--hic-radius-lg);
+    border: 1px solid var(--hic-color-border);
+    box-shadow: var(--hic-shadow-sm);
+    padding: var(--hic-spacing-lg);
+}
+
+.hic-card + .hic-card {
+    margin-top: var(--hic-spacing-lg);
+}
+
+.hic-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--hic-spacing-sm);
+    margin-bottom: var(--hic-spacing-md);
+}
+
+.hic-card__title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.hic-card__subtitle {
+    margin: 0;
+    color: var(--hic-color-text-muted);
+    font-size: 13px;
+}
+
+.hic-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-md);
+}
+
+.hic-grid {
+    display: grid;
+    gap: var(--hic-spacing-lg);
+}
+
+.hic-grid--two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hic-grid--three {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.hic-button,
+.button.hic-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    text-decoration: none;
+    box-shadow: var(--hic-shadow-xs);
+}
+
+.hic-button:hover,
+.button.hic-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(28, 126, 214, 0.18);
+}
+
+.hic-button:focus,
+.button.hic-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(28, 126, 214, 0.25);
+}
+
+.hic-button:disabled,
+.button.hic-button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.hic-button--primary {
+    background: linear-gradient(135deg, var(--hic-color-primary), #4dabf7);
+    color: #fff;
+}
+
+.hic-button--primary:hover {
+    background: linear-gradient(135deg, var(--hic-color-primary-hover), #4098d7);
+}
+
+.hic-button--secondary {
+    background: #eef3fb;
+    border-color: #cad8ef;
+    color: var(--hic-color-primary);
+}
+
+.hic-button--secondary:hover {
+    background: #dce8fb;
+}
+
+.hic-button--ghost {
+    background: transparent;
+    border-color: var(--hic-color-border);
+    color: var(--hic-color-secondary);
+    box-shadow: none;
+}
+
+.hic-button--ghost:hover {
+    border-color: var(--hic-color-secondary);
+}
+
+.hic-button--danger {
+    background: rgba(224, 49, 49, 0.12);
+    border-color: rgba(224, 49, 49, 0.3);
+    color: var(--hic-color-danger);
+}
+
+.hic-button--danger:hover {
+    background: rgba(224, 49, 49, 0.2);
+}
+
+.hic-button--block {
+    width: 100%;
+}
+
+.hic-button--small {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.hic-feedback {
+    border-radius: var(--hic-radius-md);
+    border: 1px solid var(--hic-color-border);
+    padding: var(--hic-spacing-sm) var(--hic-spacing-md);
+    background: var(--hic-color-card-muted);
+    color: var(--hic-color-text);
+    font-size: 13px;
+}
+
+.hic-feedback.is-success {
+    border-color: rgba(47, 158, 68, 0.35);
+    background: rgba(47, 158, 68, 0.1);
+    color: var(--hic-color-success);
+}
+
+.hic-feedback.is-error {
+    border-color: rgba(224, 49, 49, 0.35);
+    background: rgba(224, 49, 49, 0.1);
+    color: var(--hic-color-danger);
+}
+
+.hic-feedback.is-warning {
+    border-color: rgba(245, 159, 0, 0.3);
+    background: rgba(245, 159, 0, 0.12);
+    color: #b07600;
+}
+
+.hic-feedback.is-info {
+    border-color: rgba(28, 126, 214, 0.35);
+    background: rgba(28, 126, 214, 0.12);
+    color: var(--hic-color-primary);
+}
+
+[hidden] {
+    display: none !important;
+}
+
+.hic-inline-loader {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--hic-color-text-muted);
+    font-size: 13px;
+}
+
+.hic-inline-loader .spinner {
+    margin: 0;
+    float: none;
+}
+
+.hic-tablist {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: var(--hic-spacing-lg);
+    padding: 6px;
+    border-radius: 999px;
+    background: rgba(28, 126, 214, 0.08);
+}
+
+.hic-tab {
+    border: none;
+    background: transparent;
+    color: var(--hic-color-primary);
+    font-weight: 600;
+    padding: 8px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.hic-tab:hover,
+.hic-tab:focus {
+    background: rgba(28, 126, 214, 0.15);
+    color: var(--hic-color-primary);
+    outline: none;
+}
+
+.hic-tab.is-active {
+    background: #fff;
+    color: var(--hic-color-heading);
+    box-shadow: var(--hic-shadow-xs);
+}
+
+.hic-tab-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-lg);
+}
+
+.hic-settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-md);
+}
+
+.hic-settings-section__title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.hic-field-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-md);
+}
+
+.hic-field-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 240px) minmax(0, 1fr);
+    gap: var(--hic-spacing-lg);
+    padding: var(--hic-spacing-md);
+    border-radius: var(--hic-radius-md);
+    border: 1px solid var(--hic-color-border);
+    background: var(--hic-color-card-muted);
+}
+
+.hic-field-label {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--hic-color-heading);
+    line-height: 1.4;
+}
+
+.hic-field-control {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-xs);
+}
+
+.hic-field-control .description {
+    margin: 0;
+    color: var(--hic-color-text-muted);
+}
+
+.hic-field-control input[type="text"],
+.hic-field-control input[type="email"],
+.hic-field-control input[type="number"],
+.hic-field-control input[type="url"],
+.hic-field-control input[type="password"],
+.hic-field-control select,
+.hic-field-control textarea {
+    border-radius: var(--hic-radius-sm);
+    border: 1px solid var(--hic-color-border);
+    padding: 10px 12px;
+    box-shadow: none;
+    width: 100%;
+    max-width: 420px;
+    font-size: 13px;
+}
+
+.hic-field-control textarea {
+    min-height: 110px;
+}
+
+.hic-field-control input:focus,
+.hic-field-control select:focus,
+.hic-field-control textarea:focus {
+    border-color: var(--hic-color-primary);
+    box-shadow: 0 0 0 2px rgba(28, 126, 214, 0.2);
+    outline: none;
+}
+
+.hic-toggle {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--hic-color-text);
+}
+
+.hic-toggle input[type="checkbox"],
+.hic-toggle input[type="radio"] {
+    margin-top: 2px;
+}
+
+.hic-input-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hic-spacing-sm);
+    align-items: center;
+}
+
+.hic-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hic-spacing-sm);
+    align-items: center;
+    margin-top: var(--hic-spacing-lg);
+}
+
+.hic-callout {
+    border-radius: var(--hic-radius-md);
+    padding: var(--hic-spacing-md);
+    border: 1px solid var(--hic-color-border);
+}
+
+.hic-callout h4 {
+    margin-top: 0;
+    margin-bottom: var(--hic-spacing-sm);
+    font-size: 15px;
+}
+
+.hic-callout--muted {
+    background: rgba(15, 23, 42, 0.02);
+}
+
+.hic-details {
+    border-radius: var(--hic-radius-sm);
+}
+
+.hic-details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--hic-color-primary);
+}
+
+.hic-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.hic-details summary::before {
+    content: '\25BC';
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 10px;
+    transform: rotate(-90deg);
+    transition: transform 0.2s ease;
+}
+
+.hic-details[open] summary::before {
+    transform: rotate(0deg);
+}
+
+.hic-details ol,
+.hic-details ul {
+    margin: var(--hic-spacing-sm) 0;
+    padding-left: 18px;
+    color: var(--hic-color-text-muted);
+}
+
+.hic-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.hic-status-badge--success {
+    background: rgba(47, 158, 68, 0.12);
+    color: var(--hic-color-success);
+}
+
+.hic-status-badge--warning {
+    background: rgba(245, 159, 0, 0.15);
+    color: #b07600;
+}
+
+.hic-status-badge--danger {
+    background: rgba(224, 49, 49, 0.15);
+    color: var(--hic-color-danger);
+}
+
+.hic-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hic-spacing-sm);
+    color: var(--hic-color-text-muted);
+    font-size: 12px;
+}
+
+@media (max-width: 1024px) {
+    .hic-grid--two {
+        grid-template-columns: 1fr;
+    }
+
+    .hic-field-row {
+        grid-template-columns: 1fr;
+    }
+
+    .hic-field-label {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 782px) {
+    .hic-tablist {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .hic-button,
+    .button.hic-button {
+        width: 100%;
+    }
+
+    .hic-input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .hic-form-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

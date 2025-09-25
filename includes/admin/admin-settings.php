@@ -382,11 +382,19 @@ function hic_admin_enqueue_scripts($hook) {
         wp_enqueue_script('jquery');
     }
 
+    wp_register_style(
+        'hic-admin-base',
+        plugin_dir_url(__FILE__) . '../../assets/css/hic-admin.css',
+        array(),
+        HIC_PLUGIN_VERSION
+    );
+
     if ($hook === 'hic-monitoring_page_hic-monitoring-settings') {
+        wp_enqueue_style('hic-admin-base');
         wp_enqueue_style(
             'hic-admin-settings',
             plugin_dir_url(__FILE__) . '../../assets/css/admin-settings.css',
-            array(),
+            array('hic-admin-base'),
             HIC_PLUGIN_VERSION
         );
         wp_enqueue_script(
@@ -406,14 +414,22 @@ function hic_admin_enqueue_scripts($hook) {
             'api_nonce' => wp_create_nonce('hic_test_api_nonce'),
             'email_nonce' => wp_create_nonce('hic_test_email'),
             'health_nonce' => wp_create_nonce('hic_generate_health_token'),
+            'i18n' => array(
+                'bookings_found_suffix' => __('prenotazioni trovate negli ultimi 7 giorni', 'hotel-in-cloud'),
+                'api_network_error' => __('Errore di comunicazione:', 'hotel-in-cloud'),
+                'email_missing' => __('Inserisci un indirizzo email per il test.', 'hotel-in-cloud'),
+                'email_sending' => __('Invio email di test in corso...', 'hotel-in-cloud'),
+                'token_generating' => __('Generazione token in corso...', 'hotel-in-cloud'),
+            ),
         ));
     }
 
     if ($hook === 'hic-monitoring_page_hic-diagnostics') {
+        wp_enqueue_style('hic-admin-base');
         wp_enqueue_style(
             'hic-diagnostics',
             plugin_dir_url(__FILE__) . '../../assets/css/diagnostics.css',
-            array(),
+            array('hic-admin-base'),
             HIC_PLUGIN_VERSION
         );
         wp_enqueue_script(
@@ -443,37 +459,156 @@ function hic_admin_enqueue_scripts($hook) {
     }
 }
 
+function hic_render_settings_sections(array $section_ids): void {
+    global $wp_settings_sections, $wp_settings_fields;
+
+    $page = 'hic_settings';
+
+    foreach ($section_ids as $section_id) {
+        if (!isset($wp_settings_sections[$page][$section_id])) {
+            continue;
+        }
+
+        $section = $wp_settings_sections[$page][$section_id];
+
+        echo '<div class="hic-settings-section" id="' . esc_attr($section_id) . '">';
+
+        if (!empty($section['title'])) {
+            echo '<h2 class="hic-settings-section__title">' . esc_html($section['title']) . '</h2>';
+        }
+
+        if (!empty($section['callback'])) {
+            call_user_func($section['callback'], $section);
+        }
+
+        if (!empty($wp_settings_fields[$page][$section_id])) {
+            echo '<div class="hic-field-grid">';
+
+            foreach ($wp_settings_fields[$page][$section_id] as $field) {
+                echo '<div class="hic-field-row" id="row-' . esc_attr($field['id']) . '">';
+
+                if (!empty($field['title'])) {
+                    echo '<label class="hic-field-label" for="' . esc_attr($field['id']) . '">' . esc_html($field['title']) . '</label>';
+                } else {
+                    echo '<div class="hic-field-label"></div>';
+                }
+
+                echo '<div class="hic-field-control">';
+                call_user_func($field['callback'], $field['args']);
+                echo '</div>';
+                echo '</div>';
+            }
+
+            echo '</div>';
+        }
+
+        echo '</div>';
+    }
+}
+
 function hic_options_page() {
+    $tabs = array(
+        'general' => array(
+            'label' => __('Generale', 'hotel-in-cloud'),
+            'description' => __('Configurazioni principali, log e notifiche amministrative.', 'hotel-in-cloud'),
+            'sections' => array('hic_main_section'),
+        ),
+        'tracking' => array(
+            'label' => __('Tracking & Analytics', 'hotel-in-cloud'),
+            'description' => __('Impostazioni per Google Analytics 4, Google Tag Manager e Meta.', 'hotel-in-cloud'),
+            'sections' => array('hic_ga4_section', 'hic_gtm_section', 'hic_fb_section'),
+        ),
+        'hotel' => array(
+            'label' => __('Hotel in Cloud', 'hotel-in-cloud'),
+            'description' => __('Connessione API, polling affidabile e sicurezza del sistema.', 'hotel-in-cloud'),
+            'sections' => array('hic_hic_section'),
+        ),
+        'brevo' => array(
+            'label' => __('Brevo', 'hotel-in-cloud'),
+            'description' => __('Sincronizzazione contatti, liste e automazioni Brevo.', 'hotel-in-cloud'),
+            'sections' => array('hic_brevo_section'),
+        ),
+    );
+
     ?>
-    <div class="wrap">
-        <?php settings_errors(); ?>
-        <h1>Hotel in Cloud - Monitoraggio Conversioni</h1>
-        <form action='options.php' method='post'>
-            <?php
-            settings_fields('hic_settings');
-            do_settings_sections('hic_settings');
-            submit_button();
-            ?>
-        </form>
-        
-        <!-- API Connection Test Section -->
-        <?php if (\FpHic\Helpers\hic_connection_uses_api()): ?>
-        <div class="hic-api-test-section" style="margin-top: 30px; padding: 20px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px;">
-            <h2>Test Connessione API</h2>
-            <p>Testa la connessione alle API Hotel in Cloud con le credenziali Basic Auth configurate.</p>
-            
-            <button type="button" id="hic-test-api-btn" class="button button-secondary">
-                <span class="dashicons dashicons-admin-tools" style="margin-top: 3px;"></span>
-                Testa Connessione API
-            </button>
-            
-            <div id="hic-test-result" style="margin-top: 15px; display: none;"></div>
-            
-            <div id="hic-test-loading" style="margin-top: 15px; display: none;">
-                <span class="spinner is-active" style="float: left; margin: 0 10px 0 0;"></span>
-                <span>Test in corso... attendere...</span>
+    <div class="wrap hic-admin-page hic-settings-page">
+        <div class="hic-page-header">
+            <div>
+                <h1 class="hic-page-header__title"><span>⚙️</span><?php esc_html_e('Hotel in Cloud - Monitoraggio Conversioni', 'hotel-in-cloud'); ?></h1>
+                <p class="hic-page-header__subtitle"><?php esc_html_e('Configura ogni integrazione con un layout coerente, pensato per una gestione rapida e intuitiva del sistema.', 'hotel-in-cloud'); ?></p>
             </div>
         </div>
+
+        <?php settings_errors(); ?>
+
+        <form action="options.php" method="post" class="hic-card hic-settings-form" id="hic-settings-form">
+            <?php settings_fields('hic_settings'); ?>
+
+            <div class="hic-tablist" role="tablist" aria-label="<?php esc_attr_e('Categorie impostazioni', 'hotel-in-cloud'); ?>">
+                <?php $first = true; ?>
+                <?php foreach ($tabs as $tab_id => $tab_data): ?>
+                    <button
+                        type="button"
+                        class="hic-tab<?php echo $first ? ' is-active' : ''; ?>"
+                        role="tab"
+                        data-tab="<?php echo esc_attr($tab_id); ?>"
+                        id="tab-toggle-<?php echo esc_attr($tab_id); ?>"
+                        aria-controls="tab-panel-<?php echo esc_attr($tab_id); ?>"
+                        aria-selected="<?php echo $first ? 'true' : 'false'; ?>"
+                    >
+                        <?php echo esc_html($tab_data['label']); ?>
+                    </button>
+                    <?php $first = false; ?>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="hic-tab-panels">
+                <?php $first_panel = true; ?>
+                <?php foreach ($tabs as $tab_id => $tab_data): ?>
+                    <section
+                        id="tab-panel-<?php echo esc_attr($tab_id); ?>"
+                        class="hic-tab-panel<?php echo $first_panel ? ' is-active' : ''; ?>"
+                        role="tabpanel"
+                        data-tab="<?php echo esc_attr($tab_id); ?>"
+                        aria-labelledby="tab-toggle-<?php echo esc_attr($tab_id); ?>"
+                        <?php echo $first_panel ? '' : 'hidden'; ?>
+                    >
+                        <?php if (!empty($tab_data['description'])): ?>
+                            <p class="hic-section-hint"><?php echo esc_html($tab_data['description']); ?></p>
+                        <?php endif; ?>
+                        <?php hic_render_settings_sections($tab_data['sections']); ?>
+                    </section>
+                    <?php $first_panel = false; ?>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="hic-form-actions">
+                <?php submit_button(__('Salva impostazioni', 'hotel-in-cloud'), 'primary hic-button hic-button--primary', 'submit', false); ?>
+            </div>
+        </form>
+
+        <?php if (\FpHic\Helpers\hic_connection_uses_api()): ?>
+            <div class="hic-card hic-api-test-card">
+                <div class="hic-card__header">
+                    <div>
+                        <h2 class="hic-card__title"><?php esc_html_e('Test Connessione API', 'hotel-in-cloud'); ?></h2>
+                        <p class="hic-card__subtitle"><?php esc_html_e('Verifica la connessione alle API Hotel in Cloud utilizzando le credenziali configurate.', 'hotel-in-cloud'); ?></p>
+                    </div>
+                    <div class="hic-page-actions">
+                        <button type="button" id="hic-test-api-btn" class="button hic-button hic-button--secondary">
+                            <span class="dashicons dashicons-admin-tools"></span>
+                            <?php esc_html_e('Testa Connessione API', 'hotel-in-cloud'); ?>
+                        </button>
+                    </div>
+                </div>
+                <div class="hic-card__body">
+                    <div id="hic-test-loading" class="hic-inline-loader" hidden>
+                        <span class="spinner is-active"></span>
+                        <span><?php esc_html_e('Test in corso... attendere...', 'hotel-in-cloud'); ?></span>
+                    </div>
+                    <div id="hic-test-result" class="hic-feedback" hidden></div>
+                </div>
+            </div>
         <?php endif; ?>
     </div>
     <?php
@@ -566,53 +701,67 @@ function hic_admin_email_render() {
     $current_email = \FpHic\Helpers\hic_get_admin_email();
     $custom_email = \FpHic\Helpers\hic_get_option('admin_email', '');
     $wp_admin_email = get_option('admin_email');
-    
-    echo '<input type="email" name="hic_admin_email" value="' . esc_attr($current_email) . '" class="regular-text" id="hic_admin_email_field" />';
-    echo '<button type="button" class="button" id="hic-test-email-btn" style="margin-left: 10px;">Test Email</button>';
-    echo '<div id="hic_email_test_result" style="margin-top: 10px;"></div>';
-    
-    echo '<p class="description">';
-    echo 'Email per ricevere notifiche di nuove prenotazioni. ';
-    if (empty($custom_email)) {
-        echo '<strong>Attualmente usa l\'email WordPress:</strong> ' . esc_html($wp_admin_email);
-    } else {
-        echo '<strong>Email personalizzata configurata:</strong> ' . esc_html($custom_email);
-    }
-    echo '</p>';
-    
-    // Add troubleshooting guide
-    echo '<div class="hic-email-troubleshooting" style="margin-top: 15px; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9;">';
-    echo '<h4 style="margin-top: 0;">🔧 Risoluzione Problemi Email</h4>';
-    echo '<details>';
-    echo '<summary style="cursor: pointer; font-weight: bold;">Se le email non arrivano, segui questi passi:</summary>';
-    echo '<ol style="margin: 10px 0;">';
-    echo '<li><strong>Testa la configurazione:</strong> Usa il pulsante "Test Email" sopra per verificare l\'invio</li>';
-    echo '<li><strong>Controlla lo spam:</strong> Verifica la cartella spam/junk della casella email</li>';
-    echo '<li><strong>Verifica l\'indirizzo email:</strong> Assicurati che l\'email sia corretta e funzionante</li>';
-    echo '<li><strong>Controlla i log:</strong> Vai in Diagnostics per vedere i log dettagliati degli invii</li>';
-    echo '<li><strong>Configurazione SMTP:</strong> Se il test fallisce, potrebbe servire un plugin SMTP (WP Mail SMTP, Easy WP SMTP)</li>';
-    echo '<li><strong>Contatta l\'hosting:</strong> Se tutto sopra è OK, il problema potrebbe essere nel server email</li>';
-    echo '</ol>';
-    echo '<p><strong>Configurazioni comuni che causano problemi:</strong></p>';
-    echo '<ul>';
-    echo '<li>Server senza funzione mail() PHP abilitata</li>';
-    echo '<li>Provider hosting che blocca l\'invio email</li>';
-    echo '<li>Mancanza di configurazione SMTP</li>';
-    echo '<li>Email che finiscono in blacklist per spam</li>';
-    echo '</ul>';
-    echo '</details>';
-    echo '</div>';
+
+    ?>
+    <div class="hic-input-group">
+        <input type="email" name="hic_admin_email" id="hic_admin_email" class="regular-text" value="<?php echo esc_attr($current_email); ?>" />
+        <button type="button" class="button hic-button hic-button--secondary" id="hic-test-email-btn">
+            <span class="dashicons dashicons-email-alt"></span>
+            <?php esc_html_e('Test Email', 'hotel-in-cloud'); ?>
+        </button>
+    </div>
+    <div id="hic_email_test_result" class="hic-feedback" hidden></div>
+
+    <p class="description"><?php esc_html_e('Email per ricevere notifiche di nuove prenotazioni.', 'hotel-in-cloud'); ?></p>
+    <p class="hic-secondary-text">
+        <?php
+        if (empty($custom_email)) {
+            printf(
+                esc_html__("Attualmente viene utilizzata l'email amministratore di WordPress: %s", 'hotel-in-cloud'),
+                esc_html($wp_admin_email)
+            );
+        } else {
+            printf(
+                esc_html__('Email personalizzata configurata: %s', 'hotel-in-cloud'),
+                esc_html($custom_email)
+            );
+        }
+        ?>
+    </p>
+
+    <div class="hic-callout hic-callout--muted hic-email-guidance">
+        <h4>🔧 <?php esc_html_e('Risoluzione problemi email', 'hotel-in-cloud'); ?></h4>
+        <details class="hic-details">
+            <summary><?php esc_html_e('Se le email non arrivano, segui questi passi:', 'hotel-in-cloud'); ?></summary>
+            <ol>
+                <li><strong><?php esc_html_e('Testa la configurazione:', 'hotel-in-cloud'); ?></strong> <?php esc_html_e('Usa il pulsante "Test Email" per inviare un messaggio di prova.', 'hotel-in-cloud'); ?></li>
+                <li><strong><?php esc_html_e('Controlla lo spam:', 'hotel-in-cloud'); ?></strong> <?php esc_html_e('Verifica la cartella spam o indesiderata della casella email.', 'hotel-in-cloud'); ?></li>
+                <li><strong><?php esc_html_e("Verifica l'email:", 'hotel-in-cloud'); ?></strong> <?php esc_html_e("Assicurati che l'indirizzo configurato sia corretto e funzionante.", 'hotel-in-cloud'); ?></li>
+                <li><strong><?php esc_html_e('Monitora i log:', 'hotel-in-cloud'); ?></strong> <?php esc_html_e('Apri la pagina Diagnostics per analizzare gli ultimi invii.', 'hotel-in-cloud'); ?></li>
+                <li><strong><?php esc_html_e('Configura SMTP se necessario:', 'hotel-in-cloud'); ?></strong> <?php esc_html_e("Plugin come WP Mail SMTP o Easy WP SMTP migliorano l'affidabilità.", 'hotel-in-cloud'); ?></li>
+                <li><strong><?php esc_html_e("Contatta l'hosting:", 'hotel-in-cloud'); ?></strong> <?php esc_html_e('Se tutto il resto è corretto, verifica eventuali blocchi lato server.', 'hotel-in-cloud'); ?></li>
+            </ol>
+            <p><strong><?php esc_html_e('Cause comuni dei problemi:', 'hotel-in-cloud'); ?></strong></p>
+            <ul>
+                <li><?php esc_html_e('Funzione mail() di PHP disabilitata.', 'hotel-in-cloud'); ?></li>
+                <li><?php esc_html_e("Provider hosting che limita o blocca l'invio email.", 'hotel-in-cloud'); ?></li>
+                <li><?php esc_html_e('Mancata configurazione SMTP o autenticazione insufficiente.', 'hotel-in-cloud'); ?></li>
+                <li><?php esc_html_e('Indirizzi finiti in blacklist o marcati come spam.', 'hotel-in-cloud'); ?></li>
+            </ul>
+        </details>
+    </div>
+    <?php
 }
 
 
 
 function hic_log_file_render() {
-    echo '<input type="text" name="hic_log_file" value="' . esc_attr(hic_get_log_file()) . '" class="regular-text" />';
+    echo '<input type="text" name="hic_log_file" id="hic_log_file" value="' . esc_attr(hic_get_log_file()) . '" class="regular-text" />';
 }
 
 function hic_log_level_render() {
     $level = hic_get_option('log_level', HIC_LOG_LEVEL_INFO);
-    echo '<select name="hic_log_level" class="regular-text">';
+    echo '<select name="hic_log_level" id="hic_log_level" class="regular-text">';
     echo '<option value="' . esc_attr(HIC_LOG_LEVEL_ERROR) . '"' . selected($level, HIC_LOG_LEVEL_ERROR, false) . '>Error</option>';
     echo '<option value="' . esc_attr(HIC_LOG_LEVEL_WARNING) . '"' . selected($level, HIC_LOG_LEVEL_WARNING, false) . '>Warning</option>';
     echo '<option value="' . esc_attr(HIC_LOG_LEVEL_INFO) . '"' . selected($level, HIC_LOG_LEVEL_INFO, false) . '>Info</option>';
@@ -621,65 +770,67 @@ function hic_log_level_render() {
 }
 
 function hic_measurement_id_render() {
-    echo '<input type="text" name="hic_measurement_id" value="' . esc_attr(\FpHic\Helpers\hic_get_measurement_id()) . '" class="regular-text" />';
+    echo '<input type="text" name="hic_measurement_id" id="hic_measurement_id" value="' . esc_attr(\FpHic\Helpers\hic_get_measurement_id()) . '" class="regular-text" />';
 }
 
 function hic_api_secret_render() {
-    echo '<input type="text" name="hic_api_secret" value="' . esc_attr(\FpHic\Helpers\hic_get_api_secret()) . '" class="regular-text" />';
+    echo '<input type="text" name="hic_api_secret" id="hic_api_secret" value="' . esc_attr(\FpHic\Helpers\hic_get_api_secret()) . '" class="regular-text" />';
 }
 
 // GTM render functions
 function hic_gtm_enabled_render() {
-    $checked = \FpHic\Helpers\hic_is_gtm_enabled() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_gtm_enabled" value="1" ' . esc_attr($checked) . ' /> Abilita integrazione Google Tag Manager';
-    echo '<p class="description">Abilita il tracciamento tramite Google Tag Manager per una gestione più flessibile dei tag.</p>';
+    $checked = \FpHic\Helpers\hic_is_gtm_enabled();
+    echo '<label class="hic-toggle" for="hic_gtm_enabled">';
+    echo '<input type="checkbox" name="hic_gtm_enabled" id="hic_gtm_enabled" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Abilita integrazione Google Tag Manager', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
+    echo '<p class="description">' . esc_html__('Abilita il tracciamento tramite Google Tag Manager per gestire i tag dal container web.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_gtm_container_id_render() {
-    echo '<input type="text" name="hic_gtm_container_id" value="' . esc_attr(\FpHic\Helpers\hic_get_gtm_container_id()) . '" class="regular-text" placeholder="GTM-XXXXXXX" />';
-    echo '<p class="description">ID del container GTM (formato: GTM-XXXXXXX). Disponibile in Google Tag Manager sotto "ID container".</p>';
+    echo '<input type="text" name="hic_gtm_container_id" id="hic_gtm_container_id" value="' . esc_attr(\FpHic\Helpers\hic_get_gtm_container_id()) . '" class="regular-text" placeholder="GTM-XXXXXXX" />';
+    echo '<p class="description">' . esc_html__('ID del container GTM (formato: GTM-XXXXXXX). Disponibile in Google Tag Manager nella sezione dettagli container.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_tracking_mode_render() {
     $mode = \FpHic\Helpers\hic_get_tracking_mode();
-    echo '<select name="hic_tracking_mode" class="regular-text">';
-    echo '<option value="ga4_only"' . selected($mode, 'ga4_only', false) . '>Solo GA4 Measurement Protocol (Server-side)</option>';
-    echo '<option value="gtm_only"' . selected($mode, 'gtm_only', false) . '>Solo Google Tag Manager (Client-side)</option>';
-    echo '<option value="hybrid"' . selected($mode, 'hybrid', false) . '>Ibrido (GTM + GA4 backup per server-side)</option>';
+    echo '<select name="hic_tracking_mode" id="hic_tracking_mode" class="regular-text">';
+    echo '<option value="ga4_only"' . selected($mode, 'ga4_only', false) . '>' . esc_html__('Solo GA4 Measurement Protocol (server-side)', 'hotel-in-cloud') . '</option>';
+    echo '<option value="gtm_only"' . selected($mode, 'gtm_only', false) . '>' . esc_html__('Solo Google Tag Manager (client-side)', 'hotel-in-cloud') . '</option>';
+    echo '<option value="hybrid"' . selected($mode, 'hybrid', false) . '>' . esc_html__('Ibrido (GTM + GA4 di backup)', 'hotel-in-cloud') . '</option>';
     echo '</select>';
-    echo '<p class="description">';
-    echo '<strong>GA4 Only:</strong> Tracciamento server-side via Measurement Protocol (attuale, più affidabile).<br>';
-    echo '<strong>GTM Only:</strong> Tracciamento client-side via DataLayer (più flessibile per gestire multiple piattaforme).<br>';
-    echo '<strong>Ibrido:</strong> GTM per client-side + GA4 come backup server-side (raccomandato per massima copertura).';
-    echo '</p>';
+    echo '<p class="description">' . esc_html__('Scegli come distribuire gli eventi di conversione: server-side, client-side o con una strategia ibrida per massima affidabilità.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_brevo_enabled_render() {
-    $checked = \FpHic\Helpers\hic_is_brevo_enabled() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_brevo_enabled" value="1" ' . esc_attr($checked) . ' /> Abilita integrazione Brevo';
+    $checked = \FpHic\Helpers\hic_is_brevo_enabled();
+    echo '<label class="hic-toggle" for="hic_brevo_enabled">';
+    echo '<input type="checkbox" name="hic_brevo_enabled" id="hic_brevo_enabled" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Abilita integrazione Brevo', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
 }
 
 function hic_brevo_api_key_render() {
-    echo '<input type="password" name="hic_brevo_api_key" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_api_key()) . '" class="regular-text" />';
+    echo '<input type="password" name="hic_brevo_api_key" id="hic_brevo_api_key" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_api_key()) . '" class="regular-text" />';
 }
 
 function hic_fb_pixel_id_render() {
-    echo '<input type="text" name="hic_fb_pixel_id" value="' . esc_attr(\FpHic\Helpers\hic_get_fb_pixel_id()) . '" class="regular-text" />';
+    echo '<input type="text" name="hic_fb_pixel_id" id="hic_fb_pixel_id" value="' . esc_attr(\FpHic\Helpers\hic_get_fb_pixel_id()) . '" class="regular-text" />';
 }
 
 function hic_fb_access_token_render() {
-    echo '<input type="password" name="hic_fb_access_token" value="' . esc_attr(\FpHic\Helpers\hic_get_fb_access_token()) . '" class="regular-text" />';
+    echo '<input type="password" name="hic_fb_access_token" id="hic_fb_access_token" value="' . esc_attr(\FpHic\Helpers\hic_get_fb_access_token()) . '" class="regular-text" />';
 }
 
 function hic_connection_type_render() {
     $type = \FpHic\Helpers\hic_get_connection_type();
     $normalized = \FpHic\Helpers\hic_normalize_connection_type($type);
-    echo '<select name="hic_connection_type">';
-    echo '<option value="webhook"' . selected($normalized, 'webhook', false) . '>Webhook</option>';
-    echo '<option value="api"' . selected($normalized, 'api', false) . '>API Polling</option>';
-    echo '<option value="hybrid"' . selected($normalized, 'hybrid', false) . '>Hybrid (Webhook + API)</option>';
+    echo '<select name="hic_connection_type" id="hic_connection_type">';
+    echo '<option value="webhook"' . selected($normalized, 'webhook', false) . '>' . esc_html__('Solo Webhook', 'hotel-in-cloud') . '</option>';
+    echo '<option value="api"' . selected($normalized, 'api', false) . '>' . esc_html__('Solo API Polling', 'hotel-in-cloud') . '</option>';
+    echo '<option value="hybrid"' . selected($normalized, 'hybrid', false) . '>' . esc_html__('Hybrid (Webhook + API)', 'hotel-in-cloud') . '</option>';
     echo '</select>';
-    echo '<p class="description">Hybrid: combina webhook in tempo reale con API polling di backup per massima affidabilità</p>';
+    echo '<p class="description">' . esc_html__('La modalità ibrida combina webhook in tempo reale con polling API di backup per garantire continuità.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_webhook_token_render() {
@@ -691,48 +842,42 @@ function hic_webhook_token_render() {
         $endpoint = add_query_arg('token', rawurlencode($token), $base_endpoint);
     }
 
-    echo '<input type="text" name="hic_webhook_token" value="' . esc_attr($token) . '" class="regular-text" />';
-    echo '<p class="description">Token condiviso con Hotel in Cloud per autorizzare le chiamate webhook.</p>';
+    echo '<input type="text" name="hic_webhook_token" id="hic_webhook_token" value="' . esc_attr($token) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('Token condiviso con Hotel in Cloud per autorizzare le chiamate webhook.', 'hotel-in-cloud') . '</p>';
 
     if ($endpoint) {
-        echo '<p class="description">URL da fornire al supporto HIC: <code>' . esc_html($endpoint) . '</code></p>';
+        echo '<p class="description">' . sprintf(esc_html__('URL da fornire al supporto HIC: %s', 'hotel-in-cloud'), '<code>' . esc_html($endpoint) . '</code>') . '</p>';
     } else {
-        echo '<p class="description">Dopo aver salvato comparirà l\'URL completo del webhook da comunicare a Hotel in Cloud.</p>';
+        echo '<p class="description">' . esc_html__("Dopo aver salvato comparirà l'URL completo del webhook da comunicare a Hotel in Cloud.", 'hotel-in-cloud') . '</p>';
     }
 }
 
 function hic_webhook_secret_render() {
     $secret = \FpHic\Helpers\hic_get_webhook_secret();
 
-    echo '<input type="password" name="hic_webhook_secret" value="' . esc_attr($secret) . '" class="regular-text" autocomplete="off" />';
+    echo '<input type="password" name="hic_webhook_secret" id="hic_webhook_secret" value="' . esc_attr($secret) . '" class="regular-text" autocomplete="off" />';
     $header_name = defined('HIC_WEBHOOK_SIGNATURE_HEADER') ? HIC_WEBHOOK_SIGNATURE_HEADER : 'X-HIC-Signature';
 
-    echo '<p class="description">';
-    echo 'Chiave condivisa opzionale usata per validare la firma HMAC del webhook (<code>' . esc_html($header_name) . '</code>). ';
-    echo 'Se HIC non può configurarla puoi lasciare il campo vuoto: le richieste saranno comunque accettate, ma senza verifica della firma.';
-    echo '</p>';
-
-    echo '<p class="description">';
-    echo 'Quando disponibile inserisci lo stesso valore anche nel pannello HIC, così ogni chiamata potrà essere autenticata.';
-    echo '</p>';
-
-    echo '<p class="description">Rigenera questo valore e aggiornalo sia qui che in HIC in caso di compromissione.</p>';
+    echo '<p class="description">' . sprintf(esc_html__('Chiave condivisa opzionale usata per validare la firma HMAC del webhook (%s).', 'hotel-in-cloud'), '<code>' . esc_html($header_name) . '</code>') . '</p>';
+    echo '<p class="description">' . esc_html__('Se Hotel in Cloud non può configurarla puoi lasciare il campo vuoto: le richieste saranno accettate senza verifica della firma.', 'hotel-in-cloud') . '</p>';
+    echo '<p class="description">' . esc_html__('Quando possibile, inserisci lo stesso valore anche nel pannello HIC per autenticare ogni chiamata.', 'hotel-in-cloud') . '</p>';
+    echo '<p class="description">' . esc_html__('Rigenera questo valore e aggiornalo sia qui che in HIC in caso di compromissione.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_health_token_render() {
     $token = \FpHic\Helpers\hic_get_health_token();
 
-    echo '<div class="hic-health-token-control">';
+    echo '<div class="hic-health-token-tools">';
     echo '<input type="text" name="hic_health_token" id="hic_health_token" value="' . esc_attr($token) . '" class="regular-text" autocomplete="off" />';
-    echo '<button type="button" class="button" id="hic-generate-health-token">' . esc_html__('Genera nuovo token', 'hotel-in-cloud') . '</button>';
+    echo '<button type="button" class="button hic-button hic-button--secondary" id="hic-generate-health-token">' . esc_html__('Genera nuovo token', 'hotel-in-cloud') . '</button>';
     echo '</div>';
-    echo '<p class="description">' . esc_html__('Il token protegge l\'endpoint pubblico di health check. Condividilo solo con i sistemi di monitoraggio di fiducia.', 'hotel-in-cloud') . '</p>';
-    echo '<p id="hic-health-token-status" class="description"></p>';
+    echo '<p class="description">' . esc_html__("Il token protegge l'endpoint pubblico di health check. Condividilo solo con i sistemi di monitoraggio fidati.", 'hotel-in-cloud') . '</p>';
+    echo '<p id="hic-health-token-status" class="hic-feedback" hidden></p>';
 }
 
 function hic_api_url_render() {
-    echo '<input type="url" name="hic_api_url" value="' . esc_url(\FpHic\Helpers\hic_get_api_url()) . '" class="regular-text" />';
-    echo '<p class="description">URL delle API Hotel in Cloud (solo se si usa API Polling)</p>';
+    echo '<input type="url" name="hic_api_url" id="hic_api_url" value="' . esc_url(\FpHic\Helpers\hic_get_api_url()) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('URL delle API Hotel in Cloud (necessario solo per modalità API o Hybrid).', 'hotel-in-cloud') . '</p>';
 }
 
 // Basic Auth render functions
@@ -741,12 +886,12 @@ function hic_api_email_render() {
     $is_constant = defined('HIC_API_EMAIL') && !empty(HIC_API_EMAIL);
     
     if ($is_constant) {
-        echo '<input type="email" value="' . esc_attr($value) . '" class="regular-text" disabled />';
-        echo '<p class="description"><strong>Configurato tramite costante PHP HIC_API_EMAIL in wp-config.php</strong></p>';
+        echo '<input type="email" id="hic_api_email" value="' . esc_attr($value) . '" class="regular-text" disabled />';
+        echo '<p class="description"><strong>' . esc_html__('Configurato tramite costante PHP HIC_API_EMAIL in wp-config.php', 'hotel-in-cloud') . '</strong></p>';
         echo '<input type="hidden" name="hic_api_email" value="' . esc_attr(\FpHic\Helpers\hic_get_option('api_email', '')) . '" />';
     } else {
-        echo '<input type="email" name="hic_api_email" value="' . esc_attr($value) . '" class="regular-text" />';
-        echo '<p class="description">Email per autenticazione Basic Auth alle API Hotel in Cloud</p>';
+        echo '<input type="email" name="hic_api_email" id="hic_api_email" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . esc_html__("Email utilizzata per l'autenticazione Basic Auth verso le API Hotel in Cloud.", 'hotel-in-cloud') . '</p>';
     }
 }
 
@@ -755,12 +900,12 @@ function hic_api_password_render() {
     $is_constant = defined('HIC_API_PASSWORD') && !empty(HIC_API_PASSWORD);
     
     if ($is_constant) {
-        echo '<input type="password" value="********" class="regular-text" disabled />';
-        echo '<p class="description"><strong>Configurato tramite costante PHP HIC_API_PASSWORD in wp-config.php</strong></p>';
+        echo '<input type="password" id="hic_api_password" value="********" class="regular-text" disabled />';
+        echo '<p class="description"><strong>' . esc_html__('Configurato tramite costante PHP HIC_API_PASSWORD in wp-config.php', 'hotel-in-cloud') . '</strong></p>';
         echo '<input type="hidden" name="hic_api_password" value="' . esc_attr(\FpHic\Helpers\hic_get_option('api_password', '')) . '" />';
     } else {
-        echo '<input type="password" name="hic_api_password" value="' . esc_attr($value) . '" class="regular-text" />';
-        echo '<p class="description">Password per autenticazione Basic Auth alle API Hotel in Cloud</p>';
+        echo '<input type="password" name="hic_api_password" id="hic_api_password" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . esc_html__("Password per l'autenticazione Basic Auth verso le API Hotel in Cloud.", 'hotel-in-cloud') . '</p>';
     }
 }
 
@@ -769,113 +914,140 @@ function hic_property_id_render() {
     $is_constant = defined('HIC_PROPERTY_ID') && !empty(HIC_PROPERTY_ID);
     
     if ($is_constant) {
-        echo '<input type="number" value="' . esc_attr($value) . '" class="regular-text" disabled />';
-        echo '<p class="description"><strong>Configurato tramite costante PHP HIC_PROPERTY_ID in wp-config.php</strong></p>';
+        echo '<input type="number" id="hic_property_id" value="' . esc_attr($value) . '" class="regular-text" disabled />';
+        echo '<p class="description"><strong>' . esc_html__('Configurato tramite costante PHP HIC_PROPERTY_ID in wp-config.php', 'hotel-in-cloud') . '</strong></p>';
         echo '<input type="hidden" name="hic_property_id" value="' . esc_attr(\FpHic\Helpers\hic_get_option('property_id', '')) . '" />';
     } else {
-        echo '<input type="number" name="hic_property_id" value="' . esc_attr($value) . '" class="regular-text" />';
-        echo '<p class="description">ID della struttura (propId) per le chiamate API</p>';
+        echo '<input type="number" name="hic_property_id" id="hic_property_id" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . esc_html__('ID della struttura (propId) richiesto dalle chiamate API Hotel in Cloud.', 'hotel-in-cloud') . '</p>';
     }
 }
 
 function hic_polling_interval_render() {
     $interval = \FpHic\Helpers\hic_get_polling_interval();
-    echo '<select name="hic_polling_interval">';
-    echo '<option value="every_minute"' . selected($interval, 'every_minute', false) . '>Ogni 30 secondi (quasi real-time)</option>';
-    echo '<option value="every_two_minutes"' . selected($interval, 'every_two_minutes', false) . '>Ogni 2 minuti (bilanciato)</option>';
-    echo '<option value="hic_poll_interval"' . selected($interval, 'hic_poll_interval', false) . '>Ogni 5 minuti (compatibilità)</option>';
-    echo '<option value="hic_reliable_interval"' . selected($interval, 'hic_reliable_interval', false) . '>Ogni 5 minuti (affidabile)</option>';
+    echo '<select name="hic_polling_interval" id="hic_polling_interval">';
+    echo '<option value="every_minute"' . selected($interval, 'every_minute', false) . '>' . esc_html__('Ogni 30 secondi (quasi real-time)', 'hotel-in-cloud') . '</option>';
+    echo '<option value="every_two_minutes"' . selected($interval, 'every_two_minutes', false) . '>' . esc_html__('Ogni 2 minuti (bilanciato)', 'hotel-in-cloud') . '</option>';
+    echo '<option value="hic_poll_interval"' . selected($interval, 'hic_poll_interval', false) . '>' . esc_html__('Ogni 5 minuti (compatibilità)', 'hotel-in-cloud') . '</option>';
+    echo '<option value="hic_reliable_interval"' . selected($interval, 'hic_reliable_interval', false) . '>' . esc_html__('Ogni 5 minuti (affidabile)', 'hotel-in-cloud') . '</option>';
     echo '</select>';
-    echo '<p class="description">Frequenza del polling API per prenotazioni quasi real-time. "Affidabile" utilizza WP-Cron con watchdog.</p>';
+    echo '<p class="description">' . esc_html__('Frequenza del polling API per prenotazioni quasi real-time. La modalità Affidabile utilizza WP-Cron con watchdog.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_reliable_polling_enabled_render() {
     $enabled = \FpHic\Helpers\hic_get_option('reliable_polling_enabled', '1') === '1';
-    echo '<label>';
-    echo '<input type="checkbox" name="hic_reliable_polling_enabled" value="1"' . checked($enabled, true, false) . ' />';
-    echo ' Attiva sistema polling affidabile';
+    echo '<label class="hic-toggle" for="hic_reliable_polling_enabled">';
+    echo '<input type="checkbox" name="hic_reliable_polling_enabled" id="hic_reliable_polling_enabled" value="1"' . checked($enabled, true, false) . ' />';
+    echo '<span>' . esc_html__('Attiva sistema polling affidabile', 'hotel-in-cloud') . '</span>';
     echo '</label>';
-    echo '<p class="description">Sistema interno con watchdog e recupero automatico basato su WP-Cron. <strong>Raccomandato per hosting condiviso.</strong></p>';
+    echo '<p class="description">' . esc_html__('Sistema interno con watchdog e recupero automatico basato su WP-Cron. Consigliato per hosting condivisi.', 'hotel-in-cloud') . '</p>';
 }
 
 // Extended HIC Integration render functions
 function hic_currency_render() {
-    echo '<input type="text" name="hic_currency" value="' . esc_attr(\FpHic\Helpers\hic_get_currency()) . '" maxlength="3" />';
-    echo '<p class="description">Valuta per GA4 e Meta Pixel (default: EUR)</p>';
+    echo '<input type="text" name="hic_currency" id="hic_currency" value="' . esc_attr(\FpHic\Helpers\hic_get_currency()) . '" maxlength="3" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('Valuta utilizzata per GA4 e Meta Pixel (default: EUR).', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_ga4_use_net_value_render() {
-    $checked = \FpHic\Helpers\hic_use_net_value() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_ga4_use_net_value" value="1" ' . esc_attr($checked) . ' /> Usa price - unpaid_balance come valore per GA4/Pixel';
+    $checked = \FpHic\Helpers\hic_use_net_value();
+    echo '<label class="hic-toggle" for="hic_ga4_use_net_value">';
+    echo '<input type="checkbox" name="hic_ga4_use_net_value" id="hic_ga4_use_net_value" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Usa price - unpaid_balance come valore per GA4/Pixel', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
 }
 
 function hic_process_invalid_render() {
-    $checked = \FpHic\Helpers\hic_process_invalid() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_process_invalid" value="1" ' . esc_attr($checked) . ' /> Processa anche prenotazioni con valid=0';
+    $checked = \FpHic\Helpers\hic_process_invalid();
+    echo '<label class="hic-toggle" for="hic_process_invalid">';
+    echo '<input type="checkbox" name="hic_process_invalid" id="hic_process_invalid" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Processa anche prenotazioni con valid = 0', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
 }
 
 function hic_allow_status_updates_render() {
-    $checked = \FpHic\Helpers\hic_allow_status_updates() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_allow_status_updates" value="1" ' . esc_attr($checked) . ' /> Permetti aggiornamenti quando cambia presence';
+    $checked = \FpHic\Helpers\hic_allow_status_updates();
+    echo '<label class="hic-toggle" for="hic_allow_status_updates">';
+    echo '<input type="checkbox" name="hic_allow_status_updates" id="hic_allow_status_updates" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Permetti aggiornamenti quando cambia presence', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
 }
 
 function hic_refund_tracking_render() {
-    $checked = \FpHic\Helpers\hic_refund_tracking_enabled() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_refund_tracking" value="1" ' . esc_attr($checked) . ' /> Abilita tracciamento rimborsi';
+    $checked = \FpHic\Helpers\hic_refund_tracking_enabled();
+    echo '<label class="hic-toggle" for="hic_refund_tracking">';
+    echo '<input type="checkbox" name="hic_refund_tracking" id="hic_refund_tracking" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Abilita tracciamento rimborsi', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
 }
 
 function hic_brevo_list_it_render() {
-    echo '<input type="number" name="hic_brevo_list_it" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_it()) . '" />';
-    echo '<p class="description">ID lista Brevo per contatti italiani</p>';
+    echo '<input type="number" name="hic_brevo_list_it" id="hic_brevo_list_it" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_it()) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('ID lista Brevo per contatti italiani.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_brevo_list_en_render() {
-    echo '<input type="number" name="hic_brevo_list_en" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_en()) . '" />';
-    echo '<p class="description">ID lista Brevo per contatti inglesi</p>';
+    echo '<input type="number" name="hic_brevo_list_en" id="hic_brevo_list_en" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_en()) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('ID lista Brevo per contatti inglesi.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_brevo_list_default_render() {
-    echo '<input type="number" name="hic_brevo_list_default" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_default()) . '" />';
-    echo '<p class="description">ID lista Brevo per altre lingue</p>';
+    echo '<input type="number" name="hic_brevo_list_default" id="hic_brevo_list_default" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_default()) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('ID lista Brevo per contatti in altre lingue.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_brevo_optin_default_render() {
-    $checked = \FpHic\Helpers\hic_get_brevo_optin_default() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_brevo_optin_default" value="1" ' . esc_attr($checked) . ' /> Opt-in marketing di default per nuovi contatti';
+    $checked = \FpHic\Helpers\hic_get_brevo_optin_default();
+    echo '<label class="hic-toggle" for="hic_brevo_optin_default">';
+    echo '<input type="checkbox" name="hic_brevo_optin_default" id="hic_brevo_optin_default" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Opt-in marketing di default per nuovi contatti', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
 }
 
 function hic_debug_verbose_render() {
-    $checked = \FpHic\Helpers\hic_is_debug_verbose() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_debug_verbose" value="1" ' . esc_attr($checked) . ' /> Abilita log debug estesi (solo per test)';
+    $checked = \FpHic\Helpers\hic_is_debug_verbose();
+    echo '<label class="hic-toggle" for="hic_debug_verbose">';
+    echo '<input type="checkbox" name="hic_debug_verbose" id="hic_debug_verbose" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Abilita log debug estesi (solo per test)', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
 }
 
 // Email enrichment render functions
 function hic_updates_enrich_contacts_render() {
-    $checked = \FpHic\Helpers\hic_updates_enrich_contacts() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_updates_enrich_contacts" value="1" ' . esc_attr($checked) . ' /> Aggiorna contatti Brevo quando arriva email reale da updates';
+    $checked = \FpHic\Helpers\hic_updates_enrich_contacts();
+    echo '<label class="hic-toggle" for="hic_updates_enrich_contacts">';
+    echo '<input type="checkbox" name="hic_updates_enrich_contacts" id="hic_updates_enrich_contacts" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Aggiorna contatti Brevo quando arriva email reale da updates', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
 }
 
 function hic_realtime_brevo_sync_render() {
-    $checked = \FpHic\Helpers\hic_realtime_brevo_sync_enabled() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_realtime_brevo_sync" value="1" ' . esc_attr($checked) . ' /> Invia eventi "reservation_created" a Brevo in tempo reale per nuove prenotazioni';
-    echo '<p class="description">Quando abilitato, le nuove prenotazioni rilevate dal polling updates invieranno automaticamente eventi a Brevo per automazioni e tracciamento.</p>';
+    $checked = \FpHic\Helpers\hic_realtime_brevo_sync_enabled();
+    echo '<label class="hic-toggle" for="hic_realtime_brevo_sync">';
+    echo '<input type="checkbox" name="hic_realtime_brevo_sync" id="hic_realtime_brevo_sync" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Invia eventi "reservation_created" a Brevo in tempo reale per nuove prenotazioni', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
+    echo '<p class="description">' . esc_html__('Quando abilitato, le nuove prenotazioni rilevate dal polling updates invieranno automaticamente eventi a Brevo per automazioni e tracciamento.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_brevo_list_alias_render() {
-    echo '<input type="number" name="hic_brevo_list_alias" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_alias()) . '" />';
-    echo '<p class="description">ID lista Brevo per contatti con email alias (Booking/Airbnb/OTA). Lascia vuoto per non iscriverli a nessuna lista.</p>';
+    echo '<input type="number" name="hic_brevo_list_alias" id="hic_brevo_list_alias" value="' . esc_attr(\FpHic\Helpers\hic_get_brevo_list_alias()) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('ID lista Brevo per contatti con email alias (Booking/Airbnb/OTA). Lascia vuoto per non iscriverli.', 'hotel-in-cloud') . '</p>';
 }
 
 function hic_brevo_double_optin_on_enrich_render() {
-    $checked = \FpHic\Helpers\hic_brevo_double_optin_on_enrich() ? 'checked' : '';
-    echo '<input type="checkbox" name="hic_brevo_double_optin_on_enrich" value="1" ' . esc_attr($checked) . ' /> Invia double opt-in quando arriva email reale';
+    $checked = \FpHic\Helpers\hic_brevo_double_optin_on_enrich();
+    echo '<label class="hic-toggle" for="hic_brevo_double_optin_on_enrich">';
+    echo '<input type="checkbox" name="hic_brevo_double_optin_on_enrich" id="hic_brevo_double_optin_on_enrich" value="1"' . checked($checked, true, false) . ' />';
+    echo '<span>' . esc_html__('Invia double opt-in quando arriva email reale', 'hotel-in-cloud') . '</span>';
+    echo '</label>';
 }
 
 function hic_brevo_event_endpoint_render() {
     $endpoint = \FpHic\Helpers\hic_get_brevo_event_endpoint();
-    echo '<input type="url" name="hic_brevo_event_endpoint" value="' . esc_url($endpoint) . '" style="width: 100%;" />';
-    echo '<p class="description">Endpoint API per eventi Brevo. Default: https://in-automate.brevo.com/api/v2/trackEvent<br>';
-    echo 'Modificare solo se Brevo cambia il proprio endpoint per gli eventi o se si utilizza un endpoint personalizzato.</p>';
+    echo '<input type="url" name="hic_brevo_event_endpoint" id="hic_brevo_event_endpoint" value="' . esc_url($endpoint) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('Endpoint API per eventi Brevo. Default: https://in-automate.brevo.com/api/v2/trackEvent', 'hotel-in-cloud') . '</p>';
+    echo '<p class="description">' . esc_html__('Modificare solo se Brevo cambia il proprio endpoint per gli eventi o se si utilizza un endpoint personalizzato.', 'hotel-in-cloud') . '</p>';
 }
 
 /* ============ Validation Functions ============ */

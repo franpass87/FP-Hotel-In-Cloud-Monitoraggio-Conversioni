@@ -1246,13 +1246,13 @@ function hic_diagnostics_page() {
     // Note: Updates polling and all cron dependencies removed - system uses internal scheduler only
     
     ?>
-    <div class="wrap">
+    <div class="wrap hic-admin-page hic-diagnostics-page">
         <h1>🏨 HIC Plugin Diagnostica</h1>
         
         <div class="hic-diagnostics-container">
             
             <!-- System Overview Section -->
-            <div class="card hic-overview-card" id="system-overview">
+            <div class="hic-card hic-overview-card" id="system-overview">
                 <h2>📊 Panoramica Sistema
                     <span class="hic-refresh-indicator" id="refresh-indicator"></span>
                 </h2>
@@ -1393,7 +1393,7 @@ function hic_diagnostics_page() {
             </div>
             
             <!-- Quick Diagnostics Section -->
-            <div class="card hic-quick-card">
+            <div class="hic-card hic-quick-card">
                 <h2>🔧 Diagnostica Rapida</h2>
                 
                 <div class="hic-quick-actions">
@@ -1444,7 +1444,7 @@ function hic_diagnostics_page() {
             </div>
             
             <!-- Integration Status Section -->
-            <div class="card hic-integrations-card">
+            <div class="hic-card hic-integrations-card">
                 <h2>🔌 Stato Integrazioni</h2>
                 
                 <div class="hic-integrations-grid">
@@ -1569,7 +1569,7 @@ function hic_diagnostics_page() {
             </div>
             
             <!-- Activity Monitor Section -->
-            <div class="card hic-activity-card">
+            <div class="hic-card hic-activity-card">
                 <h2>📈 Monitor Attività</h2>
                 
                 <div class="hic-activity-grid">
@@ -1644,7 +1644,7 @@ function hic_diagnostics_page() {
             </div>
             
             <!-- Advanced Tools Section -->
-            <div class="card hic-advanced-card">
+            <div class="hic-card hic-advanced-card">
                 <h2>🛠️ Strumenti Avanzati</h2>
                 
                 <details class="hic-advanced-details">

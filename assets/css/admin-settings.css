@@ -1,31 +1,143 @@
-.hic-api-test-section .dashicons {
-    vertical-align: middle;
-    margin-right: 5px;
-}
-.hic-api-test-section .notice {
-    margin: 0;
-    padding: 10px;
-}
-.hic-api-test-section .notice p {
-    margin: 0;
-}
-.hic-api-test-section .spinner {
-    visibility: visible;
+/**
+ * Settings page enhancements layered on top of the shared admin styles
+ */
+
+.hic-settings-page .hic-page-header__title span {
+    display: inline-block;
+    margin-right: 8px;
 }
 
-.hic-health-token-control {
+.hic-settings-page .hic-settings-form {
     display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-lg);
+}
+
+.hic-settings-page .hic-tab-panels {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-xl);
+}
+
+.hic-settings-page .hic-tab-panel {
+    animation: hicTabFade 0.25s ease;
+}
+
+@keyframes hicTabFade {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hic-settings-page .hic-settings-section .description {
+    max-width: 640px;
+}
+
+.hic-settings-page .hic-api-test-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-md);
+}
+
+.hic-settings-page .hic-api-test-card .hic-card__header {
+    align-items: flex-start;
+}
+
+.hic-settings-page .hic-api-test-card .hic-card__body {
+    gap: var(--hic-spacing-sm);
+}
+
+.hic-settings-page .hic-health-token-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hic-spacing-sm);
     align-items: center;
-    gap: 10px;
-    margin-top: 10px;
 }
 
-.hic-health-token-control input[type="text"] {
-    max-width: 320px;
+.hic-settings-page .hic-health-token-tools .hic-inline-loader {
+    margin-left: auto;
 }
 
-#hic-health-token-status {
-    margin-top: 8px;
-    font-style: italic;
+.hic-settings-page .hic-health-token-tools button {
+    flex-shrink: 0;
 }
 
+.hic-settings-page .hic-help-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hic-spacing-sm);
+    color: var(--hic-color-text-muted);
+    font-size: 12px;
+}
+
+.hic-settings-page .hic-help-links a {
+    color: var(--hic-color-primary);
+    text-decoration: none;
+}
+
+.hic-settings-page .hic-help-links a:hover {
+    text-decoration: underline;
+}
+
+.hic-settings-page .hic-field-control .hic-secondary-text {
+    color: var(--hic-color-text-muted);
+    font-size: 12px;
+}
+
+.hic-settings-page .hic-warning-text {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    color: var(--hic-color-warning);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.hic-settings-page .hic-email-guidance {
+    display: grid;
+    gap: var(--hic-spacing-sm);
+}
+
+.hic-settings-page .hic-email-guidance strong {
+    color: var(--hic-color-heading);
+}
+
+.hic-settings-page .hic-email-guidance ul,
+.hic-settings-page .hic-email-guidance ol {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--hic-color-text-muted);
+}
+
+.hic-settings-page .hic-section-hint {
+    background: rgba(28, 126, 214, 0.08);
+    border-radius: var(--hic-radius-md);
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--hic-color-primary);
+}
+
+.hic-settings-page .hic-api-result-list {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--hic-color-text-muted);
+}
+
+.hic-settings-page .hic-api-result-list li {
+    margin-bottom: 4px;
+}
+
+.hic-settings-page .hic-settings-form .button-primary {
+    display: inline-flex;
+}
+
+@media (max-width: 1024px) {
+    .hic-settings-page .hic-page-header {
+        align-items: flex-start;
+    }
+}

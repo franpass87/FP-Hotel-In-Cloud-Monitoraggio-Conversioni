@@ -216,16 +216,23 @@ class RealtimeDashboard {
             'hic-realtime-dashboard',
             $plugin_base_url . 'assets/js/realtime-dashboard.js',
             ['jquery', 'chart-js'],
-            '3.2.0',
+            HIC_PLUGIN_VERSION,
             true
         );
 
         // Enqueue dashboard CSS
         wp_enqueue_style(
+            'hic-admin-base',
+            $plugin_base_url . 'assets/css/hic-admin.css',
+            [],
+            HIC_PLUGIN_VERSION
+        );
+
+        wp_enqueue_style(
             'hic-realtime-dashboard',
             $plugin_base_url . 'assets/css/realtime-dashboard.css',
-            [],
-            '3.2.0'
+            ['hic-admin-base'],
+            HIC_PLUGIN_VERSION
         );
         
         // Localize script with data and settings
@@ -348,7 +355,7 @@ class RealtimeDashboard {
      */
     public function render_full_dashboard() {
         ?>
-        <div class="wrap hic-dashboard">
+        <div class="wrap hic-admin-page hic-dashboard-page hic-dashboard">
             <h1>FP HIC Monitor - Dashboard Real-Time</h1>
             
             <div class="hic-dashboard-grid">

@@ -1661,12 +1661,21 @@ class GoogleAdsEnhancedConversions {
         if ($hook !== 'hic-monitoring_page_hic-enhanced-conversions') {
             return;
         }
-        
+
+        $base_url = plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php');
+
+        wp_enqueue_style(
+            'hic-admin-base',
+            $base_url . 'assets/css/hic-admin.css',
+            [],
+            HIC_PLUGIN_VERSION
+        );
+
         wp_enqueue_script(
             'hic-enhanced-conversions',
-            plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/js/enhanced-conversions.js',
+            $base_url . 'assets/js/enhanced-conversions.js',
             ['jquery'],
-            '3.2.0',
+            HIC_PLUGIN_VERSION,
             true
         );
         
@@ -1702,145 +1711,190 @@ class GoogleAdsEnhancedConversions {
         } else {
             $status = 'configured';
         }
-        
+
+        $status_badge_class = 'hic-status-badge--warning';
+        $status_badge_label = 'Disabilitato';
+        $status_feedback_class = 'hic-feedback is-info';
+        $status_feedback_message = 'Status: Disabilitato — Il sistema funziona normalmente senza Enhanced Conversions.';
+
+        if ($status === 'not_configured') {
+            $status_badge_class = 'hic-status-badge--warning';
+            $status_badge_label = 'Da configurare';
+            $status_feedback_class = 'hic-feedback is-warning';
+            $status_feedback_message = 'Status: Abilitato ma non configurato — Inserire credenziali Google Ads per completare la configurazione.';
+        } elseif ($status === 'configured') {
+            $status_badge_class = 'hic-status-badge--success';
+            $status_badge_label = 'Attivo';
+            $status_feedback_class = 'hic-feedback is-success';
+            $status_feedback_message = 'Status: Configurato e attivo — Enhanced Conversions funzionanti.';
+        }
+
         ?>
-        <div class="wrap">
-            <h1>Google Ads Enhanced Conversions</h1>
-            
+        <div class="wrap hic-admin-page hic-enhanced-page">
+            <div class="hic-page-header">
+                <div>
+                    <h1 class="hic-page-header__title">Google Ads Enhanced Conversions</h1>
+                    <p class="hic-page-header__subtitle">Ottimizza il tracciamento importando in Google Ads i dati raccolti da Hotel in Cloud.</p>
+                </div>
+            </div>
+
             <?php if (!$enabled): ?>
-                <div class="notice notice-info">
-                    <p><strong>Nota:</strong> Il sistema HIC funziona perfettamente anche senza Google Ads Enhanced Conversions. 
-                    Questa funzionalità è opzionale e migliora l'accuratezza del tracciamento solo se utilizzi Google Ads.</p>
+                <div class="hic-feedback is-info">
+                    <strong>Nota:</strong> Il sistema HIC funziona perfettamente anche senza Google Ads Enhanced Conversions.
+                    Questa funzionalità è opzionale e migliora l'accuratezza del tracciamento solo se utilizzi Google Ads.
                 </div>
             <?php endif; ?>
-            
-            <div class="hic-enhanced-conversions-dashboard">
+
+            <div class="hic-grid hic-grid--two hic-enhanced-conversions-dashboard">
                 <!-- Configuration Status -->
-                <div class="postbox">
-                    <h2>Stato Configurazione</h2>
-                    <div class="inside">
-                        <p class="status-indicator status-<?php echo esc_attr($status); ?>">
-                            <?php if ($status === 'disabled'): ?>
-                                Status: <strong>Disabilitato</strong> - Il sistema funziona normalmente senza Enhanced Conversions
-                            <?php elseif ($status === 'not_configured'): ?>
-                                Status: <strong>Abilitato ma non configurato</strong> - Inserire credenziali Google Ads
-                            <?php else: ?>
-                                Status: <strong>Configurato e attivo</strong> - Enhanced Conversions funzionanti
-                            <?php endif; ?>
-                        </p>
-                        
-                        <form method="post" action="">
+                <div class="hic-card">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title">Stato Configurazione</h2>
+                            <p class="hic-card__subtitle">Controlla l'attivazione dell'integrazione e abilita la funzione quando sei pronto.</p>
+                        </div>
+                        <span class="hic-status-badge <?php echo esc_attr($status_badge_class); ?>"><?php echo esc_html($status_badge_label); ?></span>
+                    </div>
+                    <div class="hic-card__body">
+                        <div class="<?php echo esc_attr($status_feedback_class); ?>"><?php echo esc_html($status_feedback_message); ?></div>
+
+                        <form method="post" action="" class="hic-form">
                             <?php wp_nonce_field('hic_enhanced_conversions_toggle', 'hic_enhanced_nonce'); ?>
-                            
-                            <label>
-                                <input type="checkbox" name="hic_enhanced_enabled" value="1" <?php checked($enabled); ?>>
-                                Abilita Google Ads Enhanced Conversions (opzionale)
-                            </label>
-                            
-                            <p class="description">
-                                Il sistema HIC funziona completamente anche senza questa funzionalità. 
-                                Abilitare solo se si utilizzano campagne Google Ads e si desidera un tracciamento più accurato.
-                            </p>
-                            
-                            <?php submit_button('Salva Impostazioni', 'primary', 'save_enhanced_settings'); ?>
+
+                            <div class="hic-field-grid">
+                                <div class="hic-field-row">
+                                    <div class="hic-field-label">
+                                        <label for="hic-enhanced-enabled">Abilita Google Ads Enhanced Conversions</label>
+                                    </div>
+                                    <div class="hic-field-control">
+                                        <label class="hic-toggle" for="hic-enhanced-enabled">
+                                            <input type="checkbox" id="hic-enhanced-enabled" name="hic_enhanced_enabled" value="1" <?php checked($enabled); ?>>
+                                            <span>Funzionalità opzionale consigliata per chi utilizza campagne Google Ads.</span>
+                                        </label>
+                                        <p class="description">Quando disattivata, il monitoraggio standard continua a funzionare senza interruzioni.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="hic-form-actions">
+                                <button type="submit" class="button hic-button hic-button--primary" name="save_enhanced_settings" value="1">
+                                    Salva Impostazioni
+                                </button>
+                            </div>
                         </form>
-                        
-                        <?php if ($status === 'not_configured'): ?>
-                            <p>Configura le credenziali Google Ads API per utilizzare Enhanced Conversions.</p>
-                        <?php elseif ($status === 'configured'): ?>
-                            <p>Enhanced Conversions configurate e pronte all'uso.</p>
-                        <?php endif; ?>
                     </div>
                 </div>
-                
+
                 <!-- API Configuration -->
-                <div class="postbox">
-                    <h2>Google Ads API Configuration</h2>
-                    <div class="inside">
-                        <form method="post" action="options.php">
+                <div class="hic-card">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title">Google Ads API Configuration</h2>
+                            <p class="hic-card__subtitle">Inserisci le credenziali API necessarie per sincronizzare i dati delle conversioni.</p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body">
+                        <form method="post" action="options.php" class="hic-form" novalidate>
                             <?php settings_fields('hic_google_ads_enhanced_settings'); ?>
-                            <table class="form-table">
-                                <tr>
-                                    <th>Customer ID</th>
-                                    <td>
-                                        <input type="text" name="hic_google_ads_enhanced_settings[customer_id]" 
-                                               value="<?php echo esc_attr($settings['customer_id'] ?? ''); ?>" 
-                                               placeholder="123-456-7890" class="regular-text">
+                            <div class="hic-field-grid">
+                                <div class="hic-field-row">
+                                    <label class="hic-field-label" for="hic-google-ads-customer-id">Customer ID</label>
+                                    <div class="hic-field-control">
+                                        <input type="text" id="hic-google-ads-customer-id" name="hic_google_ads_enhanced_settings[customer_id]"
+                                               value="<?php echo esc_attr($settings['customer_id'] ?? ''); ?>"
+                                               placeholder="123-456-7890">
                                         <p class="description">Your Google Ads customer ID (format: 123-456-7890)</p>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Developer Token</th>
-                                    <td>
-                                        <input type="text" name="hic_google_ads_enhanced_settings[developer_token]" 
-                                               value="<?php echo esc_attr($settings['developer_token'] ?? ''); ?>" 
-                                               class="regular-text">
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Client ID</th>
-                                    <td>
-                                        <input type="text" name="hic_google_ads_enhanced_settings[client_id]" 
-                                               value="<?php echo esc_attr($settings['client_id'] ?? ''); ?>" 
-                                               class="regular-text">
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Client Secret</th>
-                                    <td>
-                                        <input type="password" name="hic_google_ads_enhanced_settings[client_secret]" 
-                                               value="<?php echo esc_attr($settings['client_secret'] ?? ''); ?>" 
-                                               class="regular-text">
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Refresh Token</th>
-                                    <td>
-                                        <input type="text" name="hic_google_ads_enhanced_settings[refresh_token]"
-                                               value="<?php echo esc_attr($settings['refresh_token'] ?? ''); ?>"
-                                               class="regular-text">
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Prefisso telefonico di fallback</th>
-                                    <td>
-                                        <input type="text" name="hic_google_ads_enhanced_settings[default_phone_country]"
+                                    </div>
+                                </div>
+
+                                <div class="hic-field-row">
+                                    <label class="hic-field-label" for="hic-google-ads-developer-token">Developer Token</label>
+                                    <div class="hic-field-control">
+                                        <input type="text" id="hic-google-ads-developer-token" name="hic_google_ads_enhanced_settings[developer_token]"
+                                               value="<?php echo esc_attr($settings['developer_token'] ?? ''); ?>">
+                                    </div>
+                                </div>
+
+                                <div class="hic-field-row">
+                                    <label class="hic-field-label" for="hic-google-ads-client-id">Client ID</label>
+                                    <div class="hic-field-control">
+                                        <input type="text" id="hic-google-ads-client-id" name="hic_google_ads_enhanced_settings[client_id]"
+                                               value="<?php echo esc_attr($settings['client_id'] ?? ''); ?>">
+                                    </div>
+                                </div>
+
+                                <div class="hic-field-row">
+                                    <label class="hic-field-label" for="hic-google-ads-client-secret">Client Secret</label>
+                                    <div class="hic-field-control">
+                                        <input type="password" id="hic-google-ads-client-secret" name="hic_google_ads_enhanced_settings[client_secret]"
+                                               value="<?php echo esc_attr($settings['client_secret'] ?? ''); ?>">
+                                    </div>
+                                </div>
+
+                                <div class="hic-field-row">
+                                    <label class="hic-field-label" for="hic-google-ads-refresh-token">Refresh Token</label>
+                                    <div class="hic-field-control">
+                                        <input type="text" id="hic-google-ads-refresh-token" name="hic_google_ads_enhanced_settings[refresh_token]"
+                                               value="<?php echo esc_attr($settings['refresh_token'] ?? ''); ?>">
+                                    </div>
+                                </div>
+
+                                <div class="hic-field-row">
+                                    <label class="hic-field-label" for="hic-google-ads-default-country">Prefisso telefonico di fallback</label>
+                                    <div class="hic-field-control">
+                                        <input type="text" id="hic-google-ads-default-country" name="hic_google_ads_enhanced_settings[default_phone_country]"
                                                value="<?php echo esc_attr($default_phone_country); ?>"
-                                               class="regular-text" placeholder="IT o +39">
+                                               placeholder="IT o +39">
                                         <p class="description">
-                                            Utilizzato quando il prefisso non è deducibile da SID o lingua. Inserire un codice ISO
-                                            a due lettere (es. IT) oppure un prefisso numerico (es. +39).
+                                            Utilizzato quando il prefisso non è deducibile da SID o lingua. Inserire un codice ISO a due lettere (es. IT) oppure un prefisso numerico (es. +39).
                                         </p>
-                                    </td>
-                                </tr>
-                            </table>
-                            <?php submit_button('Save Configuration'); ?>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="hic-form-actions">
+                                <button type="submit" class="button hic-button hic-button--primary" name="submit" value="save">
+                                    Save Configuration
+                                </button>
+                            </div>
                         </form>
-                        
-                        <p>
-                            <button type="button" class="button" id="test-google-ads-connection">
+
+                        <div class="hic-form-actions">
+                            <button type="button" class="button hic-button hic-button--secondary" id="test-google-ads-connection">
                                 Test Connection
                             </button>
-                        </p>
+                        </div>
                     </div>
                 </div>
-                
+
                 <!-- Conversion Statistics -->
-                <div class="postbox">
-                    <h2>Enhanced Conversion Statistics</h2>
-                    <div class="inside">
+                <div class="hic-card">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title">Enhanced Conversion Statistics</h2>
+                            <p class="hic-card__subtitle">Monitora gli invii recenti e verifica che le conversioni arrivino correttamente.</p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body">
                         <div id="enhanced-conversion-stats">Loading statistics...</div>
                     </div>
                 </div>
-                
+
                 <!-- Manual Upload -->
-                <div class="postbox">
-                    <h2>Manual Upload</h2>
-                    <div class="inside">
+                <div class="hic-card">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title">Manual Upload</h2>
+                            <p class="hic-card__subtitle">Invia manualmente eventuali conversioni in coda verso Google Ads.</p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body">
                         <p>Upload pending enhanced conversions to Google Ads:</p>
-                        <button type="button" class="button button-primary" id="upload-enhanced-conversions">
-                            Upload Pending Conversions
-                        </button>
+                        <div class="hic-form-actions">
+                            <button type="button" class="button hic-button hic-button--primary" id="upload-enhanced-conversions">
+                                Upload Pending Conversions
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

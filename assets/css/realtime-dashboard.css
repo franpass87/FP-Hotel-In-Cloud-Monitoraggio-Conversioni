@@ -3,27 +3,9 @@
  * FP HIC Monitor v3.0 - Enterprise Grade
  */
 
-body.wp-admin.toplevel_page_hic-monitoring,
-body.wp-admin.hic-monitoring_page_hic-monitoring {
-    background-color: #f0f0f1;
-    color: #1d2327;
-}
-
-body.wp-admin.toplevel_page_hic-monitoring #wpbody-content,
-body.wp-admin.hic-monitoring_page_hic-monitoring #wpbody-content {
-    background: transparent;
-}
-
-body.wp-admin.toplevel_page_hic-monitoring #wpbody-content .wrap.hic-dashboard,
-body.wp-admin.hic-monitoring_page_hic-monitoring #wpbody-content .wrap.hic-dashboard {
-    background: transparent;
-    color: inherit;
-}
-
-/* Dashboard Grid Layout */
 .hic-dashboard {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: inherit;
+    font-family: var(--hic-font-stack);
+    color: var(--hic-color-text);
 }
 
 .hic-dashboard-grid {
