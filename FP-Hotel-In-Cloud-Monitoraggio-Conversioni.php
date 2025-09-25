@@ -39,6 +39,7 @@ require_once __DIR__ . '/includes/cache-manager.php';
 require_once __DIR__ . '/includes/booking-poller.php';
 require_once __DIR__ . '/includes/intelligent-polling-manager.php';
 require_once __DIR__ . '/includes/database-optimizer.php';
+require_once __DIR__ . '/includes/booking-metrics.php';
 require_once __DIR__ . '/includes/realtime-dashboard.php';
 require_once __DIR__ . '/includes/automated-reporting.php';
 require_once __DIR__ . '/includes/google-ads-enhanced.php';

@@ -452,201 +452,351 @@ class RealtimeDashboard {
      */
     private function cache_realtime_stats() {
         global $wpdb;
-        
-        $main_table = $wpdb->prefix . 'hic_gclids';
-        $current_time = current_time('mysql');
-        
-        // Get conversions for different time periods
+
+        $metrics_table  = $wpdb->prefix . 'hic_booking_metrics';
+        $tracking_table = $wpdb->prefix . 'hic_gclids';
+
+        if (!$this->table_exists($metrics_table)) {
+            $stats = [
+                'today'           => 0,
+                'yesterday'       => 0,
+                'last_hour'       => 0,
+                'last_24h'        => 0,
+                'conversion_rate' => 0,
+                'hourly_data'     => [],
+                'last_updated'    => time(),
+            ];
+            $this->set_dashboard_cache('realtime_stats', $stats, 60);
+            return;
+        }
+
+        [$today_start, $today_end]         = $this->get_period_bounds('today');
+        [$yesterday_start, $yesterday_end] = $this->get_period_bounds('yesterday');
+        [$last_hour_start, $last_hour_end] = $this->get_period_bounds('last_hour');
+        [$last_24h_start, $last_24h_end]   = $this->get_period_bounds('last_24h');
+
         $stats = [
-            'today' => $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$main_table} WHERE DATE(created_at) = DATE(%s)",
-                $current_time
+            'today' => (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$metrics_table} WHERE is_refund = 0 AND created_at >= %s AND created_at < %s",
+                $today_start,
+                $today_end
             )),
-            'yesterday' => $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$main_table} WHERE DATE(created_at) = DATE_SUB(DATE(%s), INTERVAL 1 DAY)",
-                $current_time
+            'yesterday' => (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$metrics_table} WHERE is_refund = 0 AND created_at >= %s AND created_at < %s",
+                $yesterday_start,
+                $yesterday_end
             )),
-            'last_hour' => $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$main_table} WHERE created_at >= DATE_SUB(%s, INTERVAL 1 HOUR)",
-                $current_time
+            'last_hour' => (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$metrics_table} WHERE is_refund = 0 AND created_at >= %s AND created_at < %s",
+                $last_hour_start,
+                $last_hour_end
             )),
-            'last_24h' => $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$main_table} WHERE created_at >= DATE_SUB(%s, INTERVAL 24 HOUR)",
-                $current_time
-            ))
+            'last_24h' => (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$metrics_table} WHERE is_refund = 0 AND created_at >= %s AND created_at < %s",
+                $last_24h_start,
+                $last_24h_end
+            )),
         ];
-        
-        // Calculate conversion rate (simplified - you'd need traffic data for real rate)
-        $stats['conversion_rate'] = $stats['today'] > 0 ? 
-            round(($stats['today'] / max($stats['today'] * 10, 100)) * 100, 2) : 0;
-        
-        // Get hourly data for chart
-        $hourly_data = $wpdb->get_results($wpdb->prepare("
-            SELECT 
-                HOUR(created_at) as hour,
-                COUNT(*) as conversions
-            FROM {$main_table} 
-            WHERE DATE(created_at) = DATE(%s)
+
+        $visits_today = 0;
+        if ($this->table_exists($tracking_table)) {
+            $visits_today = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(DISTINCT sid) FROM {$tracking_table} WHERE created_at >= %s AND created_at < %s",
+                $today_start,
+                $today_end
+            ));
+        }
+
+        $stats['conversion_rate'] = $visits_today > 0
+            ? round(($stats['today'] / $visits_today) * 100, 2)
+            : 0.0;
+        $stats['visits_today'] = $visits_today;
+
+        $hourly_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT
+                HOUR(created_at) AS hour,
+                SUM(CASE WHEN is_refund = 1 THEN 0 ELSE 1 END) AS conversions
+            FROM {$metrics_table}
+            WHERE created_at >= %s AND created_at < %s
             GROUP BY HOUR(created_at)
-            ORDER BY hour
-        ", $current_time), ARRAY_A);
-        
-        $stats['hourly_data'] = $hourly_data;
+            ORDER BY hour",
+            $today_start,
+            $today_end
+        ), ARRAY_A);
+
+        $hourly_data = [];
+        if (is_array($hourly_rows)) {
+            foreach ($hourly_rows as $row) {
+                $hourly_data[] = [
+                    'hour'        => isset($row['hour']) ? (int) $row['hour'] : 0,
+                    'conversions' => isset($row['conversions']) ? (int) $row['conversions'] : 0,
+                ];
+            }
+        }
+
+        $stats['hourly_data']  = $hourly_data;
         $stats['last_updated'] = time();
-        
-        $this->set_dashboard_cache('realtime_stats', $stats, 60); // Cache for 1 minute
+
+        $this->set_dashboard_cache('realtime_stats', $stats, 60);
     }
-    
     /**
      * Cache revenue by channel data
      */
     private function cache_revenue_by_channel() {
         global $wpdb;
-        
-        $main_table = $wpdb->prefix . 'hic_gclids';
-        
+
+        $metrics_table = $wpdb->prefix . 'hic_booking_metrics';
+
+        if (!$this->table_exists($metrics_table)) {
+            $this->set_dashboard_cache('revenue_by_channel', [], 300);
+            return;
+        }
+
         $periods = ['today', 'yesterday', '7days', '30days'];
         $revenue_data = [];
-        
+
         foreach ($periods as $period) {
-            $date_condition = $this->get_date_condition($period);
-            
-            $channel_data = $wpdb->get_results($wpdb->prepare("
-                SELECT 
-                    CASE 
-                        WHEN utm_source = 'google' THEN 'Google Ads'
-                        WHEN utm_source = 'facebook' THEN 'Facebook Ads'
-                        WHEN utm_source = '' OR utm_source IS NULL THEN 'Direct'
-                        ELSE CONCAT(UPPER(SUBSTRING(utm_source, 1, 1)), SUBSTRING(utm_source, 2))
-                    END as channel,
-                    COUNT(*) as bookings,
-                    COUNT(*) * 150 as estimated_revenue -- Placeholder revenue calculation
-                FROM {$main_table} 
-                WHERE {$date_condition}
-                GROUP BY channel
-                ORDER BY bookings DESC
-            "), ARRAY_A);
-            
-            $revenue_data[$period] = $channel_data;
+            [$start, $end] = $this->get_period_bounds($period);
+
+            $channel_rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT
+                    CASE
+                        WHEN channel = '' OR channel IS NULL THEN 'Direct'
+                        ELSE channel
+                    END AS channel,
+                    SUM(CASE WHEN is_refund = 1 THEN 0 ELSE 1 END) AS bookings,
+                    COALESCE(SUM(amount), 0) AS total_revenue
+                 FROM {$metrics_table}
+                 WHERE created_at >= %s AND created_at < %s
+                 GROUP BY channel
+                 ORDER BY total_revenue DESC",
+                $start,
+                $end
+            ), ARRAY_A);
+
+            $formatted = [];
+            if (is_array($channel_rows)) {
+                foreach ($channel_rows as $row) {
+                    $channel = isset($row['channel']) && $row['channel'] !== '' ? (string) $row['channel'] : 'Direct';
+                    $bookings = isset($row['bookings']) ? (int) $row['bookings'] : 0;
+                    $revenue  = round((float) ($row['total_revenue'] ?? 0), 2);
+
+                    $formatted[] = [
+                        'channel'            => $channel,
+                        'bookings'           => $bookings,
+                        'total_revenue'      => $revenue,
+                        'estimated_revenue'  => $revenue,
+                    ];
+                }
+            }
+
+            $revenue_data[$period] = $formatted;
         }
-        
-        $this->set_dashboard_cache('revenue_by_channel', $revenue_data, 300); // Cache for 5 minutes
+
+        $this->set_dashboard_cache('revenue_by_channel', $revenue_data, 300);
     }
-    
     /**
      * Update booking heatmap data
      */
     private function update_booking_heatmap() {
         global $wpdb;
-        
-        $main_table = $wpdb->prefix . 'hic_gclids';
+
+        $metrics_table = $wpdb->prefix . 'hic_booking_metrics';
         $heatmap_table = $wpdb->prefix . 'hic_booking_heatmap';
-        
-        // Get booking counts by hour and day of week for last 30 days
-        $heatmap_data = $wpdb->get_results("
-            SELECT 
-                HOUR(created_at) as hour_of_day,
-                DAYOFWEEK(created_at) as day_of_week,
-                COUNT(*) as booking_count
-            FROM {$main_table} 
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY hour_of_day, day_of_week
-        ", ARRAY_A);
-        
-        // Update heatmap table
-        foreach ($heatmap_data as $data) {
-            $wpdb->replace($heatmap_table, [
-                'hour_of_day' => $data['hour_of_day'],
-                'day_of_week' => $data['day_of_week'],
-                'booking_count' => $data['booking_count'],
-                'revenue_total' => $data['booking_count'] * 150 // Placeholder calculation
-            ]);
+
+        if (!$this->table_exists($metrics_table) || !$this->table_exists($heatmap_table)) {
+            return;
         }
-        
+
+        [$start, $end] = $this->get_period_bounds('30days');
+
+        $wpdb->query("UPDATE {$heatmap_table} SET booking_count = 0, revenue_total = 0");
+
+        $heatmap_rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT
+                HOUR(created_at) AS hour_of_day,
+                DAYOFWEEK(created_at) AS day_of_week,
+                SUM(CASE WHEN is_refund = 1 THEN 0 ELSE 1 END) AS booking_count,
+                COALESCE(SUM(amount), 0) AS revenue_total
+             FROM {$metrics_table}
+             WHERE created_at >= %s AND created_at < %s
+             GROUP BY hour_of_day, day_of_week",
+            $start,
+            $end
+        ), ARRAY_A);
+
+        if (!is_array($heatmap_rows)) {
+            return;
+        }
+
+        foreach ($heatmap_rows as $row) {
+            $wpdb->replace($heatmap_table, [
+                'hour_of_day'   => isset($row['hour_of_day']) ? (int) $row['hour_of_day'] : 0,
+                'day_of_week'   => isset($row['day_of_week']) ? (int) $row['day_of_week'] : 0,
+                'booking_count' => isset($row['booking_count']) ? (int) $row['booking_count'] : 0,
+                'revenue_total' => round((float) ($row['revenue_total'] ?? 0), 2),
+            ], ['%d', '%d', '%d', '%f']);
+        }
+
         $this->log('Updated booking heatmap data');
     }
-    
     /**
      * Cache conversion funnel data
      */
     private function cache_conversion_funnel() {
         global $wpdb;
-        
-        $main_table = $wpdb->prefix . 'hic_gclids';
-        
+
+        $metrics_table  = $wpdb->prefix . 'hic_booking_metrics';
+        $tracking_table = $wpdb->prefix . 'hic_gclids';
+
+        if (!$this->table_exists($metrics_table)) {
+            $this->set_dashboard_cache('conversion_funnel', [], 600);
+            return;
+        }
+
         $funnel_data = [];
         $periods = ['7days', '30days'];
-        
+
         foreach ($periods as $period) {
-            $date_condition = $this->get_date_condition($period);
-            
-            $funnel_stats = $wpdb->get_row($wpdb->prepare("
-                SELECT 
-                    COUNT(*) as total_sessions,
-                    COUNT(DISTINCT CASE WHEN gclid IS NOT NULL AND gclid != '' THEN gclid END) as google_conversions,
-                    COUNT(DISTINCT CASE WHEN fbclid IS NOT NULL AND fbclid != '' THEN fbclid END) as facebook_conversions,
-                    COUNT(DISTINCT sid) as total_conversions
-                FROM {$main_table} 
-                WHERE {$date_condition}
-            "), ARRAY_A);
-            
-            $funnel_data[$period] = $funnel_stats;
+            [$start, $end] = $this->get_period_bounds($period);
+
+            $total_sessions = 0;
+            if ($this->table_exists($tracking_table)) {
+                $total_sessions = (int) $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(DISTINCT sid) FROM {$tracking_table} WHERE created_at >= %s AND created_at < %s",
+                    $start,
+                    $end
+                ));
+            }
+
+            $conversion_stats = $wpdb->get_row($wpdb->prepare(
+                "SELECT
+                    SUM(CASE WHEN channel = 'Google Ads' AND is_refund = 0 THEN 1 ELSE 0 END) AS google_conversions,
+                    SUM(CASE WHEN channel = 'Facebook Ads' AND is_refund = 0 THEN 1 ELSE 0 END) AS facebook_conversions,
+                    SUM(CASE WHEN is_refund = 0 THEN 1 ELSE 0 END) AS total_conversions
+                 FROM {$metrics_table}
+                 WHERE created_at >= %s AND created_at < %s",
+                $start,
+                $end
+            ), ARRAY_A);
+
+            $funnel_data[$period] = [
+                'total_sessions'       => $total_sessions,
+                'google_conversions'   => (int) ($conversion_stats['google_conversions'] ?? 0),
+                'facebook_conversions' => (int) ($conversion_stats['facebook_conversions'] ?? 0),
+                'total_conversions'    => (int) ($conversion_stats['total_conversions'] ?? 0),
+            ];
         }
-        
-        $this->set_dashboard_cache('conversion_funnel', $funnel_data, 600); // Cache for 10 minutes
+
+        $this->set_dashboard_cache('conversion_funnel', $funnel_data, 600);
     }
-    
     /**
-     * Get date condition for SQL queries
+     * Get normalized period bounds for SQL queries.
      */
-    private function get_date_condition($period) {
+    private function get_period_bounds($period) {
+        $timezone = $this->get_timezone();
+        $now      = new \DateTimeImmutable('now', $timezone);
+
         switch ($period) {
             case 'today':
-                return "DATE(created_at) = CURDATE()";
+                $start = $now->setTime(0, 0, 0);
+                $end   = $start->modify('+1 day');
+                break;
             case 'yesterday':
-                return "DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)";
-            case '7days':
-                return "created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+                $end   = $now->setTime(0, 0, 0);
+                $start = $end->modify('-1 day');
+                break;
             case '30days':
-                return "created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                $end   = $now;
+                $start = $now->modify('-30 days');
+                break;
+            case 'last_hour':
+                $end   = $now;
+                $start = $now->modify('-1 hour');
+                break;
+            case 'last_24h':
+                $end   = $now;
+                $start = $now->modify('-24 hours');
+                break;
+            case '7days':
             default:
-                return "created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+                $end   = $now;
+                $start = $now->modify('-7 days');
+                break;
         }
+
+        return [
+            $start->format('Y-m-d H:i:s'),
+            $end->format('Y-m-d H:i:s'),
+        ];
     }
-    
-    /**
-     * Set dashboard cache
-     */
+
+    private function get_timezone(): \DateTimeZone {
+        if (function_exists('wp_timezone')) {
+            return wp_timezone();
+        }
+
+        $timezone_string = function_exists('get_option') ? get_option('timezone_string') : '';
+        if (is_string($timezone_string) && $timezone_string !== '') {
+            try {
+                return new \DateTimeZone($timezone_string);
+            } catch (\Exception $exception) {
+                // Fallback to UTC below.
+            }
+        }
+
+        return new \DateTimeZone('UTC');
+    }
+
+    private function table_exists($table) {
+        global $wpdb;
+
+        if (!isset($wpdb)) {
+            return false;
+        }
+
+        $result = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table));
+
+        return $result === $table;
+    }
+
     private function set_dashboard_cache($key, $data, $expires_in) {
         global $wpdb;
-        
+
         $cache_table = $wpdb->prefix . 'hic_dashboard_cache';
-        $expires_at = date('Y-m-d H:i:s', time() + $expires_in);
-        
-        $wpdb->replace($cache_table, [
-            'cache_key' => $key,
-            'cache_data' => json_encode($data),
-            'expires_at' => $expires_at
-        ]);
+        $timestamp   = function_exists('current_time') ? current_time('timestamp', true) : time();
+        $expires_at  = gmdate('Y-m-d H:i:s', $timestamp + (int) $expires_in);
+        $encoded     = function_exists('wp_json_encode') ? wp_json_encode($data) : json_encode($data);
+
+        if ($encoded === false) {
+            $encoded = json_encode($data);
+        }
+
+        $wpdb->replace(
+            $cache_table,
+            [
+                'cache_key'  => $key,
+                'cache_data' => $encoded,
+                'expires_at' => $expires_at,
+            ],
+            ['%s', '%s', '%s']
+        );
     }
-    
-    /**
-     * Get dashboard cache
-     */
+
     private function get_dashboard_cache($key) {
         global $wpdb;
-        
+
         $cache_table = $wpdb->prefix . 'hic_dashboard_cache';
-        
+
         $cached_data = $wpdb->get_var($wpdb->prepare(
-            "SELECT cache_data FROM {$cache_table} 
-             WHERE cache_key = %s AND expires_at > NOW()",
+            "SELECT cache_data FROM {$cache_table}
+             WHERE cache_key = %s AND expires_at > UTC_TIMESTAMP()",
             $key
         ));
-        
+
         return $cached_data ? json_decode($cached_data, true) : null;
     }
-    
+
     /**
      * AJAX: Get real-time statistics
      */

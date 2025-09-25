@@ -132,4 +132,4 @@ define('HIC_PLUGIN_VERSION', '3.1.0');
 define('HIC_API_VERSION', 'v1');
 define('HIC_MIN_PHP_VERSION', '7.4');
 define('HIC_MIN_WP_VERSION', '5.8');
-define('HIC_DB_VERSION', '1.7');
+define('HIC_DB_VERSION', '1.8');

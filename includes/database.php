@@ -294,6 +294,69 @@ function hic_create_failed_requests_table(){
   }
 
   hic_log('DB ready: '.$table.' (failed requests)');
+  return hic_create_booking_metrics_table();
+}
+
+/**
+ * Create or update the booking metrics table used by the real-time dashboard.
+ */
+function hic_create_booking_metrics_table() {
+  $wpdb = hic_get_wpdb(['get_charset_collate', 'get_var', 'prepare', 'query']);
+
+  if (!$wpdb) {
+    hic_log('hic_create_booking_metrics_table: wpdb is not available');
+    return false;
+  }
+
+  $table = $wpdb->prefix . 'hic_booking_metrics';
+  $charset = $wpdb->get_charset_collate();
+
+  $sql = "CREATE TABLE IF NOT EXISTS $table (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    reservation_id VARCHAR(255) NOT NULL,
+    sid VARCHAR(255) NULL,
+    channel VARCHAR(100) NOT NULL DEFAULT 'Direct',
+    utm_source VARCHAR(255) NULL,
+    utm_medium VARCHAR(255) NULL,
+    utm_campaign VARCHAR(255) NULL,
+    utm_content VARCHAR(255) NULL,
+    utm_term VARCHAR(255) NULL,
+    amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
+    is_refund TINYINT(1) NOT NULL DEFAULT 0,
+    status VARCHAR(50) NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY unique_reservation (reservation_id),
+    KEY channel_idx (channel),
+    KEY created_at_idx (created_at),
+    KEY utm_source_idx (utm_source(191))
+  ) $charset;";
+
+  $upgrade_file = ABSPATH . 'wp-admin/includes/upgrade.php';
+  if (!function_exists('dbDelta')) {
+    if (is_readable($upgrade_file)) {
+      require_once $upgrade_file;
+    } else {
+      hic_log('hic_create_booking_metrics_table: dbDelta unavailable');
+      return false;
+    }
+  }
+
+  $result = dbDelta($sql);
+
+  if ($result === false) {
+    hic_log('hic_create_booking_metrics_table: Failed to create table ' . $table);
+    return false;
+  }
+
+  $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+  if (!$table_exists) {
+    hic_log('hic_create_booking_metrics_table: Table creation verification failed for ' . $table);
+    return false;
+  }
+
+  hic_log('DB ready: ' . $table . ' (booking metrics)');
   return true;
 }
 
@@ -459,6 +522,13 @@ function hic_maybe_upgrade_db() {
     update_option('hic_db_version', '1.7');
     hic_clear_option_cache('hic_db_version');
     $installed_version = '1.7';
+  }
+
+  if (version_compare($installed_version, '1.8', '<')) {
+    hic_create_booking_metrics_table();
+    update_option('hic_db_version', '1.8');
+    hic_clear_option_cache('hic_db_version');
+    $installed_version = '1.8';
   }
 
   // Set final version
