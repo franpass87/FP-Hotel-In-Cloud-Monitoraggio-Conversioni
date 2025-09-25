@@ -708,8 +708,12 @@ function hic_webhook_secret_render() {
     $header_name = defined('HIC_WEBHOOK_SIGNATURE_HEADER') ? HIC_WEBHOOK_SIGNATURE_HEADER : 'X-HIC-Signature';
 
     echo '<p class="description">';
-    echo 'Chiave condivisa usata per validare la firma HMAC del webhook (<code>' . esc_html($header_name) . '</code>). ';
-    echo 'Inserisci lo stesso valore anche nel pannello HIC, così ogni chiamata potrà essere autenticata.';
+    echo 'Chiave condivisa opzionale usata per validare la firma HMAC del webhook (<code>' . esc_html($header_name) . '</code>). ';
+    echo 'Se HIC non può configurarla puoi lasciare il campo vuoto: le richieste saranno comunque accettate, ma senza verifica della firma.';
+    echo '</p>';
+
+    echo '<p class="description">';
+    echo 'Quando disponibile inserisci lo stesso valore anche nel pannello HIC, così ogni chiamata potrà essere autenticata.';
     echo '</p>';
 
     echo '<p class="description">Rigenera questo valore e aggiornalo sia qui che in HIC in caso di compromissione.</p>';
