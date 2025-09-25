@@ -1,5 +1,8 @@
 # PHP Standards Compliance Implementation Summary
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## 🎯 Implementation Complete
 
 This repository now includes comprehensive PHP standards compliance with PHPStan and coding quality tools. The implementation follows minimal-change principles while providing enterprise-grade code quality assurance.

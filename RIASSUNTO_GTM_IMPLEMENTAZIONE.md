@@ -1,5 +1,8 @@
 # Riassunto Implementazione GTM
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Problema Originale
 "Abbiamo implementato monitoraggio completo su ga4, ti chiederei però se fosse meglio per il tracciamento delle conversioni l'utilizzo di Google tag manager e di come far coesistere sia Google analytics con Google tag manager per non creare un doppia misurazione"
 

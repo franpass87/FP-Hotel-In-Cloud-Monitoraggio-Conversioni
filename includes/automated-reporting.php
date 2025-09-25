@@ -1059,7 +1059,7 @@ class AutomatedReportingManager {
             'hic-reporting',
             plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/js/reporting.js',
             ['jquery'],
-            '3.1.0',
+            '3.2.0',
             true
         );
         

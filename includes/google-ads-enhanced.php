@@ -1666,7 +1666,7 @@ class GoogleAdsEnhancedConversions {
             'hic-enhanced-conversions',
             plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/js/enhanced-conversions.js',
             ['jquery'],
-            '3.1.0',
+            '3.2.0',
             true
         );
         

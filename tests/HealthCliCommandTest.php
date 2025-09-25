@@ -81,7 +81,7 @@ final class HealthCliCommandTest extends TestCase
                 return [
                     'status' => 'healthy',
                     'timestamp' => '2024-05-01 12:00:00',
-                    'version' => '3.1.0',
+                    'version' => '3.2.0',
                     'checks' => [
                         'plugin_active' => [
                             'status' => 'pass',
@@ -123,7 +123,7 @@ final class HealthCliCommandTest extends TestCase
                 return [
                     'status' => 'healthy',
                     'timestamp' => '2024-05-01 12:00:00',
-                    'version' => '3.1.0',
+                    'version' => '3.2.0',
                     'checks' => [],
                     'metrics' => ['uptime' => '100%'],
                     'alerts' => [],
@@ -150,6 +150,6 @@ final class HealthCliCommandTest extends TestCase
         $payload = json_decode($lines[0]['message'], true);
         $this->assertIsArray($payload);
         $this->assertSame('healthy', $payload['status']);
-        $this->assertSame('3.1.0', $payload['version']);
+        $this->assertSame('3.2.0', $payload['version']);
     }
 }

@@ -1,5 +1,8 @@
 # Guida Setup Conversioni Enhanced di Google Ads
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Cosa sono le Conversioni Enhanced
 
 Le **Conversioni Enhanced** (Enhanced Conversions) di Google Ads permettono di migliorare significativamente l'accuratezza del tracciamento delle conversioni utilizzando dati first-party hashati in modo sicuro.

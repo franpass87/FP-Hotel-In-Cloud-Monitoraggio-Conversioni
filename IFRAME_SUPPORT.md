@@ -1,5 +1,8 @@
 # Supporto iframe - Hotel in Cloud Monitoraggio Conversioni
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Panoramica
 
 **SÌ, il sistema gestisce completamente i sistemi di prenotazione Hotel in Cloud implementati in iframe.** 

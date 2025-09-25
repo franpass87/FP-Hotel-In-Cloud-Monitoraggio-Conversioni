@@ -1,5 +1,8 @@
 # Attributi Brevo da Configurare
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 Questo documento elenca tutti gli attributi che devi configurare nel tuo account Brevo per ricevere correttamente i dati dal plugin Hotel in Cloud.
 
 I recenti aggiornamenti introducono gli attributi `LANGUAGE`, `TAGS`, `HIC_ROOM_NAME`, `HIC_VALID` e `HIC_RELOCATIONS` per memorizzare rispettivamente la lingua del contatto, l'elenco di tag associati, il nome specifico della camera prenotata, la validità della prenotazione e gli eventuali spostamenti.

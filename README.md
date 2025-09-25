@@ -1,6 +1,19 @@
 # FP HIC Monitor
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 Plugin WordPress per il monitoraggio avanzato delle conversioni da Hotel in Cloud verso GA4, Facebook Meta e Brevo con sistema di sicurezza enterprise-grade.
+
+## Autore e Supporto
+
+- **Autore:** [Francesco Passeri](https://francescopasseri.com)
+- **Email:** [info@francescopasseri.com](mailto:info@francescopasseri.com)
+- **Documentazione completa:** consulta le guide in questa repository e il [changelog ufficiale](CHANGELOG.md) per la cronologia delle funzionalità.
+
+## Cronologia Versioni
+
+Le tappe principali dello sviluppo sono riepilogate nel [CHANGELOG.md](CHANGELOG.md). Ogni voce collega le funzionalità alle rispettive implementazioni nel codice per agevolare audit, debug e onboarding.
 
 ## Come Funziona in Sintesi
 

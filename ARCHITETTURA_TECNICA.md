@@ -1,5 +1,8 @@
 # Architettura Tecnica del Sistema
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Diagramma del Flusso Dati
 
 ```

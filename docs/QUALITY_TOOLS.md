@@ -1,6 +1,9 @@
 # PHP Quality Assurance Tools
 
-This directory contains comprehensive PHP standards compliance tools for the HIC Plugin.
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
+This directory contains comprehensive PHP standards compliance tools for the HIC Plugin. Gli aggiornamenti per release sono documentati nel [CHANGELOG](../CHANGELOG.md) per contestualizzare le pratiche di qualità rispetto alle feature introdotte.
 
 ## Tools Included
 
