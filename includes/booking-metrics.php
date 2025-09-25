@@ -25,6 +25,16 @@ class BookingMetrics
         return self::$instance;
     }
 
+    /**
+     * Reset the singleton instance. Primarily useful for integration tests or
+     * when the booking metrics pipeline needs to be reinitialised during the
+     * same request (for example after cleaning up global state in CLI tools).
+     */
+    public static function resetInstance(): void
+    {
+        self::$instance = null;
+    }
+
     private function __construct()
     {
         if (function_exists('add_action')) {
@@ -148,6 +158,20 @@ class BookingMetrics
         }
 
         return $exists;
+    }
+
+    /**
+     * Manually override the cached table state.
+     *
+     * WordPress unit and integration tests frequently fake the database layer
+     * with doubles that do not support real table creation. When those tests
+     * exercise the booking metrics pipeline we need to skip the expensive
+     * `ensureTable()` logic. Exposing this helper keeps the production code
+     * simple while avoiding brittle reflection hacks in the tests.
+     */
+    public function overrideTableEnsuredState(bool $ensured): void
+    {
+        $this->tableEnsured = $ensured;
     }
 
     /**

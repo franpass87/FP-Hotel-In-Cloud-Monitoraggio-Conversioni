@@ -156,18 +156,14 @@ final class BookingMetricsIngestionTest extends TestCase
 
     private function resetBookingMetricsSingleton(): void
     {
-        $property = new ReflectionProperty(BookingMetrics::class, 'instance');
-        $property->setAccessible(true);
-        $property->setValue(null);
+        BookingMetrics::resetInstance();
     }
 
     private function bookingMetrics(): BookingMetrics
     {
         $instance = BookingMetrics::instance();
 
-        $ensured = new ReflectionProperty(BookingMetrics::class, 'tableEnsured');
-        $ensured->setAccessible(true);
-        $ensured->setValue($instance, true);
+        $instance->overrideTableEnsuredState(true);
 
         return $instance;
     }
