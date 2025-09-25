@@ -1090,15 +1090,24 @@ class AutomatedReportingManager {
         if ($hook !== 'hic-monitoring_page_hic-reports') {
             return;
         }
-        
+
+        $base_url = plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php');
+
+        wp_enqueue_style(
+            'hic-admin-base',
+            $base_url . 'assets/css/hic-admin.css',
+            [],
+            HIC_PLUGIN_VERSION
+        );
+
         wp_enqueue_script(
             'hic-reporting',
-            plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/js/reporting.js',
+            $base_url . 'assets/js/reporting.js',
             ['jquery'],
-            '3.2.0',
+            HIC_PLUGIN_VERSION,
             true
         );
-        
+
         wp_localize_script('hic-reporting', 'hicReporting', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'hic_reporting_nonce' => wp_create_nonce('hic_reporting_nonce')
@@ -1110,65 +1119,106 @@ class AutomatedReportingManager {
      */
     public function render_reports_page() {
         ?>
-        <div class="wrap">
-            <h1>FP HIC Monitor - Reports & Analytics</h1>
-            
-            <div class="hic-reports-dashboard">
+        <div class="wrap hic-admin-page hic-reports-page">
+            <div class="hic-page-header">
+                <div>
+                    <h1 class="hic-page-header__title">FP HIC Monitor - Reports &amp; Analytics</h1>
+                    <p class="hic-page-header__subtitle">
+                        Strumenti per generare report personalizzati, consultare lo storico e scaricare rapidamente i dati grezzi.
+                    </p>
+                </div>
+            </div>
+
+            <div class="hic-grid hic-grid--two hic-reports-dashboard">
                 <!-- Manual Report Generation -->
-                <div class="postbox">
-                    <h2>Generate Manual Report</h2>
-                    <div class="inside">
-                        <form id="hic-manual-report-form">
-                            <table class="form-table">
-                                <tr>
-                                    <th>Report Type</th>
-                                    <td>
-                                        <select name="report_type">
+                <div class="hic-card">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title">Generate Manual Report</h2>
+                            <p class="hic-card__subtitle">Crea un'esportazione ad-hoc selezionando intervallo e formati.</p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body">
+                        <form id="hic-manual-report-form" class="hic-form" novalidate>
+                            <div class="hic-field-grid">
+                                <div class="hic-field-row">
+                                    <label class="hic-field-label" for="hic-report-type">Report Type</label>
+                                    <div class="hic-field-control">
+                                        <select id="hic-report-type" name="report_type">
                                             <option value="daily">Daily Report</option>
                                             <option value="weekly">Weekly Report</option>
                                             <option value="monthly">Monthly Report</option>
                                             <option value="custom">Custom Period</option>
                                         </select>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Export Format</th>
-                                    <td>
-                                        <label><input type="checkbox" name="formats[]" value="csv" checked> CSV</label><br>
-                                        <label><input type="checkbox" name="formats[]" value="excel"> Excel</label><br>
-                                        <label><input type="checkbox" name="formats[]" value="pdf"> PDF</label>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Email Report</th>
-                                    <td>
-                                        <label><input type="checkbox" name="send_email"> Send via email</label>
-                                    </td>
-                                </tr>
-                            </table>
-                            <p class="submit">
-                                <button type="submit" class="button button-primary">Generate Report</button>
-                            </p>
+                                    </div>
+                                </div>
+
+                                <div class="hic-field-row">
+                                    <div class="hic-field-label">Export Format</div>
+                                    <div class="hic-field-control">
+                                        <label class="hic-toggle">
+                                            <input type="checkbox" name="formats[]" value="csv" checked>
+                                            <span>CSV</span>
+                                        </label>
+                                        <label class="hic-toggle">
+                                            <input type="checkbox" name="formats[]" value="excel">
+                                            <span>Excel</span>
+                                        </label>
+                                        <label class="hic-toggle">
+                                            <input type="checkbox" name="formats[]" value="pdf">
+                                            <span>PDF</span>
+                                        </label>
+                                        <p class="description">Puoi selezionare uno o più formati per l'esportazione.</p>
+                                    </div>
+                                </div>
+
+                                <div class="hic-field-row">
+                                    <div class="hic-field-label">Email Report</div>
+                                    <div class="hic-field-control">
+                                        <label class="hic-toggle">
+                                            <input type="checkbox" name="send_email">
+                                            <span>Send via email</span>
+                                        </label>
+                                        <p class="description">L'invio utilizza l'indirizzo di amministrazione configurato nelle impostazioni.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="hic-form-actions">
+                                <button type="submit" class="button hic-button hic-button--primary">Generate Report</button>
+                            </div>
                         </form>
                     </div>
                 </div>
-                
+
                 <!-- Report History -->
-                <div class="postbox">
-                    <h2>Report History</h2>
-                    <div class="inside">
+                <div class="hic-card">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title">Report History</h2>
+                            <p class="hic-card__subtitle">Consultazione rapida dei report generati recentemente.</p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body">
                         <div id="hic-report-history">Loading...</div>
                     </div>
                 </div>
-                
+
                 <!-- Quick Export -->
-                <div class="postbox">
-                    <h2>Quick Data Export</h2>
-                    <div class="inside">
+                <div class="hic-card">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title">Quick Data Export</h2>
+                            <p class="hic-card__subtitle">Scarica velocemente dataset predefiniti per analisi esterne.</p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body">
                         <p>Export raw data for external analysis:</p>
-                        <button type="button" class="button" onclick="hicExportCSV('last_7_days')">Export Last 7 Days (CSV)</button>
-                        <button type="button" class="button" onclick="hicExportCSV('last_30_days')">Export Last 30 Days (CSV)</button>
-                        <button type="button" class="button" onclick="hicExportExcel('last_7_days')">Export Last 7 Days (Excel)</button>
+                        <div class="hic-form-actions">
+                            <button type="button" class="button hic-button hic-button--secondary" onclick="hicExportCSV('last_7_days')">Export Last 7 Days (CSV)</button>
+                            <button type="button" class="button hic-button hic-button--secondary" onclick="hicExportCSV('last_30_days')">Export Last 30 Days (CSV)</button>
+                            <button type="button" class="button hic-button hic-button--secondary" onclick="hicExportExcel('last_7_days')">Export Last 7 Days (Excel)</button>
+                        </div>
                     </div>
                 </div>
             </div>

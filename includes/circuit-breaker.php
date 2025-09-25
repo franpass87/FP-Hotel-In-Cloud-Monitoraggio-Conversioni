@@ -963,18 +963,27 @@ class CircuitBreakerManager {
             return;
         }
 
+        $base_url = plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php');
+
+        wp_enqueue_style(
+            'hic-admin-base',
+            $base_url . 'assets/css/hic-admin.css',
+            [],
+            HIC_PLUGIN_VERSION
+        );
+
         wp_enqueue_style(
             'hic-circuit-breaker-styles',
-            plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/css/circuit-breaker.css',
-            [],
-            '3.2.0'
+            $base_url . 'assets/css/circuit-breaker.css',
+            ['hic-admin-base'],
+            HIC_PLUGIN_VERSION
         );
 
         wp_enqueue_script(
             'hic-circuit-breaker',
-            plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/js/circuit-breaker.js',
+            $base_url . 'assets/js/circuit-breaker.js',
             ['jquery'],
-            '3.2.0',
+            HIC_PLUGIN_VERSION,
             true
         );
         
@@ -989,26 +998,26 @@ class CircuitBreakerManager {
      */
     public function render_circuit_breaker_page() {
         ?>
-        <div class="wrap">
+        <div class="wrap hic-admin-page hic-circuit-page">
             <h1>Circuit Breaker Status</h1>
             
             <div class="hic-circuit-breaker-dashboard">
                 <!-- Circuit Status Overview -->
-                <div class="postbox">
+                <div class="hic-card">
                     <h2>Service Status Overview</h2>
-                    <div class="inside">
+                    <div class="hic-card__body">
                         <div id="circuit-status-summary" class="hic-circuit-summary"></div>
                         <div id="circuit-status-grid"><?php esc_html_e('Caricamento stato dei servizi...', 'hotel-in-cloud'); ?></div>
                     </div>
                 </div>
 
                 <!-- Retry Queue Status -->
-                <div class="postbox">
+                <div class="hic-card">
                     <h2>Retry Queue Status</h2>
-                    <div class="inside">
+                    <div class="hic-card__body">
                         <div id="retry-queue-status" class="hic-queue-summary"><?php esc_html_e('Caricamento stato della coda di retry...', 'hotel-in-cloud'); ?></div>
                         <p>
-                            <button type="button" class="button button-primary" id="process-retry-queue">
+                            <button type="button" class="button hic-button hic-button--primary" id="process-retry-queue">
                                 Process Retry Queue Now
                             </button>
                         </p>
@@ -1016,9 +1025,9 @@ class CircuitBreakerManager {
                 </div>
                 
                 <!-- Manual Controls -->
-                <div class="postbox">
+                <div class="hic-card">
                     <h2>Manual Controls</h2>
-                    <div class="inside">
+                    <div class="hic-card__body">
                         <p>Reset circuit breakers or force service checks:</p>
                         <div id="manual-controls" class="hic-manual-controls-placeholder">
                             <p><?php esc_html_e('Al momento non sono necessari interventi manuali: il sistema riapre automaticamente i servizi quando tornano disponibili.', 'hotel-in-cloud'); ?></p>
