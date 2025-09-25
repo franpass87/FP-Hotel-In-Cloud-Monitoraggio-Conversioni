@@ -1675,13 +1675,22 @@ function hic_deactivate(): void {
         delete_transient($transient);
     }
 
-    global $wpdb;
-    if (isset($wpdb)) {
-        // Clear all hic_* transients including processing locks
-        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_hic_%' OR option_name LIKE '_transient_timeout_hic_%'");
+    $wpdb = Helpers\hic_get_wpdb_instance(['query']);
 
-        // Remove temporary options related to polling and locks
-        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE 'hic_last_%' OR option_name LIKE 'hic_%_lock'");
+    if ($wpdb) {
+        $options_table = Helpers\hic_get_options_table_name($wpdb);
+
+        if (is_string($options_table) && $options_table !== '') {
+            if (function_exists('esc_sql')) {
+                $options_table = esc_sql($options_table);
+            }
+
+            // Clear all hic_* transients including processing locks
+            $wpdb->query("DELETE FROM {$options_table} WHERE option_name LIKE '_transient_hic_%' OR option_name LIKE '_transient_timeout_hic_%'");
+
+            // Remove temporary options related to polling and locks
+            $wpdb->query("DELETE FROM {$options_table} WHERE option_name LIKE 'hic_last_%' OR option_name LIKE 'hic_%_lock'");
+        }
     }
 
     delete_option('hic_api_calls_today');
