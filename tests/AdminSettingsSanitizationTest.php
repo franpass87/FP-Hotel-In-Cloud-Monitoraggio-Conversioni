@@ -121,7 +121,7 @@ final class AdminSettingsSanitizationTest extends TestCase {
     }
 
     public function testSecurityHeadersAppliedOnPluginPage(): void {
-        $_GET['page'] = 'hic-monitoring';
+        $_GET['page'] = 'hic-monitoring-settings';
         $_SERVER['PHP_SELF'] = '/wp-admin/admin.php';
 
         $headers = hic_filter_admin_security_headers([]);

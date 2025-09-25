@@ -21,7 +21,7 @@ class EnterpriseManagementSuite {
         add_action('wp_ajax_hic_run_reconciliation', [$this, 'ajax_run_reconciliation']);
         
         // Setup Wizard
-        add_action('admin_menu', [$this, 'add_setup_wizard_menu']);
+        add_action('admin_menu', [$this, 'add_setup_wizard_menu'], 50);
         add_action('wp_ajax_hic_setup_wizard_step', [$this, 'ajax_setup_wizard_step']);
         
         // Health Check System
@@ -532,7 +532,7 @@ class EnterpriseManagementSuite {
             'hic-monitoring',
             'Setup Wizard',
             'Setup Wizard',
-            'manage_options',
+            'hic_manage',
             'hic-setup-wizard',
             [$this, 'render_setup_wizard']
         );
@@ -785,8 +785,8 @@ class EnterpriseManagementSuite {
             
             <h3>What's Next?</h3>
             <ul>
-                <li>✅ <strong>Monitor Dashboard:</strong> <a href="<?php echo admin_url('admin.php?page=hic-realtime-dashboard'); ?>">View Real-Time Dashboard</a></li>
-                <li>✅ <strong>Check Health Status:</strong> <a href="<?php echo admin_url('admin.php?page=hic-monitoring'); ?>">System Health Check</a></li>
+                <li>✅ <strong>Monitor Dashboard:</strong> <a href="<?php echo admin_url('admin.php?page=hic-monitoring'); ?>">View Real-Time Dashboard</a></li>
+                <li>✅ <strong>Check Health Status:</strong> <a href="<?php echo admin_url('admin.php?page=hic-monitoring-settings'); ?>">System Health Check</a></li>
                 <li>✅ <strong>Review Reports:</strong> <a href="<?php echo admin_url('admin.php?page=hic-reports'); ?>">Analytics Reports</a></li>
                 <li>✅ <strong>Configure Alerts:</strong> Set up email notifications for important events</li>
             </ul>
@@ -824,7 +824,7 @@ class EnterpriseManagementSuite {
                 nonce: '<?php echo wp_create_nonce('hic_setup_wizard'); ?>'
             }, function(response) {
                 if (response.success) {
-                    window.location.href = '<?php echo admin_url('admin.php?page=hic-realtime-dashboard'); ?>';
+                    window.location.href = '<?php echo admin_url('admin.php?page=hic-monitoring'); ?>';
                 }
             });
         }

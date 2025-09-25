@@ -21,7 +21,7 @@
             this.loadInitialData();
             this.startAutoRefresh();
         }
-        
+
         setupEventListeners() {
             // Auto-refresh toggle
             $('#hic-auto-refresh').on('change', (e) => {
@@ -69,11 +69,49 @@
             this.initConversionFunnelChart();
             this.initTimelineChart();
         }
-        
+
+        setEmptyState(elementId, emptyKey, isEmpty) {
+            const $element = $('#' + elementId);
+
+            if ($element.length === 0) {
+                return;
+            }
+
+            const $container = $element.closest('.hic-widget, .hic-chart-container, .hic-analysis-container');
+
+            if ($container.length === 0) {
+                return;
+            }
+
+            $container.toggleClass('hic-empty', !!isEmpty);
+
+            if (typeof emptyKey === 'string' && emptyKey !== '') {
+                $container.find(`[data-empty-for="${emptyKey}"]`).toggleClass('is-visible', !!isEmpty);
+            }
+        }
+
+        clearChartData(chart) {
+            if (!chart || !chart.data) {
+                return;
+            }
+
+            if (Array.isArray(chart.data.datasets)) {
+                chart.data.datasets.forEach((dataset) => {
+                    dataset.data = [];
+                });
+            }
+
+            if (Array.isArray(chart.data.labels)) {
+                chart.data.labels = [];
+            }
+
+            chart.update();
+        }
+
         initRealtimeChart() {
             const ctx = document.getElementById('hic-realtime-chart');
             if (!ctx) return;
-            
+
             this.charts.realtime = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -345,7 +383,7 @@
         
         loadRevenueByChannel() {
             const period = $('#hic-revenue-period').val() || '7days';
-            
+
             $.ajax({
                 url: hicDashboard.ajaxUrl,
                 type: 'POST',
@@ -360,11 +398,13 @@
                     }
                 },
                 error: () => {
+                    this.setEmptyState('hic-revenue-chart', 'channel-stats', true);
+                    $('.hic-channel-stats').empty();
                     this.showError('Errore nel caricamento revenue per canale');
                 }
             });
         }
-        
+
         loadBookingHeatmap() {
             $.ajax({
                 url: hicDashboard.ajaxUrl,
@@ -379,11 +419,12 @@
                     }
                 },
                 error: () => {
+                    this.setEmptyState('hic-booking-heatmap', 'heatmap', true);
                     this.showError('Errore nel caricamento heatmap prenotazioni');
                 }
             });
         }
-        
+
         loadConversionFunnel() {
             $.ajax({
                 url: hicDashboard.ajaxUrl,
@@ -398,11 +439,12 @@
                     }
                 },
                 error: () => {
+                    this.setEmptyState('hic-conversion-funnel', 'funnel', true);
                     this.showError('Errore nel caricamento funnel conversioni');
                 }
             });
         }
-        
+
         loadPerformanceMetrics() {
             $.ajax({
                 url: hicDashboard.ajaxUrl,
@@ -461,51 +503,98 @@
         }
         
         updateRevenueChart(data) {
-            if (!this.charts.revenue || !data || data.length === 0) return;
-            
+            if (!this.charts.revenue) {
+                return;
+            }
+
+            const isEmpty = !Array.isArray(data) || data.length === 0;
+
+            this.setEmptyState('hic-revenue-chart', 'channel-stats', isEmpty);
+
+            if (isEmpty) {
+                this.clearChartData(this.charts.revenue);
+                $('.hic-channel-stats').empty();
+                return;
+            }
+
             const labels = data.map(item => item.channel);
-            const values = data.map(item => parseInt(item.estimated_revenue) || 0);
-            
+            const values = data.map(item => parseFloat(item.estimated_revenue) || 0);
+
             this.charts.revenue.data.labels = labels;
             this.charts.revenue.data.datasets[0].data = values;
             this.charts.revenue.update();
-            
-            // Update channel stats display
+
             const statsHtml = data.map(item => `
+                ${(() => {
+                    const revenueValue = parseFloat(item.estimated_revenue) || 0;
+                    const formattedRevenue = revenueValue.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                    const bookings = parseInt(item.bookings, 10) || 0;
+
+                    return `
                 <div class="hic-channel-stat">
                     <span class="hic-channel-name">${item.channel}</span>
-                    <span class="hic-channel-value">€${parseInt(item.estimated_revenue).toLocaleString()}</span>
-                    <span class="hic-channel-bookings">${item.bookings} prenotazioni</span>
-                </div>
+                    <span class="hic-channel-value">€${formattedRevenue}</span>
+                    <span class="hic-channel-bookings">${bookings} prenotazioni</span>
+                </div>`;
+                })()}
             `).join('');
-            
-            $('#hic-channel-stats').html(statsHtml);
+
+            $('.hic-channel-stats').html(statsHtml);
         }
-        
+
         updateHeatmapChart(data) {
-            if (!this.charts.heatmap || !data || data.length === 0) return;
-            
+            if (!this.charts.heatmap) {
+                return;
+            }
+
+            if (!Array.isArray(data)) {
+                this.setEmptyState('hic-booking-heatmap', 'heatmap', true);
+                this.clearChartData(this.charts.heatmap);
+                return;
+            }
+
             const heatmapData = data.map(item => ({
                 x: parseInt(item.hour_of_day),
-                y: parseInt(item.day_of_week) - 1, // Adjust for 0-based indexing
+                y: parseInt(item.day_of_week) - 1,
                 v: parseInt(item.booking_count) || 0
             }));
-            
+
+            const hasActivity = heatmapData.some(point => point.v > 0);
+
+            this.setEmptyState('hic-booking-heatmap', 'heatmap', !hasActivity);
+
+            if (!hasActivity) {
+                this.clearChartData(this.charts.heatmap);
+                return;
+            }
+
             this.charts.heatmap.data.datasets[0].data = heatmapData;
             this.charts.heatmap.update();
         }
-        
+
         updateConversionFunnel(data) {
-            if (!this.charts.funnel || !data || !data['7days']) return;
-            
-            const funnelData = data['7days'];
-            const chartData = [
+            if (!this.charts.funnel) {
+                return;
+            }
+
+            const funnelData = data && data['7days'] ? data['7days'] : null;
+
+            const chartData = funnelData ? [
                 parseInt(funnelData.total_sessions) || 0,
                 parseInt(funnelData.google_conversions) || 0,
                 parseInt(funnelData.facebook_conversions) || 0,
                 parseInt(funnelData.total_conversions) || 0
-            ];
-            
+            ] : [];
+
+            const hasData = Array.isArray(chartData) && chartData.some(value => value > 0);
+
+            this.setEmptyState('hic-conversion-funnel', 'funnel', !hasData);
+
+            if (!hasData) {
+                this.clearChartData(this.charts.funnel);
+                return;
+            }
+
             this.charts.funnel.data.datasets[0].data = chartData;
             this.charts.funnel.update();
         }

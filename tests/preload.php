@@ -125,6 +125,83 @@ if (!function_exists('wp_enqueue_script')) { function wp_enqueue_script(...$args
 if (!function_exists('wp_enqueue_style')) { function wp_enqueue_style(...$args) {} }
 if (!function_exists('wp_localize_script')) { function wp_localize_script(...$args) {} }
 if (!function_exists('wp_add_inline_script')) { function wp_add_inline_script(...$args) {} }
+if (!function_exists('add_menu_page')) {
+    function add_menu_page($page_title, $menu_title, $capability, $menu_slug, $callback = '', $icon_url = '', $position = null) {
+        global $menu, $submenu;
+
+        if (!is_array($menu ?? null)) {
+            $menu = [];
+        }
+
+        $hookname = 'toplevel_page_' . $menu_slug;
+
+        $menu[] = [$menu_title, $capability, $menu_slug, $page_title];
+
+        if (!isset($submenu[$menu_slug])) {
+            $submenu[$menu_slug] = [
+                [$menu_title, $capability, $menu_slug, $page_title],
+            ];
+        }
+
+        if (!isset($GLOBALS['hic_registered_menu_pages'])) {
+            $GLOBALS['hic_registered_menu_pages'] = [];
+        }
+
+        $GLOBALS['hic_registered_menu_pages'][$menu_slug] = [
+            'page_title' => $page_title,
+            'menu_title' => $menu_title,
+            'capability' => $capability,
+            'menu_slug'  => $menu_slug,
+            'callback'   => $callback,
+            'icon_url'   => $icon_url,
+            'position'   => $position,
+            'hookname'   => $hookname,
+        ];
+
+        return $hookname;
+    }
+}
+if (!function_exists('add_submenu_page')) {
+    function add_submenu_page($parent_slug, $page_title, $menu_title, $capability, $menu_slug, $callback = '', $position = null) {
+        global $submenu;
+
+        if (!is_array($submenu ?? null)) {
+            $submenu = [];
+        }
+
+        if (!isset($submenu[$parent_slug])) {
+            $submenu[$parent_slug] = [];
+        }
+
+        $entry = [$menu_title, $capability, $menu_slug, $page_title];
+
+        if ($position === null) {
+            $submenu[$parent_slug][] = $entry;
+        } else {
+            $submenu[$parent_slug][$position] = $entry;
+            ksort($submenu[$parent_slug]);
+            $submenu[$parent_slug] = array_values($submenu[$parent_slug]);
+        }
+
+        if (!isset($GLOBALS['hic_registered_submenus'])) {
+            $GLOBALS['hic_registered_submenus'] = [];
+        }
+
+        $hookname = $parent_slug . '_page_' . $menu_slug;
+
+        $GLOBALS['hic_registered_submenus'][$parent_slug][$menu_slug] = [
+            'page_title' => $page_title,
+            'menu_title' => $menu_title,
+            'capability' => $capability,
+            'menu_slug'  => $menu_slug,
+            'callback'   => $callback,
+            'position'   => $position,
+            'hookname'   => $hookname,
+        ];
+
+        return $hookname;
+    }
+}
 if (!class_exists('WP_Role')) {
     class WP_Role {
         /** @var string */
@@ -371,5 +448,25 @@ if (!function_exists('wp_date')) {
 if (!function_exists('esc_sql')) {
     function esc_sql($sql) {
         return $sql;
+    }
+}
+if (!function_exists('__')) {
+    function __($text, $domain = null) {
+        return is_scalar($text) ? (string) $text : '';
+    }
+}
+if (!function_exists('_e')) {
+    function _e($text, $domain = null) {
+        echo is_scalar($text) ? (string) $text : '';
+    }
+}
+if (!function_exists('esc_html__')) {
+    function esc_html__($text, $domain = null) {
+        return htmlspecialchars(is_scalar($text) ? (string) $text : '', ENT_QUOTES, 'UTF-8');
+    }
+}
+if (!function_exists('esc_html_e')) {
+    function esc_html_e($text, $domain = null) {
+        echo esc_html__($text, $domain);
     }
 }

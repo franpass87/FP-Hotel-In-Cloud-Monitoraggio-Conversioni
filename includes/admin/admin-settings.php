@@ -11,7 +11,7 @@ use FpHic\HIC_Rate_Limiter;
 use function FpHic\Helpers\hic_log;
 
 /* ============ Admin Settings Page ============ */
-add_action('admin_menu', 'hic_add_admin_menu');
+add_action('admin_menu', 'hic_add_admin_menu', 40);
 add_action('admin_init', 'hic_settings_init');
 add_action('admin_enqueue_scripts', 'hic_admin_enqueue_scripts');
 add_filter('wp_headers', 'hic_filter_admin_security_headers', 10, 2);
@@ -237,11 +237,12 @@ function hic_ajax_generate_health_token() {
 }
 
 function hic_add_admin_menu() {
-    add_menu_page(
-        'HIC Monitoring Settings',
-        'HIC Monitoring',
-        'hic_manage',
+    add_submenu_page(
         'hic-monitoring',
+        'HIC Monitoring Settings',
+        'Impostazioni',
+        'hic_manage',
+        'hic-monitoring-settings',
         'hic_options_page'
     );
 
@@ -376,12 +377,12 @@ function hic_settings_init() {
  */
 function hic_admin_enqueue_scripts($hook) {
     // Only load on our plugin pages
-    if ($hook === 'hic-monitoring_page_hic-diagnostics' || $hook === 'toplevel_page_hic-monitoring') {
+    if (in_array($hook, ['hic-monitoring_page_hic-diagnostics', 'hic-monitoring_page_hic-monitoring-settings'], true)) {
         // Ensure jQuery is loaded
         wp_enqueue_script('jquery');
     }
 
-    if ($hook === 'toplevel_page_hic-monitoring') {
+    if ($hook === 'hic-monitoring_page_hic-monitoring-settings') {
         wp_enqueue_style(
             'hic-admin-settings',
             plugin_dir_url(__FILE__) . '../../assets/css/admin-settings.css',
@@ -942,7 +943,15 @@ function hic_is_plugin_admin_request(): bool {
         return false;
     }
 
-    $allowed_pages = ['hic-monitoring', 'hic-diagnostics'];
+    $allowed_pages = [
+        'hic-monitoring',
+        'hic-monitoring-settings',
+        'hic-diagnostics',
+        'hic-circuit-breakers',
+        'hic-reports',
+        'hic-enhanced-conversions',
+        'hic-setup-wizard'
+    ];
     if (!in_array($page, $allowed_pages, true)) {
         return false;
     }
