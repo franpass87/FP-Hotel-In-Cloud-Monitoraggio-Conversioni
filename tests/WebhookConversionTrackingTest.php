@@ -201,6 +201,70 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         $this->assertEquals('invalid_email', $result->get_error_code());
     }
 
+    public function test_webhook_rate_limiting_blocks_excessive_requests() {
+        if (!defined('HIC_FEATURE_WEBHOOK_RATE_LIMITING') || !HIC_FEATURE_WEBHOOK_RATE_LIMITING) {
+            $this->markTestSkipped('Webhook rate limiting disabilitato.');
+        }
+
+        $max_attempts = (int) HIC_WEBHOOK_RATE_LIMIT_MAX_ATTEMPTS;
+        $this->assertGreaterThan(0, $max_attempts, 'Rate limit non configurato correttamente.');
+
+        $ip = '203.0.113.10';
+        $_SERVER['REMOTE_ADDR'] = $ip;
+
+        $token = 'test_token_123';
+        $rate_limit_key = hic_generate_webhook_rate_limit_key($token, $ip);
+
+        \FpHic\HIC_Rate_Limiter::reset($rate_limit_key);
+
+        try {
+            for ($i = 0; $i < $max_attempts; $i++) {
+                $request = $this->create_webhook_request($token);
+                $this->assertSame(
+                    $rate_limit_key,
+                    hic_generate_webhook_rate_limit_key($token, hic_get_webhook_client_ip($request))
+                );
+                $this->assertNull(hic_check_webhook_rate_limit($request, $token));
+            }
+
+            $this->assertGreaterThan(0, \FpHic\HIC_Rate_Limiter::getRetryAfter($rate_limit_key));
+
+            $limit_check = \FpHic\HIC_Rate_Limiter::attempt(
+                $rate_limit_key,
+                $max_attempts,
+                HIC_WEBHOOK_RATE_LIMIT_WINDOW
+            );
+            $this->assertFalse($limit_check['allowed']);
+
+            $blocked_request = $this->create_webhook_request($token);
+            $this->assertSame(
+                $rate_limit_key,
+                hic_generate_webhook_rate_limit_key($token, hic_get_webhook_client_ip($blocked_request))
+            );
+            $error = hic_check_webhook_rate_limit($blocked_request, $token);
+
+            $this->assertInstanceOf(\WP_Error::class, $error);
+            $this->assertSame('rate_limited', $error->get_error_code());
+
+            $data = $error->get_error_data();
+            $this->assertIsArray($data);
+            $this->assertSame(429, $data['status']);
+            $this->assertArrayHasKey('retry_after', $data);
+            $this->assertGreaterThan(0, $data['retry_after']);
+        } finally {
+            \FpHic\HIC_Rate_Limiter::reset($rate_limit_key);
+            unset($_SERVER['REMOTE_ADDR']);
+        }
+    }
+
+    private function create_webhook_request(string $token): WP_REST_Request {
+        $request = new WP_REST_Request('POST', '/hic/v1/conversion');
+        $request->set_param('token', $token);
+        $request->set_header('content-type', 'application/json');
+
+        return $request;
+    }
+
     /**
      * Test dimostrazione soluzione completa
      */
