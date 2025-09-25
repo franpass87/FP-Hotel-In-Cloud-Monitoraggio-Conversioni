@@ -22,9 +22,16 @@ if (!defined('ABSPATH')) exit;
     'action',
     'admin_enqueue_scripts',
     function ($hook) {
-        $diagnostics_hook = 'hic-monitoring_page_hic-diagnostics';
-
-        if (is_string($hook) && strpos($hook, $diagnostics_hook) === 0) {
+        if (function_exists('hic_admin_hook_matches_page') && hic_admin_hook_matches_page(
+            $hook,
+            'hic-diagnostics',
+            array(
+                'hic-monitoring_page_hic-diagnostics',
+                'hic-monitoring-network_page_hic-diagnostics',
+                'hic-monitoring-user_page_hic-diagnostics',
+                'hotel-in-cloud_page_hic-diagnostics'
+            )
+        )) {
             wp_set_script_translations(
                 'hic-diagnostics',
                 'hotel-in-cloud',
@@ -1350,7 +1357,7 @@ function hic_diagnostics_page() {
                         <span class="dashicons dashicons-admin-generic"></span>
                         <?php esc_html_e('Apri Impostazioni', 'hotel-in-cloud'); ?>
                     </a>
-                    <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-realtime-dashboard')); ?>">
+                    <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-monitoring')); ?>">
                         <span class="dashicons dashicons-chart-line"></span>
                         <?php esc_html_e('Dashboard Real-Time', 'hotel-in-cloud'); ?>
                     </a>

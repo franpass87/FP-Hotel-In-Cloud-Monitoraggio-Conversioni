@@ -16,6 +16,50 @@ add_action('admin_init', 'hic_settings_init');
 add_action('admin_enqueue_scripts', 'hic_admin_enqueue_scripts');
 add_filter('wp_headers', 'hic_filter_admin_security_headers', 10, 2);
 
+if (!function_exists('hic_admin_hook_matches_page')) {
+    /**
+     * Determine whether the current admin screen matches the provided submenu slug.
+     *
+     * @param mixed         $hook          The hook string received via admin_enqueue_scripts.
+     * @param string        $page_slug     The expected submenu slug.
+     * @param array<string> $hook_prefixes Expected hook prefixes (network/user variations).
+     */
+    function hic_admin_hook_matches_page($hook, string $page_slug, array $hook_prefixes): bool {
+        $page_slug = strtolower(trim($page_slug));
+        $page_slug = preg_replace('/[^a-z0-9_-]/', '', $page_slug) ?? '';
+
+        if ($page_slug === '') {
+            return false;
+        }
+
+        $requested_page = $_GET['page'] ?? '';
+        if (is_string($requested_page) && $requested_page !== '') {
+            if (function_exists('wp_unslash')) {
+                $requested_page = wp_unslash($requested_page);
+            }
+
+            $requested_page = strtolower(trim($requested_page));
+            $requested_page = preg_replace('/[^a-z0-9_-]/', '', $requested_page) ?? '';
+
+            if ($requested_page === $page_slug) {
+                return true;
+            }
+        }
+
+        if (!is_string($hook) || $hook === '') {
+            return false;
+        }
+
+        foreach ($hook_prefixes as $prefix) {
+            if (strpos($hook, $prefix) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 // Add AJAX handler for API connection test
 add_action('wp_ajax_hic_test_api_connection', 'hic_ajax_test_api_connection');
 
@@ -376,11 +420,22 @@ function hic_settings_init() {
  * Enqueue admin scripts for HIC plugin pages
  */
 function hic_admin_enqueue_scripts($hook) {
-    $settings_hook = 'hic-monitoring_page_hic-monitoring-settings';
-    $diagnostics_hook = 'hic-monitoring_page_hic-diagnostics';
+    $settings_hooks = array(
+        'hic-monitoring_page_hic-monitoring-settings',
+        'hic-monitoring-network_page_hic-monitoring-settings',
+        'hic-monitoring-user_page_hic-monitoring-settings',
+        'hotel-in-cloud_page_hic-monitoring-settings',
+    );
 
-    $is_settings_page = strpos($hook, $settings_hook) === 0;
-    $is_diagnostics_page = strpos($hook, $diagnostics_hook) === 0;
+    $diagnostics_hooks = array(
+        'hic-monitoring_page_hic-diagnostics',
+        'hic-monitoring-network_page_hic-diagnostics',
+        'hic-monitoring-user_page_hic-diagnostics',
+        'hotel-in-cloud_page_hic-diagnostics',
+    );
+
+    $is_settings_page = hic_admin_hook_matches_page($hook, 'hic-monitoring-settings', $settings_hooks);
+    $is_diagnostics_page = hic_admin_hook_matches_page($hook, 'hic-diagnostics', $diagnostics_hooks);
 
     // Only load on our plugin pages, including multisite/network variations.
     if ($is_settings_page || $is_diagnostics_page) {
@@ -602,7 +657,7 @@ function hic_options_page() {
                     <p class="hic-page-header__subtitle"><?php esc_html_e('Configura le integrazioni chiave del plugin mantenendo la stessa esperienza visiva della Dashboard Real-Time.', 'hotel-in-cloud'); ?></p>
                 </div>
                 <div class="hic-page-actions">
-                    <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-realtime-dashboard')); ?>">
+                    <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-monitoring')); ?>">
                         <span class="dashicons dashicons-chart-area"></span>
                         <?php esc_html_e('Apri Dashboard Real-Time', 'hotel-in-cloud'); ?>
                     </a>
