@@ -26,10 +26,11 @@ class GoogleAdsEnhancedConversions {
     private const DEFAULT_PHONE_COUNTRY = 'IT';
     
     public function __construct() {
+        if (\is_admin()) {
+            $this->register_basic_admin_hooks();
+        }
+
         if (!$this->is_enhanced_conversions_enabled()) {
-            if (\is_admin()) {
-                $this->register_basic_admin_hooks();
-            }
             return;
         }
 
@@ -52,18 +53,17 @@ class GoogleAdsEnhancedConversions {
         add_action('admin_menu', [$this, 'add_enhanced_conversions_menu'], 50);
         add_action('admin_init', [$this, 'handle_enhanced_conversions_form']);
         add_action('admin_init', [$this, 'register_settings']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue_enhanced_conversions_assets']);
+        add_action('wp_ajax_hic_test_google_ads_connection', [$this, 'ajax_test_google_ads_connection']);
+        add_action('wp_ajax_hic_upload_enhanced_conversions', [$this, 'ajax_upload_enhanced_conversions']);
+        add_action('wp_ajax_hic_get_enhanced_conversion_stats', [$this, 'ajax_get_enhanced_conversion_stats']);
     }
 
     /**
      * Register the complete set of admin-only hooks.
      */
     private function register_full_admin_hooks(): void {
-        $this->register_basic_admin_hooks();
-
-        add_action('admin_enqueue_scripts', [$this, 'enqueue_enhanced_conversions_assets']);
-        add_action('wp_ajax_hic_test_google_ads_connection', [$this, 'ajax_test_google_ads_connection']);
-        add_action('wp_ajax_hic_upload_enhanced_conversions', [$this, 'ajax_upload_enhanced_conversions']);
-        add_action('wp_ajax_hic_get_enhanced_conversion_stats', [$this, 'ajax_get_enhanced_conversion_stats']);
+        // Placeholder for hooks that should execute only when the integration is fully enabled.
     }
 
     /**
