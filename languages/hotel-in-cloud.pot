@@ -2,30 +2,87 @@ msgid ""
 msgstr ""
 "Project-Id-Version: FP HIC Monitor\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-09-24 20:47+0000\n"
+"POT-Creation-Date: 2025-09-25 21:29+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: FP HIC make-pot.php\n"
 
-#: includes/admin/diagnostics.php:1833
+#: includes/cli.php:632
+msgid "Configuration valid with warnings"
+msgstr ""
+
+#: includes/admin/diagnostics.php:2030
 msgid "Test connettività Brevo fallito"
 msgstr ""
 
-#: includes/admin/admin-settings.php:596
-msgid "Il token protegge l'endpoint pubblico di health check. Condividilo solo con i sistemi di monitoraggio di fiducia."
+#: includes/realtime-dashboard.php:527
+msgid "Caricamento metriche..."
 msgstr ""
 
-#: includes/admin/diagnostics.php:781
+#: includes/realtime-dashboard.php:323
+#: includes/realtime-dashboard.php:474
+msgid "Nessun dato disponibile per il periodo selezionato."
+msgstr ""
+
+#: includes/realtime-dashboard.php:376
+msgid "Apri Diagnostica"
+msgstr ""
+
+#: includes/cli.php:395
+msgid "Operation"
+msgstr ""
+
+#: includes/admin/admin-settings.php:996
+msgid "URL da fornire al supporto HIC: %s"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1009
+msgid "Se Hotel in Cloud non può configurarla puoi lasciare il campo vuoto: le richieste saranno accettate senza verifica della firma."
+msgstr ""
+
+#: includes/automated-reporting.php:1231
+msgid "Automazioni attive"
+msgstr ""
+
+#: includes/cli.php:402
+msgid "Success Δ"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:937
+msgid "Fallback automatico e retry intelligenti."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:833
+msgid "Attiva gli automatismi consigliati per performance e affidabilità."
+msgstr ""
+
+#: includes/admin/diagnostics.php:791
 msgid "Alcune tabelle potrebbero non essere state create."
 msgstr ""
 
-#: includes/admin/diagnostics.php:1233
+#: includes/admin/diagnostics.php:1243
 msgid "Non hai i permessi necessari per accedere a questa pagina."
 msgstr ""
 
-#: includes/admin/diagnostics.php:900
+#: includes/admin/diagnostics.php:910
 msgid "Errore nel recupero prenotazioni: %s"
+msgstr ""
+
+#: includes/cli.php:226
+msgid "ready"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1920
+msgid "Errore durante il recupero dei log"
+msgstr ""
+
+#: includes/admin/admin-settings.php:872
+msgid "Email personalizzata configurata: %s"
+msgstr ""
+
+#: includes/realtime-dashboard.php:419
+msgid "Periodo"
 msgstr ""
 
 #: includes/helpers-tracking.php:11
@@ -34,51 +91,329 @@ msgstr ""
 msgid "Dati di tracciamento HIC"
 msgstr ""
 
-#: includes/realtime-dashboard.php:235
+#: includes/cli.php:243
+msgid "Storage key"
+msgstr ""
+
+#: includes/admin/admin-settings.php:980
+msgid "La modalità ibrida combina webhook in tempo reale con polling API di backup per garantire continuità."
+msgstr ""
+
+#: includes/admin/admin-settings.php:637
+msgid "Container configurato per lanciare i tag marketing."
+msgstr ""
+
+#: includes/realtime-dashboard.php:436
+msgid "Aggiorna Ora"
+msgstr ""
+
+#: includes/cli.php:542
+msgid "\\FpHic\\hic_process_booking_data function not found"
+msgstr ""
+
+#: includes/realtime-dashboard.php:248
 msgid "Conversioni"
 msgstr ""
 
-#: includes/admin/diagnostics.php:689
-#: includes/admin/diagnostics.php:717
-#: includes/admin/diagnostics.php:736
-#: includes/admin/diagnostics.php:749
-#: includes/admin/diagnostics.php:804
-#: includes/admin/diagnostics.php:889
-#: includes/admin/diagnostics.php:1038
-#: includes/admin/diagnostics.php:1059
-#: includes/admin/diagnostics.php:1116
-#: includes/admin/diagnostics.php:1163
-#: includes/admin/diagnostics.php:1205
-#: includes/admin/diagnostics.php:1739
-#: includes/admin/diagnostics.php:1762
-#: includes/admin/diagnostics.php:1816
-#: includes/admin/diagnostics.php:1855
-#: includes/admin/diagnostics.php:1910
+#: includes/cli.php:809
+msgid "Stats error: %s"
+msgstr ""
+
+#: includes/admin/admin-settings.php:646
+msgid "Sincronizzazione real-time e automazioni pronte."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:918
+msgid "Avvisi automatici:"
+msgstr ""
+
+#: includes/admin/admin-settings.php:977
+msgid "Solo API Polling"
+msgstr ""
+
+#: includes/cli.php:110
+msgid "Polling state reset successfully"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1783
+msgid "Funzionalità opzionale, il monitoraggio standard resta attivo."
+msgstr ""
+
+#: includes/admin/admin-settings.php:884
+msgid "Usa il pulsante \"Test Email\" per inviare un messaggio di prova."
+msgstr ""
+
+#: includes/cli.php:398
+#: includes/cli.php:437
+msgid "P95 (ms)"
+msgstr ""
+
+#: includes/admin/diagnostics.php:699
+#: includes/admin/diagnostics.php:727
+#: includes/admin/diagnostics.php:746
+#: includes/admin/diagnostics.php:759
+#: includes/admin/diagnostics.php:814
+#: includes/admin/diagnostics.php:899
+#: includes/admin/diagnostics.php:1048
+#: includes/admin/diagnostics.php:1069
+#: includes/admin/diagnostics.php:1126
+#: includes/admin/diagnostics.php:1173
+#: includes/admin/diagnostics.php:1215
+#: includes/admin/diagnostics.php:1895
+#: includes/admin/diagnostics.php:1936
+#: includes/admin/diagnostics.php:1959
+#: includes/admin/diagnostics.php:2013
+#: includes/admin/diagnostics.php:2052
+#: includes/admin/diagnostics.php:2107
 msgid "Nonce non valido"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1923
+#: includes/enterprise-management-suite.php:871
+msgid "Abilita l'upload dei dati arricchiti verso Google Ads."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:570
+msgid "Puoi sospendere e riprendere in qualsiasi momento."
+msgstr ""
+
+#: includes/cli.php:512
+msgid "Last error"
+msgstr ""
+
+#: includes/admin/diagnostics.php:2120
 msgid "Errore durante recupero statistiche: %s"
 msgstr ""
 
-#: includes/realtime-dashboard.php:236
+#: includes/realtime-dashboard.php:249
 msgid "Revenue"
 msgstr ""
 
-#: includes/admin/diagnostics.php:837
+#: includes/cli.php:773
+msgid "Performing polling (force mode)..."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1127
+msgid "Abilita tracciamento rimborsi"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1008
+msgid "Chiave condivisa opzionale usata per validare la firma HMAC del webhook (%s)."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:596
+msgid "Supporto rapido"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1313
+msgid "Nessun polling completato finora."
+msgstr ""
+
+#: includes/admin/diagnostics.php:847
 msgid "Tipo di data non valido. Deve essere \"checkin\", \"checkout\" o \"presence\"."
 msgstr ""
 
-#: includes/admin/diagnostics.php:1773
+#: includes/admin/admin-settings.php:576
+msgid "Configurazioni principali, log e notifiche amministrative."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1970
 msgid "File di log non leggibile"
+msgstr ""
+
+#: includes/admin/admin-settings.php:591
+msgid "Sincronizzazione contatti, liste e automazioni Brevo."
 msgstr ""
 
 #: includes/site-health.php:35
 msgid "La configurazione GA4 è completa."
 msgstr ""
 
-#: includes/admin/diagnostics.php:1897
+#: includes/cli.php:334
+msgid "Days must be greater than zero. Defaulting to the minimum window of 1 day."
+msgstr ""
+
+#: includes/admin/admin-settings.php:857
+msgid "Test Email"
+msgstr ""
+
+#: includes/automated-reporting.php:1223
+msgid "Errori recenti"
+msgstr ""
+
+#: includes/cli.php:755
+#: includes/cli.php:760
+msgid "- %s"
+msgstr ""
+
+#: includes/cli.php:676
+msgid "Health monitor not available"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1096
+msgid "Valuta utilizzata per GA4 e Meta Pixel (default: EUR)."
+msgstr ""
+
+#: includes/cli.php:715
+msgid "Checks:"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:670
+msgid "Cosa configureremo"
+msgstr ""
+
+#: includes/admin/admin-settings.php:668
+msgid "Vai alla Diagnostica"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1021
+msgid "Il token protegge l'endpoint pubblico di health check. Condividilo solo con i sistemi di monitoraggio fidati."
+msgstr ""
+
+#: includes/admin/admin-settings.php:481
+msgid "Inserisci un indirizzo email per il test."
+msgstr ""
+
+#: includes/cli.php:586
+msgid "Messages: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:2094
 msgid "Errore fatale durante test traffico web: %s"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:925
+msgid "Frequenza adattiva in base alle prenotazioni."
+msgstr ""
+
+#: includes/cli.php:830
+msgid "Free"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1359
+msgid "Apri Impostazioni"
+msgstr ""
+
+#: includes/realtime-dashboard.php:445
+msgid "Trend orario delle conversioni registrate"
+msgstr ""
+
+#: includes/admin/admin-settings.php:626
+msgid "ID %s"
+msgstr ""
+
+#: includes/admin/admin-settings.php:586
+msgid "Connessione API, polling affidabile e sicurezza del sistema."
+msgstr ""
+
+#: includes/admin/admin-settings.php:888
+msgid "Plugin come WP Mail SMTP o Easy WP SMTP migliorano l'affidabilità."
+msgstr ""
+
+#: includes/circuit-breaker.php:1083
+msgid "Caricamento stato della coda di retry..."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1078
+msgid "Ogni 5 minuti (compatibilità)"
+msgstr ""
+
+#: includes/realtime-dashboard.php:491
+msgid "Nessun dato di conversione disponibile per questo intervallo."
+msgstr ""
+
+#: includes/cli.php:397
+#: includes/cli.php:436
+msgid "Avg (ms)"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1782
+msgid "Completa la configurazione per iniziare a inviare conversioni migliorate."
+msgstr ""
+
+#: includes/circuit-breaker.php:1019
+msgid "Supervisiona le integrazioni con la stessa identità visiva della dashboard, monitorando servizi, code di retry e controlli manuali."
+msgstr ""
+
+#: includes/realtime-dashboard.php:523
+msgid "Analizza tempi di risposta e volumi delle integrazioni attive"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:917
+msgid "Reportistica:"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1331
+msgid "Verrà creata automaticamente al primo tracciamento."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:676
+msgid "Enhanced Conversions Google Ads"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1791
+msgid "Inserisci Customer ID, Developer Token, Client ID/Secret e Refresh Token."
+msgstr ""
+
+#: includes/admin/admin-settings.php:998
+msgid "Dopo aver salvato comparirà l'URL completo del webhook da comunicare a Hotel in Cloud."
+msgstr ""
+
+#: includes/cli.php:840
+msgid "=== Last Poll Results ==="
+msgstr ""
+
+#: includes/circuit-breaker.php:1024
+msgid "Diagnostica sistema"
+msgstr ""
+
+#: includes/cli.php:506
+msgid "ID"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:916
+msgid "Controllo stato:"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1363
+#: includes/realtime-dashboard.php:362
+#: includes/enterprise-management-suite.php:849
+#: includes/enterprise-management-suite.php:928
+msgid "Dashboard Real-Time"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1328
+msgid "Eventi notificati: %s"
+msgstr ""
+
+#: includes/realtime-dashboard.php:424
+#: includes/realtime-dashboard.php:464
+msgid "Ultimi 30 giorni"
+msgstr ""
+
+#: includes/admin/admin-settings.php:480
+msgid "Errore di comunicazione:"
+msgstr ""
+
+#: includes/cli.php:245
+msgid "Window (s)"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:773
+msgid "API Secret"
+msgstr ""
+
+#: includes/admin/admin-settings.php:630
+msgid "Aggiungi Measurement ID e API secret per inviare gli eventi."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1338
+msgid "%s errore"
+msgid_plural "%s errori"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/cli.php:710
+msgid "Timestamp: %s"
 msgstr ""
 
 #: includes/site-health.php:14
@@ -86,32 +421,292 @@ msgstr ""
 msgid "Configurazione GA4"
 msgstr ""
 
+#: includes/realtime-dashboard.php:444
+msgid "Conversioni nel Tempo"
+msgstr ""
+
+#: includes/admin/admin-settings.php:882
+msgid "Se le email non arrivano, segui questi passi:"
+msgstr ""
+
+#: includes/circuit-breaker.php:1045
+msgid "Servizi monitorati"
+msgstr ""
+
+#: includes/cli.php:345
+msgid "Invalid format. Use \"table\" or \"json\"."
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1801
+msgid "Eventi in coda verso Google Ads."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:840
+#: includes/enterprise-management-suite.php:924
+msgid "Intelligent Polling"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:800
+msgid "Integrazione Brevo"
+msgstr ""
+
+#: includes/admin/admin-settings.php:895
+msgid "Mancata configurazione SMTP o autenticazione insufficiente."
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1833
+msgid "Guida rapida"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:665
+msgid "Imposta il monitoraggio completo delle conversioni in pochi minuti con un percorso guidato."
+msgstr ""
+
+#: includes/admin/admin-settings.php:627
+msgid "Non configurato"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1158
+msgid "Abilita log debug estesi (solo per test)"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1321
+msgid "%s prenotazione tracciata"
+msgid_plural "%s prenotazioni tracciate"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/api/webhook.php:166
+msgid "Troppe richieste webhook. Riprovare più tardi."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:785
+msgid "Pixel ID"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:767
+msgid "Measurement ID"
+msgstr ""
+
+#: includes/admin/admin-settings.php:624
+#: includes/enterprise-management-suite.php:673
+#: includes/enterprise-management-suite.php:764
+msgid "Google Analytics 4"
+msgstr ""
+
+#: includes/realtime-dashboard.php:507
+msgid "Bassa attività"
+msgstr ""
+
 #: includes/intelligent-polling-manager.php:60
 msgid "Every 5 minutes (Intelligent)"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1192
+#: includes/admin/admin-settings.php:945
+msgid "Solo GA4 Measurement Protocol (server-side)"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1202
 msgid "Errore fatale durante il reset dei timestamp: %s"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1189
+#: includes/enterprise-management-suite.php:563
+msgid "Step %1$d di %2$d"
+msgstr ""
+
+#: includes/admin/admin-settings.php:575
+msgid "Generale"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1150
+msgid "Opt-in marketing di default per nuovi contatti"
+msgstr ""
+
+#: includes/cli.php:42
+msgid "Starting manual polling execution..."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:943
+msgid "Completa e vai alla dashboard"
+msgstr ""
+
+#: includes/cli.php:501
+msgid "No events found in queue"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1199
 msgid "Errore durante il reset dei timestamp: %s"
 msgstr ""
 
-#: includes/admin/diagnostics.php:707
+#: includes/admin/diagnostics.php:717
 msgid "Errore fatale durante il caricamento diagnostiche: %s"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1821
+#: includes/realtime-dashboard.php:484
+msgid "Funnel di Conversione"
+msgstr ""
+
+#: includes/admin/admin-settings.php:483
+msgid "Generazione token in corso..."
+msgstr ""
+
+#: includes/cli.php:551
+msgid "Email not found for reservation %s"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:587
+msgid "Allinea la configurazione iniziale del monitoraggio con la nuova esperienza grafica del plugin."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:675
+msgid "Automazioni Brevo"
+msgstr ""
+
+#: includes/realtime-dashboard.php:498
+msgid "Heatmap Prenotazioni"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:664
+msgid "Benvenuto in FP HIC Monitor v3.0"
+msgstr ""
+
+#: includes/cli.php:613
+msgid "Config validator not available"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:674
+#: includes/enterprise-management-suite.php:782
+msgid "Facebook Conversions API"
+msgstr ""
+
+#: includes/admin/diagnostics.php:2018
 msgid "API key Brevo mancante. Configura prima l'API key nelle impostazioni."
 msgstr ""
 
-#: includes/realtime-dashboard.php:237
+#: includes/realtime-dashboard.php:457
+msgid "Distribuzione dei ricavi sui canali di vendita"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1182
+msgid "ID lista Brevo per contatti con email alias (Booking/Airbnb/OTA). Lascia vuoto per non iscriverli."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:586
+msgid "Setup guidato FP HIC Monitor"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1197
+msgid "Modificare solo se Brevo cambia il proprio endpoint per gli eventi o se si utilizza un endpoint personalizzato."
+msgstr ""
+
+#: includes/cli.php:462
+msgid "Queue table not found"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:916
+msgid "Verifica salute sistema"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:723
+msgid "Le credenziali sono salvate in modo cifrato nel database."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1143
+msgid "ID lista Brevo per contatti in altre lingue."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:710
+msgid "Identificativo struttura fornito da Hotel in Cloud."
+msgstr ""
+
+#: includes/cli.php:711
+msgid "Plugin version: %s"
+msgstr ""
+
+#: includes/cli.php:210
+msgid "No rate limits configured."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:575
+msgid "6 moduli"
+msgstr ""
+
+#: includes/automated-reporting.php:1207
+msgid "Report generati"
+msgstr ""
+
+#: includes/cli.php:267
+msgid "Unknown rate limit host \"%s\"."
+msgstr ""
+
+#: includes/admin/admin-settings.php:888
+msgid "Configura SMTP se necessario:"
+msgstr ""
+
+#: includes/admin/admin-settings.php:867
+msgid "Attualmente viene utilizzata l'email amministratore di WordPress: %s"
+msgstr ""
+
+#: includes/admin/admin-settings.php:886
+msgid "Verifica l'email:"
+msgstr ""
+
+#: includes/realtime-dashboard.php:250
 msgid "Prenotazioni"
 msgstr ""
 
-#: includes/admin/diagnostics.php:781
+#: includes/admin/admin-settings.php:614
+msgid "Credenziali verificate"
+msgstr ""
+
+#: includes/admin/diagnostics.php:791
 msgid "Tutte le tabelle sono state create/verificate con successo."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1138
+msgid "ID lista Brevo per contatti inglesi."
+msgstr ""
+
+#: includes/cli.php:843
+msgid "Duplicates: %s"
+msgstr ""
+
+#: includes/admin/admin-settings.php:155
+msgid "Hai effettuato troppe richieste. Riprova tra %d secondi."
+msgstr ""
+
+#: includes/admin/admin-settings.php:747
+msgid "Testa Connessione API"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:933
+msgid "Dati arricchiti per migliorare il ROAS."
+msgstr ""
+
+#: includes/admin/admin-settings.php:880
+msgid "Risoluzione problemi email"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1787
+msgid "Credenziali API"
+msgstr ""
+
+#: includes/cli.php:579
+msgid "Reservation resent successfully"
+msgstr ""
+
+#: includes/cli.php:722
+#: includes/cli.php:742
+#: includes/cli.php:744
+msgid "- %1$s: %2$s"
+msgstr ""
+
+#: includes/cli.php:401
+msgid "Duration Δ"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:564
+msgid "Completa il percorso guidato per configurare tutte le integrazioni chiave."
 msgstr ""
 
 #: includes/site-health.php:19
@@ -119,155 +714,1191 @@ msgstr ""
 msgid "Ping Webhook"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1046
+#: includes/admin/diagnostics.php:1056
 msgid "Tracking degli invii resettato con successo. Ora puoi inviare nuovamente tutte le prenotazioni alle integrazioni."
 msgstr ""
 
-#: includes/admin/diagnostics.php:1222
+#: includes/admin/diagnostics.php:1232
 msgid "Errore nel recupero dello stato: %s"
+msgstr ""
+
+#: includes/cli.php:537
+msgid "Reservation ID required"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1051
+msgid "Configurato tramite costante PHP HIC_API_PASSWORD in wp-config.php"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1813
+msgid "Sincronizzazione più recente completata con successo."
+msgstr ""
+
+#: includes/cli.php:684
+msgid "Livello non valido. Valori consentiti: basic, detailed, full."
+msgstr ""
+
+#: includes/admin/admin-settings.php:741
+msgid "Test Connessione API"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1266
+msgid "%s fa"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1076
+msgid "Ogni 30 secondi (quasi real-time)"
+msgstr ""
+
+#: includes/circuit-breaker.php:1075
+msgid "Caricamento stato dei servizi..."
+msgstr ""
+
+#: includes/admin/admin-settings.php:619
+msgid "Aggiungi URL API, email e password per completare la connessione."
+msgstr ""
+
+#: includes/realtime-dashboard.php:347
+#: includes/realtime-dashboard.php:512
+msgid "Nessun dato disponibile per mostrare la heatmap delle prenotazioni."
+msgstr ""
+
+#: includes/admin/admin-settings.php:647
+msgid "Invio contatti disponibile, abilita la sync real-time se necessario."
+msgstr ""
+
+#: includes/circuit-breaker.php:1098
+msgid "Al momento non sono necessari interventi manuali: il sistema riapre automaticamente i servizi quando tornano disponibili."
+msgstr ""
+
+#: includes/admin/admin-settings.php:643
+msgid "API attiva"
+msgstr ""
+
+#: includes/admin/admin-settings.php:893
+msgid "Funzione mail() di PHP disabilitata."
+msgstr ""
+
+#: includes/realtime-dashboard.php:401
+msgid "Tasso di conversione"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:876
+#: includes/enterprise-management-suite.php:936
+msgid "Circuit Breaker"
+msgstr ""
+
+#: includes/cli.php:419
+msgid "Daily breakdown for %s"
 msgstr ""
 
 #: includes/site-health.php:62
 msgid "Token health non configurato."
 msgstr ""
 
-#: includes/admin/diagnostics.php:1181
+#: includes/admin/admin-settings.php:886
+msgid "Assicurati che l'indirizzo configurato sia corretto e funzionante."
+msgstr ""
+
+#: includes/circuit-breaker.php:1038
+#: includes/admin/diagnostics.php:1302
+msgid "Attivo"
+msgstr ""
+
+#: includes/cli.php:242
+msgid "Host"
+msgstr ""
+
+#: includes/realtime-dashboard.php:393
+msgid "Revenue stimata"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1191
 msgid "Timestamp reset completed successfully - all timestamps reset and scheduler restarted"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1840
+#: includes/enterprise-management-suite.php:867
+#: includes/enterprise-management-suite.php:932
+msgid "Enhanced Conversions"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1133
+msgid "ID lista Brevo per contatti italiani."
+msgstr ""
+
+#: includes/cli.php:818
+#: includes/cli.php:844
+msgid "Processed: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1271
+msgid "Mai eseguito"
+msgstr ""
+
+#: includes/admin/diagnostics.php:2037
 msgid "Test connettività Brevo completato"
+msgstr ""
+
+#: includes/cli.php:176
+msgid "Specify at least one cleanup target: --logs, --gclids, --booking-events, or --realtime-sync"
+msgstr ""
+
+#: includes/admin/admin-settings.php:658
+msgid "Monitoraggio Conversioni"
+msgstr ""
+
+#: includes/realtime-dashboard.php:363
+msgid "Monitora conversioni, revenue e salute delle integrazioni con lo stesso linguaggio visivo delle altre aree del plugin."
+msgstr ""
+
+#: includes/cli.php:356
+msgid "No performance metrics available for the selected window."
+msgstr ""
+
+#: includes/automated-reporting.php:1188
+msgid "FP HIC Monitor - Reports &amp; Analytics"
+msgstr ""
+
+#: includes/admin/admin-settings.php:590
+#: includes/admin/admin-settings.php:642
+msgid "Brevo"
+msgstr ""
+
+#: includes/admin/admin-settings.php:620
+msgid "Abilita la modalità API per utilizzare il polling affidabile."
+msgstr ""
+
+#: includes/cli.php:141
+msgid "Log manager not available"
+msgstr ""
+
+#: includes/admin/admin-settings.php:946
+msgid "Solo Google Tag Manager (client-side)"
+msgstr ""
+
+#: includes/admin/admin-settings.php:932
+msgid "Abilita integrazione Google Tag Manager"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:858
+msgid "Reportistica automatica"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1324
+msgid "Tabella non inizializzata"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:731
+msgid "Test connessione"
+msgstr ""
+
+#: includes/cli.php:634
+msgid "Configuration valid"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1175
+msgid "Invia eventi \"reservation_created\" a Brevo in tempo reale per nuove prenotazioni"
+msgstr ""
+
+#: includes/automated-reporting.php:1189
+msgid "Genera report personalizzati e consulta lo storico con la stessa UI della dashboard di monitoraggio."
+msgstr ""
+
+#: includes/cli.php:589
+msgid "Failed to resend reservation"
+msgstr ""
+
+#: includes/admin/admin-settings.php:896
+msgid "Indirizzi finiti in blacklist o marcati come spam."
+msgstr ""
+
+#: includes/cli.php:831
+msgid "Lock status: %s"
 msgstr ""
 
 #: includes/intelligent-polling-manager.php:56
 msgid "Every 2 minutes (Intelligent)"
 msgstr ""
 
-#: includes/realtime-dashboard.php:234
+#: includes/enterprise-management-suite.php:907
+msgid "Setup completato!"
+msgstr ""
+
+#: includes/cli.php:275
+msgid "Rate limit bucket \"%s\" reset successfully."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:862
+msgid "Invia report periodici via email."
+msgstr ""
+
+#: includes/realtime-dashboard.php:538
+msgid "Controllo anomalie..."
+msgstr ""
+
+#: includes/automated-reporting.php:1215
+msgid "Ultimo completato"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:677
+msgid "Dashboard real-time e reporting"
+msgstr ""
+
+#: includes/circuit-breaker.php:1099
+msgid "In caso di blocco prolungato è possibile aprire un ticket al supporto indicando il servizio e l'orario del disservizio."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:714
+msgid "Email"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:682
+msgid "Inizia la configurazione →"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1309
+msgid "Ultimo Polling"
+msgstr ""
+
+#: includes/circuit-breaker.php:1063
+msgid "Eventi in attesa di nuova elaborazione."
+msgstr ""
+
+#: includes/cli.php:247
+msgid "Remaining"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1317
+msgid "Sincronizzazione Real-Time"
+msgstr ""
+
+#: includes/cli.php:372
+msgid "Aggregated metrics from %1$s to %2$s"
+msgstr ""
+
+#: includes/admin/admin-settings.php:733
+msgid "Salva impostazioni"
+msgstr ""
+
+#: includes/realtime-dashboard.php:247
 msgid "Nessun dato disponibile"
+msgstr ""
+
+#: includes/admin/admin-settings.php:585
+msgid "Hotel in Cloud"
+msgstr ""
+
+#: includes/cli.php:248
+msgid "Retry after (s)"
+msgstr ""
+
+#: includes/api/webhook.php:189
+msgid "Token webhook non configurato"
+msgstr ""
+
+#: includes/cli.php:53
+msgid "Polling execution completed"
 msgstr ""
 
 #: includes/intelligent-polling-manager.php:68
 msgid "Every 30 minutes (Intelligent)"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1016
+#: includes/cli.php:825
+msgid "Last poll: %1$s (%2$s)"
+msgstr ""
+
+#: includes/admin/admin-settings.php:615
+#: includes/admin/admin-settings.php:976
+msgid "Solo Webhook"
+msgstr ""
+
+#: includes/realtime-dashboard.php:430
+msgid "Auto-refresh"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1111
+msgid "Processa anche prenotazioni con valid = 0"
+msgstr ""
+
+#: includes/admin/admin-settings.php:615
+msgid "Richiede completamento"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:918
+msgid "Configura notifiche email per gli eventi critici."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:844
+msgid "Adatta la frequenza di polling in base al volume di prenotazioni."
+msgstr ""
+
+#: includes/admin/admin-settings.php:634
+msgid "Google Tag Manager"
+msgstr ""
+
+#: includes/cli.php:737
+msgid "Metrics:"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1088
+msgid "Attiva sistema polling affidabile"
+msgstr ""
+
+#: includes/automated-reporting.php:1175
+msgid "—"
+msgstr ""
+
+#: includes/admin/admin-settings.php:887
+msgid "Apri la pagina Diagnostics per analizzare gli ultimi invii."
+msgstr ""
+
+#: includes/admin/admin-settings.php:862
+msgid "Email per ricevere notifiche di nuove prenotazioni."
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1790
+msgid "Tutte le chiavi richieste sono state salvate."
+msgstr ""
+
+#: includes/circuit-breaker.php:1047
+msgid "Totale circuiti attualmente sotto controllo."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1079
+msgid "Ogni 5 minuti (affidabile)"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1026
 msgid "Prenotazioni inviate alle integrazioni configurate"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1068
+#: includes/admin/admin-settings.php:993
+msgid "Token condiviso con Hotel in Cloud per autorizzare le chiamate webhook."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1011
+msgid "Rigenera questo valore e aggiornalo sia qui che in HIC in caso di compromissione."
+msgstr ""
+
+#: includes/circuit-breaker.php:1018
+msgid "Circuit Breaker Status"
+msgstr ""
+
+#: includes/automated-reporting.php:1198
+msgid "Guida reportistica"
+msgstr ""
+
+#: includes/admin/admin-settings.php:891
+msgid "Cause comuni dei problemi:"
+msgstr ""
+
+#: includes/cli.php:581
+msgid "Reservation resent with partial success"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1078
 msgid "Classe HIC_Booking_Poller non trovata"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1049
+#: includes/admin/diagnostics.php:1059
 msgid "Errore durante il reset: %s"
 msgstr ""
 
-#: includes/admin/diagnostics.php:907
+#: includes/admin/diagnostics.php:1353
+msgid "Diagnostica e Performance"
+msgstr ""
+
+#: includes/admin/admin-settings.php:956
+msgid "Abilita integrazione Brevo"
+msgstr ""
+
+#: includes/admin/admin-settings.php:754
+msgid "Test in corso... attendere..."
+msgstr ""
+
+#: includes/cli.php:279
+msgid "Invalid action. Use \"list\" or \"reset\"."
+msgstr ""
+
+#: includes/admin/admin-settings.php:617
+msgid "Polling API attivo e pronto per il monitoraggio."
+msgstr ""
+
+#: includes/cli.php:244
+msgid "Max attempts"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1800
+msgid "Le statistiche saranno disponibili dopo il primo tracciamento."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1090
+msgid "Sistema interno con watchdog e recupero automatico basato su WP-Cron. Consigliato per hosting condivisi."
+msgstr ""
+
+#: includes/automated-reporting.php:1209
+msgid "Totale esportazioni archiviate."
+msgstr ""
+
+#: includes/cli.php:161
+msgid "hic_cleanup_booking_events function not found"
+msgstr ""
+
+#: includes/realtime-dashboard.php:367
+msgid "Ultimo aggiornamento alle"
+msgstr ""
+
+#: includes/admin/admin-settings.php:889
+msgid "Se tutto il resto è corretto, verifica eventuali blocchi lato server."
+msgstr ""
+
+#: includes/api/webhook.php:219
+msgid "Token non valido"
+msgstr ""
+
+#: includes/admin/diagnostics.php:917
 msgid "Nessuna prenotazione trovata nell'API"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1150
+#: includes/admin/admin-settings.php:947
+msgid "Ibrido (GTM + GA4 di backup)"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1302
+msgid "In verifica"
+msgstr ""
+
+#: includes/cli.php:434
+msgid "Date"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:880
+msgid "Abilita il fallback automatico in caso di API non disponibili."
+msgstr ""
+
+#: includes/api/rate-limit-controller.php:116
+msgid "Rate limit raggiunto. Riprovare tra %d secondi."
+msgstr ""
+
+#: includes/admin/admin-settings.php:889
+msgid "Contatta l'hosting:"
+msgstr ""
+
+#: includes/realtime-dashboard.php:421
+#: includes/realtime-dashboard.php:461
+msgid "Oggi"
+msgstr ""
+
+#: includes/admin/admin-settings.php:742
+msgid "Verifica la connessione alle API Hotel in Cloud utilizzando le credenziali configurate."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:569
+msgid "≈ 5 minuti"
+msgstr ""
+
+#: includes/realtime-dashboard.php:522
+msgid "Metriche di Performance"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1160
 msgid "Errore fatale durante l'esecuzione del watchdog: %s"
 msgstr ""
 
-#: includes/admin/diagnostics.php:704
+#: includes/admin/diagnostics.php:714
 msgid "Errore durante il caricamento diagnostiche: %s"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1304
+msgid "Sistema interno operativo per acquisire le prenotazioni."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1041
+msgid "Email utilizzata per l'autenticazione Basic Auth verso le API Hotel in Cloud."
+msgstr ""
+
+#: includes/circuit-breaker.php:1061
+msgid "Retry in coda"
 msgstr ""
 
 #: includes/site-health.php:74
 msgid "Webhook non raggiungibile o token non valido."
 msgstr ""
 
+#: includes/cli.php:833
+msgid "Lock age: %s seconds"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1795
+msgid "Conversioni pendenti"
+msgstr ""
+
+#: includes/cli.php:509
+msgid "Polled at"
+msgstr ""
+
 #: includes/intelligent-polling-manager.php:64
 msgid "Every 15 minutes (Intelligent)"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1185
+#: includes/admin/admin-settings.php:648
+msgid "Configura la chiave API Brevo per abilitare l'invio."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1335
+msgid "Errori ultime 24h"
+msgstr ""
+
+#: includes/automated-reporting.php:1194
+msgid "Dashboard live"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:758
+msgid "Configura gli ID di tracciamento per alimentare Google Analytics e Facebook."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1119
+msgid "Permetti aggiornamenti quando cambia presence"
+msgstr ""
+
+#: includes/realtime-dashboard.php:509
+msgid "Alta attività"
+msgstr ""
+
+#: includes/cli.php:249
+msgid "Resets in"
+msgstr ""
+
+#: includes/cli.php:690
+msgid "Formato non valido. Utilizzo formato \"table\"."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:908
+msgid "FP HIC Monitor è pronto per tracciare le conversioni del tuo hotel con la nuova esperienza grafica."
+msgstr ""
+
+#: includes/admin/admin-settings.php:884
+msgid "Testa la configurazione:"
+msgstr ""
+
+#: includes/cli.php:820
+#: includes/cli.php:845
+msgid "Errors: %s"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1065
+msgid "Configurato tramite costante PHP HIC_PROPERTY_ID in wp-config.php"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1777
+msgid "Stato integrazione"
+msgstr ""
+
+#: includes/realtime-dashboard.php:499
+msgid "Individua i momenti con maggiore domanda"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:739
+#: includes/enterprise-management-suite.php:814
+#: includes/enterprise-management-suite.php:889
+msgid "← Torna indietro"
+msgstr ""
+
+#: includes/realtime-dashboard.php:485
+msgid "Misura le tappe chiave dal traffico alla prenotazione"
+msgstr ""
+
+#: includes/circuit-breaker.php:1053
+msgid "Servizi sospesi"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1055
+msgid "Password per l'autenticazione Basic Auth verso le API Hotel in Cloud."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1189
+msgid "Invia double opt-in quando arriva email reale"
+msgstr ""
+
+#: includes/admin/admin-settings.php:694
+msgid "Categorie impostazioni"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1788
+msgid "Incomplete"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:700
+msgid "Inserisci le credenziali per abilitare la comunicazione sicura con il PMS."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1195
 msgid "Classe HIC_Booking_Poller non disponibile"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1147
+#: includes/admin/admin-settings.php:664
+msgid "Apri Dashboard Real-Time"
+msgstr ""
+
+#: includes/cli.php:817
+msgid "Total events: %s"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1780
+msgid "Sincronizzazione pronta all'invio automatico."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1301
+msgid "Scheduler Polling"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:757
+msgid "Passo 2: Analytics &amp; Conversioni"
+msgstr ""
+
+#: includes/admin/admin-settings.php:638
+msgid "Inserisci l'ID container per pubblicare i tag."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:917
+msgid "Consulta i report"
+msgstr ""
+
+#: includes/cli.php:400
+msgid "Events Δ"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1157
 msgid "Errore durante l'esecuzione del watchdog: %s"
 msgstr ""
 
-#: includes/realtime-dashboard.php:233
+#: includes/realtime-dashboard.php:246
 msgid "Errore nel caricamento dei dati"
 msgstr ""
 
-#: includes/admin/admin-settings.php:594
+#: includes/admin/diagnostics.php:1923
+msgid "Errore fatale durante il recupero dei log"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1027
+msgid "URL delle API Hotel in Cloud (necessario solo per modalità API o Hybrid)."
+msgstr ""
+
+#: includes/admin/admin-settings.php:885
+msgid "Verifica la cartella spam o indesiderata della casella email."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1167
+msgid "Aggiorna contatti Brevo quando arriva email reale da updates"
+msgstr ""
+
+#: includes/cli.php:841
+msgid "Fetched: %s"
+msgstr ""
+
+#: includes/admin/admin-settings.php:659
+msgid "Configura le integrazioni chiave del plugin mantenendo la stessa esperienza visiva della Dashboard Real-Time."
+msgstr ""
+
+#: includes/admin/admin-settings.php:887
+msgid "Monitora i log:"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:929
+msgid "Tracciamento live di conversioni e ricavi."
+msgstr ""
+
+#: includes/cli.php:354
+msgid "No metrics recorded for operation \"%s\" in the selected window."
+msgstr ""
+
+#: includes/cli.php:259
+msgid "Specify either --host or --key to reset a rate limit bucket."
+msgstr ""
+
+#: includes/cli.php:830
+msgid "Active"
+msgstr ""
+
+#: includes/cli.php:399
+#: includes/cli.php:438
+msgid "Success"
+msgstr ""
+
+#: includes/cli.php:149
+msgid "GCLIDs cleanup completed (%d removed)"
+msgstr ""
+
+#: includes/admin/admin-settings.php:629
+msgid "Misurazione e API secret configurati."
+msgstr ""
+
+#: includes/automated-reporting.php:1225
+msgid "Tentativi falliti nelle ultime generazioni."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1077
+msgid "Ogni 2 minuti (bilanciato)"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1019
 msgid "Genera nuovo token"
 msgstr ""
 
-#: includes/realtime-dashboard.php:232
+#: includes/cli.php:97
+msgid "This will reset polling state (locks, timestamps). Use --confirm to proceed."
+msgstr ""
+
+#: includes/admin/admin-settings.php:949
+msgid "Scegli come distribuire gli eventi di conversione: server-side, client-side o con una strategia ibrida per massima affidabilità."
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1811
+msgid "Ultimo upload"
+msgstr ""
+
+#: includes/circuit-breaker.php:1028
+msgid "Guida circuito"
+msgstr ""
+
+#: includes/admin/admin-settings.php:939
+msgid "ID del container GTM (formato: GTM-XXXXXXX). Disponibile in Google Tag Manager nella sezione dettagli container."
+msgstr ""
+
+#: includes/cli.php:819
+msgid "Pending: %s"
+msgstr ""
+
+#: includes/admin/admin-settings.php:978
+msgid "Hybrid (Webhook + API)"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1196
+msgid "Endpoint API per eventi Brevo. Default: https://in-automate.brevo.com/api/v2/trackEvent"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1069
+msgid "ID della struttura (propId) richiesto dalle chiamate API Hotel in Cloud."
+msgstr ""
+
+#: includes/admin/admin-settings.php:479
+msgid "prenotazioni trovate negli ultimi 7 giorni"
+msgstr ""
+
+#: includes/realtime-dashboard.php:245
+#: includes/realtime-dashboard.php:470
 msgid "Caricamento..."
 msgstr ""
 
-#: includes/admin/diagnostics.php:791
+#: includes/admin/diagnostics.php:1905
+msgid "Gestore log non disponibile"
+msgstr ""
+
+#: includes/admin/diagnostics.php:801
 msgid "Errore durante la creazione delle tabelle. Controlla i log per maggiori dettagli."
 msgstr ""
 
-#: includes/admin/diagnostics.php:1138
+#: includes/admin/admin-settings.php:580
+msgid "Tracking & Analytics"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1148
 msgid "Watchdog check completed successfully"
 msgstr ""
 
-#: includes/admin/diagnostics.php:685
-#: includes/admin/diagnostics.php:713
-#: includes/admin/diagnostics.php:732
-#: includes/admin/diagnostics.php:745
-#: includes/admin/diagnostics.php:800
-#: includes/admin/diagnostics.php:885
-#: includes/admin/diagnostics.php:1034
-#: includes/admin/diagnostics.php:1055
-#: includes/admin/diagnostics.php:1112
-#: includes/admin/diagnostics.php:1159
-#: includes/admin/diagnostics.php:1201
-#: includes/admin/diagnostics.php:1735
-#: includes/admin/diagnostics.php:1758
-#: includes/admin/diagnostics.php:1812
-#: includes/admin/diagnostics.php:1851
-#: includes/admin/diagnostics.php:1906
+#: includes/enterprise-management-suite.php:915
+msgid "Monitor Dashboard:"
+msgstr ""
+
+#: includes/admin/diagnostics.php:695
+#: includes/admin/diagnostics.php:723
+#: includes/admin/diagnostics.php:742
+#: includes/admin/diagnostics.php:755
+#: includes/admin/diagnostics.php:810
+#: includes/admin/diagnostics.php:895
+#: includes/admin/diagnostics.php:1044
+#: includes/admin/diagnostics.php:1065
+#: includes/admin/diagnostics.php:1122
+#: includes/admin/diagnostics.php:1169
+#: includes/admin/diagnostics.php:1211
+#: includes/admin/diagnostics.php:1888
+#: includes/admin/diagnostics.php:1932
+#: includes/admin/diagnostics.php:1955
+#: includes/admin/diagnostics.php:2009
+#: includes/admin/diagnostics.php:2048
+#: includes/admin/diagnostics.php:2103
 msgid "Permessi insufficienti"
 msgstr ""
 
-#: includes/admin/diagnostics.php:842
+#: includes/cli.php:45
+msgid "Force mode: bypassing lock check"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:622
+msgid "Passo %1$d di %2$d"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:568
+msgid "Tempo stimato"
+msgstr ""
+
+#: includes/circuit-breaker.php:1037
+msgid "Monitoraggio"
+msgstr ""
+
+#: includes/cli.php:791
+msgid "Polling completed in %ss"
+msgstr ""
+
+#: includes/cli.php:246
+msgid "Used"
+msgstr ""
+
+#: includes/cli.php:171
+msgid "hic_cleanup_realtime_sync function not found"
+msgstr ""
+
+#: includes/cli.php:510
+msgid "Processed at"
+msgstr ""
+
+#: includes/admin/diagnostics.php:852
 msgid "Date di inizio e fine sono obbligatorie"
 msgstr ""
 
-#: includes/admin/diagnostics.php:312
-#: includes/admin/diagnostics.php:794
-#: includes/admin/diagnostics.php:1028
+#: includes/enterprise-management-suite.php:574
+msgid "Funzionalità incluse"
+msgstr ""
+
+#: includes/admin/diagnostics.php:321
+#: includes/admin/diagnostics.php:804
+#: includes/admin/diagnostics.php:1038
 msgid "Errore: %s"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1103
+#: includes/enterprise-management-suite.php:720
+msgid "Password"
+msgstr ""
+
+#: includes/admin/diagnostics.php:1113
 msgid "Errore durante l'esecuzione del polling: %s"
 msgstr ""
 
-#: includes/admin/diagnostics.php:910
+#: includes/automated-reporting.php:1217
+msgid "Data di generazione più recente."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1103
+msgid "Usa price - unpaid_balance come valore per GA4/Pixel"
+msgstr ""
+
+#: includes/cli.php:709
+msgid "Status: %s"
+msgstr ""
+
+#: includes/cli.php:169
+msgid "Realtime sync cleanup completed (%d removed)"
+msgstr ""
+
+#: includes/realtime-dashboard.php:409
+msgid "Valore medio ordine (AOV)"
+msgstr ""
+
+#: includes/cli.php:319
+msgid "Performance monitor is disabled. Enable performance metrics to use this command."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1010
+msgid "Quando possibile, inserisci lo stesso valore anche nel pannello HIC per autenticare ogni chiamata."
+msgstr ""
+
+#: includes/admin/diagnostics.php:920
 msgid "Tutte le ultime 5 prenotazioni sono già state inviate. Usa il bottone \"Reset Download Tracking\" per reinviarle."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1081
+msgid "Frequenza del polling API per prenotazioni quasi real-time. La modalità Affidabile utilizza WP-Cron con watchdog."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1305
+msgid "Controlla credenziali API e cron per riattivare il polling."
+msgstr ""
+
+#: includes/realtime-dashboard.php:533
+msgid "Alert e Anomalie"
+msgstr ""
+
+#: includes/cli.php:507
+msgid "Booking ID"
+msgstr ""
+
+#: includes/cli.php:151
+msgid "hic_cleanup_old_gclids function not found"
+msgstr ""
+
+#: includes/admin/admin-settings.php:581
+msgid "Impostazioni per Google Analytics 4, Google Tag Manager e Meta."
+msgstr ""
+
+#: includes/realtime-dashboard.php:422
+#: includes/realtime-dashboard.php:462
+msgid "Ieri"
 msgstr ""
 
 #: includes/intelligent-polling-manager.php:52
 msgid "Every 1 minute (Intelligent)"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1918
+#: includes/enterprise-management-suite.php:562
+msgid "Avanzamento"
+msgstr ""
+
+#: includes/admin/diagnostics.php:2115
 msgid "Statistiche traffico web recuperate"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1879
+#: includes/admin/diagnostics.php:1354
+msgid "Monitora lo stato del sistema con la stessa identità visiva della Dashboard Real-Time, tra controlli API, sincronizzazioni e log."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1312
+msgid "Tempo trascorso dall'ultima esecuzione riuscita."
+msgstr ""
+
+#: includes/circuit-breaker.php:1055
+msgid "Circuiti temporaneamente bloccati per errori."
+msgstr ""
+
+#: includes/cli.php:396
+#: includes/cli.php:435
+msgid "Events"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1829
+msgid "Vai ai report"
+msgstr ""
+
+#: includes/admin/diagnostics.php:2076
 msgid "Test monitoraggio traffico web completato"
 msgstr ""
 
-#: includes/admin/diagnostics.php:1894
+#: includes/enterprise-management-suite.php:742
+#: includes/enterprise-management-suite.php:817
+#: includes/enterprise-management-suite.php:892
+msgid "Salva e continua →"
+msgstr ""
+
+#: includes/admin/diagnostics.php:2091
 msgid "Errore durante test traffico web: %s"
+msgstr ""
+
+#: includes/realtime-dashboard.php:423
+#: includes/realtime-dashboard.php:463
+msgid "Ultimi 7 giorni"
+msgstr ""
+
+#: includes/cli.php:814
+msgid "=== Polling Statistics ==="
+msgstr ""
+
+#: includes/enterprise-management-suite.php:576
+msgid "API HIC, Analytics, Facebook, Brevo, Enhanced, Dashboard."
+msgstr ""
+
+#: includes/enterprise-management-suite.php:791
+msgid "Access Token"
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1788
+msgid "Complete"
+msgstr ""
+
+#: includes/cli.php:583
+#: includes/cli.php:594
+msgid "Failed integrations: %s"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:707
+msgid "Property ID"
+msgstr ""
+
+#: includes/admin/admin-settings.php:934
+msgid "Abilita il tracciamento tramite Google Tag Manager per gestire i tag dal container web."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1343
+msgid "Analizza i log per approfondire eventuali anomalie."
+msgstr ""
+
+#: includes/cli.php:708
+msgid "=== HIC Health Check ==="
+msgstr ""
+
+#: includes/google-ads-enhanced.php:1824
+msgid "Ottimizza il tracciamento importando in Google Ads i dati raccolti da Hotel in Cloud, mantenendo coerenza con la nuova interfaccia del monitoraggio."
+msgstr ""
+
+#: includes/admin/admin-settings.php:885
+msgid "Controlla lo spam:"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:592
+msgid "Apri dashboard"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:853
+msgid "Abilita widget e grafici in tempo reale."
+msgstr ""
+
+#: includes/admin/admin-settings.php:635
+msgid "In attesa"
+msgstr ""
+
+#: includes/admin/admin-settings.php:482
+msgid "Invio email di test in corso..."
+msgstr ""
+
+#: includes/admin/admin-settings.php:1037
+msgid "Configurato tramite costante PHP HIC_API_EMAIL in wp-config.php"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:832
+msgid "Passo 3: Funzionalità avanzate"
+msgstr ""
+
+#: includes/admin/admin-settings.php:1177
+msgid "Quando abilitato, le nuove prenotazioni rilevate dal polling updates invieranno automaticamente eventi a Brevo per automazioni e tracciamento."
+msgstr ""
+
+#: includes/admin/admin-settings.php:894
+msgid "Provider hosting che limita o blocca l'invio email."
+msgstr ""
+
+#: includes/realtime-dashboard.php:385
+msgid "Conversioni ultime 24h"
+msgstr ""
+
+#: includes/realtime-dashboard.php:456
+msgid "Revenue per Canale"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:913
+msgid "E adesso?"
+msgstr ""
+
+#: includes/cli.php:826
+msgid "Lag: %s seconds"
+msgstr ""
+
+#: includes/cli.php:159
+msgid "Booking events cleanup completed (%d removed)"
+msgstr ""
+
+#: includes/cli.php:508
+msgid "Processed"
+msgstr ""
+
+#: includes/cli.php:800
+msgid "Polling failed: %s"
+msgstr ""
+
+#: includes/automated-reporting.php:1233
+msgid "Programmazioni pianificate (daily/weekly/monthly)."
+msgstr ""
+
+#: includes/admin/diagnostics.php:1342
+msgid "Sistema stabile, nessun errore critico rilevato."
+msgstr ""
+
+#: includes/cli.php:139
+msgid "Logs cleanup completed"
+msgstr ""
+
+#: includes/realtime-dashboard.php:372
+msgid "Vai alle Impostazioni"
+msgstr ""
+
+#: includes/cli.php:846
+msgid "API calls: %s"
+msgstr ""
+
+#: includes/cli.php:730
+msgid "  Details: %s"
+msgstr ""
+
+#: includes/cli.php:842
+msgid "New: %s"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:672
+msgid "Connessione API Hotel in Cloud"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:915
+msgid "Apri la dashboard real-time"
+msgstr ""
+
+#: includes/cli.php:36
+#: includes/cli.php:72
+msgid "HIC_Booking_Poller class not found"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:803
+msgid "API Key"
+msgstr ""
+
+#: includes/enterprise-management-suite.php:699
+msgid "Passo 1: Connessione API Hotel in Cloud"
+msgstr ""
+
+#: includes/realtime-dashboard.php:534
+msgid "Ricevi segnalazioni proattive su criticità operative"
+msgstr ""
+
+#: includes/cli.php:312
+msgid "Performance monitor not available. Enable performance metrics to use this command."
+msgstr ""
+
+#: includes/circuit-breaker.php:1039
+msgid "Blocca automaticamente le integrazioni instabili."
 msgstr ""
 
 #: includes/site-health.php:38
 msgid "GA4 non è configurato correttamente."
 msgstr ""
 
+#: includes/admin/admin-settings.php:643
+msgid "Non collegato"
+msgstr ""
+
+#: includes/cli.php:821
+msgid "24h activity: %s"
+msgstr ""
+
+#: includes/cli.php:751
+msgid "Alerts:"
+msgstr ""
+
 #: includes/site-health.php:71
 msgid "Webhook risponde correttamente."
+msgstr ""
+
+#: includes/cli.php:564
+msgid "Resending reservation %s..."
+msgstr ""
+
+#: includes/cli.php:511
+msgid "Attempts"
+msgstr ""
+
+#: includes/realtime-dashboard.php:387
+#: includes/realtime-dashboard.php:395
+#: includes/realtime-dashboard.php:403
+#: includes/realtime-dashboard.php:411
+msgid "In aggiornamento..."
+msgstr ""
+
+#: includes/admin/admin-settings.php:612
+msgid "Connessione API"
 msgstr ""

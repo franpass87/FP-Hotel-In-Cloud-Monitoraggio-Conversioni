@@ -167,6 +167,14 @@ $monitor->track_api_call('/api/reservations', 0.5, true, 1024);
 $summary = $monitor->get_performance_summary(7); // ultimi 7 giorni
 ```
 
+```bash
+# Report CLI sulle metriche aggregate degli ultimi 14 giorni
+wp hic performance --days=14
+
+# Esporta le metriche in JSON per l'operazione "booking_processing"
+wp hic performance --operation=booking_processing --format=json
+```
+
 ## 🔧 7. Miglioramenti all'Architettura
 
 ### Struttura Modulare:
@@ -226,6 +234,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/health-monitor.php';
 - **Performance**: Monitoraggio e ottimizzazione continua
 - **Supporto**: Diagnostic migliorato per troubleshooting
 - **Trasparenza**: Visibilità sul funzionamento del sistema
+- **Compliance**: Integrazione con gli strumenti privacy di WordPress per esportare e cancellare i dati personali su richiesta
 
 ### Per l'Operatività:
 - **Monitoring**: Health checks automatici

@@ -1,0 +1,117 @@
+openapi: 3.0.3
+info:
+  title: FP Hotel in Cloud Monitor API
+  version: "1.0.0"
+  description: |
+    Specifica OpenAPI per gli endpoint REST esposti dal plugin FP Hotel in Cloud Monitor.
+    Gli endpoint sono pubblicati sotto il namespace `hic/v1` e richiedono autenticazione
+    tramite chiave API o cookie WordPress con le capability appropriate.
+servers:
+  - url: https://example.com/wp-json
+    description: Endpoint predefinito dell'installazione WordPress
+paths:
+  /hic/v1/health:
+    get:
+      summary: Stato di salute del connettore
+      tags: [Health]
+      security:
+        - api_key: []
+      responses:
+        '200':
+          description: Stato del sistema e controlli diagnostici
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  checks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        status:
+                          type: string
+                        message:
+                          type: string
+        '401':
+          description: Autenticazione mancante o non valida
+  /hic/v1/conversion:
+    post:
+      summary: Registra una conversione proveniente da Hotel in Cloud
+      tags: [Conversions]
+      description: |
+        Riceve notifiche webhook sicure contenenti dati di prenotazione e le inoltra
+        verso le integrazioni configurate (GA4, Meta CAPI, Brevo). È richiesto l'header
+        di firma `X-HIC-Signature` calcolato con l'algoritmo HMAC-SHA256.
+      security:
+        - api_key: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reservation_id:
+                  type: string
+                event_type:
+                  type: string
+                  enum: [booking_created, booking_updated, booking_cancelled]
+                payload:
+                  type: object
+              required: [reservation_id, event_type, payload]
+      responses:
+        '202':
+          description: Conversione accettata e messa in coda
+        '400':
+          description: Payload non valido
+        '401':
+          description: Firma assente o errata
+        '429':
+          description: Limite di chiamate superato
+  /hic/v1/gtm-events:
+    get:
+      summary: Recupera gli eventi GTM normalizzati
+      tags: [Tracking]
+      security:
+        - cookie_auth: []
+      parameters:
+        - in: query
+          name: since
+          schema:
+            type: string
+            format: date-time
+          description: Filtra gli eventi prodotti dopo la data indicata
+      responses:
+        '200':
+          description: Elenco di eventi pronti per il data layer
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    type:
+                      type: string
+                    payload:
+                      type: object
+        '403':
+          description: Permessi insufficienti
+components:
+  securitySchemes:
+    api_key:
+      type: apiKey
+      in: header
+      name: X-HIC-Token
+    cookie_auth:
+      type: apiKey
+      in: cookie
+      name: wordpress_logged_in

@@ -44,6 +44,11 @@ define('HIC_LOG_LEVEL_INFO', 'info');
 define('HIC_LOG_LEVEL_DEBUG', 'debug');
 // Default log level is configured via the 'hic_log_level' option
 
+// === DATA RETENTION ===
+define('HIC_RETENTION_GCLID_DAYS', 90);           // Keep tracking identifiers for 90 days
+define('HIC_RETENTION_BOOKING_EVENT_DAYS', 30);   // Keep processed booking events for 30 days
+define('HIC_RETENTION_REALTIME_SYNC_DAYS', 60);   // Keep realtime sync state records for 60 days
+
 // === BREVO DEFAULTS ===
 define('HIC_BREVO_DEFAULT_LIST_IT', 20);          // Default Italian list ID
 define('HIC_BREVO_DEFAULT_LIST_EN', 21);          // Default English list ID

@@ -266,7 +266,13 @@ wp hic reset --confirm
 wp hic queue --limit=10 --status=pending
 
 # Esegui le routine di pulizia
-wp hic cleanup --logs --gclids --booking-events
+wp hic cleanup --logs --gclids --booking-events --realtime-sync
+
+# Esplora le metriche di performance aggregate
+wp hic performance --days=14
+
+# Esporta le metriche di una singola operazione in JSON
+wp hic performance --operation=booking_processing --format=json
 
 # Valida la configurazione del plugin
 wp hic validate-config
@@ -314,6 +320,18 @@ wp cron event schedule now hic_continuous_poll_event
 - **Filtro `hic_booking_payload`**: nuovo hook dedicato al payload normalizzato inviato alle integrazioni. Riceve lo stesso contesto di tracciamento del filtro precedente come secondo parametro e l'array normalizzato come terzo parametro per eventuali confronti con i dati originari.
 
 I callback esistenti che operavano sul payload normalizzato devono spostarsi su `hic_booking_payload`, mentre `hic_booking_data` continua a occuparsi esclusivamente dei dati grezzi in ingresso.
+
+### Data retention e compliance
+
+- **Filtro `hic_retention_gclid_days`**: permette di personalizzare il numero di giorni di conservazione per gli identificatori tracciati (`wp_hic_gclids`).
+- **Filtro `hic_retention_booking_event_days`**: consente di variare la retention degli eventi di prenotazione processati (`wp_hic_booking_events`).
+- **Filtro `hic_retention_realtime_sync_days`**: definisce per quanti giorni mantenere lo stato di sincronizzazione realtime in `wp_hic_realtime_sync`.
+- **Filtro `hic_retention_realtime_sync_statuses`**: consente di specificare quali stati (`new`, `notified`, `failed`, `permanent_failure`) devono essere considerati per la cancellazione automatica.
+
+### Privacy e strumenti GDPR
+- **Esportatore dati personali**: registrato automaticamente nei tool privacy di WordPress (`Strumenti > Esporta dati personali`), restituisce prenotazioni, stati di sincronizzazione realtime, eventi in coda e identificatori marketing legati all'email richiesta.
+- **Cancellazione mirata**: l'eraser (`Strumenti > Cancella dati personali`) elimina le metriche di prenotazione, le code di sincronizzazione, i dati di tracking e le mappe email ↔ prenotazione per ogni indirizzo coinvolto.
+- **Payload strutturati normalizzati**: i JSON memorizzati per diagnostica vengono convertiti in formato leggibile (pretty-print) durante l'esportazione così da facilitare audit e risposte agli interessati.
 
 ## Notifiche Email
 
