@@ -36,6 +36,59 @@ function hic_get_wpdb_instance(array $required_methods = [])
     return $wpdb;
 }
 
+/**
+ * Determine the options table name for a wpdb instance without triggering
+ * dynamic property notices on custom test doubles.
+ *
+ * @param object $wpdb The wpdb-like instance.
+ * @return string|null Fully qualified table name or null when unavailable.
+ */
+function hic_get_options_table_name($wpdb)
+{
+    if (!is_object($wpdb)) {
+        return null;
+    }
+
+    $candidates = [];
+
+    if (property_exists($wpdb, 'options')) {
+        $options_table = $wpdb->options;
+        if (is_string($options_table) && $options_table !== '') {
+            $candidates[] = $options_table;
+        }
+    }
+
+    if (property_exists($wpdb, 'prefix')) {
+        $prefix = $wpdb->prefix;
+        if (is_string($prefix) && $prefix !== '') {
+            $candidates[] = $prefix . 'options';
+        }
+    }
+
+    if (property_exists($wpdb, 'base_prefix')) {
+        $base_prefix = $wpdb->base_prefix;
+        if (is_string($base_prefix) && $base_prefix !== '') {
+            $candidates[] = $base_prefix . 'options';
+        }
+    }
+
+    if (method_exists($wpdb, 'get_blog_prefix')) {
+        $blog_prefix = $wpdb->get_blog_prefix();
+        if (is_string($blog_prefix) && $blog_prefix !== '') {
+            $candidates[] = $blog_prefix . 'options';
+        }
+    }
+
+    foreach ($candidates as $candidate) {
+        $candidate = trim((string) $candidate);
+        if ($candidate !== '') {
+            return $candidate;
+        }
+    }
+
+    return null;
+}
+
 /* ================= CONFIG FUNCTIONS ================= */
 function &hic_option_cache() {
     static $cache = [];
