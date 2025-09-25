@@ -959,7 +959,7 @@ class CircuitBreakerManager {
      * Enqueue circuit breaker assets
      */
     public function enqueue_circuit_breaker_assets($hook) {
-        if ($hook !== 'hic-monitoring_page_hic-circuit-breakers') {
+        if (!$this->is_circuit_breaker_hook($hook)) {
             return;
         }
 
@@ -991,6 +991,19 @@ class CircuitBreakerManager {
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('hic_circuit_breaker_nonce')
         ]);
+    }
+
+    private function is_circuit_breaker_hook($hook): bool
+    {
+        if (!is_string($hook)) {
+            return false;
+        }
+
+        if (strpos($hook, '_page_hic-circuit-breakers') !== false) {
+            return true;
+        }
+
+        return strpos($hook, 'hic-circuit-breakers') !== false;
     }
     
     /**

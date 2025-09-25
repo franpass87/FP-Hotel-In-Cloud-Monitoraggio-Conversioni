@@ -1087,7 +1087,7 @@ class AutomatedReportingManager {
      * Enqueue reporting assets
      */
     public function enqueue_reporting_assets($hook) {
-        if ($hook !== 'hic-monitoring_page_hic-reports') {
+        if (!$this->is_reports_hook($hook)) {
             return;
         }
 
@@ -1112,6 +1112,19 @@ class AutomatedReportingManager {
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'hic_reporting_nonce' => wp_create_nonce('hic_reporting_nonce')
         ]);
+    }
+
+    private function is_reports_hook($hook): bool
+    {
+        if (!is_string($hook)) {
+            return false;
+        }
+
+        if (strpos($hook, '_page_hic-reports') !== false) {
+            return true;
+        }
+
+        return strpos($hook, 'hic-reports') !== false;
     }
     
     /**
