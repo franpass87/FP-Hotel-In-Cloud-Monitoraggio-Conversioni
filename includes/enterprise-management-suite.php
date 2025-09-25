@@ -1266,18 +1266,27 @@ class EnterpriseManagementSuite {
      * Enqueue management assets
      */
     public function enqueue_management_assets($hook) {
-        if (strpos($hook, 'hic-') === false) {
+        if (!$this->is_setup_wizard_hook($hook)) {
             return;
         }
-        
+
+        $base_url = plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php');
+
+        wp_enqueue_style(
+            'hic-admin-base',
+            $base_url . 'assets/css/hic-admin.css',
+            [],
+            HIC_PLUGIN_VERSION
+        );
+
         wp_enqueue_script('jquery');
-        
+
         // Add inline script for wizard functionality
         wp_add_inline_script('jquery', '
             function saveStepAndContinue(currentStep, nextStep) {
                 var formData = jQuery("#hic-wizard-step-" + currentStep).serialize();
                 formData += "&action=hic_setup_wizard_step&step=" + currentStep + "&nonce=' . wp_create_nonce('hic_setup_wizard') . '";
-                
+
                 jQuery.post(ajaxurl, formData, function(response) {
                     if (response.success) {
                         window.location.href = "?page=hic-setup-wizard&step=" + nextStep;
@@ -1287,6 +1296,20 @@ class EnterpriseManagementSuite {
                 });
             }
         ');
+    }
+
+    private function is_setup_wizard_hook($hook): bool
+    {
+        if (!is_string($hook)) {
+            return false;
+        }
+
+        if (strpos($hook, '_page_hic-setup-wizard') !== false) {
+            return true;
+        }
+
+        // Legacy fallback when hook names don't include the parent slug
+        return strpos($hook, 'hic-setup-wizard') !== false;
     }
     
     // ===== AJAX HANDLERS =====

@@ -1658,7 +1658,7 @@ class GoogleAdsEnhancedConversions {
      * Enqueue enhanced conversions assets
      */
     public function enqueue_enhanced_conversions_assets($hook) {
-        if ($hook !== 'hic-monitoring_page_hic-enhanced-conversions') {
+        if (!$this->is_enhanced_conversions_hook($hook)) {
             return;
         }
 
@@ -1683,6 +1683,19 @@ class GoogleAdsEnhancedConversions {
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('hic_enhanced_conversions_nonce')
         ]);
+    }
+
+    private function is_enhanced_conversions_hook($hook): bool
+    {
+        if (!is_string($hook)) {
+            return false;
+        }
+
+        if (strpos($hook, '_page_hic-enhanced-conversions') !== false) {
+            return true;
+        }
+
+        return strpos($hook, 'hic-enhanced-conversions') !== false;
     }
     
     /**
