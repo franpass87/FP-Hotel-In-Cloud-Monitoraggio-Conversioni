@@ -117,10 +117,13 @@ define('HIC_FEATURE_EMAIL_ENRICHMENT', true);     // Enable email enrichment
 define('HIC_FEATURE_REAL_TIME_SYNC', true);       // Enable real-time sync
 define('HIC_FEATURE_HEALTH_MONITORING', true);    // Enable health monitoring
 define('HIC_FEATURE_PERFORMANCE_METRICS', true);  // Enable performance tracking
+define('HIC_FEATURE_WEBHOOK_RATE_LIMITING', true); // Enable webhook rate limiting
 
 // === WEBHOOK VALIDATION ===
 define('HIC_WEBHOOK_MAX_PAYLOAD_SIZE', 1048576);  // 1MB max webhook payload
 define('HIC_WEBHOOK_SIGNATURE_HEADER', 'X-HIC-Signature');
+define('HIC_WEBHOOK_RATE_LIMIT_MAX_ATTEMPTS', 60); // Maximum webhook requests per window
+define('HIC_WEBHOOK_RATE_LIMIT_WINDOW', 60);      // Rate limit window in seconds
 
 // === DIAGNOSTIC LEVELS ===
 define('HIC_DIAGNOSTIC_BASIC', 'basic');

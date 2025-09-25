@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use FpHic\HIC_Rate_Limiter;
 use function FpHic\hic_process_booking_data;
 
 /**
@@ -12,6 +13,165 @@ if (!defined('ABSPATH')) exit;
 /* Configura in Hotel in Cloud:
    https://www.villadianella.it/wp-json/hic/v1/conversion?token=hic2025ga4
 */
+
+if (!function_exists('hic_get_webhook_client_ip')) {
+function hic_get_webhook_client_ip($request): string
+{
+  $candidates = [];
+
+  if (is_object($request) && method_exists($request, 'get_header')) {
+    $forwarded = $request->get_header('x-forwarded-for');
+    if (is_string($forwarded) && $forwarded !== '') {
+      $candidates[] = $forwarded;
+    }
+
+    $real_ip = $request->get_header('x-real-ip');
+    if (is_string($real_ip) && $real_ip !== '') {
+      $candidates[] = $real_ip;
+    }
+  }
+
+  foreach (['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR'] as $server_key) {
+    if (!empty($_SERVER[$server_key]) && is_string($_SERVER[$server_key])) {
+      $candidates[] = $_SERVER[$server_key];
+    }
+  }
+
+  foreach ($candidates as $candidate) {
+    $normalized = hic_normalize_ip_for_rate_limit($candidate);
+    if ($normalized !== '') {
+      return $normalized;
+    }
+  }
+
+  return 'unknown';
+}
+}
+
+if (!function_exists('hic_normalize_ip_for_rate_limit')) {
+function hic_normalize_ip_for_rate_limit($ip): string
+{
+  if (!is_string($ip)) {
+    return '';
+  }
+
+  $trimmed = trim($ip);
+  if ($trimmed === '') {
+    return '';
+  }
+
+  if (strpos($trimmed, ',') !== false) {
+    $parts = explode(',', $trimmed);
+    $trimmed = $parts[0];
+  }
+
+  $sanitized = preg_replace('/[^0-9a-fA-F:\\.]/', '', $trimmed) ?? '';
+
+  return trim($sanitized);
+}
+}
+
+if (!function_exists('hic_generate_webhook_rate_limit_key')) {
+function hic_generate_webhook_rate_limit_key($token, string $ip): string
+{
+  $ip = hic_normalize_ip_for_rate_limit($ip);
+  if ($ip === '') {
+    $ip = 'unknown';
+  }
+
+  $token_hash = 'no-token';
+  if (is_string($token)) {
+    $token = trim($token);
+    if ($token !== '') {
+      $token_hash = substr(hash('sha256', $token), 0, 16);
+    }
+  }
+
+  return 'hic_webhook:' . $ip . ':' . $token_hash;
+}
+}
+
+if (!function_exists('hic_check_webhook_rate_limit')) {
+function hic_check_webhook_rate_limit($request, $token = null)
+{
+  if (!defined('HIC_FEATURE_WEBHOOK_RATE_LIMITING') || !HIC_FEATURE_WEBHOOK_RATE_LIMITING) {
+    return null;
+  }
+
+  $max_attempts = defined('HIC_WEBHOOK_RATE_LIMIT_MAX_ATTEMPTS') ? (int) HIC_WEBHOOK_RATE_LIMIT_MAX_ATTEMPTS : 0;
+  $window = defined('HIC_WEBHOOK_RATE_LIMIT_WINDOW') ? (int) HIC_WEBHOOK_RATE_LIMIT_WINDOW : 0;
+
+  if ($max_attempts <= 0 || $window <= 0) {
+    return null;
+  }
+
+  $ip = hic_get_webhook_client_ip($request);
+  $key = hic_generate_webhook_rate_limit_key($token, $ip);
+
+  if ($key === '') {
+    return null;
+  }
+
+  static $processed_requests = null;
+
+  if ($processed_requests === null) {
+    $processed_requests = class_exists('SplObjectStorage') ? new \SplObjectStorage() : [];
+  }
+
+  if (is_object($request)) {
+    if ($processed_requests instanceof \SplObjectStorage) {
+      if ($processed_requests->contains($request)) {
+        $processed_requests->detach($request);
+        return null;
+      }
+
+      $processed_requests->attach($request);
+    } else {
+      $request_id = spl_object_id($request);
+      if (isset($processed_requests[$request_id])) {
+        unset($processed_requests[$request_id]);
+        return null;
+      }
+
+      $processed_requests[$request_id] = true;
+    }
+  }
+
+  $result = HIC_Rate_Limiter::attempt($key, $max_attempts, $window);
+
+  if (!empty($result['allowed'])) {
+    return null;
+  }
+
+  $retry_after = max(1, (int) ($result['retry_after'] ?? 0));
+
+  hic_log(
+    'Webhook rate limit triggered',
+    HIC_LOG_LEVEL_WARNING,
+    [
+      'ip' => $ip,
+      'key' => $key,
+      'retry_after' => $retry_after,
+      'max_attempts' => $max_attempts,
+      'window' => $window,
+    ]
+  );
+
+  if (!headers_sent()) {
+    header('Retry-After: ' . $retry_after);
+  }
+
+  return new \WP_Error(
+    'rate_limited',
+    __('Troppe richieste webhook. Riprovare più tardi.', 'hotel-in-cloud'),
+    [
+      'status' => 429,
+      'retry_after' => $retry_after,
+      'ip' => $ip,
+    ]
+  );
+}
+}
 
 if (!function_exists('hic_webhook_permission_callback')) {
 function hic_webhook_permission_callback($request)
@@ -46,6 +206,11 @@ function hic_webhook_permission_callback($request)
   }
 
   $provided_token = sanitize_text_field($provided_token);
+
+  $rate_limit = hic_check_webhook_rate_limit($request, $provided_token);
+  if (is_wp_error($rate_limit)) {
+    return $rate_limit;
+  }
 
   if ($provided_token === '' || !hash_equals($expected_token, $provided_token)) {
     hic_log('Webhook permission denied: token invalido', HIC_LOG_LEVEL_WARNING);
@@ -191,6 +356,11 @@ function hic_webhook_handler(WP_REST_Request $request) {
   if ($token !== $expected_token) {
     hic_log('Webhook rifiutato: token invalido');
     return new \WP_Error('invalid_token','Token non valido',['status'=>403]);
+  }
+
+  $rate_limit = hic_check_webhook_rate_limit($request, $token);
+  if (is_wp_error($rate_limit)) {
+    return $rate_limit;
   }
 
   // Validate Content-Type header
