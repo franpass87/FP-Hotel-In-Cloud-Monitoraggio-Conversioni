@@ -198,6 +198,24 @@
     color: #b32d2e;
 }
 
+.hic-manual-controls-placeholder {
+    padding: 14px 16px;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    background: #f8f9fa;
+    color: #2c3338;
+}
+
+.hic-manual-controls-placeholder p {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #50575e;
+}
+
+.hic-manual-controls-placeholder p:last-child {
+    margin-bottom: 0;
+}
+
 #process-retry-queue[disabled] {
     opacity: 0.7;
 }
