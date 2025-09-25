@@ -22,7 +22,9 @@ if (!defined('ABSPATH')) exit;
     'action',
     'admin_enqueue_scripts',
     function ($hook) {
-        if ($hook === 'hic-monitoring_page_hic-diagnostics') {
+        $diagnostics_hook = 'hic-monitoring_page_hic-diagnostics';
+
+        if (is_string($hook) && strpos($hook, $diagnostics_hook) === 0) {
             wp_set_script_translations(
                 'hic-diagnostics',
                 'hotel-in-cloud',
@@ -1232,7 +1234,7 @@ function hic_diagnostics_page() {
     if (!current_user_can('hic_manage')) {
         wp_die( __( 'Non hai i permessi necessari per accedere a questa pagina.', 'hotel-in-cloud' ) );
     }
-    
+
     // Get initial data
     $scheduler_status = hic_get_internal_scheduler_status();
     $credentials_status = hic_get_credentials_status();
@@ -1242,15 +1244,137 @@ function hic_diagnostics_page() {
     $recent_logs = current_user_can('hic_view_logs') ? hic_get_log_manager()->get_recent_logs(20) : array();
     $schedules = wp_get_schedules();
     $error_stats = hic_get_error_stats();
-    
+
     // Note: Updates polling and all cron dependencies removed - system uses internal scheduler only
-    
+
+    $polling_active = !empty($scheduler_status['internal_scheduler']['enabled']) && !empty($scheduler_status['internal_scheduler']['conditions_met']);
+    $last_success_ts = isset($execution_stats['last_successful_poll']) ? (int) $execution_stats['last_successful_poll'] : 0;
+    $now = current_time('timestamp');
+
+    if ($last_success_ts > 0) {
+        $last_success_diff = max(0, $now - $last_success_ts);
+        $last_success_human = sprintf(
+            /* translators: %s: human readable time difference */
+            __('%s fa', 'hotel-in-cloud'),
+            human_time_diff($last_success_ts, $now)
+        );
+    } else {
+        $last_success_diff = null;
+        $last_success_human = __('Mai eseguito', 'hotel-in-cloud');
+    }
+
+    if ($last_success_diff === null) {
+        $last_poll_state = 'inactive';
+    } elseif ($last_success_diff <= 900) {
+        $last_poll_state = 'active';
+    } elseif ($last_success_diff <= 3600) {
+        $last_poll_state = 'warning';
+    } else {
+        $last_poll_state = 'danger';
+    }
+
+    $realtime_table_exists = !empty($scheduler_status['realtime_sync']['table_exists']);
+    $realtime_total = isset($scheduler_status['realtime_sync']['total_tracked']) ? (int) $scheduler_status['realtime_sync']['total_tracked'] : 0;
+    $realtime_notified = isset($scheduler_status['realtime_sync']['notified']) ? (int) $scheduler_status['realtime_sync']['notified'] : 0;
+
+    if (!$realtime_table_exists) {
+        $realtime_state = 'inactive';
+    } elseif ($realtime_total > 0) {
+        $realtime_state = 'active';
+    } else {
+        $realtime_state = 'warning';
+    }
+
+    $errors_last_24h = isset($error_stats['last_24h']['total']) ? (int) $error_stats['last_24h']['total'] : 0;
+    $errors_state = $errors_last_24h === 0 ? 'active' : ($errors_last_24h <= 3 ? 'warning' : 'danger');
+
+    $hero_overview = array(
+        array(
+            'label' => __('Scheduler Polling', 'hotel-in-cloud'),
+            'value' => $polling_active ? __('Attivo', 'hotel-in-cloud') : __('In verifica', 'hotel-in-cloud'),
+            'description' => $polling_active
+                ? __('Sistema interno operativo per acquisire le prenotazioni.', 'hotel-in-cloud')
+                : __('Controlla credenziali API e cron per riattivare il polling.', 'hotel-in-cloud'),
+            'state' => $polling_active ? 'active' : 'warning',
+        ),
+        array(
+            'label' => __('Ultimo Polling', 'hotel-in-cloud'),
+            'value' => $last_success_human,
+            'description' => $last_success_ts > 0
+                ? __('Tempo trascorso dall\'ultima esecuzione riuscita.', 'hotel-in-cloud')
+                : __('Nessun polling completato finora.', 'hotel-in-cloud'),
+            'state' => $last_poll_state,
+        ),
+        array(
+            'label' => __('Sincronizzazione Real-Time', 'hotel-in-cloud'),
+            'value' => $realtime_table_exists
+                ? sprintf(
+                    /* translators: %s: number of processed reservations */
+                    _n('%s prenotazione tracciata', '%s prenotazioni tracciate', $realtime_total, 'hotel-in-cloud'),
+                    number_format_i18n($realtime_total)
+                )
+                : __('Tabella non inizializzata', 'hotel-in-cloud'),
+            'description' => $realtime_table_exists
+                ? sprintf(
+                    /* translators: %s: number of notified events */
+                    __('Eventi notificati: %s', 'hotel-in-cloud'),
+                    number_format_i18n($realtime_notified)
+                )
+                : __('Verrà creata automaticamente al primo tracciamento.', 'hotel-in-cloud'),
+            'state' => $realtime_state,
+        ),
+        array(
+            'label' => __('Errori ultime 24h', 'hotel-in-cloud'),
+            'value' => sprintf(
+                /* translators: %s: number of errors */
+                _n('%s errore', '%s errori', $errors_last_24h, 'hotel-in-cloud'),
+                number_format_i18n($errors_last_24h)
+            ),
+            'description' => $errors_last_24h === 0
+                ? __('Sistema stabile, nessun errore critico rilevato.', 'hotel-in-cloud')
+                : __('Analizza i log per approfondire eventuali anomalie.', 'hotel-in-cloud'),
+            'state' => $errors_state,
+        ),
+    );
+
     ?>
     <div class="wrap hic-admin-page hic-diagnostics-page">
-        <h1>🏨 HIC Plugin Diagnostica</h1>
-        
+        <div class="hic-page-hero">
+            <div class="hic-page-header">
+                <div class="hic-page-header__content">
+                    <h1 class="hic-page-header__title">🏨 <?php esc_html_e('Diagnostica e Performance', 'hotel-in-cloud'); ?></h1>
+                    <p class="hic-page-header__subtitle"><?php esc_html_e('Monitora lo stato del sistema con la stessa identità visiva della Dashboard Real-Time, tra controlli API, sincronizzazioni e log.', 'hotel-in-cloud'); ?></p>
+                </div>
+                <div class="hic-page-actions">
+                    <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-monitoring-settings')); ?>">
+                        <span class="dashicons dashicons-admin-generic"></span>
+                        <?php esc_html_e('Apri Impostazioni', 'hotel-in-cloud'); ?>
+                    </a>
+                    <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-realtime-dashboard')); ?>">
+                        <span class="dashicons dashicons-chart-line"></span>
+                        <?php esc_html_e('Dashboard Real-Time', 'hotel-in-cloud'); ?>
+                    </a>
+                </div>
+            </div>
+
+            <div class="hic-page-meta">
+                <?php foreach ($hero_overview as $overview_item): ?>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-<?php echo esc_attr($overview_item['state']); ?>"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php echo esc_html($overview_item['label']); ?></p>
+                            <p class="hic-page-meta__value"><?php echo esc_html($overview_item['value']); ?></p>
+                            <?php if (!empty($overview_item['description'])): ?>
+                                <p class="hic-page-meta__description"><?php echo esc_html($overview_item['description']); ?></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
         <div class="hic-diagnostics-container">
-            
+
             <!-- System Overview Section -->
             <div class="hic-card hic-overview-card" id="system-overview">
                 <h2>📊 Panoramica Sistema
