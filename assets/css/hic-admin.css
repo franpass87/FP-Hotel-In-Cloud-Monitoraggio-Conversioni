@@ -63,6 +63,12 @@ body.wp-admin[class*="hic-monitoring"] #wpbody-content .wrap {
     margin-bottom: var(--hic-spacing-xl);
 }
 
+.hic-page-header__content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
 .hic-page-header__title {
     margin: 0;
     font-size: 28px;
@@ -75,6 +81,127 @@ body.wp-admin[class*="hic-monitoring"] #wpbody-content .wrap {
     color: var(--hic-color-text-muted);
     font-size: 14px;
     max-width: 720px;
+}
+
+.hic-page-hero {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-lg);
+    background: linear-gradient(135deg, rgba(28, 126, 214, 0.95), rgba(51, 154, 240, 0.95));
+    border-radius: var(--hic-radius-lg);
+    padding: var(--hic-spacing-xl);
+    margin-bottom: var(--hic-spacing-xl);
+    color: #fff;
+    overflow: hidden;
+    box-shadow: var(--hic-shadow-sm);
+}
+
+.hic-page-hero .hic-page-header {
+    margin-bottom: 0;
+}
+
+.hic-page-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 45%),
+                radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.18), transparent 40%);
+    pointer-events: none;
+}
+
+.hic-page-hero > * {
+    position: relative;
+    z-index: 1;
+}
+
+.hic-page-hero .hic-page-header__title,
+.hic-page-hero .hic-page-header__subtitle {
+    color: #fff;
+}
+
+.hic-page-hero .hic-page-header__title span {
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+}
+
+.hic-page-hero .hic-page-actions {
+    gap: var(--hic-spacing-sm);
+}
+
+.hic-page-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--hic-spacing-md);
+}
+
+.hic-page-meta__item {
+    display: flex;
+    gap: var(--hic-spacing-sm);
+    align-items: flex-start;
+    padding: var(--hic-spacing-md);
+    border-radius: var(--hic-radius-md);
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(6px);
+}
+
+.hic-page-meta__status {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    margin-top: 4px;
+    background: rgba(255, 255, 255, 0.45);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16);
+    flex-shrink: 0;
+}
+
+.hic-page-meta__status.is-active {
+    background: #51cf66;
+    box-shadow: 0 0 0 4px rgba(81, 207, 102, 0.35);
+}
+
+.hic-page-meta__status.is-warning {
+    background: #ffd43b;
+    box-shadow: 0 0 0 4px rgba(255, 212, 59, 0.28);
+}
+
+.hic-page-meta__status.is-inactive {
+    background: rgba(255, 255, 255, 0.45);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16);
+}
+
+.hic-page-meta__status.is-danger {
+    background: #ff6b6b;
+    box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.32);
+}
+
+.hic-page-meta__content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.hic-page-meta__label {
+    margin: 0;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.hic-page-meta__value {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.hic-page-meta__description {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.75);
 }
 
 .hic-page-actions {
@@ -201,6 +328,22 @@ body.wp-admin[class*="hic-monitoring"] #wpbody-content .wrap {
 
 .hic-button--ghost:hover {
     border-color: var(--hic-color-secondary);
+}
+
+.hic-button--inverted {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.55);
+    color: #fff;
+    box-shadow: none;
+}
+
+.hic-button--inverted:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.75);
+}
+
+.hic-button--inverted:focus {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.28);
 }
 
 .hic-button--danger {
@@ -510,6 +653,10 @@ body.wp-admin[class*="hic-monitoring"] #wpbody-content .wrap {
     .hic-field-label {
         font-size: 14px;
     }
+
+    .hic-page-meta {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 @media (max-width: 782px) {
@@ -521,6 +668,14 @@ body.wp-admin[class*="hic-monitoring"] #wpbody-content .wrap {
     .hic-button,
     .button.hic-button {
         width: 100%;
+    }
+
+    .hic-page-hero {
+        padding: var(--hic-spacing-lg);
+    }
+
+    .hic-page-meta {
+        grid-template-columns: 1fr;
     }
 
     .hic-input-group {

@@ -376,8 +376,14 @@ function hic_settings_init() {
  * Enqueue admin scripts for HIC plugin pages
  */
 function hic_admin_enqueue_scripts($hook) {
-    // Only load on our plugin pages
-    if (in_array($hook, ['hic-monitoring_page_hic-diagnostics', 'hic-monitoring_page_hic-monitoring-settings'], true)) {
+    $settings_hook = 'hic-monitoring_page_hic-monitoring-settings';
+    $diagnostics_hook = 'hic-monitoring_page_hic-diagnostics';
+
+    $is_settings_page = strpos($hook, $settings_hook) === 0;
+    $is_diagnostics_page = strpos($hook, $diagnostics_hook) === 0;
+
+    // Only load on our plugin pages, including multisite/network variations.
+    if ($is_settings_page || $is_diagnostics_page) {
         // Ensure jQuery is loaded
         wp_enqueue_script('jquery');
     }
@@ -389,7 +395,7 @@ function hic_admin_enqueue_scripts($hook) {
         HIC_PLUGIN_VERSION
     );
 
-    if ($hook === 'hic-monitoring_page_hic-monitoring-settings') {
+    if ($is_settings_page) {
         wp_enqueue_style('hic-admin-base');
         wp_enqueue_style(
             'hic-admin-settings',
@@ -424,7 +430,7 @@ function hic_admin_enqueue_scripts($hook) {
         ));
     }
 
-    if ($hook === 'hic-monitoring_page_hic-diagnostics') {
+    if ($is_diagnostics_page) {
         wp_enqueue_style('hic-admin-base');
         wp_enqueue_style(
             'hic-diagnostics',
@@ -530,12 +536,96 @@ function hic_options_page() {
         ),
     );
 
+    $api_url_configured = (bool) \FpHic\Helpers\hic_get_api_url();
+    $api_credentials_ready = $api_url_configured && hic_has_basic_auth_credentials();
+    $connection_uses_api = \FpHic\Helpers\hic_connection_uses_api();
+
+    $ga_measurement_id = (string) \FpHic\Helpers\hic_get_measurement_id();
+    $ga_api_secret = (string) \FpHic\Helpers\hic_get_api_secret();
+    $ga_ready = $ga_measurement_id !== '' && $ga_api_secret !== '';
+
+    $gtm_container_id = (string) \FpHic\Helpers\hic_get_gtm_container_id();
+    $gtm_ready = $gtm_container_id !== '';
+
+    $brevo_enabled = \FpHic\Helpers\hic_is_brevo_enabled() && (string) \FpHic\Helpers\hic_get_brevo_api_key() !== '';
+    $brevo_sync = $brevo_enabled && \FpHic\Helpers\hic_realtime_brevo_sync_enabled();
+
+    $hero_overview = array(
+        array(
+            'label' => __('Connessione API', 'hotel-in-cloud'),
+            'value' => $api_credentials_ready
+                ? __('Credenziali verificate', 'hotel-in-cloud')
+                : ($connection_uses_api ? __('Richiede completamento', 'hotel-in-cloud') : __('Solo Webhook', 'hotel-in-cloud')),
+            'description' => $api_credentials_ready
+                ? __('Polling API attivo e pronto per il monitoraggio.', 'hotel-in-cloud')
+                : ($connection_uses_api
+                    ? __('Aggiungi URL API, email e password per completare la connessione.', 'hotel-in-cloud')
+                    : __('Abilita la modalità API per utilizzare il polling affidabile.', 'hotel-in-cloud')),
+            'state' => $api_credentials_ready ? 'active' : ($connection_uses_api ? 'warning' : 'inactive'),
+        ),
+        array(
+            'label' => __('Google Analytics 4', 'hotel-in-cloud'),
+            'value' => $ga_ready
+                ? sprintf(__('ID %s', 'hotel-in-cloud'), substr($ga_measurement_id, -4))
+                : __('Non configurato', 'hotel-in-cloud'),
+            'description' => $ga_ready
+                ? __('Misurazione e API secret configurati.', 'hotel-in-cloud')
+                : __('Aggiungi Measurement ID e API secret per inviare gli eventi.', 'hotel-in-cloud'),
+            'state' => $ga_ready ? 'active' : (($ga_measurement_id !== '' || $ga_api_secret !== '') ? 'warning' : 'inactive'),
+        ),
+        array(
+            'label' => __('Google Tag Manager', 'hotel-in-cloud'),
+            'value' => $gtm_ready ? $gtm_container_id : __('In attesa', 'hotel-in-cloud'),
+            'description' => $gtm_ready
+                ? __('Container configurato per lanciare i tag marketing.', 'hotel-in-cloud')
+                : __('Inserisci l\'ID container per pubblicare i tag.', 'hotel-in-cloud'),
+            'state' => $gtm_ready ? 'active' : 'inactive',
+        ),
+        array(
+            'label' => __('Brevo', 'hotel-in-cloud'),
+            'value' => $brevo_enabled ? __('API attiva', 'hotel-in-cloud') : __('Non collegato', 'hotel-in-cloud'),
+            'description' => $brevo_enabled
+                ? ($brevo_sync
+                    ? __('Sincronizzazione real-time e automazioni pronte.', 'hotel-in-cloud')
+                    : __('Invio contatti disponibile, abilita la sync real-time se necessario.', 'hotel-in-cloud'))
+                : __('Configura la chiave API Brevo per abilitare l\'invio.', 'hotel-in-cloud'),
+            'state' => $brevo_enabled ? 'active' : 'inactive',
+        ),
+    );
+
     ?>
     <div class="wrap hic-admin-page hic-settings-page">
-        <div class="hic-page-header">
-            <div>
-                <h1 class="hic-page-header__title"><span>⚙️</span><?php esc_html_e('Hotel in Cloud - Monitoraggio Conversioni', 'hotel-in-cloud'); ?></h1>
-                <p class="hic-page-header__subtitle"><?php esc_html_e('Configura ogni integrazione con un layout coerente, pensato per una gestione rapida e intuitiva del sistema.', 'hotel-in-cloud'); ?></p>
+        <div class="hic-page-hero">
+            <div class="hic-page-header">
+                <div class="hic-page-header__content">
+                    <h1 class="hic-page-header__title"><span>⚙️</span><?php esc_html_e('Monitoraggio Conversioni', 'hotel-in-cloud'); ?></h1>
+                    <p class="hic-page-header__subtitle"><?php esc_html_e('Configura le integrazioni chiave del plugin mantenendo la stessa esperienza visiva della Dashboard Real-Time.', 'hotel-in-cloud'); ?></p>
+                </div>
+                <div class="hic-page-actions">
+                    <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-realtime-dashboard')); ?>">
+                        <span class="dashicons dashicons-chart-area"></span>
+                        <?php esc_html_e('Apri Dashboard Real-Time', 'hotel-in-cloud'); ?>
+                    </a>
+                    <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-diagnostics')); ?>">
+                        <span class="dashicons dashicons-admin-tools"></span>
+                        <?php esc_html_e('Vai alla Diagnostica', 'hotel-in-cloud'); ?>
+                    </a>
+                </div>
+            </div>
+
+            <div class="hic-page-meta">
+                <?php foreach ($hero_overview as $overview_item): ?>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-<?php echo esc_attr($overview_item['state']); ?>"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php echo esc_html($overview_item['label']); ?></p>
+                            <p class="hic-page-meta__value"><?php echo esc_html($overview_item['value']); ?></p>
+                            <?php if (!empty($overview_item['description'])): ?>
+                                <p class="hic-page-meta__description"><?php echo esc_html($overview_item['description']); ?></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
 
