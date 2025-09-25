@@ -1,0 +1,225 @@
+.hic-circuit-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.hic-circuit-summary-item {
+    flex: 1 1 160px;
+    min-width: 150px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    border: 1px solid #dcdcde;
+    background: #f8f9fa;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.hic-circuit-summary-item strong {
+    display: block;
+    font-size: 22px;
+    line-height: 1.3;
+    margin-bottom: 6px;
+    color: #2c3338;
+}
+
+.hic-circuit-summary-item span {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #50575e;
+}
+
+.hic-circuit-summary-item.status-open {
+    border-color: #d63638;
+    background: #fbeaea;
+    color: #b32d2e;
+}
+
+.hic-circuit-summary-item.status-half-open {
+    border-color: #f0b849;
+    background: #fff3cd;
+    color: #aa6f00;
+}
+
+.hic-circuit-summary-item.status-closed {
+    border-color: #46b450;
+    background: #f1fdf6;
+    color: #1a6840;
+}
+
+.hic-circuit-summary-item.status-total {
+    border-color: #2271b1;
+    background: #f0f6fc;
+    color: #0a4b78;
+}
+
+.hic-circuit-status-table {
+    margin-top: 12px;
+}
+
+.hic-circuit-status-table th,
+.hic-circuit-status-table td {
+    vertical-align: top;
+}
+
+.hic-circuit-status-table td.service-name {
+    font-weight: 600;
+    color: #2c3338;
+}
+
+.hic-circuit-status-table td.service-metrics .metric,
+.hic-circuit-status-table td.service-timestamps span,
+.hic-circuit-status-table td.service-thresholds span {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: #50575e;
+}
+
+.hic-circuit-status-table td.service-status {
+    width: 140px;
+}
+
+.hic-circuit-status-table .status-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 110px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.hic-circuit-status-table .status-label.status-open {
+    background: #fbeaea;
+    color: #b32d2e;
+}
+
+.hic-circuit-status-table .status-label.status-half-open {
+    background: #fff3cd;
+    color: #aa6f00;
+}
+
+.hic-circuit-status-table .status-label.status-closed {
+    background: #f1fdf6;
+    color: #1a6840;
+}
+
+.hic-circuit-empty {
+    padding: 18px;
+    border: 1px dashed #ccd0d4;
+    border-radius: 6px;
+    background: #f8f9fa;
+    color: #50575e;
+    text-align: center;
+    font-size: 13px;
+}
+
+.hic-circuit-error {
+    padding: 14px 16px;
+    border-radius: 6px;
+    background: #fbeaea;
+    border: 1px solid #d63638;
+    color: #b32d2e;
+    font-size: 13px;
+}
+
+.hic-queue-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: stretch;
+}
+
+.hic-queue-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.hic-queue-metrics li {
+    min-width: 120px;
+    padding: 12px 16px;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    background: #f8f9fa;
+    text-align: center;
+}
+
+.hic-queue-metrics .label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #50575e;
+    margin-bottom: 6px;
+}
+
+.hic-queue-metrics .value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3338;
+}
+
+.hic-queue-failed {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    border: 1px solid #dcdcde;
+    background: #f8f9fa;
+}
+
+.hic-queue-failed .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #50575e;
+}
+
+.hic-queue-failed .value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3338;
+}
+
+.hic-queue-failed.has-failed {
+    border-color: #d63638;
+    background: #fbeaea;
+    color: #b32d2e;
+}
+
+#process-retry-queue[disabled] {
+    opacity: 0.7;
+}
+
+@media (max-width: 782px) {
+    .hic-circuit-summary {
+        flex-direction: column;
+    }
+
+    .hic-circuit-summary-item {
+        width: 100%;
+    }
+
+    .hic-queue-summary {
+        flex-direction: column;
+    }
+
+    .hic-queue-metrics {
+        width: 100%;
+    }
+
+    .hic-queue-metrics li {
+        flex: 1 1 100%;
+    }
+}

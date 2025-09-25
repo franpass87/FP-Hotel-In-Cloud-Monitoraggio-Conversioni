@@ -49,7 +49,7 @@ class GoogleAdsEnhancedConversions {
      * Register admin hooks that are required even when Enhanced Conversions is disabled.
      */
     private function register_basic_admin_hooks(): void {
-        add_action('admin_menu', [$this, 'add_enhanced_conversions_menu']);
+        add_action('admin_menu', [$this, 'add_enhanced_conversions_menu'], 50);
         add_action('admin_init', [$this, 'handle_enhanced_conversions_form']);
         add_action('admin_init', [$this, 'register_settings']);
     }
@@ -1648,7 +1648,7 @@ class GoogleAdsEnhancedConversions {
             'hic-monitoring',
             'Google Ads Enhanced Conversions',
             'Enhanced Conversions',
-            'manage_options',
+            'hic_manage',
             'hic-enhanced-conversions',
             [$this, 'render_enhanced_conversions_page']
         );

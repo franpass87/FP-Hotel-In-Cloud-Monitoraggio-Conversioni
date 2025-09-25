@@ -166,7 +166,7 @@ class RealtimeDashboard {
      * Add WordPress dashboard widgets
      */
     public function add_dashboard_widgets() {
-        if (current_user_can('manage_options')) {
+        if (current_user_can('hic_manage')) {
             wp_add_dashboard_widget(
                 'hic_realtime_conversions',
                 'FP HIC Monitor - Conversioni in Tempo Reale',
@@ -191,7 +191,13 @@ class RealtimeDashboard {
      * Enqueue dashboard assets
      */
     public function enqueue_dashboard_assets($hook) {
-        if (!in_array($hook, ['index.php', 'toplevel_page_hic-realtime-dashboard'])) {
+        $allowed_hooks = [
+            'index.php',
+            'toplevel_page_hic-monitoring',
+            'hic-monitoring_page_hic-monitoring'
+        ];
+
+        if (!in_array($hook, $allowed_hooks, true)) {
             return;
         }
         
@@ -244,14 +250,19 @@ class RealtimeDashboard {
      */
     public function add_dashboard_menu() {
         add_menu_page(
-            'HIC Real-Time Dashboard',
-            'HIC Dashboard',
-            'manage_options',
-            'hic-realtime-dashboard',
+            'HIC Monitor',
+            'HIC Monitor',
+            'hic_manage',
+            'hic-monitoring',
             [$this, 'render_full_dashboard'],
             'dashicons-chart-area',
             30
         );
+
+        global $submenu;
+        if (isset($submenu['hic-monitoring'][0])) {
+            $submenu['hic-monitoring'][0][0] = \__('Dashboard', 'hotel-in-cloud');
+        }
     }
     
     /**
@@ -277,7 +288,7 @@ class RealtimeDashboard {
             <canvas id="hic-realtime-chart" width="400" height="200"></canvas>
             <div class="hic-widget-footer">
                 <span class="hic-last-update">Ultimo aggiornamento: <span id="hic-last-update">-</span></span>
-                <a href="<?php echo admin_url('admin.php?page=hic-realtime-dashboard'); ?>" class="button button-small">Vedi dettagli</a>
+                <a href="<?php echo admin_url('admin.php?page=hic-monitoring'); ?>" class="button button-small">Vedi dettagli</a>
             </div>
         </div>
         <?php
@@ -301,6 +312,9 @@ class RealtimeDashboard {
                     <option value="30days">Ultimi 30 giorni</option>
                 </select>
             </div>
+            <div class="hic-empty-state" data-empty-for="channel-stats">
+                <?php esc_html_e('Nessun dato disponibile per il periodo selezionato.', 'hotel-in-cloud'); ?>
+            </div>
         </div>
         <?php
     }
@@ -321,6 +335,9 @@ class RealtimeDashboard {
             </div>
             <div class="hic-widget-footer">
                 <span class="hic-heatmap-info">Prenotazioni per ora del giorno e giorno della settimana</span>
+            </div>
+            <div class="hic-empty-state" data-empty-for="heatmap">
+                <?php esc_html_e('Nessun dato disponibile per mostrare la heatmap delle prenotazioni.', 'hotel-in-cloud'); ?>
             </div>
         </div>
         <?php
@@ -367,19 +384,39 @@ class RealtimeDashboard {
                     </div>
                     <div class="hic-chart-container hic-chart-medium">
                         <h3>Revenue per Canale</h3>
-                        <canvas id="hic-revenue-breakdown"></canvas>
+                        <div class="hic-channel-stats" id="hic-channel-stats">
+                            <div class="hic-loading">Caricamento...</div>
+                        </div>
+                        <canvas id="hic-revenue-chart"></canvas>
+                        <div class="hic-widget-footer">
+                            <select id="hic-revenue-period" class="hic-period-selector">
+                                <option value="today">Oggi</option>
+                                <option value="yesterday">Ieri</option>
+                                <option value="7days" selected>Ultimi 7 giorni</option>
+                                <option value="30days">Ultimi 30 giorni</option>
+                            </select>
+                        </div>
+                        <div class="hic-empty-state" data-empty-for="channel-stats">
+                            <?php esc_html_e('Nessun dato disponibile per il periodo selezionato.', 'hotel-in-cloud'); ?>
+                        </div>
                     </div>
                 </div>
-                
+
                 <!-- Analysis Row -->
                 <div class="hic-analysis-row">
                     <div class="hic-analysis-container">
                         <h3>Funnel di Conversione</h3>
                         <canvas id="hic-conversion-funnel"></canvas>
+                        <div class="hic-empty-state" data-empty-for="funnel">
+                            <?php esc_html_e('Nessun dato di conversione disponibile per questo intervallo.', 'hotel-in-cloud'); ?>
+                        </div>
                     </div>
                     <div class="hic-analysis-container">
                         <h3>Heatmap Prenotazioni</h3>
-                        <canvas id="hic-booking-heatmap-full"></canvas>
+                        <canvas id="hic-booking-heatmap"></canvas>
+                        <div class="hic-empty-state" data-empty-for="heatmap">
+                            <?php esc_html_e('Nessun dato disponibile per mostrare la heatmap delle prenotazioni.', 'hotel-in-cloud'); ?>
+                        </div>
                     </div>
                 </div>
                 

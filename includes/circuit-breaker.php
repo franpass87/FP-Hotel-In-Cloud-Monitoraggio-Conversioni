@@ -51,7 +51,7 @@ class CircuitBreakerManager {
 
         // Admin integration
         if (\is_admin()) {
-            add_action('admin_menu', [$this, 'add_circuit_breaker_menu']);
+            add_action('admin_menu', [$this, 'add_circuit_breaker_menu'], 50);
             add_action('admin_enqueue_scripts', [$this, 'enqueue_circuit_breaker_assets']);
         }
 
@@ -949,7 +949,7 @@ class CircuitBreakerManager {
             'hic-monitoring',
             'Circuit Breaker Status',
             'Circuit Breakers',
-            'manage_options',
+            'hic_manage',
             'hic-circuit-breakers',
             [$this, 'render_circuit_breaker_page']
         );
@@ -962,7 +962,14 @@ class CircuitBreakerManager {
         if ($hook !== 'hic-monitoring_page_hic-circuit-breakers') {
             return;
         }
-        
+
+        wp_enqueue_style(
+            'hic-circuit-breaker-styles',
+            plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/css/circuit-breaker.css',
+            [],
+            '3.2.0'
+        );
+
         wp_enqueue_script(
             'hic-circuit-breaker',
             plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php') . 'assets/js/circuit-breaker.js',
@@ -990,15 +997,16 @@ class CircuitBreakerManager {
                 <div class="postbox">
                     <h2>Service Status Overview</h2>
                     <div class="inside">
-                        <div id="circuit-status-grid">Loading circuit breaker status...</div>
+                        <div id="circuit-status-summary" class="hic-circuit-summary"></div>
+                        <div id="circuit-status-grid"><?php esc_html_e('Caricamento stato dei servizi...', 'hotel-in-cloud'); ?></div>
                     </div>
                 </div>
-                
+
                 <!-- Retry Queue Status -->
                 <div class="postbox">
                     <h2>Retry Queue Status</h2>
                     <div class="inside">
-                        <div id="retry-queue-status">Loading retry queue status...</div>
+                        <div id="retry-queue-status" class="hic-queue-summary"><?php esc_html_e('Caricamento stato della coda di retry...', 'hotel-in-cloud'); ?></div>
                         <p>
                             <button type="button" class="button button-primary" id="process-retry-queue">
                                 Process Retry Queue Now
@@ -1053,7 +1061,7 @@ class CircuitBreakerManager {
      * AJAX: Reset circuit breaker
      */
     public function ajax_reset_circuit_breaker() {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('hic_manage')) {
             wp_die('Insufficient permissions');
         }
         
@@ -1121,7 +1129,7 @@ class CircuitBreakerManager {
      * AJAX: Process retry queue manually
      */
     public function ajax_process_retry_queue_manual() {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('hic_manage')) {
             wp_die('Insufficient permissions');
         }
         

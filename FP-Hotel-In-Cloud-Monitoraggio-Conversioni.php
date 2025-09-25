@@ -178,10 +178,55 @@ function hic_activate($network_wide)
 
 // Add settings link in plugin list
 \add_filter('plugin_action_links_' . \plugin_basename(__FILE__), function ($links) {
-    $settings_link = '<a href="' . \admin_url('admin.php?page=hic-monitoring') . '">' . \__('Impostazioni', 'hotel-in-cloud') . '</a>';
+    $settings_link = '<a href="' . \admin_url('admin.php?page=hic-monitoring-settings') . '">' . \__('Impostazioni', 'hotel-in-cloud') . '</a>';
     \array_unshift($links, $settings_link);
     return $links;
 });
+
+/**
+ * Ensure administrator roles keep the capabilities required to access the unified HIC Monitor menu.
+ *
+ * When the plugin is updated on an existing installation we can no longer rely on the activation hook
+ * to grant the custom capabilities. Calling this helper on each request keeps the role configuration
+ * consistent without requiring a manual reactivation.
+ */
+function hic_ensure_admin_capabilities(): void
+{
+    if (!\function_exists('get_role') || !\class_exists('\WP_Role')) {
+        return;
+    }
+
+    $target_roles = ['administrator'];
+
+    foreach ($target_roles as $role_name) {
+        $role = \get_role($role_name);
+
+        if (!($role instanceof \WP_Role)) {
+            continue;
+        }
+
+        if (!$role->has_cap('hic_manage')) {
+            $role->add_cap('hic_manage');
+        }
+
+        if (!$role->has_cap('hic_view_logs')) {
+            $role->add_cap('hic_view_logs');
+        }
+    }
+}
+
+// Apply the capability synchronization immediately and on subsequent requests.
+hic_ensure_admin_capabilities();
+\add_action('init', __NAMESPACE__ . '\\hic_ensure_admin_capabilities');
+\add_action('admin_init', __NAMESPACE__ . '\\hic_ensure_admin_capabilities');
+
+if (\function_exists('is_multisite') && \is_multisite() && \function_exists('switch_to_blog') && \function_exists('restore_current_blog')) {
+    \add_action('wpmu_new_blog', function (int $blog_id): void {
+        \switch_to_blog($blog_id);
+        hic_ensure_admin_capabilities();
+        \restore_current_blog();
+    });
+}
 
 // Initialize tracking parameters capture
 \add_action('init', function () {

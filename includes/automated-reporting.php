@@ -1077,7 +1077,7 @@ class AutomatedReportingManager {
             'hic-monitoring',
             'Reports & Analytics',
             'Reports',
-            'manage_options',
+            'hic_manage',
             'hic-reports',
             [$this, 'render_reports_page']
         );

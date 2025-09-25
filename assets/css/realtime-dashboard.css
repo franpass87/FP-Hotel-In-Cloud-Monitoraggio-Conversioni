@@ -14,6 +14,22 @@
     margin: 20px 0;
 }
 
+.hic-empty-state {
+    display: none;
+    margin-top: 16px;
+    padding: 16px;
+    border: 1px dashed #ccd0d4;
+    border-radius: 6px;
+    background: #f8f9fa;
+    color: #50575e;
+    font-size: 13px;
+    text-align: center;
+}
+
+.hic-empty-state.is-visible {
+    display: block;
+}
+
 /* Metrics Row */
 .hic-metrics-row {
     display: grid;
@@ -81,6 +97,24 @@
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.hic-widget.hic-empty .hic-channel-stats,
+.hic-widget.hic-empty canvas,
+.hic-widget.hic-empty .hic-heatmap-container,
+.hic-widget.hic-empty .hic-heatmap-legend,
+.hic-chart-container.hic-empty .hic-channel-stats,
+.hic-chart-container.hic-empty canvas,
+.hic-analysis-container.hic-empty canvas,
+.hic-analysis-container.hic-empty .hic-heatmap-container,
+.hic-analysis-container.hic-empty .hic-heatmap-legend {
+    display: none !important;
+}
+
+.hic-widget.hic-empty .hic-empty-state,
+.hic-chart-container.hic-empty .hic-empty-state,
+.hic-analysis-container.hic-empty .hic-empty-state {
+    display: block;
 }
 
 .hic-chart-container h3 {
