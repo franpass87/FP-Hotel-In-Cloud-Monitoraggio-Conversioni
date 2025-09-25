@@ -112,6 +112,41 @@ class HIC_Rate_Limiter
     }
 
     /**
+     * Inspect the current usage for a rate limit without mutating it.
+     *
+     * @param string $key         Unique identifier that matches the attempt key.
+     * @param int    $maxAttempts Configured maximum attempts for the window.
+     * @param int    $window      Window length in seconds.
+     *
+     * @return array{count:int,remaining:int,retry_after:int,expires_at:int,window:int}
+     */
+    public static function inspect(string $key, int $maxAttempts, int $window): array
+    {
+        $normalizedKey = self::normalizeKey($key);
+        if ($normalizedKey === '' || $maxAttempts <= 0 || $window <= 0) {
+            return [
+                'count' => 0,
+                'remaining' => max(0, $maxAttempts),
+                'retry_after' => 0,
+                'expires_at' => 0,
+                'window' => max(0, $window),
+            ];
+        }
+
+        $now = time();
+        $state = self::getState($normalizedKey, $now);
+        $retryAfter = $state['expires_at'] > $now ? $state['expires_at'] - $now : 0;
+
+        return [
+            'count' => $state['count'],
+            'remaining' => max(0, $maxAttempts - $state['count']),
+            'retry_after' => $retryAfter,
+            'expires_at' => $state['expires_at'],
+            'window' => max(1, $window),
+        ];
+    }
+
+    /**
      * Retrieve the stored state for the given key.
      *
      * @return array{count:int,expires_at:int}

@@ -1289,7 +1289,8 @@ function hic_is_plugin_admin_request(): bool {
         'hic-circuit-breakers',
         'hic-reports',
         'hic-enhanced-conversions',
-        'hic-setup-wizard'
+        'hic-setup-wizard',
+        'hic-performance-monitor'
     ];
     if (!in_array($page, $allowed_pages, true)) {
         return false;

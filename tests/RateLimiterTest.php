@@ -50,6 +50,24 @@ final class RateLimiterTest extends TestCase
         $this->assertSame(0, $result['remaining']);
     }
 
+    public function testInspectReportsUsageWithoutMutating(): void
+    {
+        \FpHic\HIC_Rate_Limiter::reset('limit-introspect');
+
+        \FpHic\HIC_Rate_Limiter::attempt('limit-introspect', 3, 90);
+
+        $status = \FpHic\HIC_Rate_Limiter::inspect('limit-introspect', 3, 90);
+
+        $this->assertSame(1, $status['count']);
+        $this->assertSame(2, $status['remaining']);
+        $this->assertGreaterThan(0, $status['retry_after']);
+
+        // A subsequent inspect should not modify the counters.
+        $second = \FpHic\HIC_Rate_Limiter::inspect('limit-introspect', 3, 90);
+        $this->assertSame($status['count'], $second['count']);
+        $this->assertSame($status['remaining'], $second['remaining']);
+    }
+
     public function testWindowExpirationAllowsNewAttempts(): void
     {
         \FpHic\HIC_Rate_Limiter::reset('limit-expire');

@@ -473,6 +473,10 @@ class HIC_Performance_Monitor {
             case 'resources':
                 $data = $this->get_system_resources();
                 break;
+            case 'aggregated':
+                $operation = sanitize_text_field( wp_unslash( $_GET['operation'] ?? '' ) );
+                $data = $this->get_aggregated_metrics($days, $operation !== '' ? $operation : null);
+                break;
             default:
                 $data = ['error' => 'Invalid type'];
         }
@@ -486,12 +490,179 @@ class HIC_Performance_Monitor {
     public function get_current_status() {
         $averages = get_option('hic_performance_averages', []);
         $resources = $this->get_system_resources();
-        
+
         return [
             'averages' => $averages,
             'resources' => $resources,
             'timestamp' => current_time('mysql')
         ];
+    }
+
+    /**
+     * Build aggregated metrics for the provided operations and period.
+     *
+     * @param int         $days      Number of days to aggregate.
+     * @param string|null $operation Optional specific operation to include.
+     *
+     * @return array<string,mixed>
+     */
+    public function get_aggregated_metrics(int $days = 30, $operation = null): array {
+        $days = max(1, min($days, 90));
+
+        $endTimestamp = current_time('timestamp');
+        $endDate = wp_date('Y-m-d', $endTimestamp);
+        $startOffset = $days > 1 ? $days - 1 : 0;
+        $startDate = wp_date('Y-m-d', strtotime("-{$startOffset} days", $endTimestamp));
+
+        $metrics = $this->get_metrics($startDate, $endDate, $operation);
+
+        $aggregated = [
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'operations' => [],
+        ];
+
+        foreach ($metrics as $metric) {
+            $op = $metric['operation'];
+            $date = $metric['date'];
+
+            if (!isset($aggregated['operations'][$op])) {
+                $aggregated['operations'][$op] = [
+                    'total' => 0,
+                    'total_duration' => 0.0,
+                    'durations' => [],
+                    'success' => ['total' => 0, 'failed' => 0],
+                    'days' => [],
+                ];
+            }
+
+            $operationBucket = &$aggregated['operations'][$op];
+            $operationBucket['total']++;
+            $operationBucket['total_duration'] += (float) $metric['duration'];
+            $operationBucket['durations'][] = (float) $metric['duration'];
+
+            $isSuccess = (bool) ($metric['additional_data']['success'] ?? false);
+            if ($isSuccess) {
+                $operationBucket['success']['total']++;
+            } else {
+                $operationBucket['success']['failed']++;
+            }
+
+            if (!isset($operationBucket['days'][$date])) {
+                $operationBucket['days'][$date] = [
+                    'count' => 0,
+                    'durations' => [],
+                    'success' => ['total' => 0, 'failed' => 0],
+                    'total_duration' => 0.0,
+                ];
+            }
+
+            $dayBucket = &$operationBucket['days'][$date];
+            $dayBucket['count']++;
+            $dayBucket['durations'][] = (float) $metric['duration'];
+            $dayBucket['total_duration'] += (float) $metric['duration'];
+
+            if ($isSuccess) {
+                $dayBucket['success']['total']++;
+            } else {
+                $dayBucket['success']['failed']++;
+            }
+
+            unset($dayBucket, $operationBucket);
+        }
+
+        foreach ($aggregated['operations'] as $op => &$operationBucket) {
+            sort($operationBucket['durations']);
+            $operationBucket['avg_duration'] = $operationBucket['total'] > 0
+                ? $operationBucket['total_duration'] / $operationBucket['total']
+                : 0.0;
+            $operationBucket['p95_duration'] = $operationBucket['total'] > 0
+                ? $this->get_percentile($operationBucket['durations'], 95)
+                : 0.0;
+            $operationBucket['success_rate'] = $operationBucket['total'] > 0
+                ? ($operationBucket['success']['total'] / $operationBucket['total']) * 100
+                : 0.0;
+
+            $operationBucket['trend'] = $this->calculate_trend($operationBucket['days']);
+
+            foreach ($operationBucket['days'] as $date => &$dayBucket) {
+                sort($dayBucket['durations']);
+                $successTotal = $dayBucket['success']['total'];
+                $dayTotalDuration = $dayBucket['total_duration'];
+                $dayBucket = [
+                    'count' => $dayBucket['count'],
+                    'avg_duration' => $dayBucket['count'] > 0
+                        ? $dayTotalDuration / $dayBucket['count']
+                        : 0.0,
+                    'p95_duration' => $dayBucket['count'] > 0
+                        ? $this->get_percentile($dayBucket['durations'], 95)
+                        : 0.0,
+                    'success_rate' => $dayBucket['count'] > 0
+                        ? ($successTotal / $dayBucket['count']) * 100
+                        : 0.0,
+                    'success_total' => $successTotal,
+                    'total_duration' => $dayTotalDuration,
+                ];
+            }
+            unset($dayBucket);
+
+            unset($operationBucket['durations']);
+        }
+        unset($operationBucket);
+
+        return $aggregated;
+    }
+
+    /**
+     * Calculate trend data for aggregated operations.
+     *
+     * @param array<string,array{count:int,avg_duration:float,p95_duration:float,success_rate:float}> $days
+     *
+     * @return array{count_change:float,duration_change:float,success_change:float}|array<string,float>
+     */
+    private function calculate_trend(array $days): array
+    {
+        if (count($days) < 2) {
+            return [
+                'count_change' => 0.0,
+                'duration_change' => 0.0,
+                'success_change' => 0.0,
+            ];
+        }
+
+        $dates = array_keys($days);
+        sort($dates);
+        $latest = end($dates);
+        $previous = prev($dates);
+
+        if ($latest === false || $previous === false) {
+            return [
+                'count_change' => 0.0,
+                'duration_change' => 0.0,
+                'success_change' => 0.0,
+            ];
+        }
+
+        $latestData = $days[$latest];
+        $previousData = $days[$previous];
+
+        return [
+            'count_change' => $this->calculate_percentage_change($previousData['count'], $latestData['count']),
+            'duration_change' => $this->calculate_percentage_change($previousData['avg_duration'], $latestData['avg_duration']),
+            'success_change' => $this->calculate_percentage_change($previousData['success_rate'], $latestData['success_rate']),
+        ];
+    }
+
+    private function calculate_percentage_change($previous, $current): float
+    {
+        $previous = (float) $previous;
+        $current = (float) $current;
+
+        if ($previous === 0.0) {
+            return $current === 0.0 ? 0.0 : 100.0;
+        }
+
+        return (($current - $previous) / abs($previous)) * 100;
     }
 }
 

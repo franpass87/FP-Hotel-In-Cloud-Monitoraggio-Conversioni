@@ -31,6 +31,7 @@ class HIC_Booking_Poller {
         add_action('hic_deep_check_event', array($this, 'execute_deep_check'));
         add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
         add_action('hic_cleanup_event', 'hic_cleanup_old_gclids');
+        add_action('hic_cleanup_event', 'hic_cleanup_realtime_sync');
         add_action('hic_booking_events_cleanup', 'hic_cleanup_booking_events');
         add_action('hic_scheduler_restart', array($this, 'ensure_scheduler_is_active'));
         add_action('hic_retry_failed_brevo_notifications', __NAMESPACE__ . '\\hic_retry_failed_brevo_notifications');

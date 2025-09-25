@@ -1,0 +1,133 @@
+.hic-performance-dashboard {
+    max-width: 1200px;
+}
+
+.hic-performance-dashboard__intro {
+    max-width: 800px;
+    color: #555;
+    font-size: 15px;
+}
+
+.hic-performance-dashboard__filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0 30px;
+}
+
+.hic-performance-dashboard__filters select {
+    min-width: 160px;
+}
+
+.hic-performance-dashboard__range {
+    margin-left: auto;
+    font-weight: 600;
+    color: #0073aa;
+}
+
+.hic-performance-dashboard__summary {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    margin-bottom: 30px;
+}
+
+.hic-performance-card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 6px;
+    padding: 18px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.hic-performance-card__label {
+    display: block;
+    color: #6c7781;
+    font-size: 13px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.hic-performance-card__value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #23282d;
+}
+
+.hic-performance-dashboard__content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.hic-performance-panel {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 6px;
+    padding: 16px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    min-height: 360px;
+}
+
+.hic-performance-panel h2 {
+    margin-top: 0;
+    font-size: 18px;
+    margin-bottom: 12px;
+}
+
+.hic-performance-panel--wide {
+    grid-column: 1 / -1;
+}
+
+.hic-performance-dashboard__table h2 {
+    margin-bottom: 12px;
+}
+
+.hic-performance-dashboard__table table {
+    background: #fff;
+}
+
+.hic-performance-dashboard__table tbody tr.is-active {
+    background: #f0f6fc;
+}
+
+.hic-performance-dashboard__table td {
+    vertical-align: middle;
+}
+
+.hic-performance-trend {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hic-performance-trend__status {
+    font-weight: 600;
+}
+
+.hic-performance-trend__status.is-up {
+    color: #22863a;
+}
+
+.hic-performance-trend__status.is-down {
+    color: #b31d28;
+}
+
+.hic-performance-trend__meta {
+    color: #6c7781;
+    font-size: 12px;
+}
+
+@media (max-width: 782px) {
+    .hic-performance-dashboard__filters {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .hic-performance-dashboard__range {
+        margin-left: 0;
+    }
+}

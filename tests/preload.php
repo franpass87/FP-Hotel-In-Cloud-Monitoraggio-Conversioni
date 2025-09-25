@@ -99,6 +99,12 @@ if (!function_exists('wp_schedule_single_event')) {
         return true;
     }
 }
+if (!function_exists('wp_parse_url')) {
+    function wp_parse_url($url, $component = -1)
+    {
+        return parse_url($url, $component);
+    }
+}
 if (!function_exists('is_multisite')) { function is_multisite() { return false; } }
 if (!function_exists('get_sites')) { function get_sites(...$args) { return []; } }
 if (!function_exists('switch_to_blog')) {

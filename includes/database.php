@@ -1364,8 +1364,18 @@ function hic_reindex_realtime_sync_reservations() {
 }
 
 /* ============ Cleanup old GCLIDs ============ */
-function hic_cleanup_old_gclids($days = 90) {
-  if ($days <= 0) return 0;
+function hic_cleanup_old_gclids($days = null) {
+  if ($days === null) {
+    $days = HIC_RETENTION_GCLID_DAYS;
+  }
+
+  if (function_exists('apply_filters')) {
+    $days = (int) apply_filters('hic_retention_gclid_days', $days);
+  }
+
+  if ($days <= 0) {
+    return 0;
+  }
 
   $wpdb = hic_get_wpdb(['get_var', 'prepare', 'query']);
 
@@ -1402,8 +1412,18 @@ function hic_cleanup_old_gclids($days = 90) {
 }
 
 /* ============ Cleanup processed booking events ============ */
-function hic_cleanup_booking_events($days = 30) {
-  if ($days <= 0) return 0;
+function hic_cleanup_booking_events($days = null) {
+  if ($days === null) {
+    $days = HIC_RETENTION_BOOKING_EVENT_DAYS;
+  }
+
+  if (function_exists('apply_filters')) {
+    $days = (int) apply_filters('hic_retention_booking_event_days', $days);
+  }
+
+  if ($days <= 0) {
+    return 0;
+  }
 
   $wpdb = hic_get_wpdb(['get_var', 'prepare', 'query']);
 
@@ -1435,6 +1455,77 @@ function hic_cleanup_booking_events($days = 30) {
   }
 
   hic_log("hic_cleanup_booking_events: Removed $deleted processed booking events older than $days days");
+
+  return $deleted;
+}
+
+/* ============ Cleanup realtime sync queue data ============ */
+function hic_cleanup_realtime_sync($days = null) {
+  if ($days === null) {
+    $days = HIC_RETENTION_REALTIME_SYNC_DAYS;
+  }
+
+  if (function_exists('apply_filters')) {
+    $days = (int) apply_filters('hic_retention_realtime_sync_days', $days);
+  }
+
+  if ($days <= 0) {
+    return 0;
+  }
+
+  $wpdb = hic_get_wpdb(['get_var', 'prepare', 'query']);
+
+  if (!$wpdb) {
+    hic_log('hic_cleanup_realtime_sync: wpdb is not available');
+    return false;
+  }
+
+  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+  if ($exists !== $table) {
+    $created = hic_create_realtime_sync_table();
+    if ($created === false) {
+      hic_log('hic_cleanup_realtime_sync: Failed to ensure table exists: ' . $table);
+    }
+    return 0;
+  }
+
+  $cutoff = gmdate('Y-m-d H:i:s', strtotime("-{$days} days"));
+
+  $allowed_statuses = ['new', 'notified', 'failed', 'permanent_failure'];
+  $target_statuses = ['notified', 'failed', 'permanent_failure'];
+
+  if (function_exists('apply_filters')) {
+    $filtered_statuses = apply_filters('hic_retention_realtime_sync_statuses', $target_statuses);
+    if (is_array($filtered_statuses)) {
+      $target_statuses = array_values(array_intersect($allowed_statuses, array_map('strval', $filtered_statuses)));
+    }
+  }
+
+  $params = [$cutoff];
+  $condition = 'first_seen < %s';
+
+  if (!empty($target_statuses)) {
+    $placeholders = implode(', ', array_fill(0, count($target_statuses), '%s'));
+    $condition .= ' AND sync_status IN (' . $placeholders . ')';
+    $params = array_merge($params, $target_statuses);
+  }
+
+  $prepared = $wpdb->prepare("DELETE FROM $table WHERE $condition", $params);
+
+  if ($prepared === false) {
+    hic_log('hic_cleanup_realtime_sync: Failed to prepare deletion query for ' . $table);
+    return false;
+  }
+
+  $deleted = $wpdb->query($prepared);
+
+  if ($deleted === false) {
+    hic_log('hic_cleanup_realtime_sync: Database error: ' . $wpdb->last_error);
+    return false;
+  }
+
+  hic_log("hic_cleanup_realtime_sync: Removed $deleted realtime sync records older than $days days");
 
   return $deleted;
 }

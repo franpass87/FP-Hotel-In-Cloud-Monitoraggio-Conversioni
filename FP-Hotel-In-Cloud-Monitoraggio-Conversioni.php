@@ -50,6 +50,8 @@ require_once __DIR__ . '/includes/helpers-logging.php';
 require_once __DIR__ . '/includes/helpers-tracking.php';
 require_once __DIR__ . '/includes/helpers-scheduling.php';
 require_once __DIR__ . '/includes/database.php';
+require_once __DIR__ . '/includes/privacy.php';
+require_once __DIR__ . '/includes/api/rate-limit-controller.php';
 require_once __DIR__ . '/includes/uninstall.php';
 
 // Log vendor autoloader status after all includes are loaded
@@ -254,6 +256,7 @@ if (\function_exists('is_multisite') && \is_multisite() && \function_exists('swi
     require_once __DIR__ . '/includes/cli.php';
     require_once __DIR__ . '/includes/config-validator.php';
     require_once __DIR__ . '/includes/performance-monitor.php';
+    require_once __DIR__ . '/includes/performance-analytics-dashboard.php';
     require_once __DIR__ . '/includes/health-monitor.php';
 
     // Initialize log manager
