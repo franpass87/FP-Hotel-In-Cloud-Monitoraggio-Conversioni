@@ -36,6 +36,7 @@ require_once __DIR__ . '/includes/log-manager.php';
 require_once __DIR__ . '/includes/http-security.php';
 require_once __DIR__ . '/includes/input-validator.php';
 require_once __DIR__ . '/includes/cache-manager.php';
+require_once __DIR__ . '/includes/rate-limiter.php';
 require_once __DIR__ . '/includes/booking-poller.php';
 require_once __DIR__ . '/includes/intelligent-polling-manager.php';
 require_once __DIR__ . '/includes/database-optimizer.php';

@@ -5,6 +5,11 @@
 
 if (!defined('ABSPATH')) exit;
 
+require_once __DIR__ . '/../rate-limiter.php';
+
+use FpHic\HIC_Rate_Limiter;
+use function FpHic\Helpers\hic_log;
+
 /* ============ Admin Settings Page ============ */
 add_action('admin_menu', 'hic_add_admin_menu');
 add_action('admin_init', 'hic_settings_init');
@@ -20,6 +25,101 @@ add_action('wp_ajax_hic_test_email_ajax', 'hic_ajax_test_email');
 // Add AJAX handler for health token generation
 add_action('wp_ajax_hic_generate_health_token', 'hic_ajax_generate_health_token');
 
+/**
+ * Build a unique rate limit key for the current administrator request.
+ */
+function hic_get_ajax_rate_limit_key(string $action): string {
+    $normalized_action = strtolower(trim($action));
+    $normalized_action = preg_replace('/[^a-z0-9_-]/', '', $normalized_action ?? '') ?? '';
+
+    if ($normalized_action === '') {
+        $normalized_action = 'generic';
+    }
+
+    $parts = [$normalized_action];
+
+    if (function_exists('get_current_user_id')) {
+        $user_id = (int) get_current_user_id();
+        if ($user_id > 0) {
+            $parts[] = 'user-' . $user_id;
+        }
+    }
+
+    if (count($parts) === 1) {
+        $remote_addr = $_SERVER['REMOTE_ADDR'] ?? '';
+        if (is_string($remote_addr) && $remote_addr !== '') {
+            $sanitized_ip = preg_replace('/[^0-9a-fA-F:.]/', '', $remote_addr) ?? '';
+            if ($sanitized_ip !== '') {
+                $parts[] = 'ip-' . $sanitized_ip;
+            }
+        }
+    }
+
+    if (count($parts) === 1) {
+        $parts[] = 'anonymous';
+    }
+
+    return implode(':', $parts);
+}
+
+/**
+ * Enforce an AJAX rate limit and return whether the request can proceed.
+ */
+function hic_enforce_ajax_rate_limit(string $action, int $max_attempts, int $window): bool {
+    if ($max_attempts <= 0 || $window <= 0) {
+        return true;
+    }
+
+    $key = hic_get_ajax_rate_limit_key($action);
+    if ($key === '') {
+        return true;
+    }
+
+    $result = HIC_Rate_Limiter::attempt($key, $max_attempts, $window);
+
+    if ($result['allowed']) {
+        if (!headers_sent()) {
+            header('X-RateLimit-Remaining: ' . max(0, (int) $result['remaining']));
+        }
+        return true;
+    }
+
+    $retry_after = max(1, (int) $result['retry_after']);
+
+    if (!headers_sent()) {
+        header('Retry-After: ' . $retry_after);
+        header('X-RateLimit-Remaining: 0');
+    }
+
+    if (function_exists('status_header')) {
+        status_header(429);
+    }
+
+    hic_log(
+        sprintf('Rate limit triggered for %s (key: %s)', $action, $key),
+        HIC_LOG_LEVEL_WARNING,
+        [
+            'retry_after' => $retry_after,
+            'max_attempts' => $max_attempts,
+            'window' => $window,
+        ]
+    );
+
+    wp_send_json_error(
+        [
+            'message' => sprintf(
+                __('Hai effettuato troppe richieste. Riprova tra %d secondi.', 'hotel-in-cloud'),
+                $retry_after
+            ),
+            'retry_after' => $retry_after,
+            'code' => HIC_ERROR_RATE_LIMITED,
+        ],
+        429
+    );
+
+    return false;
+}
+
 function hic_ajax_test_email() {
     // Verify nonce for security
     if (!check_ajax_referer('hic_test_email', 'nonce', false)) {
@@ -33,6 +133,10 @@ function hic_ajax_test_email() {
         wp_send_json_error(array(
             'message' => 'Permessi insufficienti.'
         ));
+    }
+
+    if (!hic_enforce_ajax_rate_limit('test_email_ajax', 5, 300)) {
+        return;
     }
     
     // Get email from request
@@ -71,6 +175,10 @@ function hic_ajax_test_api_connection() {
             'message' => 'Permessi insufficienti.'
         ));
     }
+
+    if (!hic_enforce_ajax_rate_limit('test_api_connection', 5, 300)) {
+        return;
+    }
     
     // Get credentials from AJAX request or settings
     $prop_id = sanitize_text_field( wp_unslash( $_POST['prop_id'] ?? '' ) );
@@ -105,6 +213,10 @@ function hic_ajax_generate_health_token() {
         wp_send_json_error(array(
             'message' => 'Permessi insufficienti.'
         ));
+    }
+
+    if (!hic_enforce_ajax_rate_limit('generate_health_token', 3, 900)) {
+        return;
     }
 
     $token = hic_generate_health_token_value();
