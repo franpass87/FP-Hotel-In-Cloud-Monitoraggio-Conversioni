@@ -356,114 +356,187 @@ class RealtimeDashboard {
     public function render_full_dashboard() {
         ?>
         <div class="wrap hic-admin-page hic-dashboard-page hic-dashboard">
-            <h1>FP HIC Monitor - Dashboard Real-Time</h1>
-            
-            <div class="hic-dashboard-grid">
-                <!-- Key Metrics Row -->
-                <div class="hic-metrics-row">
-                    <div class="hic-metric-card">
-                        <h3>Conversioni Totali</h3>
-                        <div class="hic-metric-value" id="hic-total-conversions">-</div>
-                        <div class="hic-metric-change" id="hic-conversions-change">-</div>
+            <div class="hic-page-hero">
+                <div class="hic-page-header">
+                    <div class="hic-page-header__content">
+                        <h1 class="hic-page-header__title"><span>📈</span><?php esc_html_e('Dashboard Real-Time', 'hotel-in-cloud'); ?></h1>
+                        <p class="hic-page-header__subtitle"><?php esc_html_e('Monitora conversioni, revenue e salute delle integrazioni con lo stesso linguaggio visivo delle altre aree del plugin.', 'hotel-in-cloud'); ?></p>
                     </div>
-                    <div class="hic-metric-card">
-                        <h3>Revenue Totale</h3>
-                        <div class="hic-metric-value" id="hic-total-revenue">-</div>
-                        <div class="hic-metric-change" id="hic-revenue-change">-</div>
-                    </div>
-                    <div class="hic-metric-card">
-                        <h3>Tasso Conversione</h3>
-                        <div class="hic-metric-value" id="hic-conversion-rate-full">-</div>
-                        <div class="hic-metric-change" id="hic-rate-change">-</div>
-                    </div>
-                    <div class="hic-metric-card">
-                        <h3>AOV (Valore Medio)</h3>
-                        <div class="hic-metric-value" id="hic-aov">-</div>
-                        <div class="hic-metric-change" id="hic-aov-change">-</div>
+                    <div class="hic-page-actions">
+                        <span class="hic-inline-status">
+                            <?php esc_html_e('Ultimo aggiornamento alle', 'hotel-in-cloud'); ?>
+                            <strong id="hic-last-update">--:--</strong>
+                        </span>
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-settings')); ?>">
+                            <span class="dashicons dashicons-admin-generic"></span>
+                            <?php esc_html_e('Vai alle Impostazioni', 'hotel-in-cloud'); ?>
+                        </a>
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-diagnostics')); ?>">
+                            <span class="dashicons dashicons-chart-line"></span>
+                            <?php esc_html_e('Apri Diagnostica', 'hotel-in-cloud'); ?>
+                        </a>
                     </div>
                 </div>
-                
-                <!-- Charts Row -->
-                <div class="hic-charts-row">
-                    <div class="hic-chart-container hic-chart-large">
-                        <h3>Conversioni nel Tempo</h3>
+
+                <div class="hic-page-meta">
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-active"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Conversioni ultime 24h', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><span id="hic-total-conversions">-</span></p>
+                            <p class="hic-page-meta__description" id="hic-conversions-change"><?php esc_html_e('In aggiornamento...', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-active"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Revenue stimata', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><span id="hic-total-revenue">-</span></p>
+                            <p class="hic-page-meta__description" id="hic-revenue-change"><?php esc_html_e('In aggiornamento...', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-active"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Tasso di conversione', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><span id="hic-conversion-rate-full">-</span></p>
+                            <p class="hic-page-meta__description" id="hic-rate-change"><?php esc_html_e('In aggiornamento...', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-active"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Valore medio ordine (AOV)', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><span id="hic-aov">-</span></p>
+                            <p class="hic-page-meta__description" id="hic-aov-change"><?php esc_html_e('In aggiornamento...', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hic-card hic-dashboard-toolbar">
+                <div class="hic-toolbar-group">
+                    <label for="hic-dashboard-period"><?php esc_html_e('Periodo', 'hotel-in-cloud'); ?></label>
+                    <select id="hic-dashboard-period" class="hic-select">
+                        <option value="today"><?php esc_html_e('Oggi', 'hotel-in-cloud'); ?></option>
+                        <option value="yesterday"><?php esc_html_e('Ieri', 'hotel-in-cloud'); ?></option>
+                        <option value="7days" selected><?php esc_html_e('Ultimi 7 giorni', 'hotel-in-cloud'); ?></option>
+                        <option value="30days"><?php esc_html_e('Ultimi 30 giorni', 'hotel-in-cloud'); ?></option>
+                    </select>
+                </div>
+                <div class="hic-toolbar-group">
+                    <label class="hic-toggle" for="hic-auto-refresh">
+                        <input type="checkbox" id="hic-auto-refresh" checked>
+                        <span><?php esc_html_e('Auto-refresh', 'hotel-in-cloud'); ?></span>
+                    </label>
+                    <span class="hic-refresh-indicator" id="hic-refresh-indicator" aria-hidden="true"></span>
+                </div>
+                <button type="button" class="hic-button hic-button--primary" id="hic-refresh-dashboard">
+                    <span class="dashicons dashicons-update"></span>
+                    <?php esc_html_e('Aggiorna Ora', 'hotel-in-cloud'); ?>
+                </button>
+            </div>
+
+            <div class="hic-grid hic-grid--dashboard-primary">
+                <div class="hic-card hic-card--chart">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title"><?php esc_html_e('Conversioni nel Tempo', 'hotel-in-cloud'); ?></h2>
+                            <p class="hic-card__subtitle"><?php esc_html_e('Trend orario delle conversioni registrate', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body">
                         <canvas id="hic-conversions-timeline"></canvas>
                     </div>
-                    <div class="hic-chart-container hic-chart-medium">
-                        <h3>Revenue per Canale</h3>
-                        <div class="hic-channel-stats" id="hic-channel-stats">
-                            <div class="hic-loading">Caricamento...</div>
+                </div>
+
+                <div class="hic-card hic-card--chart">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title"><?php esc_html_e('Revenue per Canale', 'hotel-in-cloud'); ?></h2>
+                            <p class="hic-card__subtitle"><?php esc_html_e('Distribuzione dei ricavi sui canali di vendita', 'hotel-in-cloud'); ?></p>
                         </div>
-                        <canvas id="hic-revenue-chart"></canvas>
-                        <div class="hic-widget-footer">
-                            <select id="hic-revenue-period" class="hic-period-selector">
-                                <option value="today">Oggi</option>
-                                <option value="yesterday">Ieri</option>
-                                <option value="7days" selected>Ultimi 7 giorni</option>
-                                <option value="30days">Ultimi 30 giorni</option>
+                        <div class="hic-page-actions">
+                            <select id="hic-revenue-period" class="hic-select">
+                                <option value="today"><?php esc_html_e('Oggi', 'hotel-in-cloud'); ?></option>
+                                <option value="yesterday"><?php esc_html_e('Ieri', 'hotel-in-cloud'); ?></option>
+                                <option value="7days" selected><?php esc_html_e('Ultimi 7 giorni', 'hotel-in-cloud'); ?></option>
+                                <option value="30days"><?php esc_html_e('Ultimi 30 giorni', 'hotel-in-cloud'); ?></option>
                             </select>
                         </div>
+                    </div>
+                    <div class="hic-card__body">
+                        <div class="hic-channel-stats" id="hic-channel-stats">
+                            <div class="hic-loading"><?php esc_html_e('Caricamento...', 'hotel-in-cloud'); ?></div>
+                        </div>
+                        <canvas id="hic-revenue-chart"></canvas>
                         <div class="hic-empty-state" data-empty-for="channel-stats">
                             <?php esc_html_e('Nessun dato disponibile per il periodo selezionato.', 'hotel-in-cloud'); ?>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Analysis Row -->
-                <div class="hic-analysis-row">
-                    <div class="hic-analysis-container">
-                        <h3>Funnel di Conversione</h3>
+            <div class="hic-grid hic-grid--dashboard-secondary">
+                <div class="hic-card hic-card--chart">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title"><?php esc_html_e('Funnel di Conversione', 'hotel-in-cloud'); ?></h2>
+                            <p class="hic-card__subtitle"><?php esc_html_e('Misura le tappe chiave dal traffico alla prenotazione', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body">
                         <canvas id="hic-conversion-funnel"></canvas>
                         <div class="hic-empty-state" data-empty-for="funnel">
                             <?php esc_html_e('Nessun dato di conversione disponibile per questo intervallo.', 'hotel-in-cloud'); ?>
                         </div>
                     </div>
-                    <div class="hic-analysis-container">
-                        <h3>Heatmap Prenotazioni</h3>
-                        <canvas id="hic-booking-heatmap"></canvas>
+                </div>
+                <div class="hic-card hic-card--chart">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title"><?php esc_html_e('Heatmap Prenotazioni', 'hotel-in-cloud'); ?></h2>
+                            <p class="hic-card__subtitle"><?php esc_html_e('Individua i momenti con maggiore domanda', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body">
+                        <div class="hic-heatmap-container">
+                            <canvas id="hic-booking-heatmap"></canvas>
+                        </div>
+                        <div class="hic-heatmap-legend">
+                            <span class="hic-legend-label"><?php esc_html_e('Bassa attività', 'hotel-in-cloud'); ?></span>
+                            <div class="hic-legend-gradient"></div>
+                            <span class="hic-legend-label"><?php esc_html_e('Alta attività', 'hotel-in-cloud'); ?></span>
+                        </div>
                         <div class="hic-empty-state" data-empty-for="heatmap">
                             <?php esc_html_e('Nessun dato disponibile per mostrare la heatmap delle prenotazioni.', 'hotel-in-cloud'); ?>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Performance Row -->
-                <div class="hic-performance-row">
-                    <div class="hic-performance-container">
-                        <h3>Metriche Performance</h3>
-                        <div id="hic-performance-metrics">
-                            <div class="hic-loading">Caricamento metriche...</div>
-                        </div>
-                    </div>
-                    <div class="hic-alerts-container">
-                        <h3>Alert e Anomalie</h3>
-                        <div id="hic-alerts-list">
-                            <div class="hic-loading">Controllo anomalie...</div>
-                        </div>
-                    </div>
-                </div>
             </div>
-            
-            <!-- Controls -->
-            <div class="hic-dashboard-controls">
-                <div class="hic-control-group">
-                    <label for="hic-dashboard-period">Periodo:</label>
-                    <select id="hic-dashboard-period">
-                        <option value="today">Oggi</option>
-                        <option value="yesterday">Ieri</option>
-                        <option value="7days" selected>Ultimi 7 giorni</option>
-                        <option value="30days">Ultimi 30 giorni</option>
-                    </select>
+
+            <div class="hic-grid hic-grid--dashboard-primary hic-grid--stacked">
+                <div class="hic-card">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title"><?php esc_html_e('Metriche di Performance', 'hotel-in-cloud'); ?></h2>
+                            <p class="hic-card__subtitle"><?php esc_html_e('Analizza tempi di risposta e volumi delle integrazioni attive', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body" id="hic-performance-metrics">
+                        <div class="hic-loading"><?php esc_html_e('Caricamento metriche...', 'hotel-in-cloud'); ?></div>
+                    </div>
                 </div>
-                <div class="hic-control-group">
-                    <label for="hic-auto-refresh">Auto-refresh:</label>
-                    <input type="checkbox" id="hic-auto-refresh" checked>
-                    <span class="hic-refresh-indicator" id="hic-refresh-indicator">●</span>
-                </div>
-                <div class="hic-control-group">
-                    <button type="button" class="button button-primary" id="hic-refresh-dashboard">
-                        Aggiorna Ora
-                    </button>
+                <div class="hic-card hic-card--alerts">
+                    <div class="hic-card__header">
+                        <div>
+                            <h2 class="hic-card__title"><?php esc_html_e('Alert e Anomalie', 'hotel-in-cloud'); ?></h2>
+                            <p class="hic-card__subtitle"><?php esc_html_e('Ricevi segnalazioni proattive su criticità operative', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-card__body" id="hic-alerts-list">
+                        <div class="hic-loading"><?php esc_html_e('Controllo anomalie...', 'hotel-in-cloud'); ?></div>
+                    </div>
                 </div>
             </div>
         </div>

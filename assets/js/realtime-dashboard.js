@@ -77,16 +77,30 @@
                 return;
             }
 
-            const $container = $element.closest('.hic-widget, .hic-chart-container, .hic-analysis-container');
+            const $cardBody = $element.closest('.hic-card__body');
+            let $container = $element.closest('.hic-widget, .hic-chart-container, .hic-analysis-container');
+
+            if ($cardBody.length) {
+                const $card = $cardBody.closest('.hic-card');
+                if ($card.length) {
+                    $container = $card;
+                } else {
+                    $container = $cardBody;
+                }
+            }
 
             if ($container.length === 0) {
-                return;
+                $container = $element.parent();
             }
 
             $container.toggleClass('hic-empty', !!isEmpty);
 
             if (typeof emptyKey === 'string' && emptyKey !== '') {
-                $container.find(`[data-empty-for="${emptyKey}"]`).toggleClass('is-visible', !!isEmpty);
+                const $emptyState = $container.find(`[data-empty-for="${emptyKey}"]`);
+
+                if ($emptyState.length) {
+                    $emptyState.toggleClass('is-visible', !!isEmpty);
+                }
             }
         }
 
