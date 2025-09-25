@@ -1360,9 +1360,15 @@ function hic_booking_uid($reservation) {
 
 /**
  * Normalize reservation identifiers for consistent storage and comparisons.
+ *
+ * @param string|int|float|bool $value
  */
-function hic_normalize_reservation_id(string $value): string {
-    $sanitized = sanitize_text_field($value);
+function hic_normalize_reservation_id($value): string {
+    if (!is_scalar($value)) {
+        return '';
+    }
+
+    $sanitized = sanitize_text_field((string) $value);
     $sanitized = trim($sanitized);
     if ($sanitized === '') {
         return '';
