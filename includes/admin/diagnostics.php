@@ -684,6 +684,7 @@ function hic_format_bookings_as_csv($bookings) {
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_reset_timestamps', 'hic_ajax_reset_timestamps');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_test_brevo_connectivity', 'hic_ajax_test_brevo_connectivity');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_get_system_status', 'hic_ajax_get_system_status');
+\FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_get_recent_logs', 'hic_ajax_get_recent_logs');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_test_web_traffic_monitoring', 'hic_ajax_test_web_traffic_monitoring');
 \FpHic\Helpers\hic_safe_add_hook('action', 'wp_ajax_hic_get_web_traffic_stats', 'hic_ajax_get_web_traffic_stats');
 
@@ -1753,7 +1754,13 @@ function hic_diagnostics_page() {
                     <?php if (current_user_can('hic_view_logs')): ?>
                     <div class="hic-activity-section">
                         <h3>📝 Log Recenti</h3>
-                        <div class="hic-logs-container">
+                        <div
+                            class="hic-logs-container"
+                            id="hic-logs-container"
+                            data-display-limit="8"
+                            data-fetch-limit="40"
+                            data-empty-message="<?php echo esc_attr(!empty($execution_stats['log_file_exists']) && (int) $execution_stats['log_file_size'] === 0 ? 'File di log presente ma vuoto.' : 'Nessun log recente disponibile.'); ?>"
+                        >
                             <?php if (empty($recent_logs)): ?>
                                 <?php if (!empty($execution_stats['log_file_exists']) && (int) $execution_stats['log_file_size'] === 0): ?>
                                     <p class="hic-no-logs">File di log presente ma vuoto.</p>
@@ -1762,12 +1769,25 @@ function hic_diagnostics_page() {
                                 <?php endif; ?>
                             <?php else: ?>
                                 <?php foreach (array_slice($recent_logs, 0, 8) as $log_entry): ?>
-                                    <div class="hic-log-entry"><?php echo esc_html(sprintf('[%s] [%s] [%s] %s', $log_entry['timestamp'], $log_entry['level'], $log_entry['memory'], $log_entry['message'])); ?></div>
+                                    <?php
+                                    $timestamp = isset($log_entry['timestamp']) ? (string) $log_entry['timestamp'] : '';
+                                    $level     = isset($log_entry['level']) ? (string) $log_entry['level'] : '';
+                                    $memory    = isset($log_entry['memory']) ? (string) $log_entry['memory'] : '';
+                                    $message   = isset($log_entry['message']) ? (string) $log_entry['message'] : '';
+
+                                    $formatted_entry = '[' . $timestamp . '] [' . $level . '] [' . $memory . '] ' . $message;
+                                    $formatted_entry = rtrim($formatted_entry);
+                                    ?>
+                                    <div class="hic-log-entry"><?php echo esc_html($formatted_entry); ?></div>
                                 <?php endforeach; ?>
                                 <?php if (count($recent_logs) > 8): ?>
                                     <div class="hic-log-more">... e altri <?php echo esc_html(count($recent_logs) - 8); ?> eventi</div>
                                 <?php endif; ?>
                             <?php endif; ?>
+                        </div>
+                        <div class="hic-log-stream-status" id="hic-log-stream-status" role="status" aria-live="polite">
+                            <span class="hic-live-dot" aria-hidden="true"></span>
+                            <span class="hic-log-stream-text">In attesa di nuovi eventi...</span>
                         </div>
                     </div>
                     <?php endif; ?>
@@ -1857,6 +1877,52 @@ function hic_diagnostics_page() {
 
 <?php
 } // End of hic_diagnostics_page() function
+
+/**
+ * AJAX handler for retrieving recent log entries in real time
+ */
+function hic_ajax_get_recent_logs() {
+    if ( ! current_user_can('hic_view_logs') ) {
+        wp_send_json_error(
+            [
+                'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ),
+                'requires_permission' => true,
+            ]
+        );
+    }
+
+    if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
+        wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
+    }
+
+    $limit = isset($_POST['limit']) ? (int) $_POST['limit'] : 40;
+    $limit = max(1, min($limit, 200));
+
+    try {
+        $log_manager = hic_get_log_manager();
+
+        if ( ! $log_manager ) {
+            wp_send_json_error( [ 'message' => __( 'Gestore log non disponibile', 'hotel-in-cloud' ) ] );
+        }
+
+        $logs = $log_manager->get_recent_logs($limit);
+
+        wp_send_json_success(
+            [
+                'logs' => $logs,
+                'total' => count($logs),
+                'requested' => $limit,
+                'timestamp' => current_time('timestamp'),
+            ]
+        );
+    } catch ( Exception $e ) {
+        hic_log( 'AJAX Get Recent Logs Error: ' . $e->getMessage() );
+        wp_send_json_error( [ 'message' => __( 'Errore durante il recupero dei log', 'hotel-in-cloud' ) ] );
+    } catch ( Error $e ) {
+        hic_log( 'AJAX Get Recent Logs Fatal Error: ' . $e->getMessage() );
+        wp_send_json_error( [ 'message' => __( 'Errore fatale durante il recupero dei log', 'hotel-in-cloud' ) ] );
+    }
+}
 
 /**
  * AJAX handler for retrieving error log info

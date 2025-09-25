@@ -175,8 +175,11 @@ jQuery(document).ready(function($) {
         function addCopyButton(selector, textSelector = null) {
             $(selector).each(function() {
                 var $element = $(this);
+                if ($element.data('hic-copy-bound')) {
+                    return;
+                }
                 var $copyBtn = $('<button class="hic-copy-button" title="Copia negli appunti">📋</button>');
-                
+
                 $copyBtn.click(function() {
                     var text = textSelector ? $element.find(textSelector).text() : $element.text();
                     navigator.clipboard.writeText(text).then(function() {
@@ -189,15 +192,188 @@ jQuery(document).ready(function($) {
                         showToast('Errore nella copia', 'error');
                     });
                 });
-                
+
                 $element.append($copyBtn);
+                $element.data('hic-copy-bound', true);
             });
         }
-        
+
         // Initialize enhanced features
         startAutoRefresh();
         addCopyButton('.hic-log-entry');
-        
+        initLiveLogStreaming();
+
+        function initLiveLogStreaming() {
+            if (!hicDiagnostics.can_view_logs) {
+                return;
+            }
+
+            var $container = $('#hic-logs-container');
+            var $status = $('#hic-log-stream-status');
+
+            if ($container.length === 0) {
+                return;
+            }
+
+            var refreshInterval = parseInt(hicDiagnostics.log_refresh_interval, 10) || 10000;
+            var fetchLimit = parseInt($container.data('fetch-limit'), 10) || 40;
+            var displayLimit = parseInt($container.data('display-limit'), 10) || 8;
+            var emptyMessage = $container.data('empty-message') || 'Nessun log recente disponibile.';
+            var requestInFlight = false;
+            var timerId = null;
+            var lastPayloadHash = null;
+            var isVisible = !document.hidden;
+            var streamingEnabled = true;
+
+            function escapeHtml(value) {
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function setStatus(state, message) {
+                if ($status.length === 0) {
+                    return;
+                }
+
+                var states = {
+                    active: 'Aggiornamento automatico attivo',
+                    idle: 'In attesa di nuovi eventi...',
+                    paused: 'Aggiornamento in pausa (scheda inattiva)',
+                    error: "Errore durante l'aggiornamento dei log"
+                };
+
+                var text = message || states[state] || states.active;
+
+                $status
+                    .removeClass('active idle paused error')
+                    .addClass(state);
+
+                $status.find('.hic-log-stream-text').text(text);
+            }
+
+            function scheduleNext(delay) {
+                if (!streamingEnabled) {
+                    return;
+                }
+
+                if (timerId) {
+                    clearTimeout(timerId);
+                }
+
+                timerId = setTimeout(fetchLogs, delay);
+            }
+
+            function stopStreaming() {
+                streamingEnabled = false;
+                if (timerId) {
+                    clearTimeout(timerId);
+                    timerId = null;
+                }
+            }
+
+            function renderLogs(logs) {
+                if (!Array.isArray(logs) || logs.length === 0) {
+                    $container.html('<p class="hic-no-logs">' + emptyMessage + '</p>');
+                    return;
+                }
+
+                var html = '';
+                var displayLogs = logs.slice(0, displayLimit);
+
+                displayLogs.forEach(function(entry) {
+                    var timestamp = escapeHtml(entry.timestamp || '');
+                    var level = escapeHtml(entry.level || '');
+                    var memory = escapeHtml(entry.memory || '');
+                    var message = escapeHtml(entry.message || '');
+
+                    html += '<div class="hic-log-entry">[' + timestamp + '] [' + level + '] [' + memory + '] ' + message + '</div>';
+                });
+
+                if (logs.length > displayLimit) {
+                    html += '<div class="hic-log-more">... e altri ' + (logs.length - displayLimit) + ' eventi</div>';
+                }
+
+                $container.html(html);
+                addCopyButton('.hic-log-entry');
+            }
+
+            function fetchLogs() {
+                if (!isVisible) {
+                    scheduleNext(refreshInterval);
+                    return;
+                }
+
+                if (requestInFlight) {
+                    scheduleNext(refreshInterval);
+                    return;
+                }
+
+                requestInFlight = true;
+                $container.addClass('hic-logs-loading');
+
+                $.post(ajaxurl, {
+                    action: 'hic_get_recent_logs',
+                    nonce: hicDiagnostics.diagnostics_nonce,
+                    limit: fetchLimit
+                }, function(response) {
+                    if (response && response.success && response.data) {
+                        var logs = response.data.logs || [];
+                        var payloadHash = JSON.stringify(logs);
+
+                        if (payloadHash !== lastPayloadHash) {
+                            renderLogs(logs);
+                            lastPayloadHash = payloadHash;
+                        }
+
+                        if (logs.length === 0) {
+                            setStatus('idle');
+                        } else {
+                            setStatus('active');
+                        }
+                    } else if (response && response.data && response.data.requires_permission) {
+                        setStatus('error', response.data.message);
+                        stopStreaming();
+                    } else {
+                        var errorMessage = response && response.data && response.data.message ? response.data.message : null;
+                        setStatus('error', errorMessage);
+                    }
+                }, 'json').fail(function() {
+                    setStatus('error');
+                }).always(function() {
+                    requestInFlight = false;
+                    $container.removeClass('hic-logs-loading');
+                    scheduleNext(refreshInterval);
+                });
+            }
+
+            document.addEventListener('visibilitychange', function() {
+                isVisible = !document.hidden;
+
+                if (isVisible) {
+                    setStatus(lastPayloadHash ? 'active' : 'idle');
+                    scheduleNext(200);
+                } else {
+                    setStatus('paused');
+                }
+            });
+
+            $(window).on('beforeunload', function() {
+                stopStreaming();
+            });
+
+            if ($container.find('.hic-log-entry').length > 0) {
+                setStatus('active');
+            } else {
+                setStatus('idle');
+            }
+
+            scheduleNext(1000);
+        }
+
         // Add progress bar to long operations
         function createProgressBar() {
             return $('<div class="hic-progress-bar"><div class="hic-progress-fill"></div></div>');

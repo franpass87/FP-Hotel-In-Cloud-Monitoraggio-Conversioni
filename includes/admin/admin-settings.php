@@ -516,6 +516,8 @@ function hic_admin_enqueue_scripts($hook) {
             'is_api_connection' => (\FpHic\Helpers\hic_connection_uses_api()),
             'has_basic_auth' => \FpHic\Helpers\hic_has_basic_auth_credentials(),
             'has_property_id' => (bool) \FpHic\Helpers\hic_get_property_id(),
+            'can_view_logs' => current_user_can('hic_view_logs'),
+            'log_refresh_interval' => apply_filters('hic_live_log_refresh_interval', 10000),
         ));
     }
 }
