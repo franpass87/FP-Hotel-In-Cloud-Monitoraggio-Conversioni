@@ -1118,14 +1118,108 @@ class AutomatedReportingManager {
      * Render reports admin page
      */
     public function render_reports_page() {
+        global $wpdb;
+
+        $report_stats = [
+            'total' => 0,
+            'completed' => 0,
+            'failed' => 0,
+            'last_completed' => null,
+        ];
+
+        if ($wpdb instanceof \wpdb) {
+            $table_name = $wpdb->prefix . 'hic_reports_history';
+            $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_name)) === $table_name;
+
+            if ($table_exists) {
+                $stats = $wpdb->get_row(
+                    "SELECT
+                        COUNT(*) AS total,
+                        SUM(CASE WHEN status IN ('completed', 'sent') THEN 1 ELSE 0 END) AS completed,
+                        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+                        MAX(CASE WHEN status IN ('completed', 'sent') THEN generated_at ELSE NULL END) AS last_completed
+                    FROM {$table_name}",
+                    ARRAY_A
+                );
+
+                if (is_array($stats)) {
+                    $report_stats['total'] = isset($stats['total']) ? (int) $stats['total'] : 0;
+                    $report_stats['completed'] = isset($stats['completed']) ? (int) $stats['completed'] : 0;
+                    $report_stats['failed'] = isset($stats['failed']) ? (int) $stats['failed'] : 0;
+                    $report_stats['last_completed'] = $stats['last_completed'] ?? null;
+                }
+            }
+        }
+
+        $reporting_settings = get_option('hic_reporting_settings', []);
+        $automation_enabled = 0;
+        foreach (['daily', 'weekly', 'monthly'] as $type) {
+            if (!empty($reporting_settings[$type . '_enabled'])) {
+                $automation_enabled++;
+            }
+        }
+
+        $last_completed_label = __('—', 'hotel-in-cloud');
+        if (!empty($report_stats['last_completed'])) {
+            $timestamp = strtotime($report_stats['last_completed']);
+            if ($timestamp) {
+                $last_completed_label = date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $timestamp);
+            }
+        }
+
         ?>
         <div class="wrap hic-admin-page hic-reports-page">
-            <div class="hic-page-header">
-                <div>
-                    <h1 class="hic-page-header__title">FP HIC Monitor - Reports &amp; Analytics</h1>
-                    <p class="hic-page-header__subtitle">
-                        Strumenti per generare report personalizzati, consultare lo storico e scaricare rapidamente i dati grezzi.
-                    </p>
+            <div class="hic-page-hero">
+                <div class="hic-page-header">
+                    <div class="hic-page-header__content">
+                        <h1 class="hic-page-header__title">📈 <?php esc_html_e('FP HIC Monitor - Reports &amp; Analytics', 'hotel-in-cloud'); ?></h1>
+                        <p class="hic-page-header__subtitle"><?php esc_html_e('Genera report personalizzati e consulta lo storico con la stessa UI della dashboard di monitoraggio.', 'hotel-in-cloud'); ?></p>
+                    </div>
+                    <div class="hic-page-actions">
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-monitoring')); ?>">
+                            <span class="dashicons dashicons-chart-line"></span>
+                            <?php esc_html_e('Dashboard live', 'hotel-in-cloud'); ?>
+                        </a>
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url('https://support.francopasseri.it/hic-reports'); ?>" target="_blank" rel="noopener noreferrer">
+                            <span class="dashicons dashicons-portfolio"></span>
+                            <?php esc_html_e('Guida reportistica', 'hotel-in-cloud'); ?>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="hic-page-meta">
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-active"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Report generati', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><?php echo esc_html(number_format_i18n($report_stats['total'])); ?></p>
+                            <p class="hic-page-meta__description"><?php esc_html_e('Totale esportazioni archiviate.', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-active"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Ultimo completato', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><?php echo esc_html($last_completed_label); ?></p>
+                            <p class="hic-page-meta__description"><?php esc_html_e('Data di generazione più recente.', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status <?php echo $report_stats['failed'] > 0 ? 'is-warning' : 'is-active'; ?>"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Errori recenti', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><?php echo esc_html(number_format_i18n($report_stats['failed'])); ?></p>
+                            <p class="hic-page-meta__description"><?php esc_html_e('Tentativi falliti nelle ultime generazioni.', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-active"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Automazioni attive', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><?php echo esc_html($automation_enabled . '/3'); ?></p>
+                            <p class="hic-page-meta__description"><?php esc_html_e('Programmazioni pianificate (daily/weekly/monthly).', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
                 </div>
             </div>
 

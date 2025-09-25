@@ -11,6 +11,14 @@ jQuery(function ($) {
         half_open: { label: 'In recupero', css: 'status-half-open' }
     };
 
+    function updateHeroMetric(selector, value) {
+        const $target = $(selector);
+
+        if ($target.length) {
+            $target.text(value);
+        }
+    }
+
     function escapeHtml(value) {
         return $('<div>').text(value == null ? '' : value).html();
     }
@@ -37,6 +45,8 @@ jQuery(function ($) {
         }
 
         if (!Array.isArray(circuits) || circuits.length === 0) {
+            updateHeroMetric('#hic-hero-circuit-total', '0');
+            updateHeroMetric('#hic-hero-circuit-open', '0');
             $summary.html(`
                 <div class="hic-circuit-summary-item status-total">
                     <strong>0</strong>
@@ -57,6 +67,9 @@ jQuery(function ($) {
         });
 
         const totalServices = circuits.length;
+
+        updateHeroMetric('#hic-hero-circuit-total', totalServices);
+        updateHeroMetric('#hic-hero-circuit-open', totals.open);
 
         const summaryHtml = `
             <div class="hic-circuit-summary-item status-total">
@@ -168,6 +181,8 @@ jQuery(function ($) {
         `;
 
         $target.html(listHtml);
+
+        updateHeroMetric('#hic-hero-queue-failed', totals.failed);
     }
 
     function showError(targetSelector, message) {

@@ -555,33 +555,78 @@ class EnterpriseManagementSuite {
      * Render setup wizard
      */
     public function render_setup_wizard() {
-        $current_step = intval($_GET['step'] ?? 1);
+        $current_step = max(1, min(5, intval($_GET['step'] ?? 1)));
+
+        $hero_overview = [
+            [
+                'label' => __('Avanzamento', 'hotel-in-cloud'),
+                'value' => sprintf(__('Step %1$d di %2$d', 'hotel-in-cloud'), $current_step, 5),
+                'description' => __('Completa il percorso guidato per configurare tutte le integrazioni chiave.', 'hotel-in-cloud'),
+                'state' => 'is-active',
+            ],
+            [
+                'label' => __('Tempo stimato', 'hotel-in-cloud'),
+                'value' => __('≈ 5 minuti', 'hotel-in-cloud'),
+                'description' => __('Puoi sospendere e riprendere in qualsiasi momento.', 'hotel-in-cloud'),
+                'state' => 'is-active',
+            ],
+            [
+                'label' => __('Funzionalità incluse', 'hotel-in-cloud'),
+                'value' => __('6 moduli', 'hotel-in-cloud'),
+                'description' => __('API HIC, Analytics, Facebook, Brevo, Enhanced, Dashboard.', 'hotel-in-cloud'),
+                'state' => 'is-active',
+            ],
+        ];
+
         ?>
-        <div class="wrap hic-setup-wizard">
-            <h1>FP HIC Monitor - Setup Wizard</h1>
-            
-            <div class="hic-wizard-progress">
-                <div class="hic-progress-bar">
-                    <div class="hic-progress-fill" style="width: <?php echo ($current_step / 5) * 100; ?>%"></div>
+        <div class="wrap hic-admin-page hic-setup-page">
+            <div class="hic-page-hero">
+                <div class="hic-page-header">
+                    <div class="hic-page-header__content">
+                        <h1 class="hic-page-header__title">🧭 <?php esc_html_e('Setup guidato FP HIC Monitor', 'hotel-in-cloud'); ?></h1>
+                        <p class="hic-page-header__subtitle"><?php esc_html_e('Allinea la configurazione iniziale del monitoraggio con la nuova esperienza grafica del plugin.', 'hotel-in-cloud'); ?></p>
+                    </div>
+                    <div class="hic-page-actions">
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-monitoring')); ?>">
+                            <span class="dashicons dashicons-chart-line"></span>
+                            <?php esc_html_e('Apri dashboard', 'hotel-in-cloud'); ?>
+                        </a>
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url('https://support.francopasseri.it/hic-setup'); ?>" target="_blank" rel="noopener noreferrer">
+                            <span class="dashicons dashicons-sos"></span>
+                            <?php esc_html_e('Supporto rapido', 'hotel-in-cloud'); ?>
+                        </a>
+                    </div>
                 </div>
-                <span class="hic-progress-text">Step <?php echo $current_step; ?> of 5</span>
+
+                <div class="hic-page-meta">
+                    <?php foreach ($hero_overview as $overview_item): ?>
+                        <div class="hic-page-meta__item">
+                            <span class="hic-page-meta__status <?php echo esc_attr($overview_item['state']); ?>"></span>
+                            <div class="hic-page-meta__content">
+                                <p class="hic-page-meta__label"><?php echo esc_html($overview_item['label']); ?></p>
+                                <p class="hic-page-meta__value"><?php echo esc_html($overview_item['value']); ?></p>
+                                <?php if (!empty($overview_item['description'])): ?>
+                                    <p class="hic-page-meta__description"><?php echo esc_html($overview_item['description']); ?></p>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
-            
-            <div class="hic-wizard-content">
-                <?php $this->render_wizard_step($current_step); ?>
+
+            <div class="hic-wizard">
+                <div class="hic-wizard__progress" role="progressbar" aria-valuemin="1" aria-valuemax="5" aria-valuenow="<?php echo $current_step; ?>">
+                    <div class="hic-progress-bar">
+                        <div class="hic-progress-fill" style="width: <?php echo ($current_step / 5) * 100; ?>%"></div>
+                    </div>
+                    <span class="hic-progress-text"><?php echo esc_html(sprintf(__('Passo %1$d di %2$d', 'hotel-in-cloud'), $current_step, 5)); ?></span>
+                </div>
+
+                <div class="hic-wizard__content">
+                    <?php $this->render_wizard_step($current_step); ?>
+                </div>
             </div>
         </div>
-        
-        <style>
-        .hic-setup-wizard { max-width: 800px; }
-        .hic-wizard-progress { margin: 20px 0; }
-        .hic-progress-bar { width: 100%; height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden; }
-        .hic-progress-fill { height: 100%; background: #0073aa; transition: width 0.3s ease; }
-        .hic-progress-text { display: block; text-align: center; margin-top: 10px; font-weight: bold; }
-        .hic-wizard-step { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 30px; margin: 20px 0; }
-        .hic-wizard-navigation { text-align: center; margin-top: 30px; }
-        .hic-wizard-navigation .button { margin: 0 10px; }
-        </style>
         <?php
     }
     
@@ -613,22 +658,30 @@ class EnterpriseManagementSuite {
      */
     private function render_step_welcome() {
         ?>
-        <div class="hic-wizard-step">
-            <h2>Welcome to FP HIC Monitor v3.0</h2>
-            <p>This wizard will guide you through setting up enterprise-grade conversion tracking for your hotel in just 5 minutes.</p>
-            
-            <h3>What we'll configure:</h3>
-            <ul>
-                <li>✅ Hotel in Cloud API connection</li>
-                <li>✅ Google Analytics 4 tracking</li>
-                <li>✅ Facebook Conversions API</li>
-                <li>✅ Brevo automation</li>
-                <li>✅ Enhanced conversions</li>
-                <li>✅ Real-time dashboard</li>
-            </ul>
-            
-            <div class="hic-wizard-navigation">
-                <a href="?page=hic-setup-wizard&step=2" class="button button-primary button-large">Start Configuration →</a>
+        <div class="hic-card hic-wizard-step">
+            <div class="hic-card__header">
+                <div>
+                    <h2 class="hic-card__title"><?php esc_html_e('Benvenuto in FP HIC Monitor v3.0', 'hotel-in-cloud'); ?></h2>
+                    <p class="hic-card__subtitle"><?php esc_html_e('Imposta il monitoraggio completo delle conversioni in pochi minuti con un percorso guidato.', 'hotel-in-cloud'); ?></p>
+                </div>
+            </div>
+            <div class="hic-card__body">
+                <div class="hic-wizard-checklist">
+                    <h3><?php esc_html_e('Cosa configureremo', 'hotel-in-cloud'); ?></h3>
+                    <ul>
+                        <li>✅ <?php esc_html_e('Connessione API Hotel in Cloud', 'hotel-in-cloud'); ?></li>
+                        <li>✅ <?php esc_html_e('Google Analytics 4', 'hotel-in-cloud'); ?></li>
+                        <li>✅ <?php esc_html_e('Facebook Conversions API', 'hotel-in-cloud'); ?></li>
+                        <li>✅ <?php esc_html_e('Automazioni Brevo', 'hotel-in-cloud'); ?></li>
+                        <li>✅ <?php esc_html_e('Enhanced Conversions Google Ads', 'hotel-in-cloud'); ?></li>
+                        <li>✅ <?php esc_html_e('Dashboard real-time e reporting', 'hotel-in-cloud'); ?></li>
+                    </ul>
+                </div>
+                <div class="hic-wizard-actions">
+                    <a href="?page=hic-setup-wizard&step=2" class="hic-button hic-button--primary hic-button--large">
+                        <?php esc_html_e('Inizia la configurazione →', 'hotel-in-cloud'); ?>
+                    </a>
+                </div>
             </div>
         </div>
         <?php
@@ -640,35 +693,54 @@ class EnterpriseManagementSuite {
     private function render_step_hic_credentials() {
         $settings = get_option('hic_settings', []);
         ?>
-        <div class="hic-wizard-step">
-            <h2>Step 1: Hotel in Cloud Connection</h2>
-            <p>Enter your Hotel in Cloud credentials to enable booking data synchronization.</p>
-            
-            <form id="hic-wizard-step-2">
-                <table class="form-table">
-                    <tr>
-                        <th><label for="prop_id">Property ID</label></th>
-                        <td><input type="text" id="prop_id" name="prop_id" value="<?php echo esc_attr($settings['prop_id'] ?? ''); ?>" class="regular-text" placeholder="Your property ID"></td>
-                    </tr>
-                    <tr>
-                        <th><label for="email">Email</label></th>
-                        <td><input type="email" id="email" name="email" value="<?php echo esc_attr($settings['email'] ?? ''); ?>" class="regular-text" placeholder="your-email@hotel.com"></td>
-                    </tr>
-                    <tr>
-                        <th><label for="password">Password</label></th>
-                        <td><input type="password" id="password" name="password" value="<?php echo esc_attr($settings['password'] ?? ''); ?>" class="regular-text" placeholder="Your HIC password"></td>
-                    </tr>
-                </table>
-                
-                <p>
-                    <button type="button" id="test-hic-connection" class="button">Test Connection</button>
-                    <span id="connection-status"></span>
-                </p>
-            </form>
-            
-            <div class="hic-wizard-navigation">
-                <a href="?page=hic-setup-wizard&step=1" class="button">← Back</a>
-                <button type="button" class="button button-primary" onclick="saveStepAndContinue(2, 3)">Save & Continue →</button>
+        <div class="hic-card hic-wizard-step">
+            <div class="hic-card__header">
+                <div>
+                    <h2 class="hic-card__title"><?php esc_html_e('Passo 1: Connessione API Hotel in Cloud', 'hotel-in-cloud'); ?></h2>
+                    <p class="hic-card__subtitle"><?php esc_html_e('Inserisci le credenziali per abilitare la comunicazione sicura con il PMS.', 'hotel-in-cloud'); ?></p>
+                </div>
+            </div>
+            <div class="hic-card__body">
+                <form id="hic-wizard-step-2" class="hic-form" novalidate>
+                    <div class="hic-field-grid">
+                        <div class="hic-field-row">
+                            <label class="hic-field-label" for="prop_id"><?php esc_html_e('Property ID', 'hotel-in-cloud'); ?></label>
+                            <div class="hic-field-control">
+                                <input type="text" id="prop_id" name="prop_id" value="<?php echo esc_attr($settings['prop_id'] ?? ''); ?>" placeholder="HIC-1234">
+                                <p class="description"><?php esc_html_e('Identificativo struttura fornito da Hotel in Cloud.', 'hotel-in-cloud'); ?></p>
+                            </div>
+                        </div>
+                        <div class="hic-field-row">
+                            <label class="hic-field-label" for="email"><?php esc_html_e('Email', 'hotel-in-cloud'); ?></label>
+                            <div class="hic-field-control">
+                                <input type="email" id="email" name="email" value="<?php echo esc_attr($settings['email'] ?? ''); ?>" placeholder="gestione@hotel.com">
+                            </div>
+                        </div>
+                        <div class="hic-field-row">
+                            <label class="hic-field-label" for="password"><?php esc_html_e('Password', 'hotel-in-cloud'); ?></label>
+                            <div class="hic-field-control">
+                                <input type="password" id="password" name="password" value="<?php echo esc_attr($settings['password'] ?? ''); ?>" placeholder="••••••">
+                                <p class="description"><?php esc_html_e('Le credenziali sono salvate in modo cifrato nel database.', 'hotel-in-cloud'); ?></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hic-form-actions">
+                        <button type="button" id="test-hic-connection" class="hic-button hic-button--secondary">
+                            <span class="dashicons dashicons-admin-links"></span>
+                            <?php esc_html_e('Test connessione', 'hotel-in-cloud'); ?>
+                        </button>
+                        <span id="connection-status" class="hic-inline-status"></span>
+                    </div>
+                </form>
+            </div>
+            <div class="hic-wizard-actions">
+                <a href="?page=hic-setup-wizard&step=1" class="hic-button hic-button--ghost">
+                    <?php esc_html_e('← Torna indietro', 'hotel-in-cloud'); ?>
+                </a>
+                <button type="button" class="hic-button hic-button--primary" onclick="saveStepAndContinue(2, 3)">
+                    <?php esc_html_e('Salva e continua →', 'hotel-in-cloud'); ?>
+                </button>
             </div>
         </div>
         <?php
@@ -679,47 +751,71 @@ class EnterpriseManagementSuite {
      */
     private function render_step_analytics_setup() {
         ?>
-        <div class="hic-wizard-step">
-            <h2>Step 2: Analytics & Conversions Setup</h2>
-            <p>Configure your tracking integrations for comprehensive conversion monitoring.</p>
-            
-            <form id="hic-wizard-step-3">
-                <h3>Google Analytics 4</h3>
-                <table class="form-table">
-                    <tr>
-                        <th><label for="ga4_measurement_id">GA4 Measurement ID</label></th>
-                        <td><input type="text" id="ga4_measurement_id" name="ga4_measurement_id" class="regular-text" placeholder="G-XXXXXXXXXX"></td>
-                    </tr>
-                    <tr>
-                        <th><label for="ga4_api_secret">GA4 API Secret</label></th>
-                        <td><input type="text" id="ga4_api_secret" name="ga4_api_secret" class="regular-text" placeholder="API Secret Key"></td>
-                    </tr>
-                </table>
-                
-                <h3>Facebook Conversions API</h3>
-                <table class="form-table">
-                    <tr>
-                        <th><label for="facebook_pixel_id">Pixel ID</label></th>
-                        <td><input type="text" id="facebook_pixel_id" name="facebook_pixel_id" class="regular-text" placeholder="Facebook Pixel ID"></td>
-                    </tr>
-                    <tr>
-                        <th><label for="facebook_access_token">Access Token</label></th>
-                        <td><input type="text" id="facebook_access_token" name="facebook_access_token" class="regular-text" placeholder="Facebook Access Token"></td>
-                    </tr>
-                </table>
-                
-                <h3>Brevo Integration</h3>
-                <table class="form-table">
-                    <tr>
-                        <th><label for="brevo_api_key">Brevo API Key</label></th>
-                        <td><input type="text" id="brevo_api_key" name="brevo_api_key" class="regular-text" placeholder="Brevo API Key"></td>
-                    </tr>
-                </table>
-            </form>
-            
-            <div class="hic-wizard-navigation">
-                <a href="?page=hic-setup-wizard&step=2" class="button">← Back</a>
-                <button type="button" class="button button-primary" onclick="saveStepAndContinue(3, 4)">Save & Continue →</button>
+        <div class="hic-card hic-wizard-step">
+            <div class="hic-card__header">
+                <div>
+                    <h2 class="hic-card__title"><?php esc_html_e('Passo 2: Analytics &amp; Conversioni', 'hotel-in-cloud'); ?></h2>
+                    <p class="hic-card__subtitle"><?php esc_html_e('Configura gli ID di tracciamento per alimentare Google Analytics e Facebook.', 'hotel-in-cloud'); ?></p>
+                </div>
+            </div>
+            <div class="hic-card__body">
+                <form id="hic-wizard-step-3" class="hic-form" novalidate>
+                    <div class="hic-wizard-section">
+                        <h3><?php esc_html_e('Google Analytics 4', 'hotel-in-cloud'); ?></h3>
+                        <div class="hic-field-grid">
+                            <div class="hic-field-row">
+                                <label class="hic-field-label" for="ga4_measurement_id"><?php esc_html_e('Measurement ID', 'hotel-in-cloud'); ?></label>
+                                <div class="hic-field-control">
+                                    <input type="text" id="ga4_measurement_id" name="ga4_measurement_id" placeholder="G-XXXXXXXXXX">
+                                </div>
+                            </div>
+                            <div class="hic-field-row">
+                                <label class="hic-field-label" for="ga4_api_secret"><?php esc_html_e('API Secret', 'hotel-in-cloud'); ?></label>
+                                <div class="hic-field-control">
+                                    <input type="text" id="ga4_api_secret" name="ga4_api_secret" placeholder="API Secret">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hic-wizard-section">
+                        <h3><?php esc_html_e('Facebook Conversions API', 'hotel-in-cloud'); ?></h3>
+                        <div class="hic-field-grid">
+                            <div class="hic-field-row">
+                                <label class="hic-field-label" for="facebook_pixel_id"><?php esc_html_e('Pixel ID', 'hotel-in-cloud'); ?></label>
+                                <div class="hic-field-control">
+                                    <input type="text" id="facebook_pixel_id" name="facebook_pixel_id" placeholder="1234567890">
+                                </div>
+                            </div>
+                            <div class="hic-field-row">
+                                <label class="hic-field-label" for="facebook_access_token"><?php esc_html_e('Access Token', 'hotel-in-cloud'); ?></label>
+                                <div class="hic-field-control">
+                                    <input type="text" id="facebook_access_token" name="facebook_access_token" placeholder="EAABsbCS1iHgBA...">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hic-wizard-section">
+                        <h3><?php esc_html_e('Integrazione Brevo', 'hotel-in-cloud'); ?></h3>
+                        <div class="hic-field-grid">
+                            <div class="hic-field-row">
+                                <label class="hic-field-label" for="brevo_api_key"><?php esc_html_e('API Key', 'hotel-in-cloud'); ?></label>
+                                <div class="hic-field-control">
+                                    <input type="text" id="brevo_api_key" name="brevo_api_key" placeholder="xkeysib-...">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="hic-wizard-actions">
+                <a href="?page=hic-setup-wizard&step=2" class="hic-button hic-button--ghost">
+                    <?php esc_html_e('← Torna indietro', 'hotel-in-cloud'); ?>
+                </a>
+                <button type="button" class="hic-button hic-button--primary" onclick="saveStepAndContinue(3, 4)">
+                    <?php esc_html_e('Salva e continua →', 'hotel-in-cloud'); ?>
+                </button>
             </div>
         </div>
         <?php
@@ -730,45 +826,71 @@ class EnterpriseManagementSuite {
      */
     private function render_step_advanced_features() {
         ?>
-        <div class="hic-wizard-step">
-            <h2>Step 3: Advanced Features</h2>
-            <p>Enable enterprise-grade features for optimal performance and reliability.</p>
-            
-            <form id="hic-wizard-step-4">
-                <h3>Intelligent Polling</h3>
-                <label>
-                    <input type="checkbox" name="enable_intelligent_polling" value="1" checked>
-                    Enable adaptive polling based on booking activity
-                </label>
-                
-                <h3>Real-Time Dashboard</h3>
-                <label>
-                    <input type="checkbox" name="enable_realtime_dashboard" value="1" checked>
-                    Enable real-time conversion dashboard with widgets
-                </label>
-                
-                <h3>Automated Reporting</h3>
-                <label>
-                    <input type="checkbox" name="enable_automated_reports" value="1" checked>
-                    Enable daily/weekly email reports
-                </label>
-                
-                <h3>Enhanced Conversions</h3>
-                <label>
-                    <input type="checkbox" name="enable_enhanced_conversions" value="1" checked>
-                    Enable Google Ads Enhanced Conversions with email hashing
-                </label>
-                
-                <h3>Circuit Breaker Protection</h3>
-                <label>
-                    <input type="checkbox" name="enable_circuit_breaker" value="1" checked>
-                    Enable automatic fallback when APIs are unavailable
-                </label>
-            </form>
-            
-            <div class="hic-wizard-navigation">
-                <a href="?page=hic-setup-wizard&step=3" class="button">← Back</a>
-                <button type="button" class="button button-primary" onclick="saveStepAndContinue(4, 5)">Save & Continue →</button>
+        <div class="hic-card hic-wizard-step">
+            <div class="hic-card__header">
+                <div>
+                    <h2 class="hic-card__title"><?php esc_html_e('Passo 3: Funzionalità avanzate', 'hotel-in-cloud'); ?></h2>
+                    <p class="hic-card__subtitle"><?php esc_html_e('Attiva gli automatismi consigliati per performance e affidabilità.', 'hotel-in-cloud'); ?></p>
+                </div>
+            </div>
+            <div class="hic-card__body">
+                <form id="hic-wizard-step-4" class="hic-form" novalidate>
+                    <div class="hic-field-grid">
+                        <div class="hic-field-row">
+                            <div class="hic-field-label"><?php esc_html_e('Intelligent Polling', 'hotel-in-cloud'); ?></div>
+                            <div class="hic-field-control">
+                                <label class="hic-toggle">
+                                    <input type="checkbox" name="enable_intelligent_polling" value="1" checked>
+                                    <span><?php esc_html_e('Adatta la frequenza di polling in base al volume di prenotazioni.', 'hotel-in-cloud'); ?></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="hic-field-row">
+                            <div class="hic-field-label"><?php esc_html_e('Dashboard Real-Time', 'hotel-in-cloud'); ?></div>
+                            <div class="hic-field-control">
+                                <label class="hic-toggle">
+                                    <input type="checkbox" name="enable_realtime_dashboard" value="1" checked>
+                                    <span><?php esc_html_e('Abilita widget e grafici in tempo reale.', 'hotel-in-cloud'); ?></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="hic-field-row">
+                            <div class="hic-field-label"><?php esc_html_e('Reportistica automatica', 'hotel-in-cloud'); ?></div>
+                            <div class="hic-field-control">
+                                <label class="hic-toggle">
+                                    <input type="checkbox" name="enable_automated_reports" value="1" checked>
+                                    <span><?php esc_html_e('Invia report periodici via email.', 'hotel-in-cloud'); ?></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="hic-field-row">
+                            <div class="hic-field-label"><?php esc_html_e('Enhanced Conversions', 'hotel-in-cloud'); ?></div>
+                            <div class="hic-field-control">
+                                <label class="hic-toggle">
+                                    <input type="checkbox" name="enable_enhanced_conversions" value="1" checked>
+                                    <span><?php esc_html_e('Abilita l\'upload dei dati arricchiti verso Google Ads.', 'hotel-in-cloud'); ?></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="hic-field-row">
+                            <div class="hic-field-label"><?php esc_html_e('Circuit Breaker', 'hotel-in-cloud'); ?></div>
+                            <div class="hic-field-control">
+                                <label class="hic-toggle">
+                                    <input type="checkbox" name="enable_circuit_breaker" value="1" checked>
+                                    <span><?php esc_html_e('Abilita il fallback automatico in caso di API non disponibili.', 'hotel-in-cloud'); ?></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="hic-wizard-actions">
+                <a href="?page=hic-setup-wizard&step=3" class="hic-button hic-button--ghost">
+                    <?php esc_html_e('← Torna indietro', 'hotel-in-cloud'); ?>
+                </a>
+                <button type="button" class="hic-button hic-button--primary" onclick="saveStepAndContinue(4, 5)">
+                    <?php esc_html_e('Salva e continua →', 'hotel-in-cloud'); ?>
+                </button>
             </div>
         </div>
         <?php
@@ -779,43 +901,50 @@ class EnterpriseManagementSuite {
      */
     private function render_step_completion() {
         ?>
-        <div class="hic-wizard-step">
-            <h2>🎉 Setup Complete!</h2>
-            <p>Congratulations! FP HIC Monitor v3.0 is now configured and ready to track your hotel conversions.</p>
-            
-            <h3>What's Next?</h3>
-            <ul>
-                <li>✅ <strong>Monitor Dashboard:</strong> <a href="<?php echo admin_url('admin.php?page=hic-monitoring'); ?>">View Real-Time Dashboard</a></li>
-                <li>✅ <strong>Check Health Status:</strong> <a href="<?php echo admin_url('admin.php?page=hic-monitoring-settings'); ?>">System Health Check</a></li>
-                <li>✅ <strong>Review Reports:</strong> <a href="<?php echo admin_url('admin.php?page=hic-reports'); ?>">Analytics Reports</a></li>
-                <li>✅ <strong>Configure Alerts:</strong> Set up email notifications for important events</li>
-            </ul>
-            
-            <h3>Enterprise Features Enabled:</h3>
-            <div class="hic-feature-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 20px 0;">
-                <div class="hic-feature-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 6px;">
-                    <h4>🚀 Intelligent Polling</h4>
-                    <p>Adaptive frequency based on booking activity</p>
-                </div>
-                <div class="hic-feature-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 6px;">
-                    <h4>📊 Real-Time Dashboard</h4>
-                    <p>Live conversion tracking and revenue analytics</p>
-                </div>
-                <div class="hic-feature-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 6px;">
-                    <h4>📈 Enhanced Conversions</h4>
-                    <p>First-party data matching for better ROAS</p>
-                </div>
-                <div class="hic-feature-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 6px;">
-                    <h4>🛡️ Circuit Breaker</h4>
-                    <p>Automatic fallback and retry mechanisms</p>
+        <div class="hic-card hic-wizard-step">
+            <div class="hic-card__header">
+                <div>
+                    <h2 class="hic-card__title">🎉 <?php esc_html_e('Setup completato!', 'hotel-in-cloud'); ?></h2>
+                    <p class="hic-card__subtitle"><?php esc_html_e('FP HIC Monitor è pronto per tracciare le conversioni del tuo hotel con la nuova esperienza grafica.', 'hotel-in-cloud'); ?></p>
                 </div>
             </div>
-            
-            <div class="hic-wizard-navigation">
-                <button type="button" class="button button-primary button-large" onclick="completeSetup()">Complete Setup & Go to Dashboard</button>
+            <div class="hic-card__body">
+                <div class="hic-wizard-next">
+                    <h3><?php esc_html_e('E adesso?', 'hotel-in-cloud'); ?></h3>
+                    <ul>
+                        <li>✅ <strong><?php esc_html_e('Monitor Dashboard:', 'hotel-in-cloud'); ?></strong> <a href="<?php echo esc_url(admin_url('admin.php?page=hic-monitoring')); ?>"><?php esc_html_e('Apri la dashboard real-time', 'hotel-in-cloud'); ?></a></li>
+                        <li>✅ <strong><?php esc_html_e('Controllo stato:', 'hotel-in-cloud'); ?></strong> <a href="<?php echo esc_url(admin_url('admin.php?page=hic-monitoring-settings')); ?>"><?php esc_html_e('Verifica salute sistema', 'hotel-in-cloud'); ?></a></li>
+                        <li>✅ <strong><?php esc_html_e('Reportistica:', 'hotel-in-cloud'); ?></strong> <a href="<?php echo esc_url(admin_url('admin.php?page=hic-reports')); ?>"><?php esc_html_e('Consulta i report', 'hotel-in-cloud'); ?></a></li>
+                        <li>✅ <strong><?php esc_html_e('Avvisi automatici:', 'hotel-in-cloud'); ?></strong> <?php esc_html_e('Configura notifiche email per gli eventi critici.', 'hotel-in-cloud'); ?></li>
+                    </ul>
+                </div>
+
+                <div class="hic-feature-grid">
+                    <div class="hic-feature-card">
+                        <h4>🚀 <?php esc_html_e('Intelligent Polling', 'hotel-in-cloud'); ?></h4>
+                        <p><?php esc_html_e('Frequenza adattiva in base alle prenotazioni.', 'hotel-in-cloud'); ?></p>
+                    </div>
+                    <div class="hic-feature-card">
+                        <h4>📊 <?php esc_html_e('Dashboard Real-Time', 'hotel-in-cloud'); ?></h4>
+                        <p><?php esc_html_e('Tracciamento live di conversioni e ricavi.', 'hotel-in-cloud'); ?></p>
+                    </div>
+                    <div class="hic-feature-card">
+                        <h4>📈 <?php esc_html_e('Enhanced Conversions', 'hotel-in-cloud'); ?></h4>
+                        <p><?php esc_html_e('Dati arricchiti per migliorare il ROAS.', 'hotel-in-cloud'); ?></p>
+                    </div>
+                    <div class="hic-feature-card">
+                        <h4>🛡️ <?php esc_html_e('Circuit Breaker', 'hotel-in-cloud'); ?></h4>
+                        <p><?php esc_html_e('Fallback automatico e retry intelligenti.', 'hotel-in-cloud'); ?></p>
+                    </div>
+                </div>
+            </div>
+            <div class="hic-wizard-actions">
+                <button type="button" class="hic-button hic-button--primary hic-button--large" onclick="completeSetup()">
+                    <?php esc_html_e('Completa e vai alla dashboard', 'hotel-in-cloud'); ?>
+                </button>
             </div>
         </div>
-        
+
         <script>
         function completeSetup() {
             jQuery.post(ajaxurl, {

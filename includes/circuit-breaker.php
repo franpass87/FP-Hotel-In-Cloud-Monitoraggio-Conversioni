@@ -999,8 +999,60 @@ class CircuitBreakerManager {
     public function render_circuit_breaker_page() {
         ?>
         <div class="wrap hic-admin-page hic-circuit-page">
-            <h1>Circuit Breaker Status</h1>
-            
+            <div class="hic-page-hero">
+                <div class="hic-page-header">
+                    <div class="hic-page-header__content">
+                        <h1 class="hic-page-header__title">🛡️ <?php esc_html_e('Circuit Breaker Status', 'hotel-in-cloud'); ?></h1>
+                        <p class="hic-page-header__subtitle"><?php esc_html_e('Supervisiona le integrazioni con la stessa identità visiva della dashboard, monitorando servizi, code di retry e controlli manuali.', 'hotel-in-cloud'); ?></p>
+                    </div>
+                    <div class="hic-page-actions">
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-diagnostics')); ?>">
+                            <span class="dashicons dashicons-shield"></span>
+                            <?php esc_html_e('Diagnostica sistema', 'hotel-in-cloud'); ?>
+                        </a>
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url('https://support.francopasseri.it/hic-circuit'); ?>" target="_blank" rel="noopener noreferrer">
+                            <span class="dashicons dashicons-info"></span>
+                            <?php esc_html_e('Guida circuito', 'hotel-in-cloud'); ?>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="hic-page-meta">
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-active"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Monitoraggio', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><?php esc_html_e('Attivo', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__description"><?php esc_html_e('Blocca automaticamente le integrazioni instabili.', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-active"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Servizi monitorati', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><span id="hic-hero-circuit-total">--</span></p>
+                            <p class="hic-page-meta__description"><?php esc_html_e('Totale circuiti attualmente sotto controllo.', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-warning"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Servizi sospesi', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><span id="hic-hero-circuit-open">--</span></p>
+                            <p class="hic-page-meta__description"><?php esc_html_e('Circuiti temporaneamente bloccati per errori.', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                    <div class="hic-page-meta__item">
+                        <span class="hic-page-meta__status is-warning"></span>
+                        <div class="hic-page-meta__content">
+                            <p class="hic-page-meta__label"><?php esc_html_e('Retry in coda', 'hotel-in-cloud'); ?></p>
+                            <p class="hic-page-meta__value"><span id="hic-hero-queue-failed">--</span></p>
+                            <p class="hic-page-meta__description"><?php esc_html_e('Eventi in attesa di nuova elaborazione.', 'hotel-in-cloud'); ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="hic-circuit-breaker-dashboard">
                 <!-- Circuit Status Overview -->
                 <div class="hic-card">
