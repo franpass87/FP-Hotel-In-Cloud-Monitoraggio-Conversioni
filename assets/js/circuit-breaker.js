@@ -1,6 +1,9 @@
 jQuery(function ($) {
-    const ajaxUrl = (typeof ajaxurl !== 'undefined') ? ajaxurl : hicCircuitBreaker.ajaxUrl;
-    const nonce = hicCircuitBreaker.nonce;
+    const ajaxConfig = window.hicCircuitBreaker || {};
+    const ajaxUrl = (typeof ajaxurl !== 'undefined') ? ajaxurl : (ajaxConfig.ajaxUrl || '');
+    const nonce = ajaxConfig.nonce || '';
+    const hasAjaxUrl = typeof ajaxUrl === 'string' && ajaxUrl.length > 0;
+    const hasNonce = typeof nonce === 'string' && nonce.length > 0;
 
     const STATUS_MAP = {
         closed: { label: 'Operativo', css: 'status-closed' },
@@ -172,6 +175,10 @@ jQuery(function ($) {
     }
 
     function loadCircuitStatus() {
+        if (!hasAjaxUrl || !hasNonce) {
+            return;
+        }
+
         $('#circuit-status-grid').attr('aria-busy', 'true');
 
         $.post(ajaxUrl, {
@@ -194,6 +201,10 @@ jQuery(function ($) {
     }
 
     function loadRetryQueueStatus() {
+        if (!hasAjaxUrl || !hasNonce) {
+            return;
+        }
+
         $.post(ajaxUrl, {
             action: 'hic_get_retry_queue_status',
             nonce
@@ -211,6 +222,10 @@ jQuery(function ($) {
     }
 
     $('#process-retry-queue').on('click', function () {
+        if (!hasAjaxUrl || !hasNonce) {
+            return;
+        }
+
         const $button = $(this);
         const originalText = $button.text();
 
@@ -234,6 +249,20 @@ jQuery(function ($) {
                 $button.prop('disabled', false).text(originalText);
             });
     });
+
+    if (!hasAjaxUrl) {
+        showError('#circuit-status-grid', 'Impossibile inizializzare il monitoraggio: endpoint AJAX non disponibile. Ricaricare la pagina o verificare conflitti di plugin.');
+        showError('#retry-queue-status', 'Impossibile inizializzare il monitoraggio: endpoint AJAX non disponibile.');
+        $('#process-retry-queue').prop('disabled', true);
+        return;
+    }
+
+    if (!hasNonce) {
+        showError('#circuit-status-grid', 'Sessione scaduta: ricaricare la pagina per aggiornare la sicurezza delle richieste.');
+        showError('#retry-queue-status', 'Sessione scaduta: ricaricare la pagina per aggiornare la sicurezza delle richieste.');
+        $('#process-retry-queue').prop('disabled', true);
+        return;
+    }
 
     loadCircuitStatus();
     loadRetryQueueStatus();

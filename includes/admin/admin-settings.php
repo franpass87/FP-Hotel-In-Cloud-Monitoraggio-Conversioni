@@ -683,8 +683,22 @@ function hic_connection_type_render() {
 }
 
 function hic_webhook_token_render() {
-    echo '<input type="text" name="hic_webhook_token" value="' . esc_attr(\FpHic\Helpers\hic_get_webhook_token()) . '" class="regular-text" />';
-    echo '<p class="description">Token per autenticare il webhook</p>';
+    $token = \FpHic\Helpers\hic_get_webhook_token();
+    $endpoint = '';
+
+    if (!empty($token)) {
+        $base_endpoint = rest_url('hic/v1/conversion');
+        $endpoint = add_query_arg('token', rawurlencode($token), $base_endpoint);
+    }
+
+    echo '<input type="text" name="hic_webhook_token" value="' . esc_attr($token) . '" class="regular-text" />';
+    echo '<p class="description">Token condiviso con Hotel in Cloud per autorizzare le chiamate webhook.</p>';
+
+    if ($endpoint) {
+        echo '<p class="description">URL da fornire al supporto HIC: <code>' . esc_html($endpoint) . '</code></p>';
+    } else {
+        echo '<p class="description">Dopo aver salvato comparirà l\'URL completo del webhook da comunicare a Hotel in Cloud.</p>';
+    }
 }
 
 function hic_webhook_secret_render() {
@@ -695,8 +709,10 @@ function hic_webhook_secret_render() {
 
     echo '<p class="description">';
     echo 'Chiave condivisa usata per validare la firma HMAC del webhook (<code>' . esc_html($header_name) . '</code>). ';
-    echo 'Rigenera questo valore in caso di compromissione.';
+    echo 'Inserisci lo stesso valore anche nel pannello HIC, così ogni chiamata potrà essere autenticata.';
     echo '</p>';
+
+    echo '<p class="description">Rigenera questo valore e aggiornalo sia qui che in HIC in caso di compromissione.</p>';
 }
 
 function hic_health_token_render() {

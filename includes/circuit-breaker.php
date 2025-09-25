@@ -1020,8 +1020,9 @@ class CircuitBreakerManager {
                     <h2>Manual Controls</h2>
                     <div class="inside">
                         <p>Reset circuit breakers or force service checks:</p>
-                        <div id="manual-controls">
-                            <!-- Populated by JavaScript -->
+                        <div id="manual-controls" class="hic-manual-controls-placeholder">
+                            <p><?php esc_html_e('Al momento non sono necessari interventi manuali: il sistema riapre automaticamente i servizi quando tornano disponibili.', 'hotel-in-cloud'); ?></p>
+                            <p><?php esc_html_e("In caso di blocco prolungato è possibile aprire un ticket al supporto indicando il servizio e l'orario del disservizio.", 'hotel-in-cloud'); ?></p>
                         </div>
                     </div>
                 </div>
