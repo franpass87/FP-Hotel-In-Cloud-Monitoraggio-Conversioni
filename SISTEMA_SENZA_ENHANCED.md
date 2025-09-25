@@ -1,5 +1,8 @@
 # Il Sistema Funziona Senza Google Ads Enhanced?
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Risposta Breve: SÌ
 
 **Il sistema FP HIC Monitor funziona perfettamente anche senza Google Ads Enhanced Conversions.** Questa funzionalità è completamente opzionale e non influisce sul funzionamento delle altre integrazioni.

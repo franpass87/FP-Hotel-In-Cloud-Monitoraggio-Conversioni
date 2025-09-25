@@ -1,5 +1,8 @@
 # Guida Webhook per Tracciamento Conversioni Senza Redirect
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Il Problema: Nessun Redirect dal Sistema di Prenotazione
 
 Quando un cliente completa una prenotazione su Hotel in Cloud (HIC), la **thank you page rimane nel dominio esterno di HIC** e **non viene effettuato alcun redirect verso il sito WordPress**. Questo crea un problema per il tracciamento delle conversioni perché:

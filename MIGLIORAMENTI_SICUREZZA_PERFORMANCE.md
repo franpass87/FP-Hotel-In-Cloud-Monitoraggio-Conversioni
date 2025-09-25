@@ -1,8 +1,11 @@
 # Miglioramenti di Sicurezza e Performance - FP HIC Monitor
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Panoramica delle Migliorie Implementate
 
-Questo documento descrive i miglioramenti critici di sicurezza, performance e qualità del codice implementati in **FP HIC Monitor** (ex HIC Plugin) per WordPress.
+Questo documento descrive i miglioramenti critici di sicurezza, performance e qualità del codice implementati in **FP HIC Monitor** (ex HIC Plugin) per WordPress; per una timeline completa delle evoluzioni fai riferimento al [CHANGELOG](CHANGELOG.md).
 
 ## 🚀 Aggiornamento v3.0 - FP HIC Monitor
 

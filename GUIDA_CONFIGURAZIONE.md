@@ -1,5 +1,8 @@
 # Guida Rapida di Configurazione
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Come Configurare il Sistema di Polling Automatico
 
 ### Passo 1: Configurazione Base Plugin

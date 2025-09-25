@@ -1,5 +1,14 @@
 # FAQ - Domande Frequenti
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
+## ℹ️ Contatti e Supporto
+
+### Q: Chi gestisce il plugin e come posso chiedere supporto?
+
+**R:** Il plugin è sviluppato e mantenuto da [Francesco Passeri](https://francescopasseri.com). Puoi richiedere assistenza scrivendo a [info@francescopasseri.com](mailto:info@francescopasseri.com). Per la cronologia delle funzionalità consulta il [CHANGELOG ufficiale](CHANGELOG.md).
+
 ## 🎯 DOMANDA PRINCIPALE: WEBHOOK E TRACCIAMENTO SENZA REDIRECT
 
 ### Q: Il booking system non permette redirect al sito, quindi dopo che loro prenotano la thank you page rimane nel dominio esterno di HIC. Loro però hanno una impostazione webhook - potrebbe aiutarci a tracciare le conversioni?

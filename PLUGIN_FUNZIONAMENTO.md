@@ -1,5 +1,8 @@
 # Come Funziona FP HIC Monitor
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Panoramica Generale
 
 **FP HIC Monitor** è un plugin WordPress enterprise-grade che monitora le prenotazioni di **Hotel in Cloud (HIC)** e le invia automaticamente a **Google Analytics 4 (GA4)**, **Meta/Facebook** e **Brevo** per il tracciamento delle conversioni e l'automazione del marketing, con sistema di sicurezza avanzato e cache intelligente.

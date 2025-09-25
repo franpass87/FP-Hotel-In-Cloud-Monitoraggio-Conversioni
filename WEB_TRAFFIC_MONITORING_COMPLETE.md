@@ -1,5 +1,8 @@
 # Web Traffic Monitoring Implementation - COMPLETE
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## 🎉 Implementation Successfully Completed
 
 The web traffic monitoring system has been fully implemented and tested. The system now fulfills the requirement: **"Controlla che tutti i polling funzionino non solo entrando area amministratore, ma è in modo continuo utilizzando il traffico del sito web"**

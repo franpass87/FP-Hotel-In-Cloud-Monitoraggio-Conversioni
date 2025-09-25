@@ -1,8 +1,11 @@
 # Miglioramenti Implementati per HIC Plugin
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Panoramica dei Miglioramenti
 
-Questo documento descrive i miglioramenti implementati per il plugin "FP-Hotel-In-Cloud-Monitoraggio-Conversioni" per aumentare la qualità del codice, le prestazioni, la manutenibilità e l'osservabilità del sistema.
+Questo documento descrive i miglioramenti implementati per il plugin "FP-Hotel-In-Cloud-Monitoraggio-Conversioni" per aumentare la qualità del codice, le prestazioni, la manutenibilità e l'osservabilità del sistema. Per un riepilogo cronologico delle feature consulta il [CHANGELOG](CHANGELOG.md).
 
 ## 🧪 1. Sistema di Testing Automatizzato
 

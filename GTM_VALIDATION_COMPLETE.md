@@ -1,5 +1,8 @@
 # GTM Integration - Validation Complete ✅
 
+> **Versione plugin:** 3.2.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+
+
 ## Validation Summary
 
 Ho completato una validazione completa dell'integrazione Google Tag Manager. **Tutto funziona correttamente!** 
