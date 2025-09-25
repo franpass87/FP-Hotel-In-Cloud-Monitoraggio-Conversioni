@@ -1693,6 +1693,31 @@ class GoogleAdsEnhancedConversions {
         $enabled = get_option('hic_google_ads_enhanced_enabled', false);
         $has_config = !empty($settings['customer_id']) && !empty($settings['conversion_action_id']);
 
+        global $wpdb;
+
+        $pending_conversions = null;
+        $last_upload_at = null;
+
+        if ($wpdb instanceof \wpdb) {
+            $table_name = $wpdb->prefix . 'hic_enhanced_conversions';
+            $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_name)) === $table_name;
+
+            if ($table_exists) {
+                $stats = $wpdb->get_row(
+                    "SELECT
+                        SUM(CASE WHEN upload_status = 'pending' THEN 1 ELSE 0 END) AS pending,
+                        MAX(CASE WHEN upload_status = 'uploaded' THEN uploaded_at ELSE NULL END) AS last_uploaded
+                    FROM {$table_name}",
+                    ARRAY_A
+                );
+
+                if (is_array($stats)) {
+                    $pending_conversions = isset($stats['pending']) ? (int) $stats['pending'] : null;
+                    $last_upload_at = $stats['last_uploaded'] ?? null;
+                }
+            }
+        }
+
         $default_phone_country = self::DEFAULT_PHONE_COUNTRY;
         if (is_array($settings) && array_key_exists('default_phone_country', $settings)) {
             $stored_country = $settings['default_phone_country'];
@@ -1729,12 +1754,87 @@ class GoogleAdsEnhancedConversions {
             $status_feedback_message = 'Status: Configurato e attivo — Enhanced Conversions funzionanti.';
         }
 
+        $credentials_complete = !empty($settings['developer_token'])
+            && !empty($settings['client_id'])
+            && !empty($settings['client_secret'])
+            && !empty($settings['refresh_token']);
+
+        $hero_overview = [
+            [
+                'label' => __('Stato integrazione', 'hotel-in-cloud'),
+                'value' => $status_badge_label,
+                'description' => $status === 'configured'
+                    ? __('Sincronizzazione pronta all\'invio automatico.', 'hotel-in-cloud')
+                    : ($status === 'not_configured'
+                        ? __('Completa la configurazione per iniziare a inviare conversioni migliorate.', 'hotel-in-cloud')
+                        : __('Funzionalità opzionale, il monitoraggio standard resta attivo.', 'hotel-in-cloud')),
+                'state' => $status === 'configured' ? 'is-active' : ($status === 'not_configured' ? 'is-warning' : 'is-inactive'),
+            ],
+            [
+                'label' => __('Credenziali API', 'hotel-in-cloud'),
+                'value' => $credentials_complete ? __('Complete', 'hotel-in-cloud') : __('Incomplete', 'hotel-in-cloud'),
+                'description' => $credentials_complete
+                    ? __('Tutte le chiavi richieste sono state salvate.', 'hotel-in-cloud')
+                    : __('Inserisci Customer ID, Developer Token, Client ID/Secret e Refresh Token.', 'hotel-in-cloud'),
+                'state' => $credentials_complete ? 'is-active' : 'is-warning',
+            ],
+            [
+                'label' => __('Conversioni pendenti', 'hotel-in-cloud'),
+                'value' => $pending_conversions === null
+                    ? '—'
+                    : number_format_i18n($pending_conversions),
+                'description' => $pending_conversions === null
+                    ? __('Le statistiche saranno disponibili dopo il primo tracciamento.', 'hotel-in-cloud')
+                    : __('Eventi in coda verso Google Ads.', 'hotel-in-cloud'),
+                'state' => $pending_conversions === null
+                    ? 'is-inactive'
+                    : ($pending_conversions > 0 ? 'is-warning' : 'is-active'),
+            ],
+        ];
+
+        if ($last_upload_at) {
+            $last_upload_time = strtotime($last_upload_at);
+            $hero_overview[] = [
+                'label' => __('Ultimo upload', 'hotel-in-cloud'),
+                'value' => $last_upload_time ? date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $last_upload_time) : '—',
+                'description' => __('Sincronizzazione più recente completata con successo.', 'hotel-in-cloud'),
+                'state' => 'is-active',
+            ];
+        }
+
         ?>
         <div class="wrap hic-admin-page hic-enhanced-page">
-            <div class="hic-page-header">
-                <div>
-                    <h1 class="hic-page-header__title">Google Ads Enhanced Conversions</h1>
-                    <p class="hic-page-header__subtitle">Ottimizza il tracciamento importando in Google Ads i dati raccolti da Hotel in Cloud.</p>
+            <div class="hic-page-hero">
+                <div class="hic-page-header">
+                    <div class="hic-page-header__content">
+                        <h1 class="hic-page-header__title">⚡ Google Ads Enhanced Conversions</h1>
+                        <p class="hic-page-header__subtitle"><?php esc_html_e('Ottimizza il tracciamento importando in Google Ads i dati raccolti da Hotel in Cloud, mantenendo coerenza con la nuova interfaccia del monitoraggio.', 'hotel-in-cloud'); ?></p>
+                    </div>
+                    <div class="hic-page-actions">
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-reports')); ?>">
+                            <span class="dashicons dashicons-chart-bar"></span>
+                            <?php esc_html_e('Vai ai report', 'hotel-in-cloud'); ?>
+                        </a>
+                        <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url('https://support.francopasseri.it/hic-enhanced'); ?>" target="_blank" rel="noopener noreferrer">
+                            <span class="dashicons dashicons-external"></span>
+                            <?php esc_html_e('Guida rapida', 'hotel-in-cloud'); ?>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="hic-page-meta">
+                    <?php foreach ($hero_overview as $overview_item): ?>
+                        <div class="hic-page-meta__item">
+                            <span class="hic-page-meta__status <?php echo esc_attr($overview_item['state']); ?>"></span>
+                            <div class="hic-page-meta__content">
+                                <p class="hic-page-meta__label"><?php echo esc_html($overview_item['label']); ?></p>
+                                <p class="hic-page-meta__value"><?php echo esc_html($overview_item['value']); ?></p>
+                                <?php if (!empty($overview_item['description'])): ?>
+                                    <p class="hic-page-meta__description"><?php echo esc_html($overview_item['description']); ?></p>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
 

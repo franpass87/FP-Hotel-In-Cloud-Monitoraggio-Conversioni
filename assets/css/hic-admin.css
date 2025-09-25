@@ -365,6 +365,11 @@ body.wp-admin[class*="hic-monitoring"] #wpbody-content .wrap {
     font-size: 12px;
 }
 
+.hic-button--large {
+    padding: 12px 26px;
+    font-size: 15px;
+}
+
 .hic-feedback {
     border-radius: var(--hic-radius-md);
     border: 1px solid var(--hic-color-border);
@@ -555,6 +560,96 @@ body.wp-admin[class*="hic-monitoring"] #wpbody-content .wrap {
     gap: var(--hic-spacing-sm);
     align-items: center;
     margin-top: var(--hic-spacing-lg);
+}
+
+.hic-inline-status {
+    font-size: 13px;
+    color: var(--hic-color-text-muted);
+}
+
+.hic-wizard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-lg);
+    max-width: 960px;
+    margin: 0 auto var(--hic-spacing-xl);
+}
+
+.hic-wizard__progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-sm);
+}
+
+.hic-progress-bar {
+    width: 100%;
+    height: 12px;
+    background: var(--hic-color-card-muted);
+    border-radius: 999px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+.hic-progress-fill {
+    height: 100%;
+    background: linear-gradient(135deg, #4dabf7, #1c7ed6);
+    border-radius: inherit;
+    transition: width 0.3s ease;
+}
+
+.hic-progress-text {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--hic-color-text);
+}
+
+.hic-wizard__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-lg);
+}
+
+.hic-wizard-step {
+    gap: var(--hic-spacing-lg);
+}
+
+.hic-wizard-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hic-spacing-sm);
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: var(--hic-spacing-lg);
+}
+
+.hic-wizard-checklist ul,
+.hic-wizard-next ul {
+    margin: var(--hic-spacing-sm) 0;
+    padding-left: 18px;
+    color: var(--hic-color-text-muted);
+}
+
+.hic-wizard-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--hic-spacing-sm);
+}
+
+.hic-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--hic-spacing-md);
+}
+
+.hic-feature-card {
+    border: 1px solid var(--hic-color-border);
+    border-radius: var(--hic-radius-md);
+    padding: var(--hic-spacing-md);
+    background: var(--hic-color-card-bg);
+    box-shadow: var(--hic-shadow-xs);
 }
 
 .hic-callout {
