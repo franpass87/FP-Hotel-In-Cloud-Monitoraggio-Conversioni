@@ -13,12 +13,59 @@ if (!defined('ABSPATH')) exit;
    https://www.villadianella.it/wp-json/hic/v1/conversion?token=hic2025ga4
 */
 
+if (!function_exists('hic_webhook_permission_callback')) {
+function hic_webhook_permission_callback($request)
+{
+  $expected_token = hic_get_webhook_token();
+  if (!is_string($expected_token)) {
+    $expected_token = '';
+  }
+  $expected_token = trim($expected_token);
+
+  if ($expected_token === '') {
+    hic_log('Webhook permission denied: token non configurato', HIC_LOG_LEVEL_ERROR);
+    return new \WP_Error(
+      'missing_token',
+      __('Token webhook non configurato', 'hotel-in-cloud'),
+      ['status' => 500]
+    );
+  }
+
+  $provided_token = '';
+
+  if (is_object($request) && method_exists($request, 'get_param')) {
+    $provided_token = $request->get_param('token');
+  } elseif (is_array($request) && array_key_exists('token', $request)) {
+    $provided_token = $request['token'];
+  } elseif (isset($_REQUEST['token'])) {
+    $provided_token = $_REQUEST['token'];
+  }
+
+  if (!is_string($provided_token)) {
+    $provided_token = '';
+  }
+
+  $provided_token = sanitize_text_field($provided_token);
+
+  if ($provided_token === '' || !hash_equals($expected_token, $provided_token)) {
+    hic_log('Webhook permission denied: token invalido', HIC_LOG_LEVEL_WARNING);
+    return new \WP_Error(
+      'invalid_token',
+      __('Token non valido', 'hotel-in-cloud'),
+      ['status' => 403]
+    );
+  }
+
+  return true;
+}
+}
+
 if (!function_exists('hic_get_webhook_route_args')) {
 function hic_get_webhook_route_args(): array {
   return [
     'methods'             => 'POST',
     'callback'            => 'hic_webhook_handler',
-    'permission_callback' => '__return_true',
+    'permission_callback' => 'hic_webhook_permission_callback',
     'args'                => [
       'token' => [
         'required'          => true,
