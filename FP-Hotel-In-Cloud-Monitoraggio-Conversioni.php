@@ -2,7 +2,7 @@
 /**
  * Plugin Name: FP HIC Monitor
  * Description: Monitoraggio conversioni Hotel in Cloud con tracciamento avanzato verso GA4, Meta CAPI e Brevo. Sistema sicuro enterprise-grade con cache intelligente e validazione input.
- * Version: 3.3.0
+ * Version: 3.4.0
  * Author: Francesco Passeri
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -14,8 +14,16 @@
 
 namespace FpHic;
 
+use FpHic\Bootstrap\Lifecycle;
+use FpHic\Bootstrap\ModuleLoader;
+use FpHic\Bootstrap\UpgradeManager;
+
 if (!defined('ABSPATH')) {
     exit;
+}
+
+if (!defined('HIC_PLUGIN_BASENAME')) {
+    define('HIC_PLUGIN_BASENAME', \plugin_basename(__FILE__));
 }
 
 \add_action('plugins_loaded', function () {
@@ -29,30 +37,14 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     $vendor_available = true;
 }
 
-// Ensure plugin constants and core files are loaded
-require_once __DIR__ . '/includes/constants.php';
-require_once __DIR__ . '/includes/functions.php';
-require_once __DIR__ . '/includes/log-manager.php';
-require_once __DIR__ . '/includes/http-security.php';
-require_once __DIR__ . '/includes/input-validator.php';
-require_once __DIR__ . '/includes/cache-manager.php';
-require_once __DIR__ . '/includes/rate-limiter.php';
-require_once __DIR__ . '/includes/booking-poller.php';
-require_once __DIR__ . '/includes/intelligent-polling-manager.php';
-require_once __DIR__ . '/includes/database-optimizer.php';
-require_once __DIR__ . '/includes/booking-metrics.php';
-require_once __DIR__ . '/includes/realtime-dashboard.php';
-require_once __DIR__ . '/includes/automated-reporting.php';
-require_once __DIR__ . '/includes/google-ads-enhanced.php';
-require_once __DIR__ . '/includes/circuit-breaker.php';
-require_once __DIR__ . '/includes/enterprise-management-suite.php';
-require_once __DIR__ . '/includes/helpers-logging.php';
-require_once __DIR__ . '/includes/helpers-tracking.php';
-require_once __DIR__ . '/includes/helpers-scheduling.php';
-require_once __DIR__ . '/includes/database.php';
-require_once __DIR__ . '/includes/privacy.php';
-require_once __DIR__ . '/includes/api/rate-limit-controller.php';
-require_once __DIR__ . '/includes/uninstall.php';
+require_once __DIR__ . '/includes/bootstrap/module-loader.php';
+require_once __DIR__ . '/includes/bootstrap/lifecycle.php';
+require_once __DIR__ . '/includes/bootstrap/upgrade-manager.php';
+
+$module_loader = ModuleLoader::instance(__DIR__);
+$module_loader->loadCore();
+
+UpgradeManager::register();
 
 // Log vendor autoloader status after all includes are loaded
 if (!$vendor_available) {
@@ -66,111 +58,22 @@ if (\function_exists('register_uninstall_hook')) {
     \register_uninstall_hook(__FILE__, __NAMESPACE__ . '\\hic_uninstall_plugin');
 }
 
-// Plugin activation handler
+function hic_for_each_site(callable $callback): void
+{
+    Lifecycle::forEachSite($callback);
+}
+
+/**
+ * Plugin activation handler.
+ */
 function hic_activate($network_wide)
 {
     if (\version_compare(PHP_VERSION, HIC_MIN_PHP_VERSION, '<') || \version_compare(\get_bloginfo('version'), HIC_MIN_WP_VERSION, '<')) {
         \deactivate_plugins(\plugin_basename(__FILE__));
         \wp_die(\sprintf(\__('Richiede almeno PHP %s e WordPress %s', 'hotel-in-cloud'), HIC_MIN_PHP_VERSION, HIC_MIN_WP_VERSION));
     }
-    if ($network_wide) {
-        $sites = \get_sites();
-        foreach ($sites as $site) {
-            \switch_to_blog($site->blog_id);
-            \hic_maybe_upgrade_db();
-            \FpHic\ReconAndSetup\EnterpriseManagementSuite::maybe_install_tables();
-            \FpHic\CircuitBreaker\CircuitBreakerManager::activate();
-            $role = \get_role('administrator');
-            if ($role) {
-                if (!$role->has_cap('hic_manage')) {
-                    $role->add_cap('hic_manage');
-                }
-                if (!$role->has_cap('hic_view_logs')) {
-                    $role->add_cap('hic_view_logs');
-                }
-            }
-            \restore_current_blog();
-        }
-    } else {
-        \hic_maybe_upgrade_db();
-        \FpHic\ReconAndSetup\EnterpriseManagementSuite::maybe_install_tables();
-        \FpHic\CircuitBreaker\CircuitBreakerManager::activate();
-        $role = \get_role('administrator');
-        if ($role) {
-            if (!$role->has_cap('hic_manage')) {
-                $role->add_cap('hic_manage');
-            }
-            if (!$role->has_cap('hic_view_logs')) {
-                $role->add_cap('hic_view_logs');
-            }
-        }
-    }
 
-    // Clear potential orphaned scheduled events
-    \wp_clear_scheduled_hook('hic_db_database_optimization');
-    \wp_clear_scheduled_hook('hic_reconciliation');
-    \wp_clear_scheduled_hook('hic_capture_tracking_params');
-
-    $log_dir = WP_CONTENT_DIR . '/uploads/hic-logs';
-    $dir_ok  = true;
-    if (!file_exists($log_dir)) {
-        if (function_exists('wp_mkdir_p')) {
-            $dir_ok = \wp_mkdir_p($log_dir);
-        } else {
-            $dir_ok = \mkdir($log_dir, 0755, true);
-        }
-        if (!$dir_ok) {
-            $error = \error_get_last();
-            \hic_log(
-                \sprintf(
-                    'Impossibile creare la cartella dei log %s: %s',
-                    $log_dir,
-                    $error['message'] ?? 'errore sconosciuto'
-                ),
-                HIC_LOG_LEVEL_ERROR
-            );
-            \add_action('admin_notices', function () use ($log_dir) {
-                echo '<div class="notice notice-error"><p>' .
-                    \esc_html(
-                        \sprintf(
-                            \__('Impossibile creare la cartella dei log %s. Verifica i permessi.', 'hotel-in-cloud'),
-                            $log_dir
-                        )
-                    ) .
-                    '</p></div>';
-            });
-        }
-    } else {
-        $dir_ok = \is_dir($log_dir);
-    }
-
-    if ($dir_ok) {
-        $htaccess = $log_dir . '/.htaccess';
-        if (!file_exists($htaccess)) {
-            $content = "Order allow,deny\nDeny from all\n";
-            if (false === \file_put_contents($htaccess, $content)) {
-                $error = \error_get_last();
-                \hic_log(
-                    \sprintf(
-                        'Impossibile creare il file %s: %s',
-                        $htaccess,
-                        $error['message'] ?? 'errore sconosciuto'
-                    ),
-                    HIC_LOG_LEVEL_ERROR
-                );
-                \add_action('admin_notices', function () use ($htaccess) {
-                    echo '<div class="notice notice-error"><p>' .
-                        \esc_html(
-                            \sprintf(
-                                \__('Impossibile creare il file %s. Verifica i permessi.', 'hotel-in-cloud'),
-                                $htaccess
-                            )
-                        ) .
-                        '</p></div>';
-                });
-            }
-        }
-    }
+    Lifecycle::activate((bool) $network_wide);
 }
 
 // Plugin activation hook
@@ -194,27 +97,7 @@ function hic_activate($network_wide)
  */
 function hic_ensure_admin_capabilities(): void
 {
-    if (!\function_exists('get_role') || !\class_exists('\WP_Role')) {
-        return;
-    }
-
-    $target_roles = ['administrator'];
-
-    foreach ($target_roles as $role_name) {
-        $role = \get_role($role_name);
-
-        if (!($role instanceof \WP_Role)) {
-            continue;
-        }
-
-        if (!$role->has_cap('hic_manage')) {
-            $role->add_cap('hic_manage');
-        }
-
-        if (!$role->has_cap('hic_view_logs')) {
-            $role->add_cap('hic_view_logs');
-        }
-    }
+    Lifecycle::ensureAdminCapabilities();
 }
 
 // Apply the capability synchronization immediately and on subsequent requests.
@@ -222,13 +105,7 @@ hic_ensure_admin_capabilities();
 \add_action('init', __NAMESPACE__ . '\\hic_ensure_admin_capabilities');
 \add_action('admin_init', __NAMESPACE__ . '\\hic_ensure_admin_capabilities');
 
-if (\function_exists('is_multisite') && \is_multisite() && \function_exists('switch_to_blog') && \function_exists('restore_current_blog')) {
-    \add_action('wpmu_new_blog', function (int $blog_id): void {
-        \switch_to_blog($blog_id);
-        hic_ensure_admin_capabilities();
-        \restore_current_blog();
-    });
-}
+Lifecycle::registerNetworkProvisioningHook();
 
 // Initialize tracking parameters capture
 \add_action('init', function () {
@@ -244,20 +121,8 @@ if (\function_exists('is_multisite') && \is_multisite() && \function_exists('swi
 });
 
 // Initialize enhanced systems when WordPress is ready
-\add_action('init', function() {
-    // Load additional plugin files after WordPress is ready
-    require_once __DIR__ . '/includes/booking-processor.php';
-    require_once __DIR__ . '/includes/integrations/ga4.php';
-    require_once __DIR__ . '/includes/integrations/gtm.php';
-    require_once __DIR__ . '/includes/integrations/facebook.php';
-    require_once __DIR__ . '/includes/integrations/brevo.php';
-    require_once __DIR__ . '/includes/api/webhook.php';
-    require_once __DIR__ . '/includes/api/polling.php';
-    require_once __DIR__ . '/includes/cli.php';
-    require_once __DIR__ . '/includes/config-validator.php';
-    require_once __DIR__ . '/includes/performance-monitor.php';
-    require_once __DIR__ . '/includes/performance-analytics-dashboard.php';
-    require_once __DIR__ . '/includes/health-monitor.php';
+\add_action('init', function () use ($module_loader): void {
+    $module_loader->loadInit();
 
     // Initialize log manager
     \hic_get_log_manager();
@@ -303,9 +168,7 @@ new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
 
 // Load admin functionality only in dashboard
 if (\is_admin()) {
-    require_once __DIR__ . '/includes/admin/admin-settings.php';
-    require_once __DIR__ . '/includes/admin/diagnostics.php';
-    require_once __DIR__ . '/includes/site-health.php';
+    $module_loader->loadAdmin();
 }
 
 // Ensure the circuit breaker manager is initialized in every context

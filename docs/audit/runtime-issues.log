@@ -1,0 +1,21 @@
+=== Phase 3 – Runtime Logging Audit (UTC 2025-09-26 14:26:34)
+
+Instrumentation Summary:
+- Enabled a dedicated runtime logger (`includes/runtime-dev-logger.php`) that hooks into PHP error, exception, and shutdown handlers when `WP_DEBUG` is active.
+- Surface captured issues to administrators via admin notices and a frontend overlay while persisting sanitized entries through the existing `hic_log` channel.
+- Guarded all WordPress-specific helpers to keep the logger safe for CLI smoke testing and future removal post-audit.
+
+Observations & Captured Events:
+- No fatal errors were triggered during CLI smoke validation (`php tools/runtime-smoke-check.php`), confirming the logger can safely record and recover without WordPress fully bootstrapped. Sample output:
+
+  ```
+  [runtime-smoke] WARNING: [php_error] Runtime smoke test warning {...}
+  [runtime-smoke] ERROR: [uncaught_exception] Runtime smoke test exception {...}
+  [runtime-smoke] INFO: [manual_injection] Manual runtime logger verification entry {...}
+  ```
+- The logger produced sanitized log output for simulated warnings, recorded in `wp-content/uploads/hic-logs/hic-log.txt` when available, and falls back to the PHP error log otherwise.
+- No production frontend/admin runs were executed in this container; further manual browsing in a real WordPress instance is recommended to populate live runtime data.
+
+Next Actions:
+- Integrate the runtime logger during QA/staging browsing sessions to capture genuine notices or deprecated warnings.
+- Remove or scope the dev overlay before release once runtime issues are resolved.

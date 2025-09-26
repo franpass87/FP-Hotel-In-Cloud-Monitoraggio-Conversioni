@@ -42,21 +42,21 @@ parameters:
         - '#Function wp_next_scheduled not found\.#'
         - '#Function wp_unschedule_event not found\.#'
         - '#Function wp_clear_scheduled_hook not found\.#'
-        
+
         # WordPress globals
         - '#Undefined variable: \$wpdb#'
         - '#Access to an undefined property wpdb::\$.*#'
         - '#Undefined variable: \$wp_version#'
-        
+
         # WordPress constants
         - '#Constant ABSPATH not found\.#'
         - '#Constant WP_CONTENT_DIR not found\.#'
         - '#Constant WPINC not found\.#'
-        
+
         # HIC Plugin specific ignores
         - '#Call to function hic_.* not found\.#'
         - '#Function hic_.* not found\.#'
-        
+
     universalObjectCratesClasses:
         - stdClass
         - WP_Error

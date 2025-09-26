@@ -118,6 +118,10 @@ function hic_create_database_table(){
     return false;
   }
 
+  if (function_exists('\\FpHic\\Helpers\\hic_flush_tracking_table_state')) {
+    \FpHic\Helpers\hic_flush_tracking_table_state($wpdb->prefix);
+  }
+
   hic_log('DB ready: '.$table);
 
   // Create real-time sync state table
@@ -646,6 +650,10 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
 
   hic_log(strtoupper($type) . " salvato → $value (SID: $sid_to_use)");
 
+  if (function_exists('\\FpHic\\Helpers\\hic_flush_tracking_cache')) {
+    \FpHic\Helpers\hic_flush_tracking_cache($sid_to_use);
+  }
+
   return true;
 }
 /* ============ Cattura gclid/fbclid → cookie + DB ============ */
@@ -818,6 +826,10 @@ function hic_capture_tracking_params(){
     if ($wpdb->last_error) {
       hic_log('hic_capture_tracking_params: Database error storing UTM params: ' . $wpdb->last_error);
       return false;
+    }
+
+    if (!empty($sid_for_utm) && function_exists('\\FpHic\\Helpers\\hic_flush_tracking_cache')) {
+      \FpHic\Helpers\hic_flush_tracking_cache($sid_for_utm);
     }
   }
 

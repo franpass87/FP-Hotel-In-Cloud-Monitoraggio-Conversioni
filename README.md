@@ -1,6 +1,6 @@
 # FP HIC Monitor
 
-> **Versione plugin:** 3.3.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+> **Versione plugin:** 3.4.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
 
 
 Plugin WordPress per il monitoraggio avanzato delle conversioni da Hotel in Cloud verso GA4, Facebook Meta e Brevo con sistema di sicurezza enterprise-grade.
@@ -14,6 +14,14 @@ Plugin WordPress per il monitoraggio avanzato delle conversioni da Hotel in Clou
 ## Cronologia Versioni
 
 Le tappe principali dello sviluppo sono riepilogate nel [CHANGELOG.md](CHANGELOG.md). Ogni voce collega le funzionalità alle rispettive implementazioni nel codice per agevolare audit, debug e onboarding.
+
+## Novità della versione 3.4.0
+
+- 🔐 **Hardening sicurezza webhook** con normalizzazione dei token prima di rate limiting e confronto costante, per ridurre vettori di attacco sui payload remoti.
+- 🚀 **Cache e ottimizzazioni tracking** che riutilizzano l'object cache WordPress per SID, UTM e controlli di esistenza tabelle, abbattendo query ripetute.
+- 🧩 **Bootstrap modulare e migrazioni automatiche** grazie ai nuovi `ModuleLoader`, `Lifecycle` e `UpgradeManager`, che coordinano attivazione multisito, capability e upgrade schema.
+- 🛠️ **Logger di runtime per ambienti di test** capace di intercettare errori PHP, generarne copie sanificate nel canale di log esistente e mostrare alert amministrativi.
+- 🌐 **Provisioning multisito affidabile** con helper `hic_for_each_site()` e hook `wpmu_new_blog` che riconfigurano ruoli, cron e tabelle su ogni blog.
 
 ## Come Funziona in Sintesi
 
@@ -662,3 +670,9 @@ Per analizzare lo stile del codice:
 composer lint
 ```
 
+
+## Build & Release (CI)
+- Gli artefatti di build (zip) **non** sono versionati nel repo.
+- La CI su **Pull Request** crea lo zip e lo pubblica come **artifact**.
+- Il push di un tag `v*` crea una **GitHub Release** e allega lo zip + checksum.
+- Build locale: `bash scripts/build-plugin-zip.sh` → output in `dist/`.
