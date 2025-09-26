@@ -21,6 +21,9 @@ final class CoreFunctionsTest extends TestCase
         self::assertSame('gads', Helpers\fp_normalize_bucket('CL123456', null));
         self::assertSame('fbads', Helpers\fp_normalize_bucket(null, 'FB123456'));
         self::assertSame('gads', Helpers\fp_normalize_bucket('CL123456', 'FB123456'));
+        self::assertSame('gads', Helpers\fp_normalize_bucket(null, null, 'GBRAID-123', null));
+        self::assertSame('gads', Helpers\fp_normalize_bucket(null, null, null, 'WBRAID-987'));
+        self::assertSame('gads', Helpers\hic_get_bucket(null, null, 'GBRAID-123', 'WBRAID-987'));
         self::assertSame('organic', Helpers\fp_normalize_bucket(null, null));
         self::assertSame('organic', Helpers\fp_normalize_bucket('', ''));
     }

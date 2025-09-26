@@ -42,7 +42,7 @@ namespace FpHic\Helpers {
     function hic_get_tracking_mode() { return \get_option('hic_tracking_mode', 'ga4_only'); }
     function hic_is_valid_email($email) { return filter_var($email, FILTER_VALIDATE_EMAIL) !== false; }
     function hic_normalize_price($price) { return (float) str_replace([',', ' '], ['', ''], $price); }
-    function hic_get_tracking_ids_by_sid($sid) { return ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null]; }
+    function hic_get_tracking_ids_by_sid($sid) { return ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null]; }
     function hic_refund_tracking_enabled() { return false; }
     function hic_get_measurement_id() { return \get_option('hic_measurement_id', ''); }
     function hic_get_api_secret() { return \get_option('hic_api_secret', ''); }

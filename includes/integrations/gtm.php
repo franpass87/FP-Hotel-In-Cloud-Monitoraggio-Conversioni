@@ -22,7 +22,7 @@ function hic_send_to_gtm_datalayer($data, $gclid, $fbclid, $msclkid = '', $ttcli
         return false;
     }
 
-    $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+    $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid); // gads | fbads | organic
     $sid = !empty($sid) ? sanitize_text_field($sid) : '';
 
     // Validate and normalize amount
@@ -413,7 +413,7 @@ function hic_dispatch_gtm_reservation($data, $sid = '') {
         $wbraid = $tracking['wbraid'] ?? '';
     }
 
-    $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+    $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
 
     // Prepare GTM ecommerce data
     $gtm_data = [

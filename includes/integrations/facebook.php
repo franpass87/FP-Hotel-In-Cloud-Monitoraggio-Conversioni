@@ -24,7 +24,7 @@ function hic_send_to_fb($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gb
     return false;
   }
   
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid); // gads | fbads | organic
   
   // Generate event ID using consistent extraction
   $event_id = Helpers\hic_extract_reservation_id($data);
@@ -195,7 +195,7 @@ function hic_send_fb_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = '',
     return false;
   }
 
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
 
   $event_id = Helpers\hic_extract_reservation_id($data);
   if (empty($event_id)) {
@@ -395,7 +395,7 @@ function hic_dispatch_pixel_reservation($data, $sid = '') {
     $wbraid = $tracking['wbraid'] ?? '';
   }
 
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
 
   $user_data = [
     'em' => [hash('sha256', strtolower(trim($data['email'])))]

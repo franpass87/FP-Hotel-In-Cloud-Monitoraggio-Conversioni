@@ -202,7 +202,7 @@ function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid = '', $ttclid = '', $g
     return false;
   }
 
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid); // gads | fbads | organic
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid); // gads | fbads | organic
   $client_id = $gclid ?: ($fbclid ?: (string) wp_generate_uuid4());
   $sid = (is_string($sid) || is_numeric($sid)) ? sanitize_text_field((string) $sid) : '';
 
@@ -330,7 +330,7 @@ function hic_send_ga4_refund($data, $gclid, $fbclid, $msclkid = '', $ttclid = ''
     return false;
   }
 
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
   $client_id = $gclid ?: ($fbclid ?: (string) wp_generate_uuid4());
   $sid = (is_string($sid) || is_numeric($sid)) ? sanitize_text_field((string) $sid) : '';
 
@@ -509,7 +509,7 @@ function hic_dispatch_ga4_reservation($data, $sid = '') {
     $wbraid = $tracking['wbraid'] ?? '';
   }
 
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
 
   $params = [
     'transaction_id' => $transaction_id,
