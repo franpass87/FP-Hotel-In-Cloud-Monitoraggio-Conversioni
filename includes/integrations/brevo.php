@@ -119,7 +119,7 @@ function hic_send_brevo_contact($data, $gclid, $fbclid, $msclkid = '', $ttclid =
 /* ============ Brevo: evento personalizzato (purchase + bucket) ============ */
 function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = ''){
   if (!Helpers\hic_get_brevo_api_key()) { return; }
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
 
   $amount = 0;
   $amount_source = null;
@@ -197,7 +197,7 @@ function hic_send_brevo_event($reservation, $gclid, $fbclid, $msclkid = '', $ttc
  */
 function hic_send_brevo_refund_event($reservation, $gclid, $fbclid, $msclkid = '', $ttclid = '', $gbraid = '', $wbraid = ''){
   if (!Helpers\hic_get_brevo_api_key()) { return false; }
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
 
   $amount = 0;
   $amount_source = null;
@@ -625,7 +625,7 @@ function hic_send_brevo_reservation_created_event($data, $gclid = '', $fbclid = 
   $data['phone'] = $phone_data['phone'] ?? ($data['phone'] ?? '');
   $data['language'] = $phone_data['language'] ?? ($data['language'] ?? '');
 
-  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid);
+  $bucket = Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
   $currency_code = Helpers\hic_normalize_currency_code($data['currency'] ?? null);
 
   $body = array(

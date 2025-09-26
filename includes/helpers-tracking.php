@@ -283,15 +283,31 @@ function hic_get_utm_params_by_sid($sid) {
 }
 
 /**
- * Normalize bucket attribution according to priority: gclid > fbclid > organic
+ * Normalize bucket attribution according to priority: gclid > gbraid/wbraid > fbclid > organic
  *
- * @param string|null $gclid Google Click ID from Google Ads
+ * @param string|null $gclid  Google Click ID from Google Ads
  * @param string|null $fbclid Facebook Click ID from Meta Ads
+ * @param string|null $gbraid Google Ads GBRAID identifier
+ * @param string|null $wbraid Google Ads WBRAID identifier
  * @return string One of: 'gads', 'fbads', 'organic'
  */
-function fp_normalize_bucket($gclid, $fbclid){
-  if (!empty($gclid) && trim($gclid) !== '')  return 'gads';
-  if (!empty($fbclid) && trim($fbclid) !== '') return 'fbads';
+function fp_normalize_bucket($gclid, $fbclid, $gbraid = null, $wbraid = null){
+  foreach ([$gclid, $gbraid, $wbraid] as $google_identifier) {
+    if (is_string($google_identifier) || is_numeric($google_identifier)) {
+      $normalized = trim((string) $google_identifier);
+      if ($normalized !== '') {
+        return 'gads';
+      }
+    }
+  }
+
+  if (is_string($fbclid) || is_numeric($fbclid)) {
+    $facebook_identifier = trim((string) $fbclid);
+    if ($facebook_identifier !== '') {
+      return 'fbads';
+    }
+  }
+
   return 'organic';
 }
 
@@ -299,7 +315,7 @@ function fp_normalize_bucket($gclid, $fbclid){
  * Legacy function name for backward compatibility
  * @deprecated Use fp_normalize_bucket() instead
  */
-function hic_get_bucket($gclid, $fbclid){
-  return fp_normalize_bucket($gclid, $fbclid);
+function hic_get_bucket($gclid, $fbclid, $gbraid = null, $wbraid = null){
+  return fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
 }
 

@@ -1825,8 +1825,39 @@ function hic_send_admin_email($data, $gclid, $fbclid, $sid){
     hic_log('hic_send_admin_email: data is not an array');
     return false;
   }
-  
-  $bucket = fp_normalize_bucket($gclid, $fbclid);
+
+  $gbraid = '';
+  $wbraid = '';
+  $normalized_sid = '';
+
+  if (!empty($sid) && (is_string($sid) || is_numeric($sid))) {
+    $normalized_sid = sanitize_text_field((string) $sid);
+  }
+
+  if ($normalized_sid !== '') {
+    $tracking = \FpHic\Helpers\hic_get_tracking_ids_by_sid($normalized_sid);
+    if (empty($gclid) && !empty($tracking['gclid'])) {
+      $gclid = $tracking['gclid'];
+    }
+    if (empty($fbclid) && !empty($tracking['fbclid'])) {
+      $fbclid = $tracking['fbclid'];
+    }
+    if (!empty($tracking['gbraid'])) {
+      $gbraid = $tracking['gbraid'];
+    }
+    if (!empty($tracking['wbraid'])) {
+      $wbraid = $tracking['wbraid'];
+    }
+  }
+
+  if ($gbraid === '' && isset($data['gbraid']) && is_scalar($data['gbraid'])) {
+    $gbraid = sanitize_text_field((string) $data['gbraid']);
+  }
+  if ($wbraid === '' && isset($data['wbraid']) && is_scalar($data['wbraid'])) {
+    $wbraid = sanitize_text_field((string) $data['wbraid']);
+  }
+
+  $bucket = fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
   $to = hic_get_admin_email();
   
   // Enhanced email validation with detailed logging
@@ -2780,8 +2811,8 @@ namespace {
     function hic_mask_sensitive_data($message) { return \FpHic\Helpers\hic_mask_sensitive_data($message); }
     function hic_default_log_message_filter($message, $level) { return \FpHic\Helpers\hic_default_log_message_filter($message, $level); }
     function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) { return \FpHic\Helpers\hic_log($msg, $level, $context); }
-    function fp_normalize_bucket($gclid, $fbclid) { return \FpHic\Helpers\fp_normalize_bucket($gclid, $fbclid); }
-    function hic_get_bucket($gclid, $fbclid) { return \FpHic\Helpers\hic_get_bucket($gclid, $fbclid); }
+    function fp_normalize_bucket($gclid, $fbclid, $gbraid = null, $wbraid = null) { return \FpHic\Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid); }
+    function hic_get_bucket($gclid, $fbclid, $gbraid = null, $wbraid = null) { return \FpHic\Helpers\hic_get_bucket($gclid, $fbclid, $gbraid, $wbraid); }
     function hic_send_admin_email($data, $gclid, $fbclid, $sid) { return \FpHic\Helpers\hic_send_admin_email($data, $gclid, $fbclid, $sid); }
     function hic_test_email_configuration($recipient_email = null) { return \FpHic\Helpers\hic_test_email_configuration($recipient_email); }
     function hic_diagnose_email_issues() { return \FpHic\Helpers\hic_diagnose_email_issues(); }
