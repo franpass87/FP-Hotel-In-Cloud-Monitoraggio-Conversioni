@@ -1,0 +1,8 @@
+{
+  "current_phase": 1,
+  "completed": [
+    1
+  ],
+  "last_commit": "5aa522dab4e21a92efeee52b88ec49cd7095e55f",
+  "notes": "Next phase: configure PHPCS & PHPStan, record results in docs/audit/linters.txt."
+}
