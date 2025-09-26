@@ -53,5 +53,30 @@ final class LogMessageFilterTest extends TestCase {
         $this->assertStringContainsString('[masked-phone]', $contents);
         $this->assertStringContainsString('[masked-number]', $contents);
     }
+
+    public function test_default_filter_masks_additional_email_and_phone_keys(): void
+    {
+        $manager = new \HIC_Log_Manager();
+        $data = [
+            'guestEmail' => 'guest@example.com',
+            'contact_phone' => '+39 123 456 7890',
+            'details' => [
+                'customerEmail' => 'customer@example.com',
+                'mobileNumber' => '555-1234',
+            ],
+        ];
+
+        $manager->info($data);
+
+        $log_file = Helpers\hic_get_log_file();
+        $this->assertFileExists($log_file);
+        $contents = file_get_contents($log_file);
+        $this->assertStringNotContainsString('guest@example.com', $contents);
+        $this->assertStringNotContainsString('customer@example.com', $contents);
+        $this->assertStringNotContainsString('+39 123 456 7890', $contents);
+        $this->assertStringNotContainsString('555-1234', $contents);
+        $this->assertSame(2, substr_count($contents, '[masked-email]'));
+        $this->assertSame(2, substr_count($contents, '[masked-phone]'));
+    }
 }
 }
