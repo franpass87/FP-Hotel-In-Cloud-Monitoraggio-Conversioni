@@ -27,6 +27,27 @@ if (!function_exists('add_filter')) {
         ];
     }
 }
+if (!function_exists('has_filter')) {
+    function has_filter($hook, $callback = false) {
+        if (empty($GLOBALS['hic_test_filters'][$hook])) {
+            return false;
+        }
+
+        if ($callback === false) {
+            return true;
+        }
+
+        foreach ($GLOBALS['hic_test_filters'][$hook] as $priority => $callbacks) {
+            foreach ($callbacks as $registered) {
+                if ($registered['function'] === $callback) {
+                    return $priority;
+                }
+            }
+        }
+
+        return false;
+    }
+}
 if (!function_exists('remove_filter')) {
     function remove_filter($hook, $callback, $priority = 10) {
         if (empty($GLOBALS['hic_test_filters'][$hook][$priority])) {
@@ -66,6 +87,27 @@ if (!function_exists('apply_filters')) {
         }
 
         return $value;
+    }
+}
+if (!function_exists('has_action')) {
+    function has_action($hook, $callback = false) {
+        if (empty($GLOBALS['hic_test_hooks'][$hook])) {
+            return false;
+        }
+
+        if ($callback === false) {
+            return true;
+        }
+
+        foreach ($GLOBALS['hic_test_hooks'][$hook] as $priority => $callbacks) {
+            foreach ($callbacks as $registered) {
+                if ($registered['function'] === $callback) {
+                    return $priority;
+                }
+            }
+        }
+
+        return false;
     }
 }
 if (!function_exists('register_activation_hook')) { function register_activation_hook(...$args) {} }
