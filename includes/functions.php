@@ -122,37 +122,118 @@ function hic_clear_option_cache($key = null) {
 }
 
 /**
- * Safely register a WordPress hook, deferring if WordPress is not ready
+ * Generate a deterministic signature for a hook registration.
+ *
+ * @param mixed $callback The callback being registered.
+ */
+function hic_get_hook_signature(string $type, string $hook, $callback, int $priority, int $accepted_args): string
+{
+    if (is_string($callback)) {
+        $identifier = $callback;
+    } elseif ($callback instanceof \Closure) {
+        $identifier = spl_object_hash($callback);
+    } elseif (is_object($callback) && method_exists($callback, '__invoke')) {
+        $identifier = spl_object_hash($callback);
+    } elseif (is_array($callback) && count($callback) === 2) {
+        [$callable, $method] = $callback;
+        if (is_object($callable)) {
+            $identifier = spl_object_hash($callable) . '::' . (string) $method;
+        } else {
+            $identifier = (string) $callable . '::' . (string) $method;
+        }
+    } else {
+        $identifier = md5(var_export($callback, true));
+    }
+
+    return implode('|', [$type, $hook, $identifier, (string) $priority, (string) $accepted_args]);
+}
+
+/**
+ * Determine whether the provided hook is already registered in WordPress.
+ *
+ * @param mixed $callback The callback being inspected.
+ */
+function hic_hook_is_registered(string $type, string $hook, $callback): bool
+{
+    if ($type === 'action' && function_exists('has_action')) {
+        $result = has_action($hook, $callback);
+
+        if ($result !== false && $result !== null) {
+            return true;
+        }
+    }
+
+    if (function_exists('has_filter')) {
+        $result = has_filter($hook, $callback);
+
+        if ($result !== false && $result !== null) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Safely register a WordPress hook, deferring if WordPress is not ready.
  */
 function hic_safe_add_hook($type, $hook, $function, $priority = 10, $accepted_args = 1) {
     static $deferred_hooks = [];
-    
-    if (function_exists('add_action') && function_exists('add_filter')) {
-        // WordPress is ready, register the hook
-        if ($type === 'action') {
-            add_action($hook, $function, $priority, $accepted_args);
-        } else {
-            add_filter($hook, $function, $priority, $accepted_args);
+
+    $type = strtolower((string) $type) === 'filter' ? 'filter' : 'action';
+    $hook = (string) $hook;
+    $priority = (int) $priority;
+    $accepted_args = (int) $accepted_args;
+
+    $signature = hic_get_hook_signature($type, $hook, $function, $priority, $accepted_args);
+
+    $hook_data = [
+        'type' => $type,
+        'hook' => $hook,
+        'function' => $function,
+        'priority' => $priority,
+        'accepted_args' => $accepted_args,
+    ];
+
+    $hooks_available = function_exists('add_action') && function_exists('add_filter');
+
+    if (!$hooks_available) {
+        if (!isset($deferred_hooks[$signature])) {
+            $deferred_hooks[$signature] = $hook_data;
         }
-        
-        // Also register any deferred hooks
-        foreach ($deferred_hooks as $deferred) {
+
+        return;
+    }
+
+    $callback_exists = hic_hook_is_registered($type, $hook, $function);
+
+    if (!empty($deferred_hooks)) {
+        foreach ($deferred_hooks as $deferred_signature => $deferred) {
+            $deferred_exists = hic_hook_is_registered($deferred['type'], $deferred['hook'], $deferred['function']);
+
+            if ($deferred_exists) {
+                continue;
+            }
+
             if ($deferred['type'] === 'action') {
                 add_action($deferred['hook'], $deferred['function'], $deferred['priority'], $deferred['accepted_args']);
             } else {
                 add_filter($deferred['hook'], $deferred['function'], $deferred['priority'], $deferred['accepted_args']);
             }
+
         }
+
         $deferred_hooks = [];
+    }
+
+    if ($callback_exists) {
+        return;
+    }
+
+    if ($type === 'action') {
+        add_action($hook, $function, $priority, $accepted_args);
     } else {
-        // WordPress not ready, defer the hook registration
-        $deferred_hooks[] = [
-            'type' => $type,
-            'hook' => $hook,
-            'function' => $function,
-            'priority' => $priority,
-            'accepted_args' => $accepted_args
-        ];
+        add_filter($hook, $function, $priority, $accepted_args);
     }
 }
 
