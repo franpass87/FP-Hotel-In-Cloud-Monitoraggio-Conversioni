@@ -1,0 +1,28 @@
+name: PR Build (Plugin Zip)
+
+on:
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  build-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Build zip
+        run: |
+          bash scripts/build-plugin-zip.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-zip
+          path: dist/*.zip
+          if-no-files-found: error

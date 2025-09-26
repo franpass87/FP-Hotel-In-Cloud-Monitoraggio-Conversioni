@@ -1,8 +1,24 @@
 # Changelog
 
-> **Versione plugin:** 3.3.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+> **Versione plugin:** 3.4.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
 
 Tutte le modifiche degne di nota del plugin FP HIC Monitor sono documentate qui, in ordine cronologico inverso.
+
+## [3.4.0] - 2025-09-26
+### Sicurezza
+- Normalizzazione preventiva dei token webhook prima della rate limiting e del confronto costante per evitare bypass delle difese su payload malformati.【F:includes/api/webhook.php†L40-L76】
+
+### Performance
+- Cache object-cache per SID, parametri UTM e controlli di esistenza tabelle con invalidazione puntuale all'aggiornamento dei dati, riducendo chiamate ripetitive al database.【F:includes/helpers-tracking.php†L25-L210】
+
+### Compatibilità e Architettura
+- Nuovi bootstrap `ModuleLoader` e `Lifecycle` che centralizzano l'inclusione dei moduli, l'attivazione multisito e la sincronizzazione delle capability in modo riutilizzabile.【F:includes/bootstrap/module-loader.php†L17-L154】【F:includes/bootstrap/lifecycle.php†L19-L293】
+- Helper `hic_for_each_site()` e hook `wpmu_new_blog` per provisioning immediato di nuovi siti in rete, con ripristino sicuro del contesto originale.【F:FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php†L63-L109】
+- `UpgradeManager` che registra le versioni installate, rilancia i processi di installazione e svuota cache/object-cache al termine delle migrazioni.【F:includes/bootstrap/upgrade-manager.php†L9-L198】
+
+### Osservabilità e Tooling
+- Logger di runtime opzionale per intercettare errori/exception in ambienti di debug, sanificarli e instradarli verso il canale di log con avvisi per gli amministratori.【F:includes/runtime-dev-logger.php†L17-L260】
+- Documentazione e audit arricchiti (security, performance, runtime, compatibilità, refactoring, upgrade) per supportare audit futuri e quality gate.【F:docs/audit/security.md†L1-L13】【F:docs/audit/perf.md†L1-L17】
 
 ## [3.3.0] - 2025-05-20
 ### Documentazione

@@ -107,6 +107,11 @@ define('HIC_CACHE_API_RESPONSE', HIC_CACHE_PREFIX . 'api_response_');
 define('HIC_CACHE_PROCESSED_IDS', HIC_CACHE_PREFIX . 'processed_ids');
 define('HIC_CACHE_LAST_POLLING', HIC_CACHE_PREFIX . 'last_polling');
 
+// === TRACKING LOOKUP CACHE ===
+define('HIC_TRACKING_CACHE_GROUP', 'hic_monitor_tracking');
+define('HIC_TRACKING_LOOKUP_CACHE_TTL', 5 * MINUTE_IN_SECONDS);
+define('HIC_TRACKING_TABLE_CACHE_TTL', 10 * MINUTE_IN_SECONDS);
+
 // === TRANSIENT KEYS ===
 define('HIC_TRANSIENT_POLLING_LOCK', 'hic_polling_lock');
 define('HIC_TRANSIENT_API_RATE_LIMIT', 'hic_api_rate_limit');
@@ -136,7 +141,7 @@ define('HIC_DIAGNOSTIC_DETAILED', 'detailed');
 define('HIC_DIAGNOSTIC_FULL', 'full');
 
 // === VERSION INFO ===
-define('HIC_PLUGIN_VERSION', '3.3.0');
+define('HIC_PLUGIN_VERSION', '3.4.0');
 define('HIC_API_VERSION', 'v1');
 define('HIC_MIN_PHP_VERSION', '7.4');
 define('HIC_MIN_WP_VERSION', '5.8');

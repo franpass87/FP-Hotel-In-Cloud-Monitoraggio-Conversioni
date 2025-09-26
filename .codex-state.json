@@ -1,0 +1,6 @@
+{
+  "current_phase": 10,
+  "completed": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  "last_commit": "release: package version 3.4.0",
+  "notes": "Playbook complete: versione 3.4.0 pacchettizzata in /dist con checksum e documentazione aggiornata."
+}

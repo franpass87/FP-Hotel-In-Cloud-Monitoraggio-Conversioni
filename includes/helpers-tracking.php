@@ -33,8 +33,7 @@ function hic_export_tracking_data($email_address, $page = 1) {
     }
 
     $table = $wpdb->prefix . 'hic_gclids';
-    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-    if (!$table_exists) {
+    if (!hic_tracking_table_exists($wpdb)) {
         return ['data' => [], 'done' => true];
     }
 
@@ -114,8 +113,7 @@ function hic_erase_tracking_data($email_address, $page = 1) {
     }
 
     $table = $wpdb->prefix . 'hic_gclids';
-    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-    if (!$table_exists) {
+    if (!hic_tracking_table_exists($wpdb)) {
         return ['items_removed' => false, 'items_retained' => false, 'messages' => [], 'done' => true];
     }
 
@@ -158,6 +156,182 @@ function hic_erase_tracking_data($email_address, $page = 1) {
     ];
 }
 
+// -------------------------------------------------------------------------
+// Tracking lookup cache helpers
+// -------------------------------------------------------------------------
+
+/** @var array<string,bool> */
+$GLOBALS['hic_tracking_table_runtime_cache'] = $GLOBALS['hic_tracking_table_runtime_cache'] ?? [];
+
+/** @var array<string,bool> */
+$GLOBALS['hic_tracking_table_rebuild_attempted'] = $GLOBALS['hic_tracking_table_rebuild_attempted'] ?? [];
+
+function hic_tracking_cache_group(): string
+{
+    return defined('HIC_TRACKING_CACHE_GROUP') ? HIC_TRACKING_CACHE_GROUP : 'hic_monitor_tracking';
+}
+
+function hic_tracking_lookup_cache_ttl(string $context, string $sid): int
+{
+    $default = defined('HIC_TRACKING_LOOKUP_CACHE_TTL') ? (int) HIC_TRACKING_LOOKUP_CACHE_TTL : 5 * MINUTE_IN_SECONDS;
+
+    return (int) apply_filters('hic_tracking_lookup_cache_ttl', $default, $context, $sid);
+}
+
+function hic_tracking_table_cache_ttl(): int
+{
+    $default = defined('HIC_TRACKING_TABLE_CACHE_TTL') ? (int) HIC_TRACKING_TABLE_CACHE_TTL : 10 * MINUTE_IN_SECONDS;
+
+    return (int) apply_filters('hic_tracking_table_cache_ttl', $default);
+}
+
+function hic_tracking_cache_key(string $sid, string $suffix): string
+{
+    return $suffix . ':' . md5($sid);
+}
+
+function hic_tracking_table_cache_key(string $prefix): string
+{
+    return 'table_exists:' . md5($prefix);
+}
+
+/**
+ * Retrieve a cached lookup from the object cache if available.
+ *
+ * @return array<string,?string>|null
+ */
+function hic_get_tracking_lookup_cache(string $suffix, string $sid, ?bool &$found = null): ?array
+{
+    $found = false;
+
+    if (!function_exists('wp_cache_get')) {
+        return null;
+    }
+
+    $cache = wp_cache_get(hic_tracking_cache_key($sid, $suffix), hic_tracking_cache_group(), false, $found);
+
+    if (!$found) {
+        return null;
+    }
+
+    return is_array($cache) ? $cache : null;
+}
+
+function hic_set_tracking_lookup_cache(string $suffix, string $sid, array $value): void
+{
+    if (!function_exists('wp_cache_set')) {
+        return;
+    }
+
+    wp_cache_set(
+        hic_tracking_cache_key($sid, $suffix),
+        $value,
+        hic_tracking_cache_group(),
+        hic_tracking_lookup_cache_ttl($suffix, $sid)
+    );
+}
+
+function hic_flush_tracking_cache(string $sid): void
+{
+    if (!function_exists('wp_cache_delete')) {
+        return;
+    }
+
+    $group = hic_tracking_cache_group();
+    wp_cache_delete(hic_tracking_cache_key($sid, 'tracking'), $group);
+    wp_cache_delete(hic_tracking_cache_key($sid, 'utm'), $group);
+}
+
+function hic_flush_tracking_table_state(?string $prefix = null): void
+{
+    $runtime = &$GLOBALS['hic_tracking_table_runtime_cache'];
+    $attempted = &$GLOBALS['hic_tracking_table_rebuild_attempted'];
+
+    if ($prefix === null) {
+        $runtime = [];
+        $attempted = [];
+    } else {
+        unset($runtime[$prefix], $attempted[$prefix]);
+    }
+
+    if (!function_exists('wp_cache_delete')) {
+        return;
+    }
+
+    if ($prefix === null) {
+        return;
+    }
+
+    wp_cache_delete(hic_tracking_table_cache_key($prefix), hic_tracking_cache_group());
+}
+
+/**
+ * Determine if the plugin tracking table exists for the provided wpdb-like instance.
+ *
+ * @param \wpdb|object $wpdb Object exposing a wpdb-compatible API (prefix property plus prepare/get_var methods).
+ */
+function hic_tracking_table_exists($wpdb, bool $attempt_rebuild = true): bool
+{
+    if (!is_object($wpdb)) {
+        return false;
+    }
+
+    if (!method_exists($wpdb, 'prepare') || !method_exists($wpdb, 'get_var')) {
+        return false;
+    }
+
+    $prefix = property_exists($wpdb, 'prefix') ? (string) $wpdb->prefix : '';
+    if ($prefix === '') {
+        return false;
+    }
+
+    $runtime = &$GLOBALS['hic_tracking_table_runtime_cache'];
+    $attempted = &$GLOBALS['hic_tracking_table_rebuild_attempted'];
+
+    if (isset($runtime[$prefix]) && $runtime[$prefix] === true) {
+        return true;
+    }
+
+    $cache_found = false;
+    $cached_state = null;
+    if (function_exists('wp_cache_get')) {
+        $cached_state = wp_cache_get(hic_tracking_table_cache_key($prefix), hic_tracking_cache_group(), false, $cache_found);
+    }
+
+    if ($cache_found) {
+        $runtime[$prefix] = (bool) $cached_state;
+
+        if ($runtime[$prefix] === true || !$attempt_rebuild) {
+            return $runtime[$prefix];
+        }
+    }
+
+    $table = $wpdb->prefix . 'hic_gclids';
+    $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+
+    if (!$exists && $attempt_rebuild) {
+        if (!isset($attempted[$prefix]) && function_exists('\\hic_create_database_table')) {
+            $attempted[$prefix] = true;
+            if (\hic_create_database_table()) {
+                $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+            }
+        }
+    }
+
+    $runtime[$prefix] = $exists;
+
+    if (function_exists('wp_cache_set')) {
+        wp_cache_set(
+            hic_tracking_table_cache_key($prefix),
+            $exists ? 1 : 0,
+            hic_tracking_cache_group(),
+            hic_tracking_table_cache_ttl()
+        );
+    }
+
+    return $exists;
+}
+
 /**
  * Retrieve tracking IDs (gclid and fbclid) for a given SID from database.
  *
@@ -165,49 +339,54 @@ function hic_erase_tracking_data($email_address, $page = 1) {
  * @return array{gclid:?string, fbclid:?string, msclkid:?string, ttclid:?string, gbraid:?string, wbraid:?string}
 */
 function hic_get_tracking_ids_by_sid($sid) {
-    static $cache = [];
+    static $runtime_cache = [];
+
     $sid = sanitize_text_field($sid);
     if (empty($sid)) {
         return ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
     }
 
-    if (array_key_exists($sid, $cache)) {
-        return $cache[$sid];
+    if (array_key_exists($sid, $runtime_cache)) {
+        return $runtime_cache[$sid];
+    }
+
+    $cached = hic_get_tracking_lookup_cache('tracking', $sid, $found);
+    if ($found && is_array($cached)) {
+        return $runtime_cache[$sid] = $cached;
     }
 
     $wpdb = hic_get_wpdb_instance(['get_var', 'prepare', 'get_row']);
     if (!$wpdb) {
         hic_log('hic_get_tracking_ids_by_sid: wpdb is not available');
-        return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
+        $value = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
+        if ($found === false) {
+            hic_set_tracking_lookup_cache('tracking', $sid, $value);
+        }
+
+        return $runtime_cache[$sid] = $value;
+    }
+
+    if (!hic_tracking_table_exists($wpdb)) {
+        hic_log('hic_get_tracking_ids_by_sid: Table does not exist: ' . $wpdb->prefix . 'hic_gclids');
+        $value = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
+        hic_set_tracking_lookup_cache('tracking', $sid, $value);
+
+        return $runtime_cache[$sid] = $value;
     }
 
     $table = $wpdb->prefix . 'hic_gclids';
-
-    // Ensure table exists before querying
-    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-    if (!$table_exists) {
-        static $rebuild_attempted = false;
-
-        if (!$rebuild_attempted && function_exists('\\hic_create_database_table')) {
-            $rebuild_attempted = true;
-            \hic_create_database_table();
-            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-        }
-
-        if (!$table_exists) {
-            hic_log('hic_get_tracking_ids_by_sid: Table does not exist: ' . $table);
-            return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
-        }
-    }
     $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid, msclkid, ttclid, gbraid, wbraid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
 
     if ($wpdb->last_error) {
         hic_log('hic_get_tracking_ids_by_sid: Database error retrieving tracking IDs: ' . $wpdb->last_error);
-        return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
+        $value = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
+        hic_set_tracking_lookup_cache('tracking', $sid, $value);
+
+        return $runtime_cache[$sid] = $value;
     }
 
     if ($row) {
-        return $cache[$sid] = [
+        $value = [
             'gclid' => $row->gclid,
             'fbclid' => $row->fbclid,
             'msclkid' => $row->msclkid,
@@ -215,9 +394,15 @@ function hic_get_tracking_ids_by_sid($sid) {
             'gbraid' => $row->gbraid,
             'wbraid' => $row->wbraid,
         ];
+        hic_set_tracking_lookup_cache('tracking', $sid, $value);
+
+        return $runtime_cache[$sid] = $value;
     }
 
-    return $cache[$sid] = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
+    $value = ['gclid' => null, 'fbclid' => null, 'msclkid' => null, 'ttclid' => null, 'gbraid' => null, 'wbraid' => null];
+    hic_set_tracking_lookup_cache('tracking', $sid, $value);
+
+    return $runtime_cache[$sid] = $value;
 }
 
 /**
@@ -227,59 +412,70 @@ function hic_get_tracking_ids_by_sid($sid) {
  * @return array{utm_source:?string, utm_medium:?string, utm_campaign:?string, utm_content:?string, utm_term:?string}
 */
 function hic_get_utm_params_by_sid($sid) {
-    static $cache = [];
+    static $runtime_cache = [];
+
     $sid = sanitize_text_field($sid);
     if (empty($sid)) {
         return ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
     }
 
-    if (array_key_exists($sid, $cache)) {
-        return $cache[$sid];
+    if (array_key_exists($sid, $runtime_cache)) {
+        return $runtime_cache[$sid];
     }
 
-    $wpdb = hic_get_wpdb_instance(['get_var', 'prepare']);
+    $cached = hic_get_tracking_lookup_cache('utm', $sid, $found);
+    if ($found && is_array($cached)) {
+        return $runtime_cache[$sid] = $cached;
+    }
+
+    $wpdb = hic_get_wpdb_instance(['get_var', 'prepare', 'get_row']);
     if (!$wpdb) {
         hic_log('hic_get_utm_params_by_sid: wpdb is not available');
-        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
+        $value = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
+        if ($found === false) {
+            hic_set_tracking_lookup_cache('utm', $sid, $value);
+        }
+
+        return $runtime_cache[$sid] = $value;
+    }
+
+    if (!hic_tracking_table_exists($wpdb)) {
+        hic_log('hic_get_utm_params_by_sid: Table does not exist: ' . $wpdb->prefix . 'hic_gclids');
+        $value = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
+        hic_set_tracking_lookup_cache('utm', $sid, $value);
+
+        return $runtime_cache[$sid] = $value;
     }
 
     $table = $wpdb->prefix . 'hic_gclids';
-
-    // Ensure table exists before querying
-    $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-    if (!$table_exists) {
-        static $utm_rebuild_attempted = false;
-
-        if (!$utm_rebuild_attempted && function_exists('\\hic_create_database_table')) {
-            $utm_rebuild_attempted = true;
-            \hic_create_database_table();
-            $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
-        }
-
-        if (!$table_exists) {
-            hic_log('hic_get_utm_params_by_sid: Table does not exist: ' . $table);
-            return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
-        }
-    }
 
     $row = $wpdb->get_row($wpdb->prepare("SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
 
     if ($wpdb->last_error) {
         hic_log('hic_get_utm_params_by_sid: Database error retrieving UTM params: ' . $wpdb->last_error);
-        return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
+        $value = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
+        hic_set_tracking_lookup_cache('utm', $sid, $value);
+
+        return $runtime_cache[$sid] = $value;
     }
 
     if ($row) {
-        return $cache[$sid] = [
+        $value = [
             'utm_source'   => $row->utm_source,
             'utm_medium'   => $row->utm_medium,
             'utm_campaign' => $row->utm_campaign,
             'utm_content'  => $row->utm_content,
             'utm_term'     => $row->utm_term,
         ];
+        hic_set_tracking_lookup_cache('utm', $sid, $value);
+
+        return $runtime_cache[$sid] = $value;
     }
 
-    return $cache[$sid] = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
+    $value = ['utm_source' => null, 'utm_medium' => null, 'utm_campaign' => null, 'utm_content' => null, 'utm_term' => null];
+    hic_set_tracking_lookup_cache('utm', $sid, $value);
+
+    return $runtime_cache[$sid] = $value;
 }
 
 /**

@@ -71,6 +71,32 @@ function hic_normalize_ip_for_rate_limit($ip): string
 }
 }
 
+if (!function_exists('hic_normalize_webhook_token')) {
+function hic_normalize_webhook_token($token): string
+{
+  if (!is_string($token)) {
+    return '';
+  }
+
+  if (function_exists('wp_unslash')) {
+    $token = wp_unslash($token);
+  }
+
+  $token = sanitize_text_field($token);
+  $token = trim($token);
+
+  if ($token === '') {
+    return '';
+  }
+
+  if (strlen($token) > 128) {
+    $token = substr($token, 0, 128);
+  }
+
+  return $token;
+}
+}
+
 if (!function_exists('hic_generate_webhook_rate_limit_key')) {
 function hic_generate_webhook_rate_limit_key($token, string $ip): string
 {
@@ -79,12 +105,11 @@ function hic_generate_webhook_rate_limit_key($token, string $ip): string
     $ip = 'unknown';
   }
 
+  $normalized_token = hic_normalize_webhook_token($token);
   $token_hash = 'no-token';
-  if (is_string($token)) {
-    $token = trim($token);
-    if ($token !== '') {
-      $token_hash = substr(hash('sha256', $token), 0, 16);
-    }
+
+  if ($normalized_token !== '') {
+    $token_hash = substr(hash('sha256', $normalized_token), 0, 16);
   }
 
   return 'hic_webhook:' . $ip . ':' . $token_hash;
@@ -176,11 +201,7 @@ function hic_check_webhook_rate_limit($request, $token = null)
 if (!function_exists('hic_webhook_permission_callback')) {
 function hic_webhook_permission_callback($request)
 {
-  $expected_token = hic_get_webhook_token();
-  if (!is_string($expected_token)) {
-    $expected_token = '';
-  }
-  $expected_token = trim($expected_token);
+  $expected_token = hic_normalize_webhook_token(hic_get_webhook_token());
 
   if ($expected_token === '') {
     hic_log('Webhook permission denied: token non configurato', HIC_LOG_LEVEL_ERROR);
@@ -192,7 +213,6 @@ function hic_webhook_permission_callback($request)
   }
 
   $provided_token = '';
-
   if (is_object($request) && method_exists($request, 'get_param')) {
     $provided_token = $request->get_param('token');
   } elseif (is_array($request) && array_key_exists('token', $request)) {
@@ -201,11 +221,7 @@ function hic_webhook_permission_callback($request)
     $provided_token = $_REQUEST['token'];
   }
 
-  if (!is_string($provided_token)) {
-    $provided_token = '';
-  }
-
-  $provided_token = sanitize_text_field($provided_token);
+  $provided_token = hic_normalize_webhook_token($provided_token);
 
   $rate_limit = hic_check_webhook_rate_limit($request, $provided_token);
   if (is_wp_error($rate_limit)) {
@@ -345,15 +361,15 @@ if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK && function_exists
 
 function hic_webhook_handler(WP_REST_Request $request) {
   // Validate token
-  $token = $request->get_param('token');
-  $expected_token = hic_get_webhook_token();
-  
-  if (empty($expected_token)) {
+  $token = hic_normalize_webhook_token($request->get_param('token'));
+  $expected_token = hic_normalize_webhook_token(hic_get_webhook_token());
+
+  if ($expected_token === '') {
     hic_log('Webhook rifiutato: token webhook non configurato');
     return new \WP_Error('missing_token','Token webhook non configurato',['status'=>500]);
   }
-  
-  if ($token !== $expected_token) {
+
+  if ($token === '' || !hash_equals($expected_token, $token)) {
     hic_log('Webhook rifiutato: token invalido');
     return new \WP_Error('invalid_token','Token non valido',['status'=>403]);
   }

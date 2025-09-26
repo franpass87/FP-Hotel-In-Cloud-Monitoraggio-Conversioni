@@ -1,9 +1,14 @@
-# Test files
-*-test.html
-test-*.html
-/tmp/
-tests/temp/
-tests/*.temp
+# === Build artifacts ===
+dist/
+*.zip
+
+# Node / Composer
+node_modules/
+vendor/
+
+# Tests / Coverage / CI temp
+coverage/
+.phpunit.result.cache
 
 # IDE files
 .vscode/
@@ -19,10 +24,15 @@ Thumbs.db
 *.log
 debug.log
 hic-log*.txt
+!docs/audit/runtime-issues.log
 
 # Temporary files
 *.tmp
 *.temp
 
-# Composer
-vendor/
+# Test files
+*-test.html
+test-*.html
+/tmp/
+tests/temp/
+tests/*.temp
