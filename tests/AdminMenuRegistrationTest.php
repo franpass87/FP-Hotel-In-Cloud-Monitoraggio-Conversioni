@@ -16,7 +16,7 @@ final class AdminMenuRegistrationTest extends WP_UnitTestCase
         if (class_exists(\FpHic\AutomatedReporting\AutomatedReportingManager::class)) {
             $instanceProperty = new ReflectionProperty(\FpHic\AutomatedReporting\AutomatedReportingManager::class, 'instance');
             $instanceProperty->setAccessible(true);
-            $instanceProperty->setValue(null);
+            $instanceProperty->setValue(null, null);
         }
     }
 
@@ -67,7 +67,7 @@ final class AdminMenuRegistrationTest extends WP_UnitTestCase
     {
         $reflection = new ReflectionProperty(\FpHic\AutomatedReporting\AutomatedReportingManager::class, 'instance');
         $reflection->setAccessible(true);
-        $reflection->setValue(null);
+        $reflection->setValue(null, null);
 
         $reports = \FpHic\AutomatedReporting\AutomatedReportingManager::instance();
         $reports->add_reports_menu();

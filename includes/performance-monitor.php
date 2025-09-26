@@ -583,8 +583,6 @@ class HIC_Performance_Monitor {
                 ? ($operationBucket['success']['total'] / $operationBucket['total']) * 100
                 : 0.0;
 
-            $operationBucket['trend'] = $this->calculate_trend($operationBucket['days']);
-
             foreach ($operationBucket['days'] as $date => &$dayBucket) {
                 sort($dayBucket['durations']);
                 $successTotal = $dayBucket['success']['total'];
@@ -605,6 +603,8 @@ class HIC_Performance_Monitor {
                 ];
             }
             unset($dayBucket);
+
+            $operationBucket['trend'] = $this->calculate_trend($operationBucket['days']);
 
             unset($operationBucket['durations']);
         }
