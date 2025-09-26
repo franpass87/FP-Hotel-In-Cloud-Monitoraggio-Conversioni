@@ -57,11 +57,60 @@ function hic_mask_sensitive_data($message) {
  * @param string $level   Log level
  * @return string
  */
+function hic_normalize_sensitive_key($key): string
+{
+    if (!is_scalar($key)) {
+        return '';
+    }
+
+    $normalized = (string) $key;
+    $normalized = preg_replace('/([a-z])([A-Z])/', '$1_$2', $normalized);
+    $normalized = preg_replace('/[^a-zA-Z0-9_]+/', '_', $normalized ?? '');
+    $normalized = strtolower($normalized ?? '');
+
+    return trim($normalized ?? '', '_');
+}
+
 function hic_default_log_message_filter($message, $level) {
+    static $email_keys = null;
+    static $phone_keys = null;
+
+    if ($email_keys === null) {
+        $email_keys = [
+            'email',
+            'guest_email',
+            'customer_email',
+            'contact_email',
+            'user_email',
+            'primary_email',
+            'email_address',
+            'billing_email',
+            'shipping_email',
+        ];
+        $phone_keys = [
+            'phone',
+            'phone_number',
+            'guest_phone',
+            'customer_phone',
+            'contact_phone',
+            'user_phone',
+            'primary_phone',
+            'mobile',
+            'mobile_phone',
+            'mobile_number',
+        ];
+    }
+
     if (is_array($message)) {
         foreach ($message as $key => $value) {
-            if (is_string($key) && preg_match('/^(?:email)$/i', $key)) {
+            $normalized_key = hic_normalize_sensitive_key($key);
+
+            if ($normalized_key !== '' && in_array($normalized_key, $email_keys, true)) {
                 $message[$key] = '[masked-email]';
+                continue;
+            }
+            if ($normalized_key !== '' && in_array($normalized_key, $phone_keys, true)) {
+                $message[$key] = '[masked-phone]';
                 continue;
             }
             if (is_string($key) && preg_match('/(token|api[_-]?key|secret|password)/i', $key)) {
@@ -75,8 +124,14 @@ function hic_default_log_message_filter($message, $level) {
 
     if (is_object($message)) {
         foreach ($message as $key => $value) {
-            if (is_string($key) && preg_match('/^(?:email)$/i', $key)) {
+            $normalized_key = hic_normalize_sensitive_key($key);
+
+            if ($normalized_key !== '' && in_array($normalized_key, $email_keys, true)) {
                 $message->$key = '[masked-email]';
+                continue;
+            }
+            if ($normalized_key !== '' && in_array($normalized_key, $phone_keys, true)) {
+                $message->$key = '[masked-phone]';
                 continue;
             }
             if (is_string($key) && preg_match('/(token|api[_-]?key|secret|password)/i', $key)) {
