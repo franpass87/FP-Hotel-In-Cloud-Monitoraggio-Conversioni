@@ -67,6 +67,9 @@ final class ModuleLoader
         'includes/performance-monitor.php',
         'includes/performance-analytics-dashboard.php',
         'includes/health-monitor.php',
+        'includes/experience/helpers.php',
+        'includes/experience/assets.php',
+        'includes/experience/shortcodes.php',
     ];
 
     private const ADMIN_MODULES = [
