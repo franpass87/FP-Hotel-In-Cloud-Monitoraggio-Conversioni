@@ -194,7 +194,7 @@ function handle_shutdown(): void
  */
 function render_admin_notice(): void
 {
-    if (!function_exists('current_user_can') || !current_user_can('manage_options')) {
+    if (!function_exists('current_user_can') || !current_user_can('hic_manage')) {
         return;
     }
 
@@ -259,7 +259,7 @@ function render_admin_notice(): void
  */
 function render_frontend_overlay(): void
 {
-    if (!function_exists('current_user_can') || !current_user_can('manage_options')) {
+    if (!function_exists('current_user_can') || !current_user_can('hic_manage')) {
         return;
     }
 

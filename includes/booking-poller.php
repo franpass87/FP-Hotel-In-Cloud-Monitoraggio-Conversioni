@@ -3,6 +3,7 @@
 namespace FpHic;
 
 use \Exception;
+use function FpHic\Helpers\hic_sanitize_identifier;
 
 /**
  * Internal Booking Scheduler - WP-Cron System
@@ -14,6 +15,8 @@ class HIC_Booking_Poller {
 
     const SCHEDULER_RESTART_LOCK_KEY = 'hic_scheduler_restart_lock';
     const SCHEDULER_RESTART_LOCK_TTL = 120; // 2 minutes
+    const SCHEDULER_CHECK_TRANSIENT_KEY = 'hic_cron_checked_at';
+    const SCHEDULER_CHECK_TRANSIENT_TTL = 60; // Debounce duration in seconds
     const CLEANUP_RECURRENCE = 'daily';
     
     public function __construct() {
@@ -60,10 +63,15 @@ class HIC_Booking_Poller {
      * Enhanced to detect and recover from dormant states
      */
     public function ensure_scheduler_is_active() {
+        if ($this->has_recent_scheduler_check()) {
+            return;
+        }
+
         if (!$this->should_poll()) {
             hic_log('Scheduler conditions not met, clearing all scheduled events');
             // Clear any existing events if conditions aren't met
             $this->clear_all_scheduled_events();
+            $this->mark_scheduler_checked();
             return;
         }
         
@@ -173,6 +181,8 @@ class HIC_Booking_Poller {
         if ($this->are_scheduler_events_scheduled()) {
             $this->clear_scheduler_restart_lock();
         }
+
+        $this->mark_scheduler_checked();
     }
     
     /**
@@ -245,6 +255,30 @@ class HIC_Booking_Poller {
             update_option(self::SCHEDULER_RESTART_LOCK_KEY, $timestamp, false);
             \FpHic\Helpers\hic_clear_option_cache(self::SCHEDULER_RESTART_LOCK_KEY);
         }
+    }
+
+    /**
+     * Determine if the scheduler watchdog ran within the debounce window.
+     */
+    private function has_recent_scheduler_check() {
+        if (!function_exists('get_transient')) {
+            return false;
+        }
+
+        return get_transient(self::SCHEDULER_CHECK_TRANSIENT_KEY) !== false;
+    }
+
+    /**
+     * Track the scheduler watchdog execution time to debounce subsequent runs.
+     */
+    private function mark_scheduler_checked() {
+        if (!function_exists('set_transient')) {
+            return;
+        }
+
+        $ttl = defined('MINUTE_IN_SECONDS') ? (int) MINUTE_IN_SECONDS : self::SCHEDULER_CHECK_TRANSIENT_TTL;
+
+        set_transient(self::SCHEDULER_CHECK_TRANSIENT_KEY, time(), $ttl);
     }
 
     /**
@@ -1682,15 +1716,13 @@ function hic_deactivate(): void {
         $options_table = Helpers\hic_get_options_table_name($wpdb);
 
         if (is_string($options_table) && $options_table !== '') {
-            if (function_exists('esc_sql')) {
-                $options_table = esc_sql($options_table);
-            }
+            $options_table = hic_sanitize_identifier($options_table, 'table');
 
             // Clear all hic_* transients including processing locks
-            $wpdb->query("DELETE FROM {$options_table} WHERE option_name LIKE '_transient_hic_%' OR option_name LIKE '_transient_timeout_hic_%'");
+            $wpdb->query("DELETE FROM `{$options_table}` WHERE option_name LIKE '_transient_hic_%' OR option_name LIKE '_transient_timeout_hic_%'");
 
             // Remove temporary options related to polling and locks
-            $wpdb->query("DELETE FROM {$options_table} WHERE option_name LIKE 'hic_last_%' OR option_name LIKE 'hic_%_lock'");
+            $wpdb->query("DELETE FROM `{$options_table}` WHERE option_name LIKE 'hic_last_%' OR option_name LIKE 'hic_%_lock'");
         }
     }
 

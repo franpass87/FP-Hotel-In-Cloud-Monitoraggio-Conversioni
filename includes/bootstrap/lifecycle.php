@@ -187,59 +187,49 @@ final class Lifecycle
             return;
         }
 
-        $logDir = WP_CONTENT_DIR . '/uploads/hic-logs';
-        $dirOk  = true;
+        $status = Helpers\hic_ensure_log_directory_security();
+        $logDir = $status['path'] !== ''
+            ? $status['path']
+            : WP_CONTENT_DIR . '/uploads/hic-logs';
 
-        if (!file_exists($logDir)) {
-            if (function_exists('wp_mkdir_p')) {
-                $dirOk = wp_mkdir_p($logDir);
-            } else {
-                $dirOk = mkdir($logDir, 0755, true);
-            }
-
-            if (!$dirOk) {
-                $error = error_get_last();
-                Helpers\hic_log(
-                    sprintf(
-                        'Impossibile creare la cartella dei log %s: %s',
-                        $logDir,
-                        $error['message'] ?? 'errore sconosciuto'
-                    ),
-                    \HIC_LOG_LEVEL_ERROR
-                );
-
-                add_action('admin_notices', static function () use ($logDir): void {
-                    echo '<div class="notice notice-error"><p>' .
-                        esc_html(
-                            sprintf(
-                                __('Impossibile creare la cartella dei log %s. Verifica i permessi.', 'hotel-in-cloud'),
-                                $logDir
-                            )
-                        ) .
-                        '</p></div>';
-                });
-            }
-        } else {
-            $dirOk = is_dir($logDir);
-        }
-
-        if (!$dirOk) {
+        if ($logDir === '') {
             return;
         }
 
-        $htaccess = $logDir . '/.htaccess';
-        if (file_exists($htaccess)) {
+        if (!$status['directory']) {
+            $errorMessage = $status['errors']['directory'] ?? 'errore sconosciuto';
+            Helpers\hic_log(
+                sprintf(
+                    'Impossibile creare la cartella dei log %s: %s',
+                    $logDir,
+                    $errorMessage
+                ),
+                \HIC_LOG_LEVEL_ERROR
+            );
+
+            add_action('admin_notices', static function () use ($logDir): void {
+                echo '<div class="notice notice-error"><p>' .
+                    esc_html(
+                        sprintf(
+                            __('Impossibile creare la cartella dei log %s. Verifica i permessi.', 'hotel-in-cloud'),
+                            $logDir
+                        )
+                    ) .
+                    '</p></div>';
+            });
+
             return;
         }
 
-        $content = "Order allow,deny\nDeny from all\n";
-        if (false === file_put_contents($htaccess, $content)) {
-            $error = error_get_last();
+        if (!$status['htaccess']) {
+            $htaccess = $logDir . '/.htaccess';
+            $errorMessage = $status['errors']['htaccess'] ?? ($status['errors']['directory'] ?? 'errore sconosciuto');
+
             Helpers\hic_log(
                 sprintf(
                     'Impossibile creare il file %s: %s',
                     $htaccess,
-                    $error['message'] ?? 'errore sconosciuto'
+                    $errorMessage
                 ),
                 \HIC_LOG_LEVEL_ERROR
             );
@@ -250,6 +240,31 @@ final class Lifecycle
                         sprintf(
                             __('Impossibile creare il file %s. Verifica i permessi.', 'hotel-in-cloud'),
                             $htaccess
+                        )
+                    ) .
+                    '</p></div>';
+            });
+        }
+
+        if (!$status['web_config']) {
+            $webConfig = $logDir . '/web.config';
+            $errorMessage = $status['errors']['web_config'] ?? ($status['errors']['directory'] ?? 'errore sconosciuto');
+
+            Helpers\hic_log(
+                sprintf(
+                    'Impossibile creare il file %s: %s',
+                    $webConfig,
+                    $errorMessage
+                ),
+                \HIC_LOG_LEVEL_ERROR
+            );
+
+            add_action('admin_notices', static function () use ($webConfig): void {
+                echo '<div class="notice notice-error"><p>' .
+                    esc_html(
+                        sprintf(
+                            __('Impossibile creare il file %s. Verifica i permessi.', 'hotel-in-cloud'),
+                            $webConfig
                         )
                     ) .
                     '</p></div>';

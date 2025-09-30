@@ -10,6 +10,136 @@ function hic_get_log_file() {
     return hic_get_option('log_file', WP_CONTENT_DIR . '/uploads/hic-logs/hic-log.txt');
 }
 
+function hic_get_log_directory(): string
+{
+    $defaultDirectory = rtrim(WP_CONTENT_DIR . '/uploads/hic-logs', '/\\');
+    $logFile = hic_get_log_file();
+
+    if (!is_string($logFile) || $logFile === '') {
+        return $defaultDirectory;
+    }
+
+    $directory = dirname($logFile);
+
+    if ($directory === '' || $directory === '.' || $directory === DIRECTORY_SEPARATOR) {
+        return $defaultDirectory;
+    }
+
+    return rtrim($directory, '/\\');
+}
+
+/**
+ * Ensure the log directory exists and is shielded from direct access.
+ *
+ * @return array{directory:bool,htaccess:bool,web_config:bool,errors:array<string,string>,path:string}
+ */
+function hic_ensure_log_directory_security(): array
+{
+    $status = [
+        'directory' => false,
+        'htaccess' => false,
+        'web_config' => false,
+        'errors' => [],
+        'path' => '',
+    ];
+
+    if (!defined('WP_CONTENT_DIR')) {
+        $status['errors']['directory'] = 'WP_CONTENT_DIR not defined.';
+
+        return $status;
+    }
+
+    $logDir = hic_get_log_directory();
+    $status['path'] = $logDir;
+
+    if ($logDir === '') {
+        $status['errors']['directory'] = 'Empty log directory path.';
+
+        return $status;
+    }
+
+    if (!is_dir($logDir)) {
+        $created = function_exists('wp_mkdir_p')
+            ? wp_mkdir_p($logDir)
+            : mkdir($logDir, 0755, true);
+
+        if (!$created && !is_dir($logDir)) {
+            $status['errors']['directory'] = sprintf('Unable to create directory %s.', $logDir);
+
+            return $status;
+        }
+    }
+
+    $status['directory'] = true;
+
+    $directoryWritable = is_writable($logDir);
+    if (!$directoryWritable) {
+        $status['errors']['directory'] = sprintf('Directory %s is not writable.', $logDir);
+    }
+
+    $htaccessPath = $logDir . DIRECTORY_SEPARATOR . '.htaccess';
+    $desiredHtaccess = "Order allow,deny\nDeny from all\n";
+    $existingHtaccess = is_readable($htaccessPath) ? file_get_contents($htaccessPath) : '';
+
+    if (is_string($existingHtaccess) && strpos($existingHtaccess, 'Deny from all') !== false) {
+        $status['htaccess'] = true;
+    } elseif ($directoryWritable) {
+        if (function_exists('error_clear_last')) {
+            error_clear_last();
+        }
+
+        if (false !== file_put_contents($htaccessPath, $desiredHtaccess)) {
+            $status['htaccess'] = true;
+        } else {
+            $error = error_get_last();
+            $status['errors']['htaccess'] = sprintf(
+                'Unable to write %s: %s',
+                $htaccessPath,
+                $error['message'] ?? 'unknown error'
+            );
+        }
+    } else {
+        $status['errors']['htaccess'] = sprintf('Directory %s is not writable.', $logDir);
+    }
+
+    $webConfigPath = $logDir . DIRECTORY_SEPARATOR . 'web.config';
+    $desiredWebConfig = <<<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <system.webServer>
+    <authorization>
+      <deny users="*" />
+    </authorization>
+    <directoryBrowse enabled="false" />
+  </system.webServer>
+</configuration>
+XML;
+    $existingWebConfig = is_readable($webConfigPath) ? file_get_contents($webConfigPath) : '';
+
+    if (is_string($existingWebConfig) && strpos($existingWebConfig, '<deny users="*"') !== false) {
+        $status['web_config'] = true;
+    } elseif ($directoryWritable) {
+        if (function_exists('error_clear_last')) {
+            error_clear_last();
+        }
+
+        if (false !== file_put_contents($webConfigPath, $desiredWebConfig)) {
+            $status['web_config'] = true;
+        } else {
+            $error = error_get_last();
+            $status['errors']['web_config'] = sprintf(
+                'Unable to write %s: %s',
+                $webConfigPath,
+                $error['message'] ?? 'unknown error'
+            );
+        }
+    } else {
+        $status['errors']['web_config'] = sprintf('Directory %s is not writable.', $logDir);
+    }
+
+    return $status;
+}
+
 function hic_validate_log_path($path) {
     $base_dir = WP_CONTENT_DIR . '/uploads/hic-logs/';
     $default = $base_dir . 'hic-log.txt';
