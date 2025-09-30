@@ -79,6 +79,7 @@ final class ModuleLoader
         'includes/performance-monitor.php',
         'includes/performance-analytics-dashboard.php',
         'includes/health-monitor.php',
+        'src/bootstrap.php',
     ];
 
     private const ADMIN_MODULES = [
