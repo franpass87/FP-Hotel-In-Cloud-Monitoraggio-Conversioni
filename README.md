@@ -44,39 +44,38 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 
 #### Esempio payload Webhook
 
-Il webhook `POST /wp-json/hic/v1/conversion?token=IL_TUO_TOKEN` accetta un corpo JSON con i seguenti campi:
+L'endpoint REST `GET|POST /wp-json/hic/v1/conversion?token=IL_TUO_TOKEN` accetta sia parametri in query string sia un corpo JSON. Un esempio completo:
 
 ```json
 {
-  "email": "mario.rossi@example.com",
-  "reservation_id": "ABC123",
-  "guest_first_name": "Mario",
-  "guest_last_name": "Rossi",
-  "amount": 199.99,
+  "booking_code": "T123",
+  "status": "confirmed",
+  "amount": 199.00,
   "currency": "EUR",
-  "checkin": "2025-06-01",
-  "checkout": "2025-06-07",
-  "room": "Camera Deluxe",
-  "guests": 2,
-  "language": "it",
-  "sid": "tracking123"
+  "checkin": "2025-08-20",
+  "checkout": "2025-08-22",
+  "guest_email": "john@example.com",
+  "guest_phone": "+39333111222",
+  "rooms": 1,
+  "adults": 2,
+  "children": 0,
+  "gclid": "TEST-GCLID",
+  "fbclid": "TEST-FBCLID",
+  "booking_intent_id": "a8b01c9e-1234-45ab-9cde-ffeeddccbbaa"
 }
 ```
 
-Schema campi principali:
+Campi riconosciuti dal plugin:
 
-- `email` *(stringa, obbligatorio)* – indirizzo email del cliente
-- `reservation_id` *(stringa)* – identificativo della prenotazione
-- `guest_first_name` *(stringa)* – nome dell'ospite
-- `guest_last_name` *(stringa)* – cognome dell'ospite
-- `amount` *(numero)* – totale della prenotazione
-- `currency` *(stringa)* – valuta dell'importo (es. `EUR`)
-- `checkin` *(data Y-m-d)* – data di arrivo
-- `checkout` *(data Y-m-d)* – data di partenza
-- `room` *(stringa)* – nome della sistemazione
-- `guests` *(intero)* – numero di ospiti
-- `language` *(stringa)* – lingua dell'utente
-- `sid` *(stringa)* – identificatore utente opzionale per il tracciamento
+- `booking_code` *(stringa, obbligatorio)* – identificativo prenotazione utilizzato come transaction id
+- `status` *(stringa)* – stato prenotazione (`confirmed`, `cancelled`, ecc.)
+- `checkin`/`checkout` *(data Y-m-d)* – periodo del soggiorno
+- `currency` *(stringa 3 char)* e `amount` *(numero)* – valori economici inviati a GA4/Meta
+- `guest_email`, `guest_phone` *(stringhe)* – dati PII hashati SHA-256 per advanced matching (solo se consenso disponibile)
+- `rooms`, `adults`, `children` *(interi opzionali)* – dettagli per debug interno
+- `gclid`, `gbraid`, `wbraid`, `fbclid`, `msclkid`, `ttclid` *(stringhe)* – identificatori campagne utilizzati per attribuzione bucket `gads`/`fbads`
+- `booking_intent_id` *(UUID opzionale)* – collega la conversione a un intent salvato tramite il redirector `/go/booking`
+- `sid` *(stringa opzionale)* – session id lato client, se disponibile
 
 #### Sicurezza del Webhook
 
@@ -95,6 +94,22 @@ Schema campi principali:
 - **Non dipende** dal comportamento dell'utente o dal browser
 
 📖 **Guida Completa**: [Setup Webhook per Conversioni Senza Redirect](GUIDA_WEBHOOK_CONVERSIONI.md)
+
+### Redirector `/go/booking`
+
+Attivando il redirector dalle impostazioni “HIC Webhook & S2S” il plugin genera un link pronto all'uso:
+
+```
+/?fp_go_booking=1&target=<BASE64_URL_ENGINE>
+```
+
+Il redirector crea (se assente) il cookie `hic_sid`, salva UTM e identificatori pubblicitari nella tabella `wp_hic_booking_intents` e infine esegue un redirect 302 verso l'engine HIC. L'`intent_id` generato verrà riutilizzabile da futuri webhook per riagganciare il bucket di attribuzione.
+
+### Diagnostica e QA server-to-server
+
+- **Pagina “HIC Webhook & S2S”**: configura token, credenziali GA4/Meta, abilita il redirector e utilizza i pulsanti rapidi “Invia finto webhook”, “Ping GA4” e “Ping Meta”.
+- **Log dedicati**: la tabella `wp_hic_logs` contiene i canali `webhook`, `ga4`, `meta` ed `error`. Dalla stessa pagina è possibile filtrare e scaricare un CSV degli ultimi eventi.
+- **Endpoint salute**: `GET /wp-json/hic/v1/health` (riservato agli admin con capability `hic_manage`) restituisce stato configurazione, raggiungibilità GA4/Meta e ultime 10 conversioni elaborate.
 
 ### Caricamento dello script frontend
 

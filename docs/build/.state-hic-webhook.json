@@ -1,0 +1,13 @@
+{
+    "phase": 7,
+    "percent": 100,
+    "done": [
+        "phase1",
+        "phase2",
+        "phase3",
+        "phase4",
+        "phase5",
+        "phase6",
+        "phase7"
+    ]
+}
