@@ -293,6 +293,7 @@ jQuery(function ($) {
         const batchSize = Number.isFinite(Number.parseInt(archiveConfig.batch_size, 10))
             ? Number.parseInt(archiveConfig.batch_size, 10)
             : null;
+        let effectiveBatchSize = batchSize;
 
         let currentState = null;
         let jobDone = false;
@@ -415,8 +416,19 @@ jQuery(function ($) {
                 }
             }
 
-            if (batchSize && fragments.length === 1 && !running && !jobDone) {
-                fragments.push(formatNumbered(strings.last_batch, [batchSize.toLocaleString()]));
+            const fallbackBatchSize = Number.isFinite(effectiveBatchSize)
+                ? effectiveBatchSize
+                : batchSize;
+
+            if (
+                fallbackBatchSize &&
+                fragments.length === 1 &&
+                !running &&
+                !jobDone
+            ) {
+                fragments.push(
+                    formatNumbered(strings.last_batch, [fallbackBatchSize.toLocaleString()])
+                );
             }
 
             $archiveStatusText.text(fragments.filter(Boolean).join(' · '));
@@ -426,11 +438,20 @@ jQuery(function ($) {
             if (!data) {
                 currentState = null;
                 jobDone = false;
+                effectiveBatchSize = batchSize;
                 return;
             }
 
             currentState = data.state || null;
             jobDone = Boolean(data.done);
+
+            if (data.state && Object.prototype.hasOwnProperty.call(data.state, 'batch_size')) {
+                const parsedBatchSize = Number.parseInt(data.state.batch_size, 10);
+
+                if (Number.isFinite(parsedBatchSize) && parsedBatchSize > 0) {
+                    effectiveBatchSize = parsedBatchSize;
+                }
+            }
         }
 
         function callArchiveEndpoint(action, nonce) {

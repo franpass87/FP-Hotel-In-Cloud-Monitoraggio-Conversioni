@@ -2,6 +2,8 @@
 
 namespace FpHic\IntelligentPolling;
 
+use function FpHic\Helpers\hic_require_cap;
+
 if (!defined('ABSPATH')) exit;
 
 /**
@@ -536,9 +538,7 @@ class IntelligentPollingManager {
             wp_send_json_error('Invalid nonce');
         }
 
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         $metrics = get_option('hic_polling_metrics', []);
         $activity_metrics = get_option('hic_activity_metrics', []);

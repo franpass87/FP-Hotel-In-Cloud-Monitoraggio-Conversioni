@@ -90,6 +90,7 @@ class HIC_Booking_Poller {
             $this->clear_all_scheduled_events();
             // Schedule asynchronous restart instead of blocking sleep
             $this->schedule_scheduler_restart();
+            $this->mark_scheduler_checked();
             return;
         }
         
@@ -276,7 +277,7 @@ class HIC_Booking_Poller {
             return;
         }
 
-        $ttl = defined('MINUTE_IN_SECONDS') ? (int) MINUTE_IN_SECONDS : self::SCHEDULER_CHECK_TRANSIENT_TTL;
+        $ttl = (int) self::SCHEDULER_CHECK_TRANSIENT_TTL;
 
         set_transient(self::SCHEDULER_CHECK_TRANSIENT_KEY, time(), $ttl);
     }

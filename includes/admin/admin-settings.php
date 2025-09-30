@@ -9,6 +9,7 @@ require_once __DIR__ . '/../rate-limiter.php';
 
 use FpHic\HIC_Rate_Limiter;
 use function FpHic\Helpers\hic_log;
+use function FpHic\Helpers\hic_require_cap;
 
 /* ============ Admin Settings Page ============ */
 add_action('admin_menu', 'hic_add_admin_menu', 40);
@@ -172,12 +173,7 @@ function hic_ajax_test_email() {
         ));
     }
     
-    // Check user permissions
-    if (!current_user_can('hic_manage')) {
-        wp_send_json_error(array(
-            'message' => 'Permessi insufficienti.'
-        ));
-    }
+    hic_require_cap('hic_manage');
 
     if (!hic_enforce_ajax_rate_limit('test_email_ajax', 5, 300)) {
         return;
@@ -213,12 +209,7 @@ function hic_ajax_test_api_connection() {
         ));
     }
     
-    // Check user permissions
-    if (!current_user_can('hic_manage')) {
-        wp_send_json_error(array(
-            'message' => 'Permessi insufficienti.'
-        ));
-    }
+    hic_require_cap('hic_manage');
 
     if (!hic_enforce_ajax_rate_limit('test_api_connection', 5, 300)) {
         return;
@@ -253,11 +244,7 @@ function hic_ajax_generate_health_token() {
         ));
     }
 
-    if (!current_user_can('hic_manage')) {
-        wp_send_json_error(array(
-            'message' => 'Permessi insufficienti.'
-        ));
-    }
+    hic_require_cap('hic_manage');
 
     if (!hic_enforce_ajax_rate_limit('generate_health_token', 3, 900)) {
         return;

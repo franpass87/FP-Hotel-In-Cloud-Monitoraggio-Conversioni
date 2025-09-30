@@ -5,6 +5,8 @@
  * Tracks performance metrics, API response times, and system efficiency.
  */
 
+use function FpHic\Helpers\hic_require_cap;
+
 if (!defined('ABSPATH')) exit;
 
 class HIC_Performance_Monitor {
@@ -456,9 +458,7 @@ class HIC_Performance_Monitor {
             wp_send_json(['error' => 'Invalid nonce'], 403);
         }
 
-        if (!current_user_can('hic_manage')) {
-            wp_send_json(['error' => 'Insufficient permissions'], 403);
-        }
+        hic_require_cap('hic_manage');
 
         $type = sanitize_text_field( wp_unslash( $_GET['type'] ?? 'summary' ) );
         $days = absint( wp_unslash( $_GET['days'] ?? 7 ) );

@@ -2,6 +2,8 @@
 
 namespace FpHic\RealtimeDashboard;
 
+use function FpHic\Helpers\hic_require_cap;
+
 if (!defined('ABSPATH')) exit;
 
 /**
@@ -922,9 +924,7 @@ class RealtimeDashboard {
             wp_send_json_error( 'Invalid nonce' );
         }
 
-        if ( ! current_user_can( 'hic_manage' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        hic_require_cap('hic_manage');
         
         $cached_stats = $this->get_dashboard_cache('realtime_stats');
         
@@ -944,9 +944,7 @@ class RealtimeDashboard {
             wp_send_json_error( 'Invalid nonce' );
         }
 
-        if ( ! current_user_can( 'hic_manage' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        hic_require_cap('hic_manage');
 
         $period = isset( $_POST['period'] ) ? sanitize_text_field( wp_unslash( $_POST['period'] ) ) : '7days';
         $cached_data = $this->get_dashboard_cache('revenue_by_channel');
@@ -967,9 +965,7 @@ class RealtimeDashboard {
             wp_send_json_error( 'Invalid nonce' );
         }
 
-        if ( ! current_user_can( 'hic_manage' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        hic_require_cap('hic_manage');
         
         global $wpdb;
         
@@ -992,9 +988,7 @@ class RealtimeDashboard {
             wp_send_json_error( 'Invalid nonce' );
         }
 
-        if ( ! current_user_can( 'hic_manage' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        hic_require_cap('hic_manage');
         
         $cached_data = $this->get_dashboard_cache('conversion_funnel');
         
@@ -1014,9 +1008,7 @@ class RealtimeDashboard {
             wp_send_json_error( 'Invalid nonce' );
         }
 
-        if ( ! current_user_can( 'hic_manage' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        hic_require_cap('hic_manage');
         
         global $wpdb;
         
@@ -1046,9 +1038,7 @@ class RealtimeDashboard {
             wp_send_json_error( 'Invalid nonce' );
         }
 
-        if ( ! current_user_can( 'hic_manage' ) ) {
-            wp_send_json_error( 'Insufficient permissions' );
-        }
+        hic_require_cap('hic_manage');
         
         $last_update = get_option('hic_dashboard_last_heartbeat', 0);
         $current_time = time();

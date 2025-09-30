@@ -48,6 +48,14 @@ function hic_get_wpdb(array $required_methods = [])
     return $wpdb;
 }
 
+/**
+ * Sanitize a fully qualified table identifier.
+ */
+function hic_sanitize_table_name(string $table): string
+{
+    return \FpHic\Helpers\hic_sanitize_identifier($table, 'table');
+}
+
 /* ============ DB: tabella sid↔gclid/fbclid ============ */
 function hic_create_database_table(){
   $wpdb = hic_get_wpdb(['get_charset_collate', 'get_var', 'prepare']);
@@ -57,7 +65,7 @@ function hic_create_database_table(){
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_gclids';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_gclids');
   $charset = $wpdb->get_charset_collate();
 
   $sql = "CREATE TABLE IF NOT EXISTS $table (
@@ -86,7 +94,9 @@ function hic_create_database_table(){
     KEY utm_medium (utm_medium(100)),
     KEY utm_campaign (utm_campaign(100)),
     KEY utm_content (utm_content(100)),
-    KEY utm_term (utm_term(100))
+    KEY utm_term (utm_term(100)),
+    KEY created_at_idx (created_at),
+    KEY sid_created_at_idx (sid(100), created_at)
   ) $charset;";
 
   $upgrade_file = ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -137,7 +147,7 @@ function hic_create_realtime_sync_table(){
     return false;
   }
   
-  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
   $charset = $wpdb->get_charset_collate();
   
   $sql = "CREATE TABLE IF NOT EXISTS $table (
@@ -199,7 +209,7 @@ function hic_create_booking_events_table(){
     return false;
   }
   
-  $table = $wpdb->prefix . 'hic_booking_events';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_booking_events');
   $charset = $wpdb->get_charset_collate();
   
   $sql = "CREATE TABLE IF NOT EXISTS $table (
@@ -260,7 +270,7 @@ function hic_create_failed_requests_table(){
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_failed_requests';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_failed_requests');
   $charset = $wpdb->get_charset_collate();
 
   $sql = "CREATE TABLE IF NOT EXISTS $table (
@@ -312,7 +322,7 @@ function hic_create_booking_metrics_table() {
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_booking_metrics';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_booking_metrics');
   $charset = $wpdb->get_charset_collate();
 
   $sql = "CREATE TABLE IF NOT EXISTS $table (
@@ -376,7 +386,7 @@ function hic_ensure_utm_columns_exist() {
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_gclids';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_gclids');
   
   // Check if table exists first
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
@@ -436,7 +446,7 @@ function hic_maybe_upgrade_db() {
 
   // Example migration to version 1.1
   if (version_compare($installed_version, '1.1', '<')) {
-    $table = $wpdb->prefix . 'hic_realtime_sync';
+    $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
     $column_exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", 'brevo_event_sent'));
     if (empty($column_exists)) {
       $wpdb->query("ALTER TABLE $table ADD COLUMN brevo_event_sent TINYINT(1) DEFAULT 0");
@@ -448,7 +458,7 @@ function hic_maybe_upgrade_db() {
 
   // Migration to version 1.2 - add UTM columns
   if (version_compare($installed_version, '1.2', '<')) {
-    $table = $wpdb->prefix . 'hic_gclids';
+    $table = hic_sanitize_table_name($wpdb->prefix . 'hic_gclids');
     $columns = ['utm_source', 'utm_medium', 'utm_campaign'];
     foreach ($columns as $col) {
       $exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", $col));
@@ -463,7 +473,7 @@ function hic_maybe_upgrade_db() {
 
   // Migration to version 1.3 - add msclkid and ttclid columns
   if (version_compare($installed_version, '1.3', '<')) {
-    $table = $wpdb->prefix . 'hic_gclids';
+    $table = hic_sanitize_table_name($wpdb->prefix . 'hic_gclids');
     $columns = ['msclkid', 'ttclid'];
     foreach ($columns as $col) {
       $exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", $col));
@@ -478,7 +488,7 @@ function hic_maybe_upgrade_db() {
 
   // Migration to version 1.4 - add UTM content and term columns
   if (version_compare($installed_version, '1.4', '<')) {
-    $table = $wpdb->prefix . 'hic_gclids';
+    $table = hic_sanitize_table_name($wpdb->prefix . 'hic_gclids');
     $columns = ['utm_content', 'utm_term'];
     foreach ($columns as $col) {
       $exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", $col));
@@ -501,7 +511,7 @@ function hic_maybe_upgrade_db() {
 
   // Migration to version 1.6 - add gbraid and wbraid columns
   if (version_compare($installed_version, '1.6', '<')) {
-    $table = $wpdb->prefix . 'hic_gclids';
+    $table = hic_sanitize_table_name($wpdb->prefix . 'hic_gclids');
     $columns = ['gbraid', 'wbraid'];
     foreach ($columns as $col) {
       $exists = $wpdb->get_results($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", $col));
@@ -595,11 +605,11 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
   }
   $_COOKIE['hic_sid'] = $sid_to_use;
 
-  $table = $wpdb->prefix . 'hic_gclids';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_gclids');
 
   // Check for existing association
   $existing = $wpdb->get_var($wpdb->prepare(
-    "SELECT id FROM $table WHERE {$type} = %s AND sid = %s LIMIT 1",
+    "SELECT id FROM `{$table}` WHERE {$type} = %s AND sid = %s LIMIT 1",
     $value,
     $sid_to_use
   ));
@@ -613,7 +623,7 @@ function hic_store_tracking_id($type, $value, $existing_sid) {
     $sid_record_id = (int) $existing;
   } else {
     $sid_record_id = (int) $wpdb->get_var($wpdb->prepare(
-      "SELECT id FROM $table WHERE sid = %s ORDER BY id DESC LIMIT 1",
+      "SELECT id FROM `{$table}` WHERE sid = %s ORDER BY id DESC LIMIT 1",
       $sid_to_use
     ));
 
@@ -665,7 +675,7 @@ function hic_capture_tracking_params(){
     return false;
   }
   
-  $table = $wpdb->prefix . 'hic_gclids';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_gclids');
 
   // Check if table exists
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
@@ -862,7 +872,7 @@ function hic_is_reservation_new_for_realtime($reservation_id) {
     return false;
   }
   
-  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
   
   // Check if table exists
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
@@ -908,7 +918,7 @@ function hic_mark_reservation_new_for_realtime($reservation_id) {
     return false;
   }
   
-  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
   
   // Check if table exists
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
@@ -957,7 +967,7 @@ function hic_mark_reservation_notified_to_brevo($reservation_id) {
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
 
   $result = $wpdb->update(
     $table,
@@ -1001,7 +1011,7 @@ function hic_mark_reservation_notification_failed($reservation_id, $error_messag
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
 
   // Get current attempt count
   $current = $wpdb->get_row($wpdb->prepare(
@@ -1069,7 +1079,7 @@ function hic_mark_reservation_notification_permanent_failure($reservation_id, $e
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
   
   $result = $wpdb->update(
     $table,
@@ -1098,7 +1108,7 @@ function hic_get_failed_reservations_for_retry($max_attempts = 3, $retry_delay_m
     return array();
   }
 
-  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
 
   $retry_time = wp_date('Y-m-d H:i:s', strtotime("-{$retry_delay_minutes} minutes", current_time('timestamp')));
 
@@ -1151,7 +1161,7 @@ function hic_reindex_realtime_sync_reservations() {
     return array('normalized' => 0, 'deleted' => 0);
   }
 
-  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
   $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
   if (!$table_exists) {
     return array('normalized' => 0, 'deleted' => 0);
@@ -1396,7 +1406,7 @@ function hic_cleanup_old_gclids($days = null) {
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_gclids';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_gclids');
   $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
   if ($exists !== $table) {
     $created = hic_create_database_table();
@@ -1444,7 +1454,7 @@ function hic_cleanup_booking_events($days = null) {
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_booking_events';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_booking_events');
   $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
   if ($exists !== $table) {
     $created = hic_create_booking_events_table();
@@ -1492,7 +1502,7 @@ function hic_cleanup_realtime_sync($days = null) {
     return false;
   }
 
-  $table = $wpdb->prefix . 'hic_realtime_sync';
+  $table = hic_sanitize_table_name($wpdb->prefix . 'hic_realtime_sync');
   $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
   if ($exists !== $table) {
     $created = hic_create_realtime_sync_table();

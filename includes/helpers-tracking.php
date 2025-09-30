@@ -32,7 +32,7 @@ function hic_export_tracking_data($email_address, $page = 1) {
         return ['data' => [], 'done' => true];
     }
 
-    $table = $wpdb->prefix . 'hic_gclids';
+    $table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
     if (!hic_tracking_table_exists($wpdb)) {
         return ['data' => [], 'done' => true];
     }
@@ -42,7 +42,7 @@ function hic_export_tracking_data($email_address, $page = 1) {
         return ['data' => [], 'done' => true];
     }
 
-    $column_exists = $wpdb->get_var($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", 'email'));
+    $column_exists = $wpdb->get_var($wpdb->prepare("SHOW COLUMNS FROM `{$table}` LIKE %s", 'email'));
     if (!$column_exists) {
         return ['data' => [], 'done' => true];
     }
@@ -51,7 +51,7 @@ function hic_export_tracking_data($email_address, $page = 1) {
     $offset = ($page - 1) * $number;
     $rows = $wpdb->get_results(
         $wpdb->prepare(
-            "SELECT id, gclid, fbclid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at FROM $table WHERE email = %s ORDER BY id ASC LIMIT %d OFFSET %d",
+            "SELECT id, gclid, fbclid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at FROM `{$table}` WHERE email = %s ORDER BY id ASC LIMIT %d OFFSET %d",
             $email,
             $number,
             $offset
@@ -112,7 +112,7 @@ function hic_erase_tracking_data($email_address, $page = 1) {
         return ['items_removed' => false, 'items_retained' => false, 'messages' => [], 'done' => true];
     }
 
-    $table = $wpdb->prefix . 'hic_gclids';
+    $table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
     if (!hic_tracking_table_exists($wpdb)) {
         return ['items_removed' => false, 'items_retained' => false, 'messages' => [], 'done' => true];
     }
@@ -122,7 +122,7 @@ function hic_erase_tracking_data($email_address, $page = 1) {
         return ['items_removed' => false, 'items_retained' => false, 'messages' => [], 'done' => true];
     }
 
-    $column_exists = $wpdb->get_var($wpdb->prepare("SHOW COLUMNS FROM $table LIKE %s", 'email'));
+    $column_exists = $wpdb->get_var($wpdb->prepare("SHOW COLUMNS FROM `{$table}` LIKE %s", 'email'));
     if (!$column_exists) {
         return ['items_removed' => false, 'items_retained' => false, 'messages' => [], 'done' => true];
     }
@@ -131,7 +131,7 @@ function hic_erase_tracking_data($email_address, $page = 1) {
     $offset = ($page - 1) * $number;
     $rows = $wpdb->get_results(
         $wpdb->prepare(
-            "SELECT id FROM $table WHERE email = %s ORDER BY id ASC LIMIT %d OFFSET %d",
+            "SELECT id FROM `{$table}` WHERE email = %s ORDER BY id ASC LIMIT %d OFFSET %d",
             $email,
             $number,
             $offset
@@ -374,8 +374,8 @@ function hic_get_tracking_ids_by_sid($sid) {
         return $runtime_cache[$sid] = $value;
     }
 
-    $table = $wpdb->prefix . 'hic_gclids';
-    $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid, msclkid, ttclid, gbraid, wbraid FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
+    $table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
+    $row = $wpdb->get_row($wpdb->prepare("SELECT gclid, fbclid, msclkid, ttclid, gbraid, wbraid FROM `{$table}` WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
 
     if ($wpdb->last_error) {
         hic_log('hic_get_tracking_ids_by_sid: Database error retrieving tracking IDs: ' . $wpdb->last_error);
@@ -447,9 +447,9 @@ function hic_get_utm_params_by_sid($sid) {
         return $runtime_cache[$sid] = $value;
     }
 
-    $table = $wpdb->prefix . 'hic_gclids';
+    $table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
 
-    $row = $wpdb->get_row($wpdb->prepare("SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term FROM $table WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
+    $row = $wpdb->get_row($wpdb->prepare("SELECT utm_source, utm_medium, utm_campaign, utm_content, utm_term FROM `{$table}` WHERE sid=%s ORDER BY id DESC LIMIT 1", $sid));
 
     if ($wpdb->last_error) {
         hic_log('hic_get_utm_params_by_sid: Database error retrieving UTM params: ' . $wpdb->last_error);

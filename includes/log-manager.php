@@ -374,19 +374,30 @@ class HIC_Log_Manager {
         
         $rotated_files = [];
         foreach ($files as $file) {
+            if (!file_exists($file)) {
+                continue;
+            }
+
+            $size = filesize($file);
+            $modified = filemtime($file);
+
             $rotated_files[] = [
                 'file' => basename($file),
-                'size' => filesize($file),
-                'size_mb' => round(filesize($file) / 1048576, 2),
-                'modified' => wp_date('Y-m-d H:i:s', filemtime($file))
+                'path' => $file,
+                'size' => $size !== false ? (int) $size : 0,
+                'size_mb' => $size !== false ? round($size / 1048576, 2) : 0,
+                'modified' => $modified ? wp_date('Y-m-d H:i:s', $modified) : null,
             ];
         }
-        
+
         // Sort by modification time (newest first)
-        usort($rotated_files, function($a, $b) {
-            return strtotime($b['modified']) - strtotime($a['modified']);
+        usort($rotated_files, function ($a, $b) {
+            $timeA = isset($a['modified']) ? strtotime((string) $a['modified']) : 0;
+            $timeB = isset($b['modified']) ? strtotime((string) $b['modified']) : 0;
+
+            return $timeB <=> $timeA;
         });
-        
+
         return $rotated_files;
     }
     

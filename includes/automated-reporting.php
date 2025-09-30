@@ -2,6 +2,8 @@
 
 namespace FpHic\AutomatedReporting;
 
+use function FpHic\Helpers\hic_require_cap;
+
 if (!defined('ABSPATH')) exit;
 
 /**
@@ -1341,9 +1343,7 @@ class AutomatedReportingManager {
             wp_send_json_error('Invalid nonce');
         }
 
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
         
         $allowed_report_types = array_keys(self::REPORT_TYPES);
         $default_report_type = 'weekly';
@@ -1418,9 +1418,7 @@ class AutomatedReportingManager {
             wp_send_json_error('Invalid nonce');
         }
 
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         $period = sanitize_text_field($_POST['period'] ?? 'last_7_days');
         
@@ -1446,9 +1444,7 @@ class AutomatedReportingManager {
             wp_send_json_error('Invalid nonce');
         }
 
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         $period = sanitize_text_field($_POST['period'] ?? 'last_7_days');
 
@@ -1474,9 +1470,7 @@ class AutomatedReportingManager {
             wp_send_json_error('Invalid nonce');
         }
 
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         $report_type = sanitize_text_field($_POST['report_type'] ?? '');
 
@@ -1498,9 +1492,7 @@ class AutomatedReportingManager {
             wp_send_json_error('Invalid nonce');
         }
 
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         global $wpdb;
         $table = $wpdb->prefix . 'hic_reports_history';
@@ -1524,9 +1516,7 @@ class AutomatedReportingManager {
             wp_die('Invalid nonce');
         }
 
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         $allowed_extensions = array('csv', 'xlsx');
         $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));

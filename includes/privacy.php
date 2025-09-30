@@ -2,6 +2,8 @@
 
 namespace FpHic\Privacy;
 
+use function FpHic\Helpers\hic_sanitize_identifier;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -330,9 +332,9 @@ function get_booking_metrics(string $reservation_id): array
         return [];
     }
 
-    $table = $wpdb->prefix . 'hic_booking_metrics';
+    $table = hic_sanitize_identifier($wpdb->prefix . 'hic_booking_metrics', 'table');
     $query = $wpdb->prepare(
-        "SELECT reservation_id, sid, channel, utm_source, utm_medium, utm_campaign, utm_content, utm_term, amount, currency, is_refund, status, created_at, updated_at FROM {$table} WHERE reservation_id = %s",
+        "SELECT reservation_id, sid, channel, utm_source, utm_medium, utm_campaign, utm_content, utm_term, amount, currency, is_refund, status, created_at, updated_at FROM `{$table}` WHERE reservation_id = %s",
         $reservation_id
     );
 
@@ -353,9 +355,9 @@ function get_realtime_sync_row(string $reservation_id): array
         return [];
     }
 
-    $table = $wpdb->prefix . 'hic_realtime_sync';
+    $table = hic_sanitize_identifier($wpdb->prefix . 'hic_realtime_sync', 'table');
     $query = $wpdb->prepare(
-        "SELECT reservation_id, sync_status, first_seen, last_attempt, attempt_count, brevo_event_sent, last_error, payload_json FROM {$table} WHERE reservation_id = %s",
+        "SELECT reservation_id, sync_status, first_seen, last_attempt, attempt_count, brevo_event_sent, last_error, payload_json FROM `{$table}` WHERE reservation_id = %s",
         $reservation_id
     );
 
@@ -376,9 +378,9 @@ function get_booking_events(string $reservation_id): array
         return [];
     }
 
-    $table = $wpdb->prefix . 'hic_booking_events';
+    $table = hic_sanitize_identifier($wpdb->prefix . 'hic_booking_events', 'table');
     $query = $wpdb->prepare(
-        "SELECT booking_id, poll_timestamp, processed, processed_at, process_attempts, last_error, raw_data FROM {$table} WHERE booking_id = %s ORDER BY id ASC",
+        "SELECT booking_id, poll_timestamp, processed, processed_at, process_attempts, last_error, raw_data FROM `{$table}` WHERE booking_id = %s ORDER BY id ASC",
         $reservation_id
     );
 
@@ -399,9 +401,9 @@ function get_tracking_rows_by_sid(string $sid): array
         return [];
     }
 
-    $table = $wpdb->prefix . 'hic_gclids';
+    $table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
     $query = $wpdb->prepare(
-        "SELECT gclid, fbclid, msclkid, ttclid, gbraid, wbraid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at FROM {$table} WHERE sid = %s ORDER BY created_at DESC",
+        "SELECT gclid, fbclid, msclkid, ttclid, gbraid, wbraid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at FROM `{$table}` WHERE sid = %s ORDER BY created_at DESC",
         $sid
     );
 

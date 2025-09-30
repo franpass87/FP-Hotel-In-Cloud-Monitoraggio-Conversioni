@@ -2,6 +2,8 @@
 
 namespace FpHic\Analytics;
 
+use function FpHic\Helpers\hic_sanitize_identifier;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -67,10 +69,10 @@ class BookingMetrics
             return;
         }
 
-        $table = $wpdb->prefix . 'hic_booking_metrics';
+        $table = hic_sanitize_identifier($wpdb->prefix . 'hic_booking_metrics', 'table');
 
         $existing = $wpdb->get_row(
-            $wpdb->prepare("SELECT * FROM {$table} WHERE reservation_id = %s LIMIT 1", $reservationId),
+            $wpdb->prepare("SELECT * FROM `{$table}` WHERE reservation_id = %s LIMIT 1", $reservationId),
             ARRAY_A
         );
 
@@ -150,8 +152,9 @@ class BookingMetrics
             return false;
         }
 
-        $table = $wpdb->prefix . 'hic_booking_metrics';
-        $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table)) === $table;
+        $table_name = $wpdb->prefix . 'hic_booking_metrics';
+        $table = hic_sanitize_identifier($table_name, 'table');
+        $exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_name)) === $table_name;
 
         if ($exists) {
             $this->tableEnsured = true;

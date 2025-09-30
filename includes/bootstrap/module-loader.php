@@ -39,11 +39,8 @@ final class ModuleLoader
         'includes/intelligent-polling-manager.php',
         'includes/database-optimizer.php',
         'includes/booking-metrics.php',
-        'includes/realtime-dashboard.php',
         'includes/automated-reporting.php',
-        'includes/google-ads-enhanced.php',
         'includes/circuit-breaker.php',
-        'includes/enterprise-management-suite.php',
         'includes/helpers-logging.php',
         'includes/helpers-tracking.php',
         'includes/helpers-scheduling.php',
@@ -52,6 +49,21 @@ final class ModuleLoader
         'includes/privacy.php',
         'includes/api/rate-limit-controller.php',
         'includes/uninstall.php',
+    ];
+
+    private const OPTIONAL_CORE_MODULES = [
+        [
+            'path'    => 'includes/enterprise-management-suite.php',
+            'feature' => 'enterprise_suite',
+        ],
+        [
+            'path'    => 'includes/google-ads-enhanced.php',
+            'feature' => 'google_ads_enhanced',
+        ],
+        [
+            'path'    => 'includes/realtime-dashboard.php',
+            'feature' => 'realtime_dashboard',
+        ],
     ];
 
     private const INIT_MODULES = [
@@ -72,6 +84,7 @@ final class ModuleLoader
     private const ADMIN_MODULES = [
         'includes/admin/admin-settings.php',
         'includes/admin/diagnostics.php',
+        'includes/admin/log-viewer.php',
         'includes/site-health.php',
     ];
 
@@ -102,6 +115,7 @@ final class ModuleLoader
         $this->coreLoaded = true;
 
         $this->requireGroup(self::CORE_MODULES);
+        $this->requireFeatureGroup(self::OPTIONAL_CORE_MODULES);
     }
 
     public function loadInit(): void
@@ -130,6 +144,31 @@ final class ModuleLoader
     {
         foreach ($paths as $relativePath) {
             $this->requireRelative($relativePath);
+        }
+    }
+
+    private function requireFeatureGroup(array $modules): void
+    {
+        foreach ($modules as $module) {
+            $path = '';
+            $feature = null;
+
+            if (is_array($module)) {
+                $path = (string) ($module['path'] ?? '');
+                $feature = isset($module['feature']) ? (string) $module['feature'] : null;
+            } else {
+                $path = (string) $module;
+            }
+
+            if ($path === '') {
+                continue;
+            }
+
+            if ($feature !== null && !\FpHic\Helpers\hic_should_bootstrap_feature($feature)) {
+                continue;
+            }
+
+            $this->requireRelative($path);
         }
     }
 
