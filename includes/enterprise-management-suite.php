@@ -547,8 +547,8 @@ class EnterpriseManagementSuite {
         ?>
         <div class="notice notice-info is-dismissible">
             <p><strong>FP HIC Monitor Setup Required</strong></p>
-            <p>Complete the 5-minute setup wizard to configure your hotel conversion tracking.</p>
-            <p><a href="<?php echo admin_url('admin.php?page=hic-setup-wizard'); ?>" class="button button-primary">Start Setup Wizard</a></p>
+            <p><?php esc_html_e('Completa la configurazione guidata di 5 minuti per impostare il monitoraggio conversioni del tuo hotel.', 'hotel-in-cloud'); ?></p>
+            <p><a href="<?php echo admin_url('admin.php?page=hic-setup-wizard'); ?>" class="button button-primary"><?php esc_html_e('Avvia la configurazione guidata', 'hotel-in-cloud'); ?></a></p>
         </div>
         <?php
     }
@@ -1406,9 +1406,7 @@ class EnterpriseManagementSuite {
      * AJAX: Run reconciliation
      */
     public function ajax_run_reconciliation() {
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_management_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
@@ -1422,9 +1420,7 @@ class EnterpriseManagementSuite {
      * AJAX: Get health status
      */
     public function ajax_get_health_status() {
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_management_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');

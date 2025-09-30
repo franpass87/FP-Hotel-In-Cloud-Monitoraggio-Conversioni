@@ -88,53 +88,17 @@ class DatabaseOptimizer {
         $main_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
         $sync_table = hic_sanitize_identifier($wpdb->prefix . 'hic_realtime_sync', 'table');
         
-        // Composite indexes for main table (frequent query patterns)
+        // Indexes for main table (frequent query patterns)
         $indexes = [
             [
                 'table'   => $main_table,
-                'name'    => 'idx_created_utm_source',
-                'columns' => ['created_at', 'utm_source'],
+                'name'    => 'idx_created_at',
+                'columns' => ['created_at'],
             ],
             [
                 'table'   => $main_table,
-                'name'    => 'idx_created_utm_medium',
-                'columns' => ['created_at', 'utm_medium'],
-            ],
-            [
-                'table'   => $main_table,
-                'name'    => 'idx_created_utm_campaign',
-                'columns' => ['created_at', 'utm_campaign'],
-            ],
-
-            // Index for conversion tracking queries
-            [
-                'table'   => $main_table,
-                'name'    => 'idx_sid_created',
+                'name'    => 'idx_sid_created_at',
                 'columns' => ['sid', 'created_at'],
-            ],
-            [
-                'table'   => $main_table,
-                'name'    => 'idx_gclid_created',
-                'columns' => ['gclid', 'created_at'],
-            ],
-            [
-                'table'   => $main_table,
-                'name'    => 'idx_fbclid_created',
-                'columns' => ['fbclid', 'created_at'],
-            ],
-
-            // Composite index for dashboard queries (source + medium + date)
-            [
-                'table'   => $main_table,
-                'name'    => 'idx_source_medium_date',
-                'columns' => ['utm_source', 'utm_medium', 'created_at'],
-            ],
-
-            // Index for cleanup and archiving operations
-            [
-                'table'   => $main_table,
-                'name'    => 'idx_created_id',
-                'columns' => ['created_at', 'id'],
             ],
         ];
 
@@ -423,6 +387,7 @@ class DatabaseOptimizer {
             'processed' => 0,
             'batch' => 0,
             'last_batch' => 0,
+            'batch_size' => self::BATCH_SIZE,
             'started_at' => time(),
             'last_activity' => time(),
         ];
@@ -435,8 +400,13 @@ class DatabaseOptimizer {
      */
     private function get_archive_state(): ?array {
         $state = get_transient(self::ARCHIVE_STATE_KEY);
+        $normalized = $this->normalize_archive_state($state);
 
-        return is_array($state) ? $state : null;
+        if (null === $normalized && !empty($state)) {
+            delete_transient(self::ARCHIVE_STATE_KEY);
+        }
+
+        return $normalized;
     }
 
     /**
@@ -445,7 +415,14 @@ class DatabaseOptimizer {
      * @param array<string, mixed> $state Archive state to persist.
      */
     private function persist_archive_state(array $state): void {
-        set_transient(self::ARCHIVE_STATE_KEY, $state, self::ARCHIVE_STATE_TTL);
+        $normalized = $this->normalize_archive_state($state);
+
+        if (null === $normalized) {
+            $this->clear_archive_state();
+            return;
+        }
+
+        set_transient(self::ARCHIVE_STATE_KEY, $normalized, self::ARCHIVE_STATE_TTL);
     }
 
     /**
@@ -453,6 +430,48 @@ class DatabaseOptimizer {
      */
     private function clear_archive_state(): void {
         delete_transient(self::ARCHIVE_STATE_KEY);
+    }
+
+    /**
+     * Ensure an archive state structure contains the expected keys and sane values.
+     *
+     * @param mixed $state Raw archive state retrieved from storage.
+     *
+     * @return array<string, mixed>|null Normalized state or null if invalid.
+     */
+    private function normalize_archive_state($raw_state): ?array {
+        if (!is_array($raw_state)) {
+            return null;
+        }
+
+        $cutoff = isset($raw_state['cutoff']) && is_string($raw_state['cutoff']) ? trim($raw_state['cutoff']) : '';
+
+        if ($cutoff === '') {
+            return null;
+        }
+
+        $total = max(0, (int) ($raw_state['total'] ?? 0));
+        $processed = max(0, (int) ($raw_state['processed'] ?? 0));
+        $batch = max(0, (int) ($raw_state['batch'] ?? 0));
+        $last_batch = max(0, (int) ($raw_state['last_batch'] ?? 0));
+        $started_at = max(0, (int) ($raw_state['started_at'] ?? time()));
+        $last_activity = max(0, (int) ($raw_state['last_activity'] ?? time()));
+        $batch_size = max(1, (int) ($raw_state['batch_size'] ?? self::BATCH_SIZE));
+
+        if ($processed > $total) {
+            $total = $processed;
+        }
+
+        return [
+            'cutoff' => $cutoff,
+            'total' => $total,
+            'processed' => $processed,
+            'batch' => $batch,
+            'last_batch' => $last_batch,
+            'started_at' => $started_at,
+            'last_activity' => $last_activity,
+            'batch_size' => $batch_size,
+        ];
     }
 
     /**
@@ -464,6 +483,12 @@ class DatabaseOptimizer {
      * @return array{state: array<string, mixed>, moved: int, done: bool}
      */
     private function process_archive_step(array $state, bool $persist_state = true): array {
+        $state = $this->normalize_archive_state($state);
+
+        if (null === $state) {
+            throw new \RuntimeException('Invalid archive state.');
+        }
+
         global $wpdb;
 
         $main_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
@@ -532,10 +557,10 @@ class DatabaseOptimizer {
 
         $moved = (int) $deleted;
 
-        $state['processed'] = (int) ($state['processed'] ?? 0) + $moved;
-        $state['batch'] = (int) ($state['batch'] ?? 0) + 1;
+        $state['processed'] = (int) $state['processed'] + $moved;
+        $state['batch'] = (int) $state['batch'] + 1;
         $state['last_batch'] = $moved;
-        $state['total'] = max((int) ($state['total'] ?? 0), (int) $state['processed']);
+        $state['total'] = max((int) $state['total'], (int) $state['processed']);
         $state['last_activity'] = time();
 
         if ($persist_state) {
@@ -560,8 +585,23 @@ class DatabaseOptimizer {
      * @return array<string, mixed>
      */
     private function format_archive_state(array $state, bool $done = false): array {
-        $total = max(0, (int) ($state['total'] ?? 0));
-        $processed = max(0, (int) ($state['processed'] ?? 0));
+        $state = $this->normalize_archive_state($state);
+
+        if (null === $state) {
+            $state = [
+                'cutoff' => '',
+                'total' => 0,
+                'processed' => 0,
+                'batch' => 0,
+                'last_batch' => 0,
+                'started_at' => time(),
+                'last_activity' => time(),
+                'batch_size' => self::BATCH_SIZE,
+            ];
+        }
+
+        $total = (int) $state['total'];
+        $processed = (int) $state['processed'];
 
         if ($done) {
             $processed = max($processed, $total);
@@ -574,16 +614,17 @@ class DatabaseOptimizer {
         $progress = $total > 0 ? min(1, $processed / $total) : 1;
 
         return [
-            'cutoff' => (string) ($state['cutoff'] ?? ''),
+            'cutoff' => (string) $state['cutoff'],
             'total' => $total,
             'processed' => $processed,
             'remaining' => max(0, $total - $processed),
             'progress' => (float) round($progress, 4),
             'percentage' => (float) round($progress * 100, 2),
-            'batch' => (int) ($state['batch'] ?? 0),
-            'last_batch' => (int) ($state['last_batch'] ?? 0),
-            'started_at' => (int) ($state['started_at'] ?? time()),
-            'last_activity' => (int) ($state['last_activity'] ?? time()),
+            'batch' => (int) $state['batch'],
+            'last_batch' => (int) $state['last_batch'],
+            'batch_size' => (int) $state['batch_size'],
+            'started_at' => (int) $state['started_at'],
+            'last_activity' => (int) $state['last_activity'],
             'done' => $done,
         ];
     }
@@ -865,9 +906,7 @@ class DatabaseOptimizer {
      * AJAX: Get database statistics
      */
     public function ajax_get_database_stats() {
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_optimize_db', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');

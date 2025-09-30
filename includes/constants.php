@@ -128,6 +128,9 @@ define('HIC_FEATURE_REAL_TIME_SYNC', true);       // Enable real-time sync
 define('HIC_FEATURE_HEALTH_MONITORING', true);    // Enable health monitoring
 define('HIC_FEATURE_PERFORMANCE_METRICS', true);  // Enable performance tracking
 define('HIC_FEATURE_WEBHOOK_RATE_LIMITING', true); // Enable webhook rate limiting
+define('HIC_FEATURE_ENTERPRISE_SUITE', true);     // Enable enterprise management suite bootstrap
+define('HIC_FEATURE_GOOGLE_ADS_ENHANCED', true);  // Enable Google Ads enhanced conversions module
+define('HIC_FEATURE_REALTIME_DASHBOARD', true);   // Enable realtime analytics dashboard
 
 // === WEBHOOK VALIDATION ===
 define('HIC_WEBHOOK_MAX_PAYLOAD_SIZE', 1048576);  // 1MB max webhook payload

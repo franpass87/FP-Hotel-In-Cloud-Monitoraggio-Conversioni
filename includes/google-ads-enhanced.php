@@ -2,6 +2,8 @@
 
 namespace FpHic\GoogleAdsEnhanced;
 
+use function FpHic\Helpers\hic_require_cap;
+
 if (!defined('ABSPATH')) exit;
 
 /**
@@ -1785,7 +1787,7 @@ class GoogleAdsEnhancedConversions {
             ],
             [
                 'label' => __('Credenziali API', 'hotel-in-cloud'),
-                'value' => $credentials_complete ? __('Complete', 'hotel-in-cloud') : __('Incomplete', 'hotel-in-cloud'),
+                'value' => $credentials_complete ? __('Completo', 'hotel-in-cloud') : __('Incompleto', 'hotel-in-cloud'),
                 'description' => $credentials_complete
                     ? __('Tutte le chiavi richieste sono state salvate.', 'hotel-in-cloud')
                     : __('Inserisci Customer ID, Developer Token, Client ID/Secret e Refresh Token.', 'hotel-in-cloud'),
@@ -2019,9 +2021,7 @@ class GoogleAdsEnhancedConversions {
      * AJAX: Test Google Ads connection
      */
     public function ajax_test_google_ads_connection() {
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_enhanced_conversions_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
@@ -2045,9 +2045,7 @@ class GoogleAdsEnhancedConversions {
      * AJAX: Get enhanced conversion statistics
      */
     public function ajax_get_enhanced_conversion_stats() {
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_enhanced_conversions_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
@@ -2074,9 +2072,7 @@ class GoogleAdsEnhancedConversions {
      * AJAX: Upload enhanced conversions
      */
     public function ajax_upload_enhanced_conversions() {
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_enhanced_conversions_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
@@ -2174,9 +2170,11 @@ class GoogleAdsEnhancedConversions {
      * Handle Enhanced Conversions form submission
      */
     public function handle_enhanced_conversions_form() {
-        if (!isset($_POST['save_enhanced_settings']) || !current_user_can('hic_manage')) {
+        if (!isset($_POST['save_enhanced_settings'])) {
             return;
         }
+
+        hic_require_cap('hic_manage');
         
         if (!wp_verify_nonce($_POST['hic_enhanced_nonce'] ?? '', 'hic_enhanced_conversions_toggle')) {
             wp_die('Security check failed');

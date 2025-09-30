@@ -58,7 +58,13 @@ final class Lifecycle
     {
         $prepareSite = static function (): void {
             \hic_maybe_upgrade_db();
-            \FpHic\ReconAndSetup\EnterpriseManagementSuite::maybe_install_tables();
+
+            if (Helpers\hic_should_bootstrap_feature('enterprise_suite')
+                && class_exists('FpHic\\ReconAndSetup\\EnterpriseManagementSuite')
+            ) {
+                \FpHic\ReconAndSetup\EnterpriseManagementSuite::maybe_install_tables();
+            }
+
             \FpHic\CircuitBreaker\CircuitBreakerManager::activate();
 
             $role = function_exists('get_role') ? get_role('administrator') : null;
@@ -158,7 +164,13 @@ final class Lifecycle
         try {
             self::ensureAdminCapabilities();
             \hic_maybe_upgrade_db();
-            \FpHic\ReconAndSetup\EnterpriseManagementSuite::maybe_install_tables();
+
+            if (Helpers\hic_should_bootstrap_feature('enterprise_suite')
+                && class_exists('FpHic\\ReconAndSetup\\EnterpriseManagementSuite')
+            ) {
+                \FpHic\ReconAndSetup\EnterpriseManagementSuite::maybe_install_tables();
+            }
+
             \FpHic\CircuitBreaker\CircuitBreakerManager::activate();
 
             if (function_exists('update_option')) {

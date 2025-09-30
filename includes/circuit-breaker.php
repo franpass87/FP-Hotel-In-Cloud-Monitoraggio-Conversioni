@@ -2,6 +2,8 @@
 
 namespace FpHic\CircuitBreaker;
 
+use function FpHic\Helpers\hic_require_cap;
+
 if (!defined('ABSPATH')) exit;
 
 /**
@@ -1109,9 +1111,7 @@ class CircuitBreakerManager {
      * AJAX: Get circuit status
      */
     public function ajax_get_circuit_status() {
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_circuit_breaker_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
@@ -1136,9 +1136,7 @@ class CircuitBreakerManager {
      * AJAX: Reset circuit breaker
      */
     public function ajax_reset_circuit_breaker() {
-        if (!current_user_can('hic_manage')) {
-            wp_die('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
         
         if (!check_ajax_referer('hic_circuit_breaker_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
@@ -1175,9 +1173,7 @@ class CircuitBreakerManager {
      * AJAX: Get retry queue status
      */
     public function ajax_get_retry_queue_status() {
-        if (!current_user_can('hic_manage')) {
-            wp_send_json_error('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_circuit_breaker_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
@@ -1204,9 +1200,7 @@ class CircuitBreakerManager {
      * AJAX: Process retry queue manually
      */
     public function ajax_process_retry_queue_manual() {
-        if (!current_user_can('hic_manage')) {
-            wp_die('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
         
         if (!check_ajax_referer('hic_circuit_breaker_nonce', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');

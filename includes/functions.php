@@ -1,2871 +1,64 @@
 <?php declare(strict_types=1);
+
 namespace FpHic\Helpers {
 
-use \WP_Error;
-
-/**
- * Helper functions for HIC Plugin
- */
-
-if (!defined('ABSPATH')) {
-    exit;
-}
-
-const HIC_PHONE_DEFAULT_COUNTRY = 'IT';
-
-/**
- * Ensure the current request is executed by a user with the required capability.
- *
- * @param string $capability Capability name to validate.
- */
-function hic_require_cap(string $capability): void
-{
-    $capability = trim($capability);
-
-    if ($capability === '') {
-        $capability = 'hic_manage';
-    }
-
-    if (!\function_exists('current_user_can') || !\current_user_can($capability)) {
-        $message = \function_exists('__')
-            ? \__('Non hai i permessi necessari per completare questa operazione.', 'hotel-in-cloud')
-            : 'You do not have permission to perform this action.';
-        $title = \function_exists('__')
-            ? \__('Accesso negato', 'hotel-in-cloud')
-            : 'Access denied';
-
-        if (\function_exists('wp_die')) {
-            \wp_die($message, $title, 403);
-        }
-
-        throw new \RuntimeException($message);
-    }
-}
-
-/**
- * Sanitize SQL identifiers (table, column, index names) enforcing a strict whitelist.
- *
- * @param string $identifier Raw identifier.
- * @param string $type       Context for error messages.
- * @return string            Sanitized identifier.
- */
-function hic_sanitize_identifier(string $identifier, string $type = 'identifier'): string
-{
-    $identifier = trim($identifier);
-    $type = trim($type) !== '' ? $type : 'identifier';
-
-    if ($identifier === '' || !preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
-        $message = \function_exists('__')
-            ? sprintf(\__('Identificatore SQL non valido per %s.', 'hotel-in-cloud'), $type)
-            : sprintf('Invalid SQL identifier for %s.', $type);
-        $title = \function_exists('__')
-            ? \__('Parametro non valido', 'hotel-in-cloud')
-            : 'Invalid parameter';
-
-        if (\function_exists('wp_die')) {
-            \wp_die($message, $title, 400);
-        }
-
-        throw new \InvalidArgumentException($message);
-    }
-
-    return $identifier;
-}
-
-/**
- * Retrieve the global wpdb instance when available and supporting the required methods.
- *
- * @param string[] $required_methods
- * @return object|null
- */
-function hic_get_wpdb_instance(array $required_methods = [])
-{
-    global $wpdb;
-
-    if (!isset($wpdb) || !is_object($wpdb)) {
-        return null;
-    }
-
-    foreach ($required_methods as $method) {
-        if (!method_exists($wpdb, $method)) {
-            return null;
-        }
-    }
-
-    return $wpdb;
-}
-
-/**
- * Determine the options table name for a wpdb instance without triggering
- * dynamic property notices on custom test doubles.
- *
- * @param object $wpdb The wpdb-like instance.
- * @return string|null Fully qualified table name or null when unavailable.
- */
-function hic_get_options_table_name($wpdb)
-{
-    if (!is_object($wpdb)) {
-        return null;
-    }
-
-    $candidates = [];
-
-    if (property_exists($wpdb, 'options')) {
-        $options_table = $wpdb->options;
-        if (is_string($options_table) && $options_table !== '') {
-            $candidates[] = $options_table;
-        }
-    }
-
-    if (property_exists($wpdb, 'prefix')) {
-        $prefix = $wpdb->prefix;
-        if (is_string($prefix) && $prefix !== '') {
-            $candidates[] = $prefix . 'options';
-        }
-    }
-
-    if (property_exists($wpdb, 'base_prefix')) {
-        $base_prefix = $wpdb->base_prefix;
-        if (is_string($base_prefix) && $base_prefix !== '') {
-            $candidates[] = $base_prefix . 'options';
-        }
-    }
-
-    if (method_exists($wpdb, 'get_blog_prefix')) {
-        $blog_prefix = $wpdb->get_blog_prefix();
-        if (is_string($blog_prefix) && $blog_prefix !== '') {
-            $candidates[] = $blog_prefix . 'options';
-        }
-    }
-
-    foreach ($candidates as $candidate) {
-        $candidate = trim((string) $candidate);
-        if ($candidate !== '') {
-            return $candidate;
-        }
-    }
-
-    return null;
-}
-
-/* ================= CONFIG FUNCTIONS ================= */
-function &hic_option_cache() {
-    static $cache = [];
-    return $cache;
-}
-
-function hic_get_option($key, $default = '') {
-    $cache = &hic_option_cache();
-    if (!array_key_exists($key, $cache)) {
-        $cache[$key] = get_option('hic_' . $key, $default);
-    }
-    return $cache[$key];
-}
-
-function hic_clear_option_cache($key = null) {
-    $cache = &hic_option_cache();
-    if ($key === null) {
-        $cache = [];
-        return;
-    }
-
-    if (!is_string($key) || $key === '') {
-        return;
-    }
-
-    if (strpos($key, 'hic_') === 0) {
-        $key = substr($key, 4);
-    }
-
-    unset($cache[$key]);
-}
-
-/**
- * Generate a deterministic signature for a hook registration.
- *
- * @param mixed $callback The callback being registered.
- */
-function hic_get_hook_signature(string $type, string $hook, $callback, int $priority, int $accepted_args): string
-{
-    if (is_string($callback)) {
-        $identifier = $callback;
-    } elseif ($callback instanceof \Closure) {
-        $identifier = spl_object_hash($callback);
-    } elseif (is_object($callback) && method_exists($callback, '__invoke')) {
-        $identifier = spl_object_hash($callback);
-    } elseif (is_array($callback) && count($callback) === 2) {
-        [$callable, $method] = $callback;
-        if (is_object($callable)) {
-            $identifier = spl_object_hash($callable) . '::' . (string) $method;
-        } else {
-            $identifier = (string) $callable . '::' . (string) $method;
-        }
-    } else {
-        $identifier = md5(var_export($callback, true));
-    }
-
-    return implode('|', [$type, $hook, $identifier, (string) $priority, (string) $accepted_args]);
-}
-
-/**
- * Determine whether the provided hook is already registered in WordPress.
- *
- * @param mixed $callback The callback being inspected.
- */
-function hic_hook_is_registered(string $type, string $hook, $callback): bool
-{
-    if ($type === 'action' && function_exists('has_action')) {
-        $result = has_action($hook, $callback);
-
-        if ($result !== false && $result !== null) {
-            return true;
-        }
-    }
-
-    if (function_exists('has_filter')) {
-        $result = has_filter($hook, $callback);
-
-        if ($result !== false && $result !== null) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/**
- * Safely register a WordPress hook, deferring if WordPress is not ready.
- */
-function hic_safe_add_hook($type, $hook, $function, $priority = 10, $accepted_args = 1) {
-    static $deferred_hooks = [];
-
-    $type = strtolower((string) $type) === 'filter' ? 'filter' : 'action';
-    $hook = (string) $hook;
-    $priority = (int) $priority;
-    $accepted_args = (int) $accepted_args;
-
-    $signature = hic_get_hook_signature($type, $hook, $function, $priority, $accepted_args);
-
-    $hook_data = [
-        'type' => $type,
-        'hook' => $hook,
-        'function' => $function,
-        'priority' => $priority,
-        'accepted_args' => $accepted_args,
-    ];
-
-    $hooks_available = function_exists('add_action') && function_exists('add_filter');
-
-    if (!$hooks_available) {
-        if (!isset($deferred_hooks[$signature])) {
-            $deferred_hooks[$signature] = $hook_data;
-        }
-
-        return;
-    }
-
-    $callback_exists = hic_hook_is_registered($type, $hook, $function);
-
-    if (!empty($deferred_hooks)) {
-        foreach ($deferred_hooks as $deferred_signature => $deferred) {
-            $deferred_exists = hic_hook_is_registered($deferred['type'], $deferred['hook'], $deferred['function']);
-
-            if ($deferred_exists) {
-                continue;
-            }
-
-            if ($deferred['type'] === 'action') {
-                add_action($deferred['hook'], $deferred['function'], $deferred['priority'], $deferred['accepted_args']);
-            } else {
-                add_filter($deferred['hook'], $deferred['function'], $deferred['priority'], $deferred['accepted_args']);
-            }
-
-        }
-
-        $deferred_hooks = [];
-    }
-
-    if ($callback_exists) {
-        return;
-    }
-
-    if ($type === 'action') {
-        add_action($hook, $function, $priority, $accepted_args);
-    } else {
-        add_filter($hook, $function, $priority, $accepted_args);
-    }
-}
-
-/**
- * Initialize WordPress action hooks for the plugin helpers
- * This function should be called when WordPress is ready
- */
-function hic_init_helper_hooks() {
-    // Trigger any deferred hook registrations
-    hic_safe_add_hook('action', 'added_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
-    hic_safe_add_hook('action', 'updated_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
-    hic_safe_add_hook('action', 'deleted_option', __NAMESPACE__ . '\\hic_clear_option_cache', 10, 1);
-
-    if (function_exists('add_action') && function_exists('add_filter')) {
-        add_filter('wp_privacy_personal_data_exporters', __NAMESPACE__ . '\\hic_register_exporter');
-        add_filter('wp_privacy_personal_data_erasers', __NAMESPACE__ . '\\hic_register_eraser');
-        add_filter('cron_schedules', __NAMESPACE__ . '\\hic_add_failed_request_schedule');
-
-        // Schedule cron events immediately
-        hic_schedule_failed_request_retry();
-        hic_schedule_failed_request_cleanup();
-
-        add_action('hic_retry_failed_requests', __NAMESPACE__ . '\\hic_retry_failed_requests');
-        add_action('hic_cleanup_failed_requests', __NAMESPACE__ . '\\hic_cleanup_failed_requests');
-        add_action('admin_init', __NAMESPACE__ . '\\hic_upgrade_reservation_email_map');
-        add_action('admin_init', __NAMESPACE__ . '\\hic_upgrade_integration_retry_queue');
-    }
-}
-
-/**
- * Generate a sanitized Session ID compliant with configured length limits.
- */
-function hic_generate_sid(): string {
-    $attempts = 0;
-    $sid = '';
-
-    do {
-        $raw = (string) wp_generate_uuid4();
-        $sanitized = sanitize_text_field($raw);
-        $sanitized = preg_replace('/[^a-zA-Z0-9_-]/', '', $sanitized ?? '');
-        $sid = substr((string) $sanitized, 0, HIC_SID_MAX_LENGTH);
-        $attempts++;
-    } while (($sid === '' || strlen($sid) < HIC_SID_MIN_LENGTH) && $attempts < 5);
-
-    if (strlen($sid) < HIC_SID_MIN_LENGTH) {
-        $sid = str_pad($sid, HIC_SID_MIN_LENGTH, '0');
-    }
-
-    return $sid;
-}
-
-/**
- * Store REST route registrations in non-WordPress environments so that
- * automated tests can introspect the registered endpoints.
- */
-function hic_register_rest_route_fallback(string $namespace, string $route, array $args): void {
-    if (!defined('HIC_REST_API_FALLBACK')) {
-        return;
-    }
-
-    if (!isset($GLOBALS['hic_rest_route_registry']) || !is_array($GLOBALS['hic_rest_route_registry'])) {
-        $GLOBALS['hic_rest_route_registry'] = [];
-    }
-
-    $normalized_namespace = trim($namespace, '/');
-    $normalized_route = '/' . $normalized_namespace . '/' . ltrim($route, '/');
-    $normalized_route = preg_replace('#/+#', '/', $normalized_route ?? '');
-
-    $GLOBALS['hic_rest_route_registry'][$normalized_route] = [
-        'namespace' => $namespace,
-        'route'     => $route,
-        'args'      => $args,
-    ];
-}
-
-/**
- * Retrieve the list of REST routes captured by the fallback registry.
- *
- * @return array<string,array<string,mixed>>
- */
-function hic_get_registered_rest_routes(): array {
-    if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK) {
-        hic_include_rest_route_fallback_files();
-
-        if (!isset($GLOBALS['hic_rest_route_registry']) || !is_array($GLOBALS['hic_rest_route_registry'])) {
-            $GLOBALS['hic_rest_route_registry'] = [];
-        }
-
-        if (function_exists('hic_get_webhook_route_args')) {
-            $normalized_route = '/hic/v1/conversion';
-            if (in_array(hic_get_connection_type(), ['webhook', 'hybrid'], true)) {
-                $GLOBALS['hic_rest_route_registry'][$normalized_route] = [
-                    'namespace' => 'hic/v1',
-                    'route'     => '/conversion',
-                    'args'      => hic_get_webhook_route_args(),
-                ];
-            } else {
-                unset($GLOBALS['hic_rest_route_registry'][$normalized_route]);
-            }
-        }
-
-        return $GLOBALS['hic_rest_route_registry'];
-    }
-
-    if (!isset($GLOBALS['hic_rest_route_registry']) || !is_array($GLOBALS['hic_rest_route_registry'])) {
-        return [];
-    }
-
-    return $GLOBALS['hic_rest_route_registry'];
-}
-
-/**
- * Reset the fallback REST route registry.
- */
-function hic_reset_registered_rest_routes(): void {
-    $GLOBALS['hic_rest_route_registry'] = [];
-}
-
-/**
- * Include REST-related files when the fallback mode is active.
- */
-function hic_include_rest_route_fallback_files(): void {
-    static $included = false;
-
-    if ($included) {
-        return;
-    }
-
-    $included = true;
-
-    foreach ([
-        __DIR__ . '/api/webhook.php',
-        __DIR__ . '/health-monitor.php',
-        __DIR__ . '/integrations/gtm.php',
-    ] as $fallback_include) {
-        if (is_string($fallback_include) && file_exists($fallback_include)) {
-            require_once $fallback_include;
-        }
-    }
-}
-
-if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK) {
-    hic_include_rest_route_fallback_files();
-}
-
-// Helper functions to get configuration values
-function hic_get_measurement_id() { return hic_get_option('measurement_id', ''); }
-function hic_get_api_secret() { return hic_get_option('api_secret', ''); }
-function hic_get_brevo_api_key() { return hic_get_option('brevo_api_key', ''); }
-function hic_get_brevo_list_it() { return hic_get_option('brevo_list_it', '20'); }
-function hic_get_brevo_list_en() { return hic_get_option('brevo_list_en', '21'); }
-function hic_get_brevo_list_default() { return hic_get_option('brevo_list_default', '20'); }
-function hic_get_brevo_optin_default() { return hic_get_option('brevo_optin_default', '0') === '1'; }
-function hic_is_brevo_enabled() { return hic_get_option('brevo_enabled', '0') === '1'; }
-function hic_is_debug_verbose() { return hic_get_option('debug_verbose', '0') === '1'; }
-function hic_get_health_token() { return hic_get_option('health_token', ''); }
-
-// New email enrichment settings
-function hic_updates_enrich_contacts() { return hic_get_option('updates_enrich_contacts', '1') === '1'; }
-function hic_get_brevo_list_alias() { return hic_get_option('brevo_list_alias', ''); }
-function hic_brevo_double_optin_on_enrich() { return hic_get_option('brevo_double_optin_on_enrich', '0') === '1'; }
-
-// Real-time sync settings
-function hic_realtime_brevo_sync_enabled() { return hic_get_option('realtime_brevo_sync', '1') === '1'; }
-function hic_get_brevo_event_endpoint() { 
-    return hic_get_option('brevo_event_endpoint', 'https://in-automate.brevo.com/api/v2/trackEvent'); 
-}
-
-// Reliable polling settings
-function hic_reliable_polling_enabled() { return hic_get_option('reliable_polling_enabled', '1') === '1'; }
-
-// Admin and General Settings
-function hic_get_admin_email() {
-    $email = sanitize_email(hic_get_option('admin_email', ''));
-    if ($email === '') {
-        $email = sanitize_email(get_option('admin_email'));
-    }
-    return $email;
-}
-
-// GTM Settings
-function hic_is_gtm_enabled() { return hic_get_option('gtm_enabled', '0') === '1'; }
-function hic_get_gtm_container_id() { return hic_get_option('gtm_container_id', ''); }
-function hic_get_tracking_mode() { return hic_get_option('tracking_mode', 'ga4_only'); }
-
-// Facebook Settings
-function hic_get_fb_pixel_id() { return hic_get_option('fb_pixel_id', ''); }
-function hic_get_fb_access_token() { return hic_get_option('fb_access_token', ''); }
-
-// Hotel in Cloud Connection Settings (with wp-config.php constants support)
-function hic_get_connection_type() { return hic_get_option('connection_type', 'webhook'); }
-
-function hic_normalize_connection_type($type = null) {
-    if ($type === null) {
-        $type = hic_get_connection_type();
-    }
-
-    if (!is_string($type)) {
-        return '';
-    }
-
-    $normalized = strtolower(trim($type));
-
-    if ($normalized === 'polling') {
-        $normalized = 'api';
-    }
-
-    return $normalized;
-}
-
-function hic_connection_uses_api($type = null) {
-    $normalized = hic_normalize_connection_type($type);
-
-    return in_array($normalized, ['api', 'hybrid'], true);
-}
-function hic_get_webhook_token() { return hic_get_option('webhook_token', ''); }
-
-function hic_get_webhook_secret(): string
-{
-    $secret = hic_get_option('webhook_secret', '');
-
-    if (!is_string($secret)) {
-        return '';
-    }
-
-    return trim($secret);
-}
-function hic_get_api_url() { return hic_get_option('api_url', ''); }
-function hic_get_api_key() { return hic_get_option('api_key', ''); }
-
-function hic_get_api_email() { 
-    // Check for wp-config.php constant first, then fall back to option
-    if (defined('HIC_API_EMAIL') && !empty(HIC_API_EMAIL)) {
-        return HIC_API_EMAIL;
-    }
-    return hic_get_option('api_email', ''); 
-}
-
-function hic_get_api_password() { 
-    // Check for wp-config.php constant first, then fall back to option
-    if (defined('HIC_API_PASSWORD') && !empty(HIC_API_PASSWORD)) {
-        return HIC_API_PASSWORD;
-    }
-    return hic_get_option('api_password', ''); 
-}
-
-function hic_get_property_id() { 
-    // Check for wp-config.php constant first, then fall back to option
-    if (defined('HIC_PROPERTY_ID') && !empty(HIC_PROPERTY_ID)) {
-        return HIC_PROPERTY_ID;
-    }
-    return hic_get_option('property_id', ''); 
-}
-
-/**
- * Helper function to check if Basic Auth credentials are configured
- */
-function hic_has_basic_auth_credentials() {
-    return hic_get_property_id() && hic_get_api_email() && hic_get_api_password();
-}
-
-// HIC Extended Integration Settings
-function hic_get_currency() { return hic_get_option('currency', 'EUR'); }
-function hic_use_net_value() { return hic_get_option('ga4_use_net_value', '0') === '1'; }
-function hic_process_invalid() { return hic_get_option('process_invalid', '0') === '1'; }
-function hic_allow_status_updates() { return hic_get_option('allow_status_updates', '0') === '1'; }
-function hic_refund_tracking_enabled() { return hic_get_option('refund_tracking', '0') === '1'; }
-function hic_get_polling_range_extension_days() { return intval(hic_get_option('polling_range_extension_days', '7')); }
-
-/**
- * Get configured polling interval for quasi-realtime polling
- */
-function hic_get_polling_interval() { 
-    $interval = hic_get_option('polling_interval', 'every_two_minutes'); 
-    $valid_intervals = array('every_minute', 'every_two_minutes', 'hic_poll_interval', 'hic_reliable_interval');
-    return in_array($interval, $valid_intervals) ? $interval : 'every_two_minutes';
-}
-
-/**
- * Quasi-realtime polling lock functions
- */
-function hic_acquire_polling_lock($timeout = 300) {
-    $lock_key = 'hic_polling_lock';
-    $lock_value = current_time('timestamp');
-    
-    // Check if lock exists and is still valid
-    $existing_lock = get_transient($lock_key);
-    if ($existing_lock && ($lock_value - $existing_lock) < $timeout) {
-        return false; // Lock is held by another process
-    }
-    
-    // Acquire lock
-    return set_transient($lock_key, $lock_value, $timeout);
-}
-
-function hic_release_polling_lock() {
-    return delete_transient('hic_polling_lock');
-}
-
-/**
- * Check if retry event should be scheduled based on conditions
- */
-
-
-function hic_normalize_price($value) {
-    if (empty($value) || (!is_numeric($value) && !is_string($value))) return 0.0;
-
-    $normalized = (string) $value;
-
-    // Remove spaces and non-breaking spaces
-    $normalized = str_replace(["\xC2\xA0", ' '], '', $normalized);
-
-    $has_comma = strpos($normalized, ',') !== false;
-    $has_dot   = strpos($normalized, '.') !== false;
-
-    if ($has_comma && $has_dot) {
-        // Determine decimal separator by last occurrence
-        if (strrpos($normalized, ',') > strrpos($normalized, '.')) {
-            // European format: dot for thousands, comma for decimals
-            $normalized = str_replace('.', '', $normalized);
-            $normalized = str_replace(',', '.', $normalized);
-        } else {
-            // US format: comma for thousands, dot for decimals
-            $normalized = str_replace(',', '', $normalized);
-        }
-    } elseif ($has_comma) {
-        // Only comma present -> treat as decimal separator
-        $normalized = str_replace(',', '.', $normalized);
-    }
-
-    // Remove any non-numeric characters except dots and minus signs for negative values
-    $normalized = preg_replace('/[^0-9.-]/', '', $normalized);
-
-    // Validate that we still have a numeric value
-    if (!is_numeric($normalized)) {
-        hic_log('hic_normalize_price: Invalid numeric value after normalization: ' . $value);
-        return 0.0;
-    }
-
-    $result = floatval($normalized);
-
-    // Validate reasonable price range
-    if ($result < 0) {
-        hic_log('hic_normalize_price: Negative price detected: ' . $result . ' (original: ' . $value . ')');
-        return 0.0;
-    }
-
-    if ($result > 999999.99) {
-        hic_log('hic_normalize_price: Unusually high price detected: ' . $result . ' (original: ' . $value . ')');
-    }
-
-    return $result;
-}
-
-/**
- * Retrieve the list of supported ISO 4217 currency codes.
- *
- * @return string[]
- */
-function hic_get_iso4217_currency_codes(): array {
-    static $cache = null;
-
-    if (is_array($cache)) {
-        return $cache;
-    }
-
-    if (function_exists('get_woocommerce_currencies')) {
-        $currencies = array_keys((array) get_woocommerce_currencies());
-        $cache = array_map('strtoupper', $currencies);
-        return $cache;
-    }
-
-    $cache = [
-        'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN',
-        'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BOV',
-        'BRL', 'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHE', 'CHF',
-        'CHW', 'CLF', 'CLP', 'CNY', 'COP', 'COU', 'CRC', 'CUC', 'CUP', 'CVE',
-        'CZK', 'DJF', 'DKK', 'DOP', 'DZD', 'EGP', 'ERN', 'ETB', 'EUR', 'FJD',
-        'FKP', 'GBP', 'GEL', 'GHS', 'GIP', 'GMD', 'GNF', 'GTQ', 'GYD', 'HKD',
-        'HNL', 'HRK', 'HTG', 'HUF', 'IDR', 'ILS', 'INR', 'IQD', 'IRR', 'ISK',
-        'JMD', 'JOD', 'JPY', 'KES', 'KGS', 'KHR', 'KMF', 'KPW', 'KRW', 'KWD',
-        'KYD', 'KZT', 'LAK', 'LBP', 'LKR', 'LRD', 'LSL', 'LYD', 'MAD', 'MDL',
-        'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRU', 'MUR', 'MVR', 'MWK', 'MXN',
-        'MXV', 'MYR', 'MZN', 'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'OMR',
-        'PAB', 'PEN', 'PGK', 'PHP', 'PKR', 'PLN', 'PYG', 'QAR', 'RON', 'RSD',
-        'RUB', 'RWF', 'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP', 'SLE',
-        'SLL', 'SOS', 'SRD', 'SSP', 'STN', 'SVC', 'SYP', 'SZL', 'THB', 'TJS', 'TMT',
-        'TND', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS', 'UAH', 'UGX', 'USD', 'USN',
-        'UYI', 'UYU', 'UYW', 'UZS', 'VED', 'VES', 'VND', 'VUV', 'WST', 'XAF',
-        'XAG', 'XAU', 'XBA', 'XBB', 'XBC', 'XBD', 'XCD', 'XDR', 'XOF', 'XPD',
-        'XPF', 'XPT', 'XSU', 'XTS', 'XUA', 'XXX', 'YER', 'ZAR', 'ZMW', 'ZWL',
-    ];
-
-    return $cache;
-}
-
-/**
- * Normalize a currency code to a valid ISO 4217 representation.
- *
- * @param mixed $currency Raw currency input.
- */
-function hic_normalize_currency_code($currency): string {
-    $fallback = 'EUR';
-
-    if (!is_scalar($currency)) {
-        return $fallback;
-    }
-
-    $normalized = strtoupper(sanitize_text_field((string) $currency));
-
-    if ($normalized === '' || !preg_match('/^[A-Z]{3}$/', $normalized)) {
-        return $fallback;
-    }
-
-    if (!in_array($normalized, hic_get_iso4217_currency_codes(), true)) {
-        return $fallback;
-    }
-
-    return $normalized;
-}
-
-function hic_is_valid_email($email) {
-    if (empty($email) || !is_string($email)) return false;
-    
-    // Sanitize email first
-    $email = sanitize_email($email);
-    if (empty($email)) return false;
-    
-    // Use WordPress built-in email validation and return boolean
-    return is_email($email) !== false;
-}
-
-function hic_is_ota_alias_email($e){
-    if (empty($e) || !is_string($e)) return false;
-    $e = strtolower(trim($e));
-    
-    // Validate email format first
-    if (!filter_var($e, FILTER_VALIDATE_EMAIL)) return false;
-    
-    $domains = array(
-      'guest.booking.com', 'message.booking.com',
-      'guest.airbnb.com','airbnb.com',
-      'expedia.com','stay.expedia.com','guest.expediapartnercentral.com'
-    );
-    
-    foreach ($domains as $d) {
-        if (substr($e, -strlen('@'.$d)) === '@'.$d) return true;
-    }
-    return false;
-}
-
-/**
- * Normalize a phone number and detect language by international prefix.
- *
- * @param string $phone Raw phone number
- * @return array{phone:string, language:?string} Normalized phone and detected language ('it','en' or null)
- */
-function hic_detect_phone_language($phone) {
-    $normalized = preg_replace('/[^0-9+]/', '', (string) $phone);
-    if ($normalized === '') {
-        return ['phone' => '', 'language' => null];
-    }
-
-    if (strpos($normalized, '00') === 0) {
-        $normalized = '+' . substr($normalized, 2);
-    }
-
-    if (strlen($normalized) <= 1) {
-        return ['phone' => $normalized, 'language' => null];
-    }
-
-    if (strpos($normalized, '+') !== 0) {
-        if ((strlen($normalized) >= 9 && strlen($normalized) <= 10) && ($normalized[0] === '3' || $normalized[0] === '0')) {
-            return ['phone' => $normalized, 'language' => 'it'];
-        }
-        return ['phone' => $normalized, 'language' => null];
-    }
-
-    if (strpos($normalized, '+39') === 0) {
-        return ['phone' => $normalized, 'language' => 'it'];
-    }
-
-    return ['phone' => $normalized, 'language' => 'en'];
-}
-
-/**
- * Retrieve the list of supported telephone calling codes keyed by ISO country.
- *
- * @return array<string,string>
- */
-function hic_phone_country_calling_codes(): array {
-    static $codes = null;
-
-    if ($codes === null) {
-        $codes = [
-            'IT' => '39',
-            'SM' => '378',
-            'VA' => '379',
-            'US' => '1',
-            'CA' => '1',
-            'GB' => '44',
-            'UK' => '44',
-            'IE' => '353',
-            'FR' => '33',
-            'DE' => '49',
-            'ES' => '34',
-            'PT' => '351',
-            'NL' => '31',
-            'BE' => '32',
-            'CH' => '41',
-            'AT' => '43',
-            'DK' => '45',
-            'SE' => '46',
-            'NO' => '47',
-            'FI' => '358',
-            'PL' => '48',
-            'CZ' => '420',
-            'SK' => '421',
-            'HU' => '36',
-            'RO' => '40',
-            'HR' => '385',
-            'SI' => '386',
-            'BG' => '359',
-            'RS' => '381',
-            'GR' => '30',
-            'TR' => '90',
-            'BR' => '55',
-            'AR' => '54',
-            'CL' => '56',
-            'MX' => '52',
-            'AU' => '61',
-            'NZ' => '64',
-            'JP' => '81',
-            'CN' => '86',
-            'IN' => '91',
-            'ZA' => '27',
-            'AE' => '971',
-            'RU' => '7',
-            'UA' => '380',
-            'IL' => '972',
-            'LU' => '352',
-            'IS' => '354',
-            'MT' => '356',
-            'CY' => '357',
-            'EE' => '372',
-            'LV' => '371',
-            'LT' => '370',
-            'LI' => '423',
-            'SG' => '65',
-        ];
-    }
-
-    return $codes;
-}
-
-/**
- * Map language hints to default ISO countries.
- *
- * @return array<string,string>
- */
-function hic_phone_language_country_map(): array {
-    static $map = null;
-
-    if ($map === null) {
-        $map = [
-            'it' => 'IT',
-            'en' => 'GB',
-            'fr' => 'FR',
-            'de' => 'DE',
-            'es' => 'ES',
-            'pt' => 'PT',
-            'nl' => 'NL',
-            'be' => 'BE',
-            'da' => 'DK',
-            'sv' => 'SE',
-            'no' => 'NO',
-            'fi' => 'FI',
-            'pl' => 'PL',
-            'cs' => 'CZ',
-            'sk' => 'SK',
-            'hu' => 'HU',
-            'ro' => 'RO',
-            'hr' => 'HR',
-            'sl' => 'SI',
-            'bg' => 'BG',
-            'sr' => 'RS',
-            'el' => 'GR',
-            'tr' => 'TR',
-            'ru' => 'RU',
-            'uk' => 'UA',
-            'he' => 'IL',
-            'ar' => 'AE',
-            'ja' => 'JP',
-            'zh' => 'CN',
-            'hi' => 'IN',
-            'ptbr' => 'BR',
-            'esmx' => 'MX',
-            'enus' => 'US',
-            'engb' => 'GB',
-            'enau' => 'AU',
-            'ennz' => 'NZ',
-            'frca' => 'CA',
-            'deat' => 'AT',
-            'dech' => 'CH',
-        ];
-    }
-
-    return $map;
-}
-
-/**
- * Normalize a country hint into a structured representation.
- *
- * @param mixed $value
- * @return array{type:string,value:string}|null
- */
-function hic_phone_normalize_country_value($value): ?array {
-    if (!is_scalar($value)) {
-        return null;
-    }
-
-    $candidate = trim((string) $value);
-    if ($candidate === '') {
-        return null;
-    }
-
-    if (preg_match('/^\+?\d{1,6}$/', $candidate)) {
-        return ['type' => 'code', 'value' => ltrim($candidate, '+')];
-    }
-
-    $upper = strtoupper($candidate);
-
-    if (preg_match('/^[A-Z]{2}$/', $upper)) {
-        if ($upper === 'UK') {
-            $upper = 'GB';
-        }
-
-        return ['type' => 'country', 'value' => $upper];
-    }
-
-    if (preg_match('/^[A-Z]{3}$/', $upper)) {
-        $map = [
-            'ITA' => 'IT',
-            'SMR' => 'SM',
-            'VAT' => 'VA',
-            'USA' => 'US',
-            'GBR' => 'GB',
-            'IRL' => 'IE',
-            'FRA' => 'FR',
-            'DEU' => 'DE',
-            'ESP' => 'ES',
-            'PRT' => 'PT',
-            'NLD' => 'NL',
-            'BEL' => 'BE',
-            'CHE' => 'CH',
-            'AUT' => 'AT',
-            'DNK' => 'DK',
-            'SWE' => 'SE',
-            'NOR' => 'NO',
-            'FIN' => 'FI',
-            'POL' => 'PL',
-            'CZE' => 'CZ',
-            'SVK' => 'SK',
-            'HUN' => 'HU',
-            'ROU' => 'RO',
-            'HRV' => 'HR',
-            'SVN' => 'SI',
-            'BGR' => 'BG',
-            'SRB' => 'RS',
-            'GRC' => 'GR',
-            'TUR' => 'TR',
-            'RUS' => 'RU',
-            'UKR' => 'UA',
-            'BRA' => 'BR',
-            'ARG' => 'AR',
-            'CHL' => 'CL',
-            'MEX' => 'MX',
-            'AUS' => 'AU',
-            'NZL' => 'NZ',
-            'JPN' => 'JP',
-            'CHN' => 'CN',
-            'IND' => 'IN',
-            'ZAF' => 'ZA',
-            'ARE' => 'AE',
-            'ISR' => 'IL',
-            'LUX' => 'LU',
-            'MLT' => 'MT',
-            'CYP' => 'CY',
-            'EST' => 'EE',
-            'LVA' => 'LV',
-            'LTU' => 'LT',
-            'LIE' => 'LI',
-            'CAN' => 'CA',
-            'SGP' => 'SG',
-        ];
-
-        if (isset($map[$upper])) {
-            return ['type' => 'country', 'value' => $map[$upper]];
-        }
-    }
-
-    $normalized = preg_replace('/[^A-Z]/', '', $upper);
-    if ($normalized === '') {
-        return null;
-    }
-
-    $names = [
-        'ITALIA' => 'IT',
-        'ITALY' => 'IT',
-        'ITALIEN' => 'IT',
-        'SANMARINO' => 'SM',
-        'VATICAN' => 'VA',
-        'VATICANCITY' => 'VA',
-        'UNITEDKINGDOM' => 'GB',
-        'REGNOUNITO' => 'GB',
-        'ENGLAND' => 'GB',
-        'SCOTLAND' => 'GB',
-        'WALES' => 'GB',
-        'IRELAND' => 'IE',
-        'IRLANDA' => 'IE',
-        'UNITEDSTATES' => 'US',
-        'STATIUNITI' => 'US',
-        'FRANCE' => 'FR',
-        'GERMANY' => 'DE',
-        'DEUTSCHLAND' => 'DE',
-        'SPAIN' => 'ES',
-        'ESPANA' => 'ES',
-        'PORTUGAL' => 'PT',
-        'PORTOGALLO' => 'PT',
-        'NETHERLANDS' => 'NL',
-        'PAESIBASSI' => 'NL',
-        'BELGIUM' => 'BE',
-        'BELGIO' => 'BE',
-        'SWITZERLAND' => 'CH',
-        'SVIZZERA' => 'CH',
-        'AUSTRIA' => 'AT',
-        'DENMARK' => 'DK',
-        'DANIMARCA' => 'DK',
-        'SWEDEN' => 'SE',
-        'SVEZIA' => 'SE',
-        'NORWAY' => 'NO',
-        'NORVEGIA' => 'NO',
-        'FINLAND' => 'FI',
-        'FINLANDIA' => 'FI',
-        'POLAND' => 'PL',
-        'POLONIA' => 'PL',
-        'CZECHREPUBLIC' => 'CZ',
-        'REPUBBLICACECA' => 'CZ',
-        'SLOVAKIA' => 'SK',
-        'SLOVACCHIA' => 'SK',
-        'HUNGARY' => 'HU',
-        'UNGHERIA' => 'HU',
-        'ROMANIA' => 'RO',
-        'GREECE' => 'GR',
-        'GRECIA' => 'GR',
-        'TURKEY' => 'TR',
-        'TURCHIA' => 'TR',
-        'RUSSIA' => 'RU',
-        'RUSSIANFEDERATION' => 'RU',
-        'UKRAINE' => 'UA',
-        'BRAZIL' => 'BR',
-        'BRASILE' => 'BR',
-        'MEXICO' => 'MX',
-        'MESSICO' => 'MX',
-        'ARGENTINA' => 'AR',
-        'CHILE' => 'CL',
-        'AUSTRALIA' => 'AU',
-        'NUOVAZELANDA' => 'NZ',
-        'NEWZEALAND' => 'NZ',
-        'JAPAN' => 'JP',
-        'GIAPPONE' => 'JP',
-        'CHINA' => 'CN',
-        'CINA' => 'CN',
-        'INDIA' => 'IN',
-        'SOUTHAFRICA' => 'ZA',
-        'SUDAFRICA' => 'ZA',
-        'EMIRATIARABIUNITI' => 'AE',
-        'UNITEDARABEMIRATES' => 'AE',
-        'ISRAEL' => 'IL',
-        'LUXEMBOURG' => 'LU',
-        'LUSSEMBURGO' => 'LU',
-        'MALTA' => 'MT',
-        'CYPRES' => 'CY',
-        'CIPRO' => 'CY',
-        'ESTONIA' => 'EE',
-        'LETTONIA' => 'LV',
-        'LATVIA' => 'LV',
-        'LITUANIA' => 'LT',
-        'LITHUANIA' => 'LT',
-        'LIECHTENSTEIN' => 'LI',
-        'CANADA' => 'CA',
-        'SINGAPORE' => 'SG',
-    ];
-
-    if (isset($names[$normalized])) {
-        return ['type' => 'country', 'value' => $names[$normalized]];
-    }
-
-    return null;
-}
-
-/**
- * Resolve a language or locale into a country hint.
- *
- * @param mixed $language
- * @return array{type:string,value:string}|null
- */
-function hic_phone_map_language_to_country($language): ?array {
-    if (!is_scalar($language)) {
-        return null;
-    }
-
-    $value = strtolower(trim((string) $language));
-    if ($value === '') {
-        return null;
-    }
-
-    $value = str_replace([' ', '_'], '-', $value);
-    $parts = explode('-', $value);
-
-    if (isset($parts[1])) {
-        $region_candidate = hic_phone_normalize_country_value($parts[1]);
-        if ($region_candidate !== null) {
-            return $region_candidate;
-        }
-    }
-
-    $primary = preg_replace('/[^a-z]/', '', $parts[0]);
-    if ($primary === '') {
-        return null;
-    }
-
-    $map = hic_phone_language_country_map();
-    if (isset($map[$primary])) {
-        return ['type' => 'country', 'value' => $map[$primary]];
-    }
-
-    return null;
-}
-
-/**
- * Resolve the telephone calling code for a normalized country hint.
- *
- * @param array{type:string,value:string} $country
- */
-function hic_phone_resolve_calling_code(array $country): ?string {
-    if (empty($country['type']) || empty($country['value'])) {
-        return null;
-    }
-
-    if ($country['type'] === 'code') {
-        $digits = preg_replace('/\D/', '', $country['value']);
-        return $digits !== '' ? $digits : null;
-    }
-
-    $iso = strtoupper($country['value']);
-    $codes = hic_phone_country_calling_codes();
-
-    return $codes[$iso] ?? null;
-}
-
-/**
- * Determine whether the national trunk zero should be retained for the given country.
- *
- * @param array{type:string,value:string} $country
- */
-function hic_phone_should_retain_trunk_zero(array $country): bool {
-    if (($country['type'] ?? '') === 'code') {
-        return true;
-    }
-
-    $iso = strtoupper($country['value'] ?? '');
-    $retain = ['IT', 'SM', 'VA'];
-
-    return in_array($iso, $retain, true);
-}
-
-/**
- * Determine the default country hint for phone normalization.
- *
- * @return array{type:string,value:string}|null
- */
-function hic_phone_get_default_country(): ?array {
-    $settings = function_exists('get_option') ? get_option('hic_google_ads_enhanced_settings', []) : [];
-
-    if (is_array($settings) && array_key_exists('default_phone_country', $settings)) {
-        $stored = $settings['default_phone_country'];
-
-        if (!is_scalar($stored)) {
-            return null;
-        }
-
-        $stored_value = (string) $stored;
-        if ($stored_value === '') {
-            return null;
-        }
-
-        return hic_phone_normalize_country_value($stored_value);
-    }
-
-    return hic_phone_normalize_country_value(HIC_PHONE_DEFAULT_COUNTRY);
-}
-
-/**
- * Normalize a phone number to E.164 format using booking/customer context.
- *
- * @param mixed $phone
- * @param array<string,mixed> $context
- */
-function hic_normalize_phone_for_hash($phone, array $context = []): ?string {
-    if (!is_scalar($phone)) {
-        return null;
-    }
-
-    $raw_phone = trim((string) $phone);
-    if ($raw_phone === '') {
-        return null;
-    }
-
-    $customer_data = [];
-    if (!empty($context['customer_data']) && is_array($context['customer_data'])) {
-        $customer_data = $context['customer_data'];
-    }
-
-    $booking_data = [];
-    if (!empty($context['booking_data']) && is_array($context['booking_data'])) {
-        $booking_data = $context['booking_data'];
-    }
-
-    $details = hic_detect_phone_language($raw_phone);
-    $helper_phone = $details['phone'] ?? null;
-    $detected_language = $details['language'] ?? null;
-
-    $normalized_phone = preg_replace('/[^0-9+]/', '', $helper_phone ?? $raw_phone);
-    if ($normalized_phone === '') {
-        return null;
-    }
-
-    if (strpos($normalized_phone, '00') === 0) {
-        $normalized_phone = '+' . substr($normalized_phone, 2);
-    }
-
-    if ($normalized_phone !== '' && $normalized_phone[0] === '+') {
-        $digits = preg_replace('/\D/', '', substr($normalized_phone, 1));
-        return $digits !== '' ? '+' . $digits : null;
-    }
-
-    $numeric_phone = preg_replace('/\D/', '', $normalized_phone);
-    if ($numeric_phone === '') {
-        return null;
-    }
-
-    $country_candidates = [];
-    if (!empty($context['country_candidates']) && is_array($context['country_candidates'])) {
-        foreach ($context['country_candidates'] as $candidate) {
-            if (is_array($candidate) && isset($candidate['type'], $candidate['value'])) {
-                $country_candidates[] = $candidate;
-                continue;
-            }
-
-            $normalized_candidate = hic_phone_normalize_country_value($candidate);
-            if ($normalized_candidate !== null) {
-                $country_candidates[] = $normalized_candidate;
-            }
-        }
-    }
-
-    foreach ([$customer_data, $booking_data] as $dataset) {
-        if (!is_array($dataset)) {
-            continue;
-        }
-
-        foreach (['country_code', 'country', 'phone_country'] as $field) {
-            if (isset($dataset[$field]) && is_scalar($dataset[$field])) {
-                $candidate = hic_phone_normalize_country_value($dataset[$field]);
-                if ($candidate !== null) {
-                    $country_candidates[] = $candidate;
-                }
-            }
-        }
-    }
-
-    $sid = '';
-    if (array_key_exists('sid', $context) && is_scalar($context['sid'])) {
-        $sid = (string) $context['sid'];
-    } elseif (isset($booking_data['sid']) && is_scalar($booking_data['sid'])) {
-        $sid = (string) $booking_data['sid'];
-    }
-
-    if ($sid !== '' && function_exists('apply_filters')) {
-        $sid_country = apply_filters('hic_google_ads_phone_country_from_sid', null, $sid, $customer_data, $booking_data);
-        if (is_string($sid_country) && $sid_country !== '') {
-            $candidate = hic_phone_normalize_country_value($sid_country);
-            if ($candidate !== null) {
-                $country_candidates[] = $candidate;
-            }
-        }
-    }
-
-    $language_sources = [];
-    if (is_string($detected_language) && $detected_language !== '') {
-        $language_sources[] = $detected_language;
-    }
-
-    if (!empty($context['language_candidates']) && is_array($context['language_candidates'])) {
-        foreach ($context['language_candidates'] as $language_candidate) {
-            if (is_scalar($language_candidate)) {
-                $language_sources[] = (string) $language_candidate;
-            }
-        }
-    }
-
-    foreach ([$customer_data, $booking_data] as $dataset) {
-        if (!is_array($dataset)) {
-            continue;
-        }
-
-        foreach (['phone_language', 'language', 'locale'] as $field) {
-            if (!empty($dataset[$field]) && is_scalar($dataset[$field])) {
-                $language_sources[] = (string) $dataset[$field];
-            }
-        }
-    }
-
-    foreach ($language_sources as $language_candidate) {
-        $language_country = hic_phone_map_language_to_country($language_candidate);
-        if ($language_country !== null) {
-            $country_candidates[] = $language_country;
-        }
-    }
-
-    $default_country = null;
-    if (array_key_exists('default_country', $context)) {
-        $hint = $context['default_country'];
-        if (is_array($hint) && isset($hint['type'], $hint['value'])) {
-            $default_country = $hint;
-        } else {
-            $default_country = hic_phone_normalize_country_value($hint);
-        }
-    }
-
-    if ($default_country === null) {
-        $default_country = hic_phone_get_default_country();
-    }
-
-    if ($default_country !== null) {
-        $country_candidates[] = $default_country;
-    }
-
-    $selected_country = null;
-    $calling_code = null;
-    foreach ($country_candidates as $candidate) {
-        if (!is_array($candidate) || empty($candidate['type']) || empty($candidate['value'])) {
-            continue;
-        }
-
-        $code = hic_phone_resolve_calling_code($candidate);
-        if ($code !== null) {
-            $selected_country = $candidate;
-            $calling_code = $code;
-            break;
-        }
-    }
-
-    $logger = null;
-    if (isset($context['logger']) && is_callable($context['logger'])) {
-        $logger = $context['logger'];
-    }
-
-    $warn = static function (string $message) use ($logger): void {
-        $level = defined('HIC_LOG_LEVEL_WARNING') ? HIC_LOG_LEVEL_WARNING : 'warning';
-        if (is_callable($logger)) {
-            $logger($message, $level);
+    if (!defined('ABSPATH')) {
+        exit;
+    }
+
+    require_once __DIR__ . '/helpers/options.php';
+    require_once __DIR__ . '/helpers/strings.php';
+    require_once __DIR__ . '/helpers/api.php';
+    require_once __DIR__ . '/helpers/booking.php';
+
+    /**
+     * Trigger a deprecation notice for legacy global shims.
+     */
+    function hic_trigger_deprecated_shim(string $shim, string $replacement): void
+    {
+        static $triggered = [];
+
+        if (isset($triggered[$shim])) {
             return;
         }
 
-        if (function_exists('\\FpHic\\hic_log')) {
-            \FpHic\hic_log($message, $level);
-        }
-    };
+        $triggered[$shim] = true;
 
-    if ($calling_code === null) {
-        $warn(sprintf('Unable to determine country prefix for phone "%s"; skipping phone hash.', $raw_phone));
-        return null;
-    }
+        $message = sprintf('[HIC][Deprecated] %s() is deprecated. Use %s().', $shim, $replacement);
 
-    if (strpos($numeric_phone, $calling_code) === 0 && strlen($numeric_phone) > strlen($calling_code) + 2) {
-        return '+' . $numeric_phone;
-    }
-
-    $national_number = $numeric_phone;
-    if ($selected_country !== null && !hic_phone_should_retain_trunk_zero($selected_country)) {
-        $trimmed = preg_replace('/^0+/', '', $national_number);
-        if ($trimmed !== '') {
-            $national_number = $trimmed;
-        }
-    }
-
-    if ($national_number === '') {
-        $warn(sprintf('Normalized phone number became empty for "%s"; skipping phone hash.', $raw_phone));
-        return null;
-    }
-
-    return '+' . $calling_code . $national_number;
-}
-
-/**
- * Normalize and hash a phone number for external APIs.
- *
- * @param mixed $phone
- * @param array<string,mixed> $context
- */
-function hic_hash_normalized_phone($phone, array $context = []): ?string {
-    $normalized = hic_normalize_phone_for_hash($phone, $context);
-    if ($normalized === null) {
-        return null;
-    }
-
-    return hash('sha256', $normalized);
-}
-
-/**
- * Primary fields checked for reservation unique identifiers.
- *
- * @return string[]
- */
-function hic_booking_uid_primary_fields() {
-    return ['id', 'reservation_id', 'booking_id', 'transaction_id'];
-}
-
-/**
- * Additional aliases that may contain reservation identifiers.
- *
- * @return string[]
- */
-function hic_reservation_id_aliases() {
-    return [
-        'reservationId',
-        'bookingId',
-        'transactionId',
-        'reservation_code',
-        'reservationCode',
-        'booking_code',
-        'bookingCode',
-        'code',
-        'reservation_number',
-        'reservationNumber',
-        'reservation_reference',
-        'reservationReference',
-        'confirmation_code',
-        'confirmationCode',
-        'confirmationNumber',
-        'reference',
-        'reference_id',
-        'referenceId',
-        'reference_code',
-        'referenceCode',
-    ];
-}
-
-/**
- * Build the list of candidate reservation identifier fields, keeping order of preference.
- *
- * @param string[] $preferred_fields
- * @return string[]
- */
-function hic_candidate_reservation_id_fields(array $preferred_fields) {
-    $candidates = array_merge($preferred_fields, hic_reservation_id_aliases());
-
-    return array_values(array_unique($candidates));
-}
-
-function hic_booking_uid($reservation) {
-    if (!is_array($reservation)) {
-        hic_log('hic_booking_uid: reservation is not an array');
-        return '';
-    }
-
-    // Try multiple possible ID fields in order of preference
-    $id_fields = hic_candidate_reservation_id_fields(hic_booking_uid_primary_fields());
-
-    foreach ($id_fields as $field) {
-        if (!array_key_exists($field, $reservation)) {
-            continue;
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log($message);
         }
 
-        $value = $reservation[$field];
-        if (!is_scalar($value)) {
-            continue;
-        }
-
-        $candidate = trim((string) $value);
-        if ($candidate !== '') {
-            return $candidate;
-        }
-    }
-
-    hic_log(
-        'hic_booking_uid: No valid ID found in reservation data (checked fields: ' .
-        implode(', ', $id_fields) .
-        ')'
-    );
-    return '';
-}
-
-/**
- * Normalize reservation identifiers for consistent storage and comparisons.
- *
- * @param string|int|float|bool $value
- */
-function hic_normalize_reservation_id($value): string {
-    if (!is_scalar($value)) {
-        return '';
-    }
-
-    $sanitized = sanitize_text_field((string) $value);
-    $sanitized = trim($sanitized);
-    if ($sanitized === '') {
-        return '';
-    }
-
-    return strtoupper($sanitized);
-}
-
-/**
- * Collect every normalized reservation identifier present in the payload.
- *
- * @param array<string, mixed> $reservation
- * @return string[]
- */
-function hic_collect_reservation_ids(array $reservation): array {
-    $id_fields = hic_candidate_reservation_id_fields(hic_booking_uid_primary_fields());
-    $unique_ids = [];
-
-    foreach ($id_fields as $field) {
-        if (!array_key_exists($field, $reservation)) {
-            continue;
-        }
-
-        $value = $reservation[$field];
-        if (!is_scalar($value)) {
-            continue;
-        }
-
-        $candidate = hic_normalize_reservation_id((string) $value);
-        if ($candidate === '') {
-            continue;
-        }
-
-        $unique_ids[$candidate] = true;
-    }
-
-    return array_keys($unique_ids);
-}
-
-/**
- * Locate the first reservation identifier already marked as processed.
- *
- * @param array<string, mixed> $reservation
- */
-function hic_find_processed_reservation_alias(array $reservation): ?string {
-    $aliases = hic_collect_reservation_ids($reservation);
-    if (empty($aliases)) {
-        return null;
-    }
-
-    $processed = hic_get_processed_reservation_id_set();
-    foreach ($aliases as $alias) {
-        $normalized = hic_normalize_reservation_id($alias);
-        if ($normalized === '') {
-            continue;
-        }
-
-        if (array_key_exists($normalized, $processed)) {
-            return $normalized;
-        }
-    }
-
-    return null;
-}
-
-/* ============ Helpers ============ */
-function hic_http_request($url, $args = [], bool $suppress_failed_storage = false) {
-    $validated_url = wp_http_validate_url($url);
-    if (!$validated_url) {
-        hic_log('HTTP request rifiutata: URL non valido ' . $url, HIC_LOG_LEVEL_ERROR);
-        return new WP_Error('invalid_url', 'URL non valido');
-    }
-    if ('https' !== parse_url($validated_url, PHP_URL_SCHEME)) {
-        $allow_insecure = apply_filters('hic_allow_insecure_http', false, $validated_url, $args);
-        if (!$allow_insecure) {
-            hic_log('HTTP request rifiutata: solo HTTPS consentito ' . $url, HIC_LOG_LEVEL_ERROR);
-            return new WP_Error('invalid_url', 'Solo HTTPS consentito');
-        }
-    }
-    $url = $validated_url;
-
-    if (!isset($args['timeout'])) {
-        $args['timeout'] = defined('HIC_API_TIMEOUT') ? HIC_API_TIMEOUT : 15;
-    }
-
-    $version = defined('HIC_PLUGIN_VERSION') ? HIC_PLUGIN_VERSION : '1.0';
-    if (!isset($args['user-agent'])) {
-        $args['user-agent'] = 'HIC-Plugin/' . $version;
-    }
-
-    if (!isset($args['headers']) || !is_array($args['headers'])) {
-        $args['headers'] = [];
-    }
-    $args['headers']['User-Agent'] = 'HIC-Plugin/' . $version;
-
-    $response = wp_safe_remote_request($url, $args);
-
-    if (is_wp_error($response)) {
-        $error_message = $response->get_error_message();
-        hic_log('HTTP request error: ' . $error_message, HIC_LOG_LEVEL_ERROR);
-        if (!$suppress_failed_storage) {
-            hic_store_failed_request($url, $args, $error_message);
-        }
-    } else {
-        $code = wp_remote_retrieve_response_code($response);
-        if ($code >= 400) {
-            $error_message = 'HTTP ' . $code;
-            hic_log('HTTP request to ' . $url . ' failed with status ' . $code, HIC_LOG_LEVEL_ERROR);
-            if (!$suppress_failed_storage) {
-                hic_store_failed_request($url, $args, $error_message);
+        if (function_exists(__NAMESPACE__ . '\\hic_log')) {
+            try {
+                hic_log($message, defined('HIC_LOG_LEVEL_DEBUG') ? HIC_LOG_LEVEL_DEBUG : 'debug');
+            } catch (\Throwable $exception) {
+                // Silently ignore logging failures for shim notices.
             }
         }
     }
 
-    return $response;
-}
+    /**
+     * Invoke a namespaced helper while recording a shim deprecation.
+     *
+     * @param string   $shim        Global shim name.
+     * @param string   $replacement Fully-qualified helper name.
+     * @param string[] $args        Arguments passed to the shim.
+     *
+     * @return mixed
+     */
+    function hic_invoke_deprecated_shim(string $shim, string $replacement, array $args = [])
+    {
+        hic_trigger_deprecated_shim($shim, $replacement);
 
-function hic_store_failed_request($url, $args, $error) {
-    $wpdb = hic_get_wpdb_instance(['insert']);
-    if (!$wpdb) {
-        return;
-    }
-
-    $table = $wpdb->prefix . 'hic_failed_requests';
-    $max_attempts = 2;
-    $attempt = 0;
-    $table_recreation_attempted = false;
-    $table_recreation_succeeded = false;
-
-    do {
-        $attempt++;
-
-        $insert_result = $wpdb->insert(
-            $table,
-            [
-                'endpoint'   => $url,
-                'payload'    => wp_json_encode($args),
-                'attempts'   => 1,
-                'last_error' => $error,
-                'last_try'   => current_time('mysql'),
-            ],
-            ['%s', '%s', '%d', '%s', '%s']
-        );
-
-        if (is_wp_error($insert_result)) {
-            $log_result = hic_log(
-                'Failed to store failed request: ' . $insert_result->get_error_message(),
-                HIC_LOG_LEVEL_ERROR,
-                [
-                    'endpoint' => $url,
-                    'error'    => $error,
-                    'attempt'  => $attempt,
-                ]
-            );
-
-            if (is_wp_error($log_result)) {
-                error_log('HIC logging failure: ' . $log_result->get_error_message());
-            }
-
-            return;
-        }
-
-        if ($insert_result === false) {
-            $db_error_message = trim((string) $wpdb->last_error);
-            if ($db_error_message === '') {
-                $db_error_message = 'Unknown database error';
-            }
-
-            $lower_error = strtolower($db_error_message);
-            $missing_table_indicators = [
-                'no such table',
-                'does not exist',
-                "doesn't exist",
-                'missing table',
-                'unknown table',
-                '1146',
-            ];
-
-            $missing_table_detected = false;
-            foreach ($missing_table_indicators as $indicator) {
-                if ($indicator !== '' && strpos($lower_error, $indicator) !== false) {
-                    $missing_table_detected = true;
-                    break;
-                }
-            }
-
-            if ($missing_table_detected && function_exists('\hic_create_failed_requests_table') && !$table_recreation_attempted) {
-                $table_recreation_attempted = true;
-                $table_recreation_succeeded = (bool) \hic_create_failed_requests_table();
-
-                if ($table_recreation_succeeded && $attempt < $max_attempts) {
-                    continue;
-                }
-            }
-
-            $context = [
-                'endpoint' => $url,
-                'error'    => $error,
-                'db_error' => $db_error_message,
-                'table'    => $table,
-                'attempt'  => $attempt,
-            ];
-
-            if ($table_recreation_attempted) {
-                $context['table_recreation_succeeded'] = $table_recreation_succeeded ? 'yes' : 'no';
-            }
-
-            $log_result = hic_log(
-                'Failed to store failed request: ' . $db_error_message,
-                HIC_LOG_LEVEL_ERROR,
-                $context
-            );
-
-            if (is_wp_error($log_result)) {
-                error_log('HIC logging failure: ' . $log_result->get_error_message());
-            }
-
-            return;
-        }
-
-        break;
-    } while ($attempt < $max_attempts);
-
-    if (function_exists(__NAMESPACE__ . '\\hic_schedule_failed_request_retry')) {
-        \FpHic\Helpers\hic_schedule_failed_request_retry();
-    }
-
-    if (function_exists(__NAMESPACE__ . '\\hic_schedule_failed_request_cleanup')) {
-        \FpHic\Helpers\hic_schedule_failed_request_cleanup();
+        return call_user_func_array($replacement, $args);
     }
 }
 
-
-/**
- * Create a standardized result array for integration processing.
- *
- * @param array $overrides Custom values to merge with defaults.
- * @return array<string,mixed>
- */
-function hic_create_integration_result(array $overrides = []) {
-    $defaults = [
-        'status' => 'pending',
-        'integrations' => [],
-        'successful_integrations' => [],
-        'failed_integrations' => [],
-        'failed_details' => [],
-        'skipped_integrations' => [],
-        'messages' => [],
-        'should_mark_processed' => false,
-    ];
-
-    return array_merge($defaults, $overrides);
-}
-
-/**
- * Append an integration outcome to the aggregated result structure.
- */
-function hic_append_integration_result(array &$result, string $integration, string $status, string $note = ''): void {
-    $normalized_integration = trim($integration);
-    if ($normalized_integration === '') {
-        $normalized_integration = 'integration';
-    }
-    $normalized_integration = \sanitize_text_field($normalized_integration);
-
-    $normalized_status = strtolower($status);
-    if (!in_array($normalized_status, ['success', 'failed', 'skipped'], true)) {
-        $normalized_status = 'failed';
-    }
-
-    $normalized_note = '';
-    if ($note !== '') {
-        $normalized_note = \sanitize_text_field((string) $note);
-    }
-
-    $result['integrations'][$normalized_integration] = ['status' => $normalized_status];
-    if ($normalized_note !== '') {
-        $result['integrations'][$normalized_integration]['note'] = $normalized_note;
-    }
-
-    switch ($normalized_status) {
-        case 'success':
-            $result['successful_integrations'][] = $normalized_integration;
-            break;
-        case 'failed':
-            $result['failed_integrations'][] = $normalized_integration;
-            $result['failed_details'][$normalized_integration] = $normalized_note;
-            break;
-        case 'skipped':
-            $result['skipped_integrations'][$normalized_integration] = $normalized_note;
-            break;
-    }
-}
-
-/**
- * Determine final status for integration processing results.
- */
-function hic_finalize_integration_result(array $result, bool $tracking_skipped = false) {
-    $has_failures = !empty($result['failed_integrations']);
-    $has_success = !empty($result['successful_integrations']);
-
-    if ($has_failures && $has_success) {
-        $result['status'] = 'partial';
-    } elseif ($has_failures) {
-        $result['status'] = 'failed';
-    } else {
-        $result['status'] = 'success';
-    }
-
-    if ($tracking_skipped) {
-        $result['messages'][] = 'tracking_skipped';
-    }
-
-    $should_mark_processed = false;
-    if (in_array($result['status'], ['success', 'partial'], true)) {
-        $should_mark_processed = true;
-    }
-
-    if (!$has_success && !$has_failures && !$tracking_skipped && empty($result['integrations'])) {
-        // Nothing attempted but also nothing failed; avoid retry loops.
-        $should_mark_processed = true;
-    }
-
-    if ($tracking_skipped) {
-        $should_mark_processed = true;
-    }
-
-    $result['should_mark_processed'] = $should_mark_processed;
-    $result['messages'] = array_values(array_unique($result['messages']));
-
-    return $result;
-}
-
-/**
- * Queue failed integrations for targeted retry handling.
- *
- * @param string|int $reservation_uid Unique reservation identifier
- * @param array<string,string> $failed_details Integration => note map
- * @param array<string,string> $context Additional context information
- */
-function hic_queue_integration_retry($reservation_uid, array $failed_details, array $context = []): void {
-    if (!is_scalar($reservation_uid)) {
-        return;
-    }
-
-    $reservation_uid = trim((string) $reservation_uid);
-    if ($reservation_uid === '') {
-        return;
-    }
-
-    $reservation_uid = \FpHic\Helpers\hic_normalize_reservation_id($reservation_uid);
-    if ($reservation_uid === '' || empty($failed_details)) {
-        return;
-    }
-
-    $normalized_details = [];
-    foreach ($failed_details as $integration => $note) {
-        if (!is_scalar($integration)) {
-            continue;
-        }
-
-        $safe_integration = \sanitize_text_field((string) $integration);
-        if ($safe_integration === '') {
-            continue;
-        }
-
-        $safe_note = '';
-        if (is_scalar($note) && $note !== '') {
-            $safe_note = \sanitize_text_field((string) $note);
-        }
-
-        $normalized_details[$safe_integration] = [
-            'note' => $safe_note,
-            'last_failure' => time(),
-        ];
-    }
-
-    if (empty($normalized_details)) {
-        return;
-    }
-
-    $queue = get_option('hic_integration_retry_queue', []);
-    if (!is_array($queue)) {
-        $queue = [];
-    }
-
-    $integrations = [];
-    $keys_to_remove = [];
-
-    foreach ($queue as $key => $entry) {
-        if (!is_scalar($key) || !is_array($entry)) {
-            continue;
-        }
-
-        $candidate_key = \FpHic\Helpers\hic_normalize_reservation_id((string) $key);
-        if ($candidate_key !== $reservation_uid) {
-            continue;
-        }
-
-        $keys_to_remove[] = $key;
-
-        if (!isset($entry['integrations']) || !is_array($entry['integrations'])) {
-            continue;
-        }
-
-        foreach ($entry['integrations'] as $integration => $payload) {
-            if (!is_scalar($integration) || !is_array($payload)) {
-                continue;
-            }
-
-            $safe_integration = \sanitize_text_field((string) $integration);
-            if ($safe_integration === '') {
-                continue;
-            }
-
-            $integrations[$safe_integration] = $payload;
-        }
-    }
-
-    foreach ($keys_to_remove as $legacy_key) {
-        unset($queue[$legacy_key]);
-    }
-
-    foreach ($normalized_details as $integration => $payload) {
-        $integrations[$integration] = $payload;
-    }
-
-    $entry_context = [];
-    foreach ($context as $key => $value) {
-        if (!is_scalar($key) || !is_scalar($value)) {
-            continue;
-        }
-        $safe_key = \sanitize_key((string) $key);
-        $entry_context[$safe_key] = \sanitize_text_field((string) $value);
-    }
-
-    $queue[$reservation_uid] = [
-        'integrations' => $integrations,
-        'context' => $entry_context,
-        'last_updated' => time(),
-    ];
-
-    if (count($queue) > 200) {
-        $queue = array_slice($queue, -200, null, true);
-    }
-
-    update_option('hic_integration_retry_queue', $queue, false);
-    hic_clear_option_cache('hic_integration_retry_queue');
-}
-
-/* ============ Email admin (include bucket) ============ */
-function hic_send_admin_email($data, $gclid, $fbclid, $sid){
-  // Validate input data
-  if (!is_array($data)) {
-    hic_log('hic_send_admin_email: data is not an array');
-    return false;
-  }
-
-  $gbraid = '';
-  $wbraid = '';
-  $normalized_sid = '';
-
-  if (!empty($sid) && (is_string($sid) || is_numeric($sid))) {
-    $normalized_sid = sanitize_text_field((string) $sid);
-  }
-
-  if ($normalized_sid !== '') {
-    $tracking = \FpHic\Helpers\hic_get_tracking_ids_by_sid($normalized_sid);
-    if (empty($gclid) && !empty($tracking['gclid'])) {
-      $gclid = $tracking['gclid'];
-    }
-    if (empty($fbclid) && !empty($tracking['fbclid'])) {
-      $fbclid = $tracking['fbclid'];
-    }
-    if (!empty($tracking['gbraid'])) {
-      $gbraid = $tracking['gbraid'];
-    }
-    if (!empty($tracking['wbraid'])) {
-      $wbraid = $tracking['wbraid'];
-    }
-  }
-
-  if ($gbraid === '' && isset($data['gbraid']) && is_scalar($data['gbraid'])) {
-    $gbraid = sanitize_text_field((string) $data['gbraid']);
-  }
-  if ($wbraid === '' && isset($data['wbraid']) && is_scalar($data['wbraid'])) {
-    $wbraid = sanitize_text_field((string) $data['wbraid']);
-  }
-
-  $bucket = fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid);
-  $to = hic_get_admin_email();
-  
-  // Enhanced email validation with detailed logging
-  if (empty($to)) {
-    hic_log('hic_send_admin_email: admin email is empty');
-    return false;
-  }
-  
-  if (!hic_is_valid_email($to)) {
-    hic_log('hic_send_admin_email: invalid admin email format: ' . $to);
-    return false;
-  }
-  
-  // Check WordPress email configuration
-  if (!function_exists('wp_mail')) {
-    hic_log('hic_send_admin_email: wp_mail function not available');
-    return false;
-  }
-  
-  // Log which admin email is being used for transparency
-  $custom_email = hic_get_option('admin_email', '');
-  if (!empty($custom_email)) {
-    hic_log('hic_send_admin_email: using custom admin email from settings: ' . $to);
-  } else {
-    hic_log('hic_send_admin_email: using WordPress default admin email: ' . $to);
-  }
-  
-  // Log WordPress mail configuration for debugging
-  $phpmailer_init_triggered = false;
-  $phpmailer_error = '';
-  
-  // Add temporary hook to capture PHPMailer errors
-  $phpmailer_hook = function($phpmailer) use (&$phpmailer_init_triggered, &$phpmailer_error) {
-    $phpmailer_init_triggered = true;
-    if ($phpmailer->ErrorInfo) {
-      $phpmailer_error = $phpmailer->ErrorInfo;
-    }
-  };
-  add_action('phpmailer_init', $phpmailer_hook);
-  
-  $site_name = get_bloginfo('name');
-  if (empty($site_name)) {
-    $site_name = 'Hotel in Cloud';
-  }
-  
-  $subject = "Nuova prenotazione da " . $site_name;
-
-  $body  = "Hai ricevuto una nuova prenotazione da $site_name:\n\n";
-  $body .= "Reservation ID: " . ($data['reservation_id'] ?? ($data['id'] ?? 'n/a')) . "\n";
-  $body .= "Importo: " . (isset($data['amount']) ? hic_normalize_price($data['amount']) : '0') . " " . ($data['currency'] ?? 'EUR') . "\n";
-
-  $first = $data['first_name']
-      ?? $data['guest_first_name']
-      ?? $data['guest_firstname']
-      ?? $data['firstname']
-      ?? $data['customer_first_name']
-      ?? $data['customer_firstname']
-      ?? '';
-  $last = $data['last_name']
-      ?? $data['guest_last_name']
-      ?? $data['guest_lastname']
-      ?? $data['lastname']
-      ?? $data['customer_last_name']
-      ?? $data['customer_lastname']
-      ?? '';
-
-  if ((empty($first) || empty($last)) && !empty($data['guest_name']) && is_string($data['guest_name'])) {
-      $parts = preg_split('/\s+/', trim($data['guest_name']), 2);
-      if (empty($first) && isset($parts[0])) {
-          $first = $parts[0];
-      }
-      if (empty($last) && isset($parts[1])) {
-          $last = $parts[1];
-      }
-  }
-  if ((empty($first) || empty($last)) && !empty($data['name']) && is_string($data['name'])) {
-      $parts = preg_split('/\s+/', trim($data['name']), 2);
-      if (empty($first) && isset($parts[0])) {
-          $first = $parts[0];
-      }
-      if (empty($last) && isset($parts[1])) {
-          $last = $parts[1];
-      }
-  }
-
-  $body .= "Nome: " . trim($first . ' ' . $last) . "\n";
-  $body .= "Email: " . ($data['email'] ?? 'n/a') . "\n";
-  $body .= "Telefono: " . ($data['phone'] ?? 'n/a') . "\n";
-  $body .= "Lingua: " . ($data['language'] ?? ($data['lingua'] ?? ($data['lang'] ?? 'n/a'))) . "\n";
-  $body .= "Camera: " . ($data['room'] ?? 'n/a') . "\n";
-  $body .= "Check-in: " . ($data['checkin'] ?? 'n/a') . "\n";
-  $body .= "Check-out: " . ($data['checkout'] ?? 'n/a') . "\n";
-  $body .= "SID: " . ($sid ?? 'n/a') . "\n";
-  $body .= "GCLID: " . ($gclid ?? 'n/a') . "\n";
-  $body .= "FBCLID: " . ($fbclid ?? 'n/a') . "\n";
-  $body .= "Bucket: " . $bucket . "\n";
-
-  // Allow customization of admin email subject and body
-  $subject = apply_filters('hic_admin_email_subject', $subject, $data);
-  $body    = apply_filters('hic_admin_email_body', $body, $data);
-
-  $content_type_filter = function(){ return 'text/plain; charset=UTF-8'; };
-  add_filter('wp_mail_content_type', $content_type_filter);
-  
-  // Enhanced email sending with detailed error reporting
-  hic_log('hic_send_admin_email: attempting to send email to ' . $to . ' with subject: ' . $subject);
-  
-  $sent = wp_mail($to, $subject, $body);
-  
-  // Remove filters and capture additional debugging info
-  remove_filter('wp_mail_content_type', $content_type_filter);
-  remove_action('phpmailer_init', $phpmailer_hook);
-
-  // Enhanced logging with detailed error information
-  if ($sent) {
-    hic_log('Email admin inviata con successo (bucket='.$bucket.') a '.$to);
-    if ($phpmailer_init_triggered) {
-      hic_log('PHPMailer configuration was initialized correctly');
-    }
-    return true;
-  } else {
-    $error_details = 'wp_mail returned false';
-    
-    // Capture PHPMailer specific errors
-    if (!empty($phpmailer_error)) {
-      $error_details .= ' - PHPMailer Error: ' . $phpmailer_error;
-    }
-    
-    // Check for common WordPress mail issues
-    if (!$phpmailer_init_triggered) {
-      $error_details .= ' - PHPMailer was not initialized (possible mail function disabled)';
-    }
-    
-    // Log detailed error information
-    hic_log('ERRORE invio email admin a '.$to.' - '.$error_details);
-    
-    // Log server mail configuration for debugging
-    if (function_exists('ini_get')) {
-      $smtp_config = ini_get('SMTP');
-      $sendmail_path = ini_get('sendmail_path');
-      hic_log('Server mail config - SMTP: ' . ($smtp_config ?: 'not set') . ', Sendmail: ' . ($sendmail_path ?: 'not set'));
-    }
-    
-    return false;
-  }
-}
-
-/* ============ Email Configuration Testing ============ */
-function hic_test_email_configuration($recipient_email = null) {
-    $result = array(
-        'success' => false,
-        'message' => '',
-        'details' => array()
-    );
-    
-    // Use admin email if no recipient specified
-    if (empty($recipient_email)) {
-        $recipient_email = hic_get_admin_email();
-    }
-    
-    // Validate recipient email
-    if (empty($recipient_email) || !hic_is_valid_email($recipient_email)) {
-        $result['message'] = 'Invalid recipient email: ' . $recipient_email;
-        return $result;
-    }
-    
-    // Check WordPress mail function availability
-    if (!function_exists('wp_mail')) {
-        $result['message'] = 'wp_mail function not available';
-        return $result;
-    }
-    
-    // Capture PHPMailer configuration
-    $phpmailer_info = array();
-    $phpmailer_hook = function($phpmailer) use (&$phpmailer_info) {
-        $phpmailer_info['mailer'] = $phpmailer->Mailer;
-        $phpmailer_info['host'] = $phpmailer->Host;
-        $phpmailer_info['port'] = $phpmailer->Port;
-        $phpmailer_info['smtp_secure'] = $phpmailer->SMTPSecure;
-        $phpmailer_info['smtp_auth'] = $phpmailer->SMTPAuth;
-        $phpmailer_info['username'] = $phpmailer->Username;
-        $phpmailer_info['from'] = $phpmailer->From;
-        $phpmailer_info['from_name'] = $phpmailer->FromName;
-    };
-    
-    add_action('phpmailer_init', $phpmailer_hook);
-    
-    // Prepare test email
-    $subject = 'HIC Email Configuration Test - ' . current_time('mysql');
-    $body = "Questo è un test di configurazione email per il plugin Hotel in Cloud.\n\n";
-    $body .= "Timestamp: " . current_time('mysql') . "\n";
-    $body .= "Destinatario: " . $recipient_email . "\n";
-    $body .= "Sito: " . get_bloginfo('name') . "\n";
-    $body .= "URL: " . get_bloginfo('url') . "\n\n";
-    $body .= "Se ricevi questa email, la configurazione email funziona correttamente.";
-    
-    // Send test email
-    $sent = wp_mail($recipient_email, $subject, $body);
-    
-    remove_action('phpmailer_init', $phpmailer_hook);
-    
-    // Collect server mail configuration
-    $server_config = array();
-    if (function_exists('ini_get')) {
-        $server_config['smtp'] = ini_get('SMTP') ?: 'not set';
-        $server_config['smtp_port'] = ini_get('smtp_port') ?: 'not set';
-        $server_config['sendmail_path'] = ini_get('sendmail_path') ?: 'not set';
-        $server_config['mail_function'] = function_exists('mail') ? 'available' : 'not available';
-    }
-    
-    // Build result
-    $result['details']['phpmailer'] = $phpmailer_info;
-    $result['details']['server_config'] = $server_config;
-    $result['details']['wp_admin_email'] = get_option('admin_email');
-    $result['details']['hic_admin_email'] = hic_get_option('admin_email', '');
-    $result['details']['effective_admin_email'] = hic_get_admin_email();
-    
-    if ($sent) {
-        $result['success'] = true;
-        $result['message'] = 'Email di test inviata con successo a ' . $recipient_email;
-        hic_log('Email test configuration sent successfully to ' . $recipient_email);
-    } else {
-        $result['message'] = 'Errore nell\'invio dell\'email di test a ' . $recipient_email;
-        hic_log('Email test configuration failed for ' . $recipient_email . ' - Check server mail configuration');
-    }
-    
-    return $result;
-}
-
-/* ============ Email Diagnostics and Troubleshooting ============ */
-function hic_diagnose_email_issues() {
-    $issues = array();
-    $suggestions = array();
-    
-    // Check 1: Admin email configuration
-    $admin_email = hic_get_admin_email();
-    if (empty($admin_email)) {
-        $issues[] = 'Email amministratore non configurato';
-        $suggestions[] = 'Configura un indirizzo email nelle impostazioni HIC';
-    } elseif (!hic_is_valid_email($admin_email)) {
-        $issues[] = 'Email amministratore non valido: ' . $admin_email;
-        $suggestions[] = 'Correggi l\'indirizzo email nelle impostazioni';
-    }
-    
-    // Check 2: WordPress mail function
-    if (!function_exists('wp_mail')) {
-        $issues[] = 'Funzione wp_mail non disponibile';
-        $suggestions[] = 'Problema critico di WordPress - contatta lo sviluppatore';
-    }
-    
-    // Check 3: PHP mail function
-    if (!function_exists('mail')) {
-        $issues[] = 'Funzione mail() PHP non disponibile sul server';
-        $suggestions[] = 'Contatta il provider hosting per abilitare la funzione mail()';
-    }
-    
-    // Check 4: Server configuration
-    if (function_exists('ini_get')) {
-        $smtp_config = ini_get('SMTP');
-        $sendmail_path = ini_get('sendmail_path');
-        
-        if (empty($smtp_config) && empty($sendmail_path)) {
-            $issues[] = 'Configurazione email server non trovata';
-            $suggestions[] = 'Installa un plugin SMTP (WP Mail SMTP, Easy WP SMTP) o contatta l\'hosting';
-        }
-    }
-    
-    // Check 5: Recent email sending attempts (if function exists)
-    $email_errors = 0;
-    $log_manager = function_exists('\\hic_get_log_manager') ? \hic_get_log_manager() : null;
-    $recent_lines = $log_manager ? $log_manager->get_recent_logs(50) : array();
-
-    foreach ($recent_lines as $line) {
-        // Handle both raw string lines and parsed log entries
-        if (is_array($line)) {
-            $line = $line['message'] ?? '';
-        }
-
-        if (strpos($line, 'ERRORE invio email') !== false) {
-            $email_errors++;
-        }
-    }
-    
-    if ($email_errors > 0) {
-        $issues[] = "$email_errors errori email negli ultimi log";
-        $suggestions[] = 'Controlla i log dettagliati nella sezione Diagnostics';
-    }
-    
-    return array(
-        'issues' => $issues,
-        'suggestions' => $suggestions,
-        'has_issues' => !empty($issues)
-    );
-}
-
-/* ============ Email Enrichment Functions ============ */
-function hic_mark_email_enriched($reservation_id, $real_email) {
-    if (empty($reservation_id) || !is_scalar($reservation_id)) {
-        hic_log('hic_mark_email_enriched: reservation_id is empty or not scalar');
-        return false;
-    }
-
-    $normalized_id = hic_normalize_reservation_id((string) $reservation_id);
-    if ($normalized_id === '') {
-        hic_log('hic_mark_email_enriched: normalized reservation_id is empty');
-        return false;
-    }
-
-    if (empty($real_email) || !is_string($real_email) || !hic_is_valid_email($real_email)) {
-        hic_log('hic_mark_email_enriched: real_email is empty, not string, or invalid email format');
-        return false;
-    }
-
-    $email_map = get_option('hic_res_email_map', array());
-    if (!is_array($email_map)) {
-        $email_map = array(); // Reset if corrupted
-    }
-
-    $normalized_map = array();
-
-    foreach ($email_map as $key => $value) {
-        if (!is_scalar($key)) {
-            continue;
-        }
-
-        $candidate_key = hic_normalize_reservation_id((string) $key);
-        if ($candidate_key === '') {
-            continue;
-        }
-
-        $normalized_map[$candidate_key] = $value;
-    }
-
-    $normalized_map[$normalized_id] = $real_email;
-
-    // Keep only last 5k entries (FIFO) to prevent bloat
-    if (count($normalized_map) > 5000) {
-        $normalized_map = array_slice($normalized_map, -5000, null, true);
-    }
-
-    $result = update_option('hic_res_email_map', $normalized_map, false); // autoload=false
-    hic_clear_option_cache('hic_res_email_map');
-    return $result;
-}
-
-function hic_get_reservation_email($reservation_id) {
-    if (empty($reservation_id) || !is_scalar($reservation_id)) {
-        return null;
-    }
-
-    $normalized_id = hic_normalize_reservation_id((string) $reservation_id);
-    if ($normalized_id === '') {
-        return null;
-    }
-
-    $email_map = get_option('hic_res_email_map', array());
-    if (!is_array($email_map)) {
-        return null; // Corrupted data
-    }
-
-    if (isset($email_map[$normalized_id]) && is_string($email_map[$normalized_id])) {
-        return $email_map[$normalized_id];
-    }
-
-    foreach ($email_map as $key => $value) {
-        if (!is_scalar($key) || !is_string($value)) {
-            continue;
-        }
-
-        $candidate_key = hic_normalize_reservation_id((string) $key);
-        if ($candidate_key === '') {
-            continue;
-        }
-
-        if ($candidate_key === $normalized_id) {
-            return $value;
-        }
-    }
-
-    return null;
-}
-
-/**
- * Normalize stored reservation email mappings once during upgrade.
- */
-function hic_upgrade_reservation_email_map() {
-    $already_normalized = get_option('hic_res_email_map_normalized');
-    if ($already_normalized === '1') {
-        return;
-    }
-
-    $email_map = get_option('hic_res_email_map', array());
-    $normalized_map = array();
-    $changed = false;
-
-    if (!is_array($email_map)) {
-        $changed = true;
-        $email_map = array();
-    }
-
-    foreach ($email_map as $key => $value) {
-        if (!is_scalar($key) || !is_string($value)) {
-            $changed = true;
-            continue;
-        }
-
-        $original_key = (string) $key;
-        $normalized_key = hic_normalize_reservation_id($original_key);
-        if ($normalized_key === '') {
-            $changed = true;
-            continue;
-        }
-
-        if ($normalized_key !== $original_key) {
-            $changed = true;
-        }
-
-        $normalized_map[$normalized_key] = $value;
-    }
-
-    if (count($normalized_map) > 5000) {
-        $normalized_map = array_slice($normalized_map, -5000, null, true);
-        $changed = true;
-    }
-
-    if ($changed) {
-        update_option('hic_res_email_map', $normalized_map, false);
-        hic_clear_option_cache('hic_res_email_map');
-    }
-
-    update_option('hic_res_email_map_normalized', '1', false);
-}
-
-/**
- * Normalize stored integration retry queue keys once during upgrade.
- */
-function hic_upgrade_integration_retry_queue(): void {
-    $already_normalized = get_option('hic_integration_retry_queue_normalized');
-    if ($already_normalized === '1') {
-        return;
-    }
-
-    $queue = get_option('hic_integration_retry_queue', []);
-    $changed = false;
-
-    if (!is_array($queue)) {
-        $queue = [];
-        $changed = true;
-    }
-
-    $normalized_queue = [];
-
-    foreach ($queue as $key => $entry) {
-        if (!is_scalar($key) || !is_array($entry)) {
-            $changed = true;
-            continue;
-        }
-
-        $normalized_key = hic_normalize_reservation_id((string) $key);
-        if ($normalized_key === '') {
-            $changed = true;
-            continue;
-        }
-
-        if (!isset($normalized_queue[$normalized_key])) {
-            $normalized_queue[$normalized_key] = [
-                'integrations' => [],
-                'context' => [],
-                'last_updated' => 0,
-            ];
-        }
-
-        $normalized_entry = &$normalized_queue[$normalized_key];
-
-        if (isset($entry['integrations']) && is_array($entry['integrations'])) {
-            foreach ($entry['integrations'] as $integration => $payload) {
-                if (!is_scalar($integration) || !is_array($payload)) {
-                    $changed = true;
-                    continue;
-                }
-
-                $safe_integration = \sanitize_text_field((string) $integration);
-                if ($safe_integration === '') {
-                    $changed = true;
-                    continue;
-                }
-
-                $sanitized_payload = [
-                    'note' => '',
-                    'last_failure' => 0,
-                ];
-
-                if (isset($payload['note']) && is_scalar($payload['note'])) {
-                    $sanitized_payload['note'] = \sanitize_text_field((string) $payload['note']);
-                }
-
-                if (isset($payload['last_failure']) && is_numeric($payload['last_failure'])) {
-                    $sanitized_payload['last_failure'] = max(0, (int) $payload['last_failure']);
-                }
-
-                if (isset($normalized_entry['integrations'][$safe_integration])) {
-                    $existing_payload = $normalized_entry['integrations'][$safe_integration];
-                    if (!is_array($existing_payload)) {
-                        $existing_payload = [
-                            'note' => '',
-                            'last_failure' => 0,
-                        ];
-                    }
-
-                    $existing_last_failure = isset($existing_payload['last_failure']) && is_numeric($existing_payload['last_failure'])
-                        ? (int) $existing_payload['last_failure']
-                        : 0;
-
-                    if ($sanitized_payload['last_failure'] < $existing_last_failure) {
-                        $sanitized_payload['last_failure'] = $existing_last_failure;
-                    }
-
-                    if ($sanitized_payload['note'] === '' && isset($existing_payload['note']) && is_scalar($existing_payload['note'])) {
-                        $sanitized_payload['note'] = \sanitize_text_field((string) $existing_payload['note']);
-                    }
-                }
-
-                if ($safe_integration !== (string) $integration) {
-                    $changed = true;
-                }
-
-                $normalized_entry['integrations'][$safe_integration] = $sanitized_payload;
-            }
-        } else {
-            $changed = true;
-        }
-
-        if (isset($entry['context']) && is_array($entry['context'])) {
-            foreach ($entry['context'] as $context_key => $context_value) {
-                if (!is_scalar($context_key) || !is_scalar($context_value)) {
-                    $changed = true;
-                    continue;
-                }
-
-                $safe_context_key = \sanitize_key((string) $context_key);
-                $normalized_entry['context'][$safe_context_key] = \sanitize_text_field((string) $context_value);
-            }
-        } elseif (isset($entry['context'])) {
-            $changed = true;
-        }
-
-        if (isset($entry['last_updated']) && is_numeric($entry['last_updated'])) {
-            $normalized_entry['last_updated'] = max($normalized_entry['last_updated'], (int) $entry['last_updated']);
-        } else {
-            $changed = true;
-        }
-
-        unset($normalized_entry);
-    }
-
-    foreach ($normalized_queue as $key => &$entry) {
-        if (empty($entry['integrations'])) {
-            unset($normalized_queue[$key]);
-            $changed = true;
-            continue;
-        }
-
-        if (!isset($entry['context']) || !is_array($entry['context'])) {
-            $entry['context'] = [];
-        }
-    }
-    unset($entry);
-
-    if (count($normalized_queue) > 200) {
-        $normalized_queue = array_slice($normalized_queue, -200, null, true);
-        $changed = true;
-    }
-
-    if ($changed || $normalized_queue !== $queue) {
-        update_option('hic_integration_retry_queue', $normalized_queue, false);
-        hic_clear_option_cache('hic_integration_retry_queue');
-    }
-
-    update_option('hic_integration_retry_queue_normalized', '1', false);
-}
-
-/* ================= DEDUPLICATION HELPER FUNCTIONS ================= */
-
-/**
- * Extract reservation ID from webhook data for deduplication
- */
-function hic_extract_reservation_id($data) {
-    if (!is_array($data)) {
-        return null;
-    }
-
-    // Try different field names in order of preference
-    $id_fields = hic_candidate_reservation_id_fields(['transaction_id', 'reservation_id', 'id', 'booking_id']);
-
-    foreach ($id_fields as $field) {
-        if (!array_key_exists($field, $data)) {
-            continue;
-        }
-
-        $value = $data[$field];
-        if (!is_scalar($value)) {
-            continue;
-        }
-
-        $candidate = trim((string) $value);
-        if ($candidate !== '') {
-            return $candidate;
-        }
-    }
-
-    return null;
-}
-
-/**
- * Normalize stored timestamp values used for FIFO trimming.
- *
- * @param mixed $value
- */
-function hic_normalize_processed_reservation_timestamp($value, int $fallback): int {
-    if (is_int($value) || is_float($value)) {
-        $normalized = (int) $value;
-        return $normalized >= 0 ? $normalized : $fallback;
-    }
-
-    if (is_string($value)) {
-        $trimmed = trim($value);
-        if ($trimmed !== '' && ctype_digit($trimmed)) {
-            $normalized = (int) $trimmed;
-            return $normalized >= 0 ? $normalized : $fallback;
-        }
-    }
-
-    return $fallback;
-}
-
-/**
- * Retrieve the processed reservation ID set as an associative array keyed by ID.
- *
- * @return array<string, int>
- */
-function hic_get_processed_reservation_id_set(): array {
-    $stored = get_option('hic_synced_res_ids', array());
-    if (!is_array($stored)) {
-        return array();
-    }
-
-    $normalized = array();
-    $position = 0;
-
-    foreach ($stored as $key => $value) {
-        $position++;
-
-        $id = '';
-        $timestamp = $position;
-
-        if (is_string($key) && $key !== '') {
-            $id = hic_normalize_reservation_id($key);
-            if ($id === '') {
-                continue;
-            }
-
-            $timestamp = hic_normalize_processed_reservation_timestamp($value, $position);
-        } elseif (is_scalar($value)) {
-            $id = hic_normalize_reservation_id((string) $value);
-            if ($id === '') {
-                continue;
-            }
-        } else {
-            continue;
-        }
-
-        if (!array_key_exists($id, $normalized)) {
-            $normalized[$id] = $timestamp;
-        } else {
-            $normalized[$id] = min($normalized[$id], $timestamp);
-        }
-    }
-
-    return $normalized;
-}
-
-/**
- * Persist the processed reservation ID set while enforcing FIFO trimming.
- *
- * @param array<string, int> $set
- */
-function hic_store_processed_reservation_id_set(array $set): void {
-    if (count($set) > 10000) {
-        asort($set);
-        $set = array_slice($set, -10000, null, true);
-    }
-
-    update_option('hic_synced_res_ids', $set, false);
-    hic_clear_option_cache('hic_synced_res_ids');
-}
-
-/**
- * Mark reservation as processed by ID (for webhook deduplication)
- */
-function hic_mark_reservation_processed_by_id($reservation_id) {
-    if (empty($reservation_id)) return false;
-
-    $ids = array();
-    if (is_array($reservation_id)) {
-        foreach ($reservation_id as $candidate) {
-            if (!is_scalar($candidate)) {
-                continue;
-            }
-
-            $sanitized = hic_normalize_reservation_id((string) $candidate);
-            if ($sanitized === '') {
-                continue;
-            }
-
-            $ids[$sanitized] = true;
-        }
-    } elseif (is_scalar($reservation_id)) {
-        $sanitized = hic_normalize_reservation_id((string) $reservation_id);
-        if ($sanitized !== '') {
-            $ids[$sanitized] = true;
-        }
-    }
-
-    if (empty($ids)) {
-        return false;
-    }
-
-    $existing = hic_get_processed_reservation_id_set();
-    $changed = false;
-    $next_value = empty($existing) ? time() : (max($existing) + 1);
-
-    foreach (array_keys($ids) as $id) {
-        if (!array_key_exists($id, $existing)) {
-            $existing[$id] = $next_value++;
-            $changed = true;
-        }
-    }
-
-    if ($changed) {
-        hic_store_processed_reservation_id_set($existing);
-
-        $log_ids = array_keys($ids);
-        if (count($log_ids) === 1) {
-            hic_log('Marked reservation ' . $log_ids[0] . ' as processed for deduplication');
-        } else {
-            hic_log('Marked reservation aliases as processed for deduplication: ' . implode(', ', $log_ids));
-        }
-    }
-
-    return $changed;
-}
-
-/* ================= TRANSACTION LOCKING FUNCTIONS ================= */
-
-/**
- * Acquire a lock for processing a specific reservation to prevent concurrent processing
- */
-function hic_acquire_reservation_lock($reservation_id, $timeout = 30) {
-  if (empty($reservation_id)) return false;
-  
-  $lock_key = 'hic_processing_lock_' . md5($reservation_id);
-  $lock_time = current_time('timestamp');
-  
-  // Check if there's already a recent lock
-  $existing_lock = get_transient($lock_key);
-  if ($existing_lock !== false) {
-    $time_diff = $lock_time - $existing_lock;
-    if ($time_diff < $timeout) {
-      hic_log("Reservation $reservation_id: processing lock exists (age: {$time_diff}s), skipping");
-      return false;
-    } else {
-      hic_log("Reservation $reservation_id: expired lock found (age: {$time_diff}s), acquiring new lock");
-    }
-  }
-  
-  // Set the lock with timeout
-  set_transient($lock_key, $lock_time, $timeout);
-  hic_log("Reservation $reservation_id: processing lock acquired");
-  return true;
-}
-
-/**
- * Release the processing lock for a reservation
- */
-function hic_release_reservation_lock($reservation_id) {
-  if (empty($reservation_id)) return false;
-  
-  $lock_key = 'hic_processing_lock_' . md5($reservation_id);
-  delete_transient($lock_key);
-  hic_log("Reservation $reservation_id: processing lock released");
-  return true;
-}
-
-/**
- * Check if reservation ID was already processed (shared with polling)
- */
-function hic_is_reservation_already_processed($reservation_id) {
-    if (empty($reservation_id)) return false;
-
-    $ids = array();
-    if (is_array($reservation_id)) {
-        foreach ($reservation_id as $candidate) {
-            if (!is_scalar($candidate)) {
-                continue;
-            }
-
-            $sanitized = hic_normalize_reservation_id((string) $candidate);
-            if ($sanitized === '') {
-                continue;
-            }
-
-            $ids[$sanitized] = true;
-        }
-    } elseif (is_scalar($reservation_id)) {
-        $sanitized = hic_normalize_reservation_id((string) $reservation_id);
-        if ($sanitized !== '') {
-            $ids[$sanitized] = true;
-        }
-    }
-
-    if (empty($ids)) {
-        return false;
-    }
-
-    $synced = hic_get_processed_reservation_id_set();
-    foreach (array_keys($ids) as $id) {
-        if (array_key_exists($id, $synced)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/* ================= DIAGNOSTIC FUNCTIONS ================= */
-
-/**
- * Get processing statistics for diagnostics
- */
-function hic_get_processing_statistics() {
-    $synced = hic_get_processed_reservation_id_set();
-    $current_locks = array();
-    
-    // Check for active locks (this is just for diagnostics)
-    // In production, locks are short-lived (30 seconds max)
-    $lock_prefix = 'hic_processing_lock_';
-    global $wpdb;
-    
-    $statistics = array(
-        'total_processed_reservations' => count($synced),
-        'last_webhook_processing' => get_option('hic_last_webhook_processing', 'never'),
-        'last_polling_processing' => get_option('hic_last_api_poll', 'never'),
-        'connection_type' => hic_get_connection_type(),
-        'deduplication_enabled' => true,
-        'transaction_locking_enabled' => true
-    );
-    
-    return $statistics;
-}
-
-
-}
-
-// Global wrappers for backward compatibility
 namespace {
 
-    function hic_require_cap($capability) { \FpHic\Helpers\hic_require_cap((string) $capability); }
-    function hic_sanitize_identifier($identifier, $type = 'identifier') { return \FpHic\Helpers\hic_sanitize_identifier((string) $identifier, (string) $type); }
+    use function FpHic\Helpers\hic_invoke_deprecated_shim;
 
     if (!function_exists('rest_get_server')) {
         if (!defined('HIC_REST_API_FALLBACK')) {
@@ -2895,86 +88,504 @@ namespace {
             return $server;
         }
     }
-    function hic_http_request($url, $args = array(), $suppress_failed_storage = false) { return \FpHic\Helpers\hic_http_request($url, $args, $suppress_failed_storage); }
-    function hic_get_option($key, $default = '') { return \FpHic\Helpers\hic_get_option($key, $default); }
-    function hic_clear_option_cache($key = null) { return \FpHic\Helpers\hic_clear_option_cache($key); }
-    function hic_get_measurement_id() { return \FpHic\Helpers\hic_get_measurement_id(); }
-    function hic_get_api_secret() { return \FpHic\Helpers\hic_get_api_secret(); }
-    function hic_get_brevo_api_key() { return \FpHic\Helpers\hic_get_brevo_api_key(); }
-    function hic_get_brevo_list_it() { return \FpHic\Helpers\hic_get_brevo_list_it(); }
-    function hic_get_brevo_list_en() { return \FpHic\Helpers\hic_get_brevo_list_en(); }
-    function hic_get_brevo_list_default() { return \FpHic\Helpers\hic_get_brevo_list_default(); }
-    function hic_get_brevo_optin_default() { return \FpHic\Helpers\hic_get_brevo_optin_default(); }
-    function hic_is_brevo_enabled() { return \FpHic\Helpers\hic_is_brevo_enabled(); }
-    function hic_is_debug_verbose() { return \FpHic\Helpers\hic_is_debug_verbose(); }
-    function hic_get_health_token() { return \FpHic\Helpers\hic_get_health_token(); }
-    function hic_updates_enrich_contacts() { return \FpHic\Helpers\hic_updates_enrich_contacts(); }
-    function hic_get_brevo_list_alias() { return \FpHic\Helpers\hic_get_brevo_list_alias(); }
-    function hic_brevo_double_optin_on_enrich() { return \FpHic\Helpers\hic_brevo_double_optin_on_enrich(); }
-    function hic_realtime_brevo_sync_enabled() { return \FpHic\Helpers\hic_realtime_brevo_sync_enabled(); }
-    function hic_get_brevo_event_endpoint() { return \FpHic\Helpers\hic_get_brevo_event_endpoint(); }
-    function hic_reliable_polling_enabled() { return \FpHic\Helpers\hic_reliable_polling_enabled(); }
-    function hic_get_admin_email() { return \FpHic\Helpers\hic_get_admin_email(); }
-    function hic_get_log_file() { return \FpHic\Helpers\hic_get_log_file(); }
-    function hic_is_gtm_enabled() { return \FpHic\Helpers\hic_is_gtm_enabled(); }
-    function hic_get_gtm_container_id() { return \FpHic\Helpers\hic_get_gtm_container_id(); }
-    function hic_get_tracking_mode() { return \FpHic\Helpers\hic_get_tracking_mode(); }
-    function hic_get_fb_pixel_id() { return \FpHic\Helpers\hic_get_fb_pixel_id(); }
-    function hic_get_fb_access_token() { return \FpHic\Helpers\hic_get_fb_access_token(); }
-    function hic_get_connection_type() { return \FpHic\Helpers\hic_get_connection_type(); }
-    function hic_normalize_connection_type($type = null) { return \FpHic\Helpers\hic_normalize_connection_type($type); }
-    function hic_connection_uses_api($type = null) { return \FpHic\Helpers\hic_connection_uses_api($type); }
-    function hic_get_webhook_token() { return \FpHic\Helpers\hic_get_webhook_token(); }
-    function hic_get_webhook_secret(): string { return \FpHic\Helpers\hic_get_webhook_secret(); }
-    function hic_get_api_url() { return \FpHic\Helpers\hic_get_api_url(); }
-    function hic_get_api_key() { return \FpHic\Helpers\hic_get_api_key(); }
-    function hic_get_api_email() { return \FpHic\Helpers\hic_get_api_email(); }
-    function hic_get_api_password() { return \FpHic\Helpers\hic_get_api_password(); }
-    function hic_get_property_id() { return \FpHic\Helpers\hic_get_property_id(); }
-    function hic_has_basic_auth_credentials() { return \FpHic\Helpers\hic_has_basic_auth_credentials(); }
-    function hic_get_currency() { return \FpHic\Helpers\hic_get_currency(); }
-    function hic_use_net_value() { return \FpHic\Helpers\hic_use_net_value(); }
-    function hic_process_invalid() { return \FpHic\Helpers\hic_process_invalid(); }
-    function hic_allow_status_updates() { return \FpHic\Helpers\hic_allow_status_updates(); }
-    function hic_refund_tracking_enabled() { return \FpHic\Helpers\hic_refund_tracking_enabled(); }
-    function hic_get_polling_range_extension_days() { return \FpHic\Helpers\hic_get_polling_range_extension_days(); }
-    function hic_get_polling_interval() { return \FpHic\Helpers\hic_get_polling_interval(); }
-    function hic_acquire_polling_lock($timeout = 300) { return \FpHic\Helpers\hic_acquire_polling_lock($timeout); }
-    function hic_release_polling_lock() { return \FpHic\Helpers\hic_release_polling_lock(); }
-    function hic_should_schedule_retry_event() { return \FpHic\Helpers\hic_should_schedule_retry_event(); }
-    function hic_get_tracking_ids_by_sid($sid) { return \FpHic\Helpers\hic_get_tracking_ids_by_sid($sid); }
-    function hic_get_utm_params_by_sid($sid) { return \FpHic\Helpers\hic_get_utm_params_by_sid($sid); }
-    function hic_normalize_price($value) { return \FpHic\Helpers\hic_normalize_price($value); }
-    function hic_is_valid_email($email) { return \FpHic\Helpers\hic_is_valid_email($email); }
-    function hic_is_ota_alias_email($e) { return \FpHic\Helpers\hic_is_ota_alias_email($e); }
-    function hic_detect_phone_language($phone) { return \FpHic\Helpers\hic_detect_phone_language($phone); }
-    function hic_normalize_phone_for_hash($phone, $context = []) { return \FpHic\Helpers\hic_normalize_phone_for_hash($phone, is_array($context) ? $context : []); }
-    function hic_hash_normalized_phone($phone, $context = []) { return \FpHic\Helpers\hic_hash_normalized_phone($phone, is_array($context) ? $context : []); }
-    function hic_booking_uid($reservation) { return \FpHic\Helpers\hic_booking_uid($reservation); }
-    function hic_mask_sensitive_data($message) { return \FpHic\Helpers\hic_mask_sensitive_data($message); }
-    function hic_default_log_message_filter($message, $level) { return \FpHic\Helpers\hic_default_log_message_filter($message, $level); }
-    function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) { return \FpHic\Helpers\hic_log($msg, $level, $context); }
-    function fp_normalize_bucket($gclid, $fbclid, $gbraid = null, $wbraid = null) { return \FpHic\Helpers\fp_normalize_bucket($gclid, $fbclid, $gbraid, $wbraid); }
-    function hic_get_bucket($gclid, $fbclid, $gbraid = null, $wbraid = null) { return \FpHic\Helpers\hic_get_bucket($gclid, $fbclid, $gbraid, $wbraid); }
-    function hic_send_admin_email($data, $gclid, $fbclid, $sid) { return \FpHic\Helpers\hic_send_admin_email($data, $gclid, $fbclid, $sid); }
-    function hic_test_email_configuration($recipient_email = null) { return \FpHic\Helpers\hic_test_email_configuration($recipient_email); }
-    function hic_diagnose_email_issues() { return \FpHic\Helpers\hic_diagnose_email_issues(); }
-    function hic_mark_email_enriched($reservation_id, $real_email) { return \FpHic\Helpers\hic_mark_email_enriched($reservation_id, $real_email); }
-    function hic_get_reservation_email($reservation_id) { return \FpHic\Helpers\hic_get_reservation_email($reservation_id); }
-    function hic_normalize_reservation_id($value) { return \FpHic\Helpers\hic_normalize_reservation_id((string) $value); }
-    function hic_collect_reservation_ids(array $reservation) { return \FpHic\Helpers\hic_collect_reservation_ids($reservation); }
-    function hic_find_processed_reservation_alias(array $reservation) { return \FpHic\Helpers\hic_find_processed_reservation_alias($reservation); }
-    function hic_create_integration_result($overrides = []) { return \FpHic\Helpers\hic_create_integration_result(is_array($overrides) ? $overrides : []); }
-    function hic_append_integration_result(array &$result, $integration, $status, $note = '') { \FpHic\Helpers\hic_append_integration_result($result, (string) $integration, (string) $status, (string) $note); }
-    function hic_finalize_integration_result($result, $tracking_skipped = false) { return \FpHic\Helpers\hic_finalize_integration_result(is_array($result) ? $result : [], (bool) $tracking_skipped); }
-    function hic_queue_integration_retry($reservation_uid, $failed_details, $context = []) { \FpHic\Helpers\hic_queue_integration_retry($reservation_uid, is_array($failed_details) ? $failed_details : [], is_array($context) ? $context : []); }
-    function hic_extract_reservation_id($data) { return \FpHic\Helpers\hic_extract_reservation_id($data); }
-    function hic_mark_reservation_processed_by_id($reservation_id) { return \FpHic\Helpers\hic_mark_reservation_processed_by_id($reservation_id); }
-    function hic_acquire_reservation_lock($reservation_id, $timeout = 30) { return \FpHic\Helpers\hic_acquire_reservation_lock($reservation_id, $timeout); }
-    function hic_release_reservation_lock($reservation_id) { return \FpHic\Helpers\hic_release_reservation_lock($reservation_id); }
-    function hic_is_reservation_already_processed($reservation_id) { return \FpHic\Helpers\hic_is_reservation_already_processed($reservation_id); }
-    function hic_get_processing_statistics() { return \FpHic\Helpers\hic_get_processing_statistics(); }
-    function hic_safe_wp_next_scheduled($hook) { return \FpHic\Helpers\hic_safe_wp_next_scheduled($hook); }
-    function hic_safe_wp_schedule_event($timestamp, $recurrence, $hook, $args = array()) { return \FpHic\Helpers\hic_safe_wp_schedule_event($timestamp, $recurrence, $hook, $args); }
-    function hic_safe_wp_clear_scheduled_hook($hook, $args = array()) { return \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook($hook, $args); }
+
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_require_cap()
+ */
+function hic_require_cap($capability) {
+    hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_require_cap', func_get_args());
 }
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_sanitize_identifier()
+ */
+function hic_sanitize_identifier($identifier, $type = 'identifier') {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_sanitize_identifier', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_http_request()
+ */
+function hic_http_request($url, $args = array(), $suppress_failed_storage = false) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_http_request', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_option()
+ */
+function hic_get_option($key, $default = '') {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_option', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_clear_option_cache()
+ */
+function hic_clear_option_cache($key = null) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_clear_option_cache', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_measurement_id()
+ */
+function hic_get_measurement_id() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_measurement_id', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_api_secret()
+ */
+function hic_get_api_secret() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_api_secret', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_brevo_api_key()
+ */
+function hic_get_brevo_api_key() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_brevo_api_key', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_brevo_list_it()
+ */
+function hic_get_brevo_list_it() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_brevo_list_it', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_brevo_list_en()
+ */
+function hic_get_brevo_list_en() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_brevo_list_en', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_brevo_list_default()
+ */
+function hic_get_brevo_list_default() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_brevo_list_default', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_brevo_optin_default()
+ */
+function hic_get_brevo_optin_default() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_brevo_optin_default', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_is_brevo_enabled()
+ */
+function hic_is_brevo_enabled() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_is_brevo_enabled', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_is_debug_verbose()
+ */
+function hic_is_debug_verbose() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_is_debug_verbose', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_health_token()
+ */
+function hic_get_health_token() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_health_token', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_updates_enrich_contacts()
+ */
+function hic_updates_enrich_contacts() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_updates_enrich_contacts', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_brevo_list_alias()
+ */
+function hic_get_brevo_list_alias() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_brevo_list_alias', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_brevo_double_optin_on_enrich()
+ */
+function hic_brevo_double_optin_on_enrich() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_brevo_double_optin_on_enrich', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_realtime_brevo_sync_enabled()
+ */
+function hic_realtime_brevo_sync_enabled() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_realtime_brevo_sync_enabled', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_brevo_event_endpoint()
+ */
+function hic_get_brevo_event_endpoint() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_brevo_event_endpoint', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_reliable_polling_enabled()
+ */
+function hic_reliable_polling_enabled() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_reliable_polling_enabled', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_admin_email()
+ */
+function hic_get_admin_email() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_admin_email', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_log_file()
+ */
+function hic_get_log_file() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_log_file', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_is_gtm_enabled()
+ */
+function hic_is_gtm_enabled() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_is_gtm_enabled', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_gtm_container_id()
+ */
+function hic_get_gtm_container_id() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_gtm_container_id', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_tracking_mode()
+ */
+function hic_get_tracking_mode() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_tracking_mode', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_fb_pixel_id()
+ */
+function hic_get_fb_pixel_id() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_fb_pixel_id', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_fb_access_token()
+ */
+function hic_get_fb_access_token() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_fb_access_token', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_connection_type()
+ */
+function hic_get_connection_type() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_connection_type', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_normalize_connection_type()
+ */
+function hic_normalize_connection_type($type = null) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_normalize_connection_type', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_connection_uses_api()
+ */
+function hic_connection_uses_api($type = null) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_connection_uses_api', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_webhook_token()
+ */
+function hic_get_webhook_token() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_webhook_token', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_webhook_secret()
+ */
+function hic_get_webhook_secret() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_webhook_secret', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_api_url()
+ */
+function hic_get_api_url() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_api_url', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_api_key()
+ */
+function hic_get_api_key() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_api_key', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_api_email()
+ */
+function hic_get_api_email() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_api_email', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_api_password()
+ */
+function hic_get_api_password() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_api_password', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_property_id()
+ */
+function hic_get_property_id() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_property_id', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_has_basic_auth_credentials()
+ */
+function hic_has_basic_auth_credentials() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_has_basic_auth_credentials', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_currency()
+ */
+function hic_get_currency() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_currency', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_use_net_value()
+ */
+function hic_use_net_value() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_use_net_value', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_process_invalid()
+ */
+function hic_process_invalid() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_process_invalid', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_allow_status_updates()
+ */
+function hic_allow_status_updates() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_allow_status_updates', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_refund_tracking_enabled()
+ */
+function hic_refund_tracking_enabled() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_refund_tracking_enabled', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_polling_range_extension_days()
+ */
+function hic_get_polling_range_extension_days() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_polling_range_extension_days', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_polling_interval()
+ */
+function hic_get_polling_interval() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_polling_interval', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_acquire_polling_lock()
+ */
+function hic_acquire_polling_lock($timeout = 300) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_acquire_polling_lock', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_release_polling_lock()
+ */
+function hic_release_polling_lock() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_release_polling_lock', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_should_schedule_retry_event()
+ */
+function hic_should_schedule_retry_event() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_should_schedule_retry_event', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_tracking_ids_by_sid()
+ */
+function hic_get_tracking_ids_by_sid($sid) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_tracking_ids_by_sid', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_utm_params_by_sid()
+ */
+function hic_get_utm_params_by_sid($sid) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_utm_params_by_sid', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_normalize_price()
+ */
+function hic_normalize_price($value) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_normalize_price', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_is_valid_email()
+ */
+function hic_is_valid_email($email) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_is_valid_email', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_is_ota_alias_email()
+ */
+function hic_is_ota_alias_email($e) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_is_ota_alias_email', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_detect_phone_language()
+ */
+function hic_detect_phone_language($phone) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_detect_phone_language', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_normalize_phone_for_hash()
+ */
+function hic_normalize_phone_for_hash($phone, $context = []) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_normalize_phone_for_hash', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_hash_normalized_phone()
+ */
+function hic_hash_normalized_phone($phone, $context = []) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_hash_normalized_phone', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_booking_uid()
+ */
+function hic_booking_uid($reservation) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_booking_uid', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_mask_sensitive_data()
+ */
+function hic_mask_sensitive_data($message) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_mask_sensitive_data', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_default_log_message_filter()
+ */
+function hic_default_log_message_filter($message, $level) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_default_log_message_filter', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_log()
+ */
+function hic_log($msg, $level = HIC_LOG_LEVEL_INFO, $context = []) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_log', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_bucket()
+ */
+function hic_get_bucket($gclid, $fbclid, $gbraid = null, $wbraid = null) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_bucket', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_send_admin_email()
+ */
+function hic_send_admin_email($data, $gclid, $fbclid, $sid) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_send_admin_email', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_test_email_configuration()
+ */
+function hic_test_email_configuration($recipient_email = null) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_test_email_configuration', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_diagnose_email_issues()
+ */
+function hic_diagnose_email_issues() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_diagnose_email_issues', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_mark_email_enriched()
+ */
+function hic_mark_email_enriched($reservation_id, $real_email) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_mark_email_enriched', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_reservation_email()
+ */
+function hic_get_reservation_email($reservation_id) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_reservation_email', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_normalize_reservation_id()
+ */
+function hic_normalize_reservation_id($value) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_normalize_reservation_id', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_collect_reservation_ids()
+ */
+function hic_collect_reservation_ids(array $reservation) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_collect_reservation_ids', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_find_processed_reservation_alias()
+ */
+function hic_find_processed_reservation_alias(array $reservation) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_find_processed_reservation_alias', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_create_integration_result()
+ */
+function hic_create_integration_result($overrides = []) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_create_integration_result', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_append_integration_result()
+ */
+function hic_append_integration_result(array &$result, $integration, $status, $note = '') {
+    hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_append_integration_result', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_finalize_integration_result()
+ */
+function hic_finalize_integration_result($result, $tracking_skipped = false) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_finalize_integration_result', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_queue_integration_retry()
+ */
+function hic_queue_integration_retry($reservation_uid, $failed_details, $context = []) {
+    hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_queue_integration_retry', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_extract_reservation_id()
+ */
+function hic_extract_reservation_id($data) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_extract_reservation_id', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_mark_reservation_processed_by_id()
+ */
+function hic_mark_reservation_processed_by_id($reservation_id) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_mark_reservation_processed_by_id', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_acquire_reservation_lock()
+ */
+function hic_acquire_reservation_lock($reservation_id, $timeout = 30) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_acquire_reservation_lock', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_release_reservation_lock()
+ */
+function hic_release_reservation_lock($reservation_id) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_release_reservation_lock', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_is_reservation_already_processed()
+ */
+function hic_is_reservation_already_processed($reservation_id) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_is_reservation_already_processed', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_get_processing_statistics()
+ */
+function hic_get_processing_statistics() {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_get_processing_statistics', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_safe_wp_next_scheduled()
+ */
+function hic_safe_wp_next_scheduled($hook) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_safe_wp_next_scheduled', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_safe_wp_schedule_event()
+ */
+function hic_safe_wp_schedule_event($timestamp, $recurrence, $hook, $args = array()) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_safe_wp_schedule_event', func_get_args());
+}
+/**
+ * @deprecated 2.x Use \FpHic\Helpers\hic_safe_wp_clear_scheduled_hook()
+ */
+function hic_safe_wp_clear_scheduled_hook($hook, $args = array()) {
+    return hic_invoke_deprecated_shim(__FUNCTION__, '\FpHic\Helpers\hic_safe_wp_clear_scheduled_hook', func_get_args());
+}
+}
+

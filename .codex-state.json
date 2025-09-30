@@ -1,79 +1,79 @@
 {
-    "phase": 5,
-    "tasks": [
-        {
-            "id": 0,
-            "title": "Bootstrap",
-            "status": "done",
-            "notes": "Branch created, dependencies installed, QA baseline captured (PHPUnit shows 4 pre-existing deprecations)."
-        },
-        {
-            "id": 1,
-            "title": "Capability coherence",
-            "status": "done",
-            "notes": "All admin/AJAX flows now rely on the hic_manage capability via hic_require_cap()."
-        },
-        {
-            "id": 2,
-            "title": "SQL safety & identifier sanitization",
-            "status": "done",
-            "notes": "Introduced strict identifier sanitization helper and refactored optimizer/poller queries to rely on sanitized names with prepared statements."
-        },
-        {
-            "id": 3,
-            "title": "Download log hardening",
-            "status": "done",
-            "notes": "Protezione directory log con .htaccess/web.config, sanificazione filename e streaming buffered con wp_die finale."
-        },
-        {
-            "id": 4,
-            "title": "Archiviazione progressiva via AJAX",
-            "status": "done",
-            "notes": "Archivio manuale trasformato in job AJAX riprendibile con stato persistito, rate limiting e nuova UI con barra di avanzamento."
-        },
-        {
-            "id": 5,
-            "title": "Debounce watchdog cron",
-            "status": "done",
-            "notes": "Inserito transient di debounce da 60s in ensure_scheduler_is_active() per limitare i controlli reiterati."
-        },
-        {
-            "id": 6,
-            "title": "Modularizzazione includes/functions.php",
-            "status": "pending",
-            "notes": ""
-        },
-        {
-            "id": 7,
-            "title": "Lazy loading feature flags",
-            "status": "pending",
-            "notes": ""
-        },
-        {
-            "id": 8,
-            "title": "i18n pass & UI coherence",
-            "status": "pending",
-            "notes": ""
-        },
-        {
-            "id": 9,
-            "title": "Logging hardening extra",
-            "status": "pending",
-            "notes": ""
-        },
-        {
-            "id": 10,
-            "title": "Indici & query review",
-            "status": "pending",
-            "notes": ""
-        },
-        {
-            "id": 11,
-            "title": "CI GitHub Actions",
-            "status": "pending",
-            "notes": ""
-        }
-    ],
-    "last_commit": "176125f0ebbb9cd418254a3f37df5dd4f96a5c92",
-    "resume_hint": "Proceed to Phase 6 - Modularizzazione includes/functions.php."
+  "phase": 12,
+  "tasks": [
+    {
+      "id": 0,
+      "title": "Bootstrap",
+      "status": "done",
+      "notes": "Branch created, dependencies installed, QA baseline captured (PHPUnit reports 4 deprecations + 1 skipped)."
+    },
+    {
+      "id": 1,
+      "title": "Capability coherence",
+      "status": "done",
+      "notes": "Aligned admin pages and AJAX endpoints to hic_manage/hic_view_logs using the hic_require_cap helper with AJAX-aware 403 handling."
+    },
+    {
+      "id": 2,
+      "title": "SQL safety & identifier sanitization",
+      "status": "done",
+      "notes": "Sanitized dynamic table identifiers in privacy exports, tracking utilities, health checks and booking metrics while adding strict helper wrappers."
+    },
+    {
+      "id": 3,
+      "title": "Download log hardening",
+      "status": "done",
+      "notes": "Bloccato l'accesso ai log tramite symlink o percorsi anomali, disattivata la compressione output e rafforzato lo streaming con intestazioni noindex."
+    },
+    {
+      "id": 4,
+      "title": "Archiviazione progressiva via AJAX",
+      "status": "done",
+      "notes": "Archiviazione manuale resa progressiva con job AJAX riprendibile, stato normalizzato e batch dinamici esposti all'interfaccia."
+    },
+    {
+      "id": 5,
+      "title": "Debounce watchdog cron",
+      "status": "done",
+      "notes": "Il watchdog del cron usa ora il transient hic_cron_checked_at per eseguire al massimo un controllo al minuto anche durante i riavvii forzati."
+    },
+    {
+      "id": 6,
+      "title": "Modularizzazione includes/functions.php",
+      "status": "done",
+      "notes": "Funzioni legacy ripartite nei moduli helpers/options, helpers/strings, helpers/api e helpers/booking con shim globali deprecati e logging di debug."
+    },
+    {
+      "id": 7,
+      "title": "Lazy loading feature flags",
+      "status": "done",
+      "notes": "Feature flags saved via hic_get_feature_flags() gate the enterprise suite, Google Ads EC e realtime dashboard; ModuleLoader e bootstrap istanziano i moduli solo quando consentito dal contesto."
+    },
+    {
+      "id": 8,
+      "title": "i18n pass & UI coherence",
+      "status": "done",
+      "notes": "Schermate diagnostiche e CTA localizzati con __()/esc_html__(), terminologia di stato aggiornata (Completo/Incompleto) e POT rigenerato."
+    },
+    {
+      "id": 9,
+      "title": "Logging hardening extra",
+      "status": "done",
+      "notes": "Log viewer amministrativo paginato con verifica protezione directory, accesso hic_view_logs e documentazione rotazione."
+    },
+    {
+      "id": 10,
+      "title": "Indici & query review",
+      "status": "done",
+      "notes": "Allineati gli indici di hic_gclids con le query temporali/SID, aggiornato il Database Optimizer e documentata la strategia in docs/DB-INDEXES.md."
+    },
+    {
+      "id": 11,
+      "title": "CI GitHub Actions",
+      "status": "done",
+      "notes": "Workflow CI ottimizzato con concurrency, composer validate e cache automatica tramite ramsey/composer-install; badge README aggiornato."
+    }
+  ],
+  "last_commit": "HEAD",
+  "resume_hint": "Playbook completato: QA rieseguito il 2025-09-30 15:05:00 UTC (composer qa: lint, analyse, test); attendere nuove istruzioni."
 }

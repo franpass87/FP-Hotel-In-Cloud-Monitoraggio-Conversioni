@@ -1,5 +1,7 @@
 # FP HIC Monitor
 
+[![QA matrix](https://github.com/francescopasseri/FP-Hotel-In-Cloud-Monitoraggio-Conversioni/actions/workflows/ci.yml/badge.svg)](https://github.com/francescopasseri/FP-Hotel-In-Cloud-Monitoraggio-Conversioni/actions/workflows/ci.yml)
+
 > **Versione plugin:** 3.4.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
 
 

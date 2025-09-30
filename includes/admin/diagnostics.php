@@ -5,6 +5,7 @@
 
 use FpHic\HIC_Booking_Poller;
 use function FpHic\Helpers\hic_ensure_log_directory_security;
+use function FpHic\Helpers\hic_get_log_directory;
 use function FpHic\Helpers\hic_require_cap;
 use function FpHic\hic_send_to_ga4;
 use function FpHic\hic_send_to_gtm_datalayer;
@@ -57,10 +58,10 @@ function hic_get_internal_scheduler_status() {
             'enabled' => hic_reliable_polling_enabled(),
             'conditions_met' => false,
             'last_poll' => null,
-            'last_poll_human' => 'Mai eseguito',
+            'last_poll_human' => __('Mai eseguito', 'hotel-in-cloud'),
             'lag_seconds' => 0,
             'next_run_estimate' => null,
-            'next_run_human' => 'Sconosciuto'
+            'next_run_human' => __('Sconosciuto', 'hotel-in-cloud')
         ),
         'realtime_sync' => array(
             'table_exists' => true,
@@ -88,18 +89,18 @@ function hic_get_internal_scheduler_status() {
         if (!isset($poller_stats['error'])) {
             $status['internal_scheduler'] = array_merge($status['internal_scheduler'], array(
                 'last_poll' => $poller_stats['last_poll'] ?? 0,
-                'last_poll_human' => $poller_stats['last_poll_human'] ?? 'Mai eseguito',
+                'last_poll_human' => $poller_stats['last_poll_human'] ?? __('Mai eseguito', 'hotel-in-cloud'),
                 'last_continuous_poll' => $poller_stats['last_continuous_poll'] ?? 0,
-                'last_continuous_human' => $poller_stats['last_continuous_human'] ?? 'Mai eseguito',
+                'last_continuous_human' => $poller_stats['last_continuous_human'] ?? __('Mai eseguito', 'hotel-in-cloud'),
                 'last_deep_check' => $poller_stats['last_deep_check'] ?? 0,
-                'last_deep_human' => $poller_stats['last_deep_human'] ?? 'Mai eseguito',
+                'last_deep_human' => $poller_stats['last_deep_human'] ?? __('Mai eseguito', 'hotel-in-cloud'),
                 'lag_seconds' => $poller_stats['lag_seconds'] ?? 0,
                 'continuous_lag' => $poller_stats['continuous_lag'] ?? 0,
                 'deep_lag' => $poller_stats['deep_lag'] ?? 0,
                 'polling_interval' => $poller_stats['polling_interval'] ?? 30,
                 'deep_check_interval' => $poller_stats['deep_check_interval'] ?? 600,
                 'wp_cron_working' => $poller_stats['wp_cron_working'] ?? false,
-                'scheduler_type' => $poller_stats['scheduler_type'] ?? 'Unknown',
+                'scheduler_type' => $poller_stats['scheduler_type'] ?? __('Sconosciuto', 'hotel-in-cloud'),
                 'should_poll' => $poller_stats['should_poll'] ?? false,
                 'polling_conditions' => $poller_stats['polling_conditions'] ?? array()
             ));
@@ -111,9 +112,13 @@ function hic_get_internal_scheduler_status() {
             
             $status['internal_scheduler']['cron_diagnostics'] = array(
                 'continuous_scheduled' => $continuous_next,
-                'continuous_scheduled_human' => $continuous_next ? wp_date('Y-m-d H:i:s', $continuous_next) : 'Non programmato',
+                'continuous_scheduled_human' => $continuous_next
+                    ? wp_date('Y-m-d H:i:s', $continuous_next)
+                    : __('Non programmato', 'hotel-in-cloud'),
                 'deep_scheduled' => $deep_next,
-                'deep_scheduled_human' => $deep_next ? wp_date('Y-m-d H:i:s', $deep_next) : 'Non programmato',
+                'deep_scheduled_human' => $deep_next
+                    ? wp_date('Y-m-d H:i:s', $deep_next)
+                    : __('Non programmato', 'hotel-in-cloud'),
                 'wp_cron_disabled' => $wp_cron_disabled,
                 'current_time' => time(),
                 'continuous_overdue' => $continuous_next && $continuous_next < (time() - 120),
@@ -127,22 +132,30 @@ function hic_get_internal_scheduler_status() {
                 // WP-Cron is working - show actual scheduled times
                 $next_continuous = $poller_stats['next_continuous_scheduled'] ?? 0;
                 $next_deep = $poller_stats['next_deep_scheduled'] ?? 0;
-                
+
                 if ($next_continuous > time()) {
-                    $status['internal_scheduler']['next_continuous_human'] = 'Tra ' . human_time_diff(time(), $next_continuous);
+                    $status['internal_scheduler']['next_continuous_human'] = sprintf(
+                        /* translators: %s: human readable relative time */
+                        __('Tra %s', 'hotel-in-cloud'),
+                        human_time_diff(time(), $next_continuous)
+                    );
                 } else {
-                    $status['internal_scheduler']['next_continuous_human'] = 'In ritardo o ora (WP-Cron)';
+                    $status['internal_scheduler']['next_continuous_human'] = __('In ritardo o ora (WP-Cron)', 'hotel-in-cloud');
                 }
-                
+
                 if ($next_deep > time()) {
-                    $status['internal_scheduler']['next_deep_human'] = 'Tra ' . human_time_diff(time(), $next_deep);
+                    $status['internal_scheduler']['next_deep_human'] = sprintf(
+                        /* translators: %s: human readable relative time */
+                        __('Tra %s', 'hotel-in-cloud'),
+                        human_time_diff(time(), $next_deep)
+                    );
                 } else {
-                    $status['internal_scheduler']['next_deep_human'] = 'In ritardo o ora (WP-Cron)';
+                    $status['internal_scheduler']['next_deep_human'] = __('In ritardo o ora (WP-Cron)', 'hotel-in-cloud');
                 }
             } else {
                 // WP-Cron non attivo
-                $status['internal_scheduler']['next_continuous_human'] = 'WP-Cron non funzionante';
-                $status['internal_scheduler']['next_deep_human'] = 'WP-Cron non funzionante';
+                $status['internal_scheduler']['next_continuous_human'] = __('WP-Cron non funzionante', 'hotel-in-cloud');
+                $status['internal_scheduler']['next_deep_human'] = __('WP-Cron non funzionante', 'hotel-in-cloud');
             }
         }
     }
@@ -419,6 +432,7 @@ function hic_get_error_stats() {
     $log_lines_to_check = 1000; // Configurable number of recent log lines to analyze
     
     $log_file = hic_get_log_file();
+
     if (!file_exists($log_file)) {
         return array('error_count' => 0, 'last_error' => null);
     }
@@ -693,9 +707,7 @@ function hic_format_bookings_as_csv($bookings) {
 
 
 function hic_ajax_refresh_diagnostics() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -721,9 +733,7 @@ function hic_ajax_refresh_diagnostics() {
 }
 
 function hic_ajax_test_dispatch() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -740,9 +750,7 @@ function hic_ajax_test_dispatch() {
 }
 
 function hic_ajax_force_reschedule() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -753,9 +761,7 @@ function hic_ajax_force_reschedule() {
 }
 
 function hic_ajax_create_tables() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -808,9 +814,7 @@ function hic_ajax_create_tables() {
 }
 
 function hic_ajax_backfill_reservations() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -827,12 +831,12 @@ function hic_ajax_backfill_reservations() {
     // Validate dates
     $from_date_validation = \FpHic\HIC_Input_Validator::validate_date($raw_params['from_date']);
     if (is_wp_error($from_date_validation)) {
-        wp_send_json_error(['message' => 'Data inizio non valida: ' . $from_date_validation->get_error_message()]);
+        wp_send_json_error(['message' => sprintf(__('Data inizio non valida: %s', 'hotel-in-cloud'), $from_date_validation->get_error_message())]);
     }
     
     $to_date_validation = \FpHic\HIC_Input_Validator::validate_date($raw_params['to_date']);
     if (is_wp_error($to_date_validation)) {
-        wp_send_json_error(['message' => 'Data fine non valida: ' . $to_date_validation->get_error_message()]);
+        wp_send_json_error(['message' => sprintf(__('Data fine non valida: %s', 'hotel-in-cloud'), $to_date_validation->get_error_message())]);
     }
     
     $from_date = $from_date_validation;
@@ -893,9 +897,7 @@ function hic_convert_api_booking_to_processor_format($api_booking) {
 }
 
 function hic_ajax_download_latest_bookings() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -1042,9 +1044,7 @@ function hic_ajax_download_latest_bookings() {
 }
 
 function hic_ajax_reset_download_tracking() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -1063,9 +1063,7 @@ function hic_ajax_reset_download_tracking() {
 }
 
 function hic_ajax_force_polling() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -1120,9 +1118,7 @@ function hic_ajax_force_polling() {
  * AJAX handler for triggering watchdog check
  */
 function hic_ajax_trigger_watchdog() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_admin_action', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -1167,9 +1163,7 @@ function hic_ajax_trigger_watchdog() {
  * AJAX handler for resetting timestamps (emergency recovery)
  */
 function hic_ajax_reset_timestamps() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_admin_action', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -1209,9 +1203,7 @@ function hic_ajax_reset_timestamps() {
  * AJAX handler for getting system status updates
  */
 function hic_ajax_get_system_status() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -1241,9 +1233,7 @@ function hic_ajax_get_system_status() {
  * HIC Diagnostics Admin Page
  */
 function hic_diagnostics_page() {
-    if (!current_user_can('hic_manage')) {
-        wp_die( __( 'Non hai i permessi necessari per accedere a questa pagina.', 'hotel-in-cloud' ) );
-    }
+    hic_require_cap('hic_manage');
 
     // Get initial data
     $scheduler_status = hic_get_internal_scheduler_status();
@@ -1387,92 +1377,120 @@ function hic_diagnostics_page() {
 
             <!-- System Overview Section -->
             <div class="hic-card hic-overview-card" id="system-overview">
-                <h2>📊 Panoramica Sistema
+                <h2><?php echo esc_html__('📊 Panoramica Sistema', 'hotel-in-cloud'); ?>
                     <span class="hic-refresh-indicator" id="refresh-indicator"></span>
                 </h2>
-                
+
                 <div class="hic-overview-grid">
                     <div class="hic-overview-section">
-                        <h3>🔗 Connessione</h3>
+                        <h3><?php echo esc_html__('🔗 Connessione', 'hotel-in-cloud'); ?></h3>
                         <table class="hic-status-table">
                             <tr>
-                                <td>Modalità</td>
+                                <td><?php esc_html_e('Modalità', 'hotel-in-cloud'); ?></td>
                                 <td><strong><?php echo esc_html($connection_type_raw); ?></strong></td>
                                 <td>
                                     <?php if ($connection_type_normalized === 'api'): ?>
-                                        <span class="status ok">✓ Polling Attivo</span>
+                                    <span class="status ok"><?php echo esc_html__('✓ Polling Attivo', 'hotel-in-cloud'); ?></span>
                                     <?php elseif ($connection_type_normalized === 'hybrid'): ?>
-                                        <span class="status ok">✓ Hybrid (Webhook + API)</span>
+                                        <span class="status ok"><?php echo esc_html__('✓ Hybrid (Webhook + API)', 'hotel-in-cloud'); ?></span>
                                     <?php else: ?>
-                                        <span class="status warning">⚠ Solo Webhook</span>
+                                        <span class="status warning"><?php echo esc_html__('⚠ Solo Webhook', 'hotel-in-cloud'); ?></span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
                             <tr>
-                                <td>API URL</td>
+                                <td><?php esc_html_e('API URL', 'hotel-in-cloud'); ?></td>
                                 <td><span class="status <?php echo esc_attr($credentials_status['api_url'] ? 'ok' : 'error'); ?>">
-                                    <?php echo esc_html($credentials_status['api_url'] ? 'Configurato' : 'Mancante'); ?>
+                                    <?php
+                                    echo esc_html(
+                                        $credentials_status['api_url']
+                                            ? __('Configurato', 'hotel-in-cloud')
+                                            : __('Mancante', 'hotel-in-cloud')
+                                    );
+                                    ?>
                                 </span></td>
-                                <td><?php echo esc_html($credentials_status['api_url'] ? 'Connessione disponibile' : 'Configurazione richiesta'); ?></td>
+                                <td>
+                                    <?php
+                                    echo esc_html(
+                                        $credentials_status['api_url']
+                                            ? __('Connessione disponibile', 'hotel-in-cloud')
+                                            : __('Configurazione richiesta', 'hotel-in-cloud')
+                                    );
+                                    ?>
+                                </td>
                             </tr>
                             <tr>
-                                <td>Credenziali</td>
+                                <td><?php esc_html_e('Credenziali', 'hotel-in-cloud'); ?></td>
                                 <td><span class="status <?php echo esc_attr($credentials_status['api_email'] && $credentials_status['api_password'] ? 'ok' : 'error'); ?>">
-                                    <?php echo esc_html($credentials_status['api_email'] && $credentials_status['api_password'] ? 'Complete' : 'Incomplete'); ?>
+                                    <?php
+                                    echo esc_html(
+                                        $credentials_status['api_email'] && $credentials_status['api_password']
+                                            ? __('Completo', 'hotel-in-cloud')
+                                            : __('Incompleto', 'hotel-in-cloud')
+                                    );
+                                    ?>
                                 </span></td>
-                                <td>Property ID + Email + Password</td>
+                                <td><?php esc_html_e('Property ID + Email + Password', 'hotel-in-cloud'); ?></td>
                             </tr>
                         </table>
                     </div>
                     
                     <div class="hic-overview-section">
-                        <h3>⚡ Stato Polling</h3>
+                        <h3><?php echo esc_html__('⚡ Stato Polling', 'hotel-in-cloud'); ?></h3>
                         <table class="hic-status-table">
                             <?php 
                             $polling_active = $scheduler_status['internal_scheduler']['enabled'] && $scheduler_status['internal_scheduler']['conditions_met'];
                             $last_poll = $execution_stats['last_successful_poll'];
                             ?>
                             <tr>
-                                <td>Sistema</td>
+                                <td><?php esc_html_e('Sistema', 'hotel-in-cloud'); ?></td>
                                 <td>
                                     <?php if ($polling_active): ?>
-                                        <span class="status ok">✓ Attivo</span>
+                                        <span class="status ok"><?php echo esc_html__('✓ Attivo', 'hotel-in-cloud'); ?></span>
                                     <?php else: ?>
-                                        <span class="status error">✗ Inattivo</span>
+                                        <span class="status error"><?php echo esc_html__('✗ Inattivo', 'hotel-in-cloud'); ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo esc_html($polling_active ? 'Polling automatico funzionante' : 'Richiede configurazione'); ?></td>
+                                <td>
+                                    <?php
+                                    echo esc_html(
+                                        $polling_active
+                                            ? __('Polling automatico funzionante', 'hotel-in-cloud')
+                                            : __('Richiede configurazione', 'hotel-in-cloud')
+                                    );
+                                    ?>
+                                </td>
                             </tr>
                             <tr>
-                                <td>Ultimo Successo</td>
+                                <td><?php esc_html_e('Ultimo Successo', 'hotel-in-cloud'); ?></td>
                                 <td>
                                     <?php if ($last_poll > 0): ?>
                                         <?php 
                                         $time_diff = current_time('timestamp') - $last_poll;
                                         if ($time_diff < 900): // Less than 15 minutes
                                         ?>
-                                            <span class="status ok"><?php echo esc_html(human_time_diff($last_poll, current_time('timestamp'))); ?> fa</span>
+                                            <span class="status ok"><?php echo esc_html(human_time_diff($last_poll, current_time('timestamp'))); ?> <?php esc_html_e('fa', 'hotel-in-cloud'); ?></span>
                                         <?php elseif ($time_diff < 3600): // Less than 1 hour ?>
-                                            <span class="status warning"><?php echo esc_html(human_time_diff($last_poll, current_time('timestamp'))); ?> fa</span>
+                                            <span class="status warning"><?php echo esc_html(human_time_diff($last_poll, current_time('timestamp'))); ?> <?php esc_html_e('fa', 'hotel-in-cloud'); ?></span>
                                         <?php else: ?>
-                                            <span class="status error"><?php echo esc_html(human_time_diff($last_poll, current_time('timestamp'))); ?> fa</span>
+                                            <span class="status error"><?php echo esc_html(human_time_diff($last_poll, current_time('timestamp'))); ?> <?php esc_html_e('fa', 'hotel-in-cloud'); ?></span>
                                         <?php endif; ?>
                                     <?php else: ?>
-                                        <span class="status error">Mai</span>
+                                        <span class="status error"><?php esc_html_e('Mai', 'hotel-in-cloud'); ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td>Tempo dall'ultimo polling riuscito</td>
+                                <td><?php esc_html_e("Tempo dall'ultimo polling riuscito", 'hotel-in-cloud'); ?></td>
                             </tr>
                             <tr>
-                                <td>Prenotazioni</td>
+                                <td><?php esc_html_e('Prenotazioni', 'hotel-in-cloud'); ?></td>
                                 <td><strong><?php echo esc_html(number_format($execution_stats['processed_reservations'])); ?></strong></td>
-                                <td>Totale prenotazioni elaborate</td>
+                                <td><?php esc_html_e('Totale prenotazioni elaborate', 'hotel-in-cloud'); ?></td>
                             </tr>
                         </table>
                     </div>
                     
                     <div class="hic-overview-section">
-                        <h3>🌐 Monitoraggio Traffico Web</h3>
+                        <h3><?php echo esc_html__('🌐 Monitoraggio Traffico Web', 'hotel-in-cloud'); ?></h3>
                         <?php
                         // Get web traffic monitoring statistics 
                         $poller = new HIC_Booking_Poller();
@@ -1480,44 +1498,44 @@ function hic_diagnostics_page() {
                         ?>
                         <table class="hic-status-table">
                             <tr>
-                                <td>Controlli Totali</td>
+                                <td><?php esc_html_e('Controlli Totali', 'hotel-in-cloud'); ?></td>
                                 <td><strong><?php echo esc_html(number_format($web_stats['total_checks'])); ?></strong></td>
-                                <td>Verifiche automatiche via traffico web</td>
+                                <td><?php esc_html_e('Verifiche automatiche via traffico web', 'hotel-in-cloud'); ?></td>
                             </tr>
                             <tr>
-                                <td>Ultimo Frontend</td>
+                                <td><?php esc_html_e('Ultimo Frontend', 'hotel-in-cloud'); ?></td>
                                 <td>
                                     <?php if ($web_stats['last_frontend_check'] > 0): ?>
                                         <?php 
                                         $time_diff = current_time('timestamp') - $web_stats['last_frontend_check'];
                                         if ($time_diff < 3600): // Less than 1 hour
                                         ?>
-                                            <span class="status ok"><?php echo esc_html(human_time_diff($web_stats['last_frontend_check'], current_time('timestamp'))); ?> fa</span>
+                                            <span class="status ok"><?php echo esc_html(human_time_diff($web_stats['last_frontend_check'], current_time('timestamp'))); ?> <?php esc_html_e('fa', 'hotel-in-cloud'); ?></span>
                                         <?php else: ?>
-                                            <span class="status warning"><?php echo esc_html(human_time_diff($web_stats['last_frontend_check'], current_time('timestamp'))); ?> fa</span>
+                                            <span class="status warning"><?php echo esc_html(human_time_diff($web_stats['last_frontend_check'], current_time('timestamp'))); ?> <?php esc_html_e('fa', 'hotel-in-cloud'); ?></span>
                                         <?php endif; ?>
                                     <?php else: ?>
-                                        <span class="status error">Mai</span>
+                                        <span class="status error"><?php esc_html_e('Mai', 'hotel-in-cloud'); ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td>Traffico frontend (visitatori)</td>
+                                <td><?php esc_html_e('Traffico frontend (visitatori)', 'hotel-in-cloud'); ?></td>
                             </tr>
                             <tr>
-                                <td>Recovery Attivati</td>
+                                <td><?php esc_html_e('Recovery Attivati', 'hotel-in-cloud'); ?></td>
                                 <td>
                                     <?php if ($web_stats['recoveries_triggered'] > 0): ?>
                                         <span class="status <?php echo $web_stats['recoveries_triggered'] > 5 ? 'warning' : 'ok'; ?>">
                                             <?php echo esc_html(number_format($web_stats['recoveries_triggered'])); ?>
                                         </span>
                                     <?php else: ?>
-                                        <span class="status ok">0</span>
+                                        <span class="status ok"><?php echo esc_html__('0', 'hotel-in-cloud'); ?></span>
                                     <?php endif; ?>
                                 </td>
                                 <td>
                                     <?php if ($web_stats['last_recovery_via'] !== 'none'): ?>
-                                        Ultimo: <?php echo esc_html($web_stats['last_recovery_via']); ?>
+                                        <?php esc_html_e('Ultimo:', 'hotel-in-cloud'); ?> <?php echo esc_html($web_stats['last_recovery_via']); ?>
                                     <?php else: ?>
-                                        Nessun recovery necessario
+                                        <?php esc_html_e('Nessun recovery necessario', 'hotel-in-cloud'); ?>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -1528,43 +1546,43 @@ function hic_diagnostics_page() {
             
             <!-- Quick Diagnostics Section -->
             <div class="hic-card hic-quick-card">
-                <h2>🔧 Diagnostica Rapida</h2>
+                <h2><?php echo esc_html__('🔧 Diagnostica Rapida', 'hotel-in-cloud'); ?></h2>
                 
                 <div class="hic-quick-actions">
                     <div class="hic-action-group">
-                        <h3>Test Sistema</h3>
+                        <h3><?php echo esc_html__('Test Sistema', 'hotel-in-cloud'); ?></h3>
                         <button class="hic-button hic-button--primary hic-button--block" id="force-polling">
                             <span class="dashicons dashicons-update"></span>
-                            Test Polling
+                            <?php esc_html_e('Test Polling', 'hotel-in-cloud'); ?>
                         </button>
                         <button class="hic-button hic-button--secondary hic-button--block" id="test-connectivity">
                             <span class="dashicons dashicons-cloud"></span>
-                            Test Connessione
+                            <?php esc_html_e('Test Connessione', 'hotel-in-cloud'); ?>
                         </button>
                         <button class="hic-button hic-button--secondary hic-button--block" id="test-web-traffic">
                             <span class="dashicons dashicons-networking"></span>
-                            Test Traffico Web
+                            <?php esc_html_e('Test Traffico Web', 'hotel-in-cloud'); ?>
                         </button>
                     </div>
                     
                     <div class="hic-action-group">
-                        <h3>Risoluzione Problemi</h3>
+                        <h3><?php echo esc_html__('Risoluzione Problemi', 'hotel-in-cloud'); ?></h3>
                         <button class="hic-button hic-button--secondary hic-button--block" id="trigger-watchdog">
                             <span class="dashicons dashicons-shield"></span>
-                            Watchdog
+                            <?php esc_html_e('Watchdog', 'hotel-in-cloud'); ?>
                         </button>
                         <button class="hic-button hic-button--danger hic-button--block" id="reset-timestamps">
                             <span class="dashicons dashicons-warning"></span>
-                            Reset Emergenza
+                            <?php esc_html_e('Reset Emergenza', 'hotel-in-cloud'); ?>
                         </button>
                     </div>
                     
                     <?php if (current_user_can('hic_view_logs')): ?>
                     <div class="hic-action-group">
-                        <h3>Logs & Export</h3>
+                        <h3><?php echo esc_html__('Logs & Export', 'hotel-in-cloud'); ?></h3>
                         <button class="hic-button hic-button--secondary hic-button--block" id="download-error-logs">
                             <span class="dashicons dashicons-download"></span>
-                            Scarica Log
+                            <?php esc_html_e('Scarica Log', 'hotel-in-cloud'); ?>
                         </button>
                     </div>
                     <?php endif; ?>
@@ -1579,23 +1597,23 @@ function hic_diagnostics_page() {
             
             <!-- Integration Status Section -->
             <div class="hic-card hic-integrations-card">
-                <h2>🔌 Stato Integrazioni</h2>
+                <h2><?php echo esc_html__('🔌 Stato Integrazioni', 'hotel-in-cloud'); ?></h2>
                 
                 <div class="hic-integrations-grid">
                     <div class="hic-integration-item">
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">📊</span>
-                            <h3>Google Analytics 4</h3>
+                            <h3><?php echo esc_html__('Google Analytics 4', 'hotel-in-cloud'); ?></h3>
                             <?php if (!empty(hic_get_measurement_id()) && !empty(hic_get_api_secret())): ?>
-                                <span class="status ok">✓ Attivo</span>
+                                <span class="status ok"><?php echo esc_html__('✓ Attivo', 'hotel-in-cloud'); ?></span>
                             <?php else: ?>
-                                <span class="status error">✗ Inattivo</span>
+                                <span class="status error"><?php echo esc_html__('✗ Inattivo', 'hotel-in-cloud'); ?></span>
                             <?php endif; ?>
                         </div>
                         <div class="hic-integration-details">
-                            <p>Tracking conversioni e eventi booking</p>
+                            <p><?php esc_html_e('Tracking conversioni e eventi booking', 'hotel-in-cloud'); ?></p>
                             <?php if (!empty(hic_get_measurement_id())): ?>
-                                <small>ID: <?php echo esc_html(substr(hic_get_measurement_id(), 0, 8)); ?>...</small>
+                                <small><?php esc_html_e('ID:', 'hotel-in-cloud'); ?> <?php echo esc_html(substr(hic_get_measurement_id(), 0, 8)); ?>...</small>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -1603,22 +1621,22 @@ function hic_diagnostics_page() {
                     <div class="hic-integration-item">
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">📧</span>
-                            <h3>Brevo</h3>
+                            <h3><?php echo esc_html__('Brevo', 'hotel-in-cloud'); ?></h3>
                             <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
-                                <span class="status ok">✓ Attivo</span>
+                                <span class="status ok"><?php echo esc_html__('✓ Attivo', 'hotel-in-cloud'); ?></span>
                             <?php else: ?>
-                                <span class="status error">✗ Inattivo</span>
+                                <span class="status error"><?php echo esc_html__('✗ Inattivo', 'hotel-in-cloud'); ?></span>
                             <?php endif; ?>
                         </div>
                         <div class="hic-integration-details">
-                            <p>Email marketing e automazioni</p>
+                            <p><?php esc_html_e('Email marketing e automazioni', 'hotel-in-cloud'); ?></p>
                             <?php if (hic_realtime_brevo_sync_enabled()): ?>
-                                <small>Real-time sync: ✓</small>
+                                <small><?php esc_html_e('Real-time sync: ✓', 'hotel-in-cloud'); ?></small>
                             <?php endif; ?>
                         </div>
                         <?php if (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())): ?>
                         <div class="hic-integration-actions">
-                            <button class="hic-button hic-button--secondary hic-button--small" id="test-brevo-connectivity-quick">Test API</button>
+                            <button class="hic-button hic-button--secondary hic-button--small" id="test-brevo-connectivity-quick"><?php esc_html_e('Test API', 'hotel-in-cloud'); ?></button>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -1626,17 +1644,17 @@ function hic_diagnostics_page() {
                     <div class="hic-integration-item">
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">📱</span>
-                            <h3>Meta/Facebook</h3>
+                            <h3><?php echo esc_html__('Meta/Facebook', 'hotel-in-cloud'); ?></h3>
                             <?php if (!empty(hic_get_fb_pixel_id()) && !empty(hic_get_fb_access_token())): ?>
-                                <span class="status ok">✓ Attivo</span>
+                                <span class="status ok"><?php echo esc_html__('✓ Attivo', 'hotel-in-cloud'); ?></span>
                             <?php else: ?>
-                                <span class="status error">✗ Inattivo</span>
+                                <span class="status error"><?php echo esc_html__('✗ Inattivo', 'hotel-in-cloud'); ?></span>
                             <?php endif; ?>
                         </div>
                         <div class="hic-integration-details">
-                            <p>Facebook Pixel e Conversions API</p>
+                            <p><?php esc_html_e('Facebook Pixel e Conversions API', 'hotel-in-cloud'); ?></p>
                             <?php if (!empty(hic_get_fb_pixel_id())): ?>
-                                <small>Pixel: <?php echo esc_html(substr(hic_get_fb_pixel_id(), 0, 8)); ?>...</small>
+                                <small><?php esc_html_e('Pixel:', 'hotel-in-cloud'); ?> <?php echo esc_html(substr(hic_get_fb_pixel_id(), 0, 8)); ?>...</small>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -1644,7 +1662,7 @@ function hic_diagnostics_page() {
                     <div class="hic-integration-item">
                         <div class="hic-integration-header">
                             <span class="hic-integration-icon">🎯</span>
-                            <h3>Google Ads</h3>
+                            <h3><?php echo esc_html__('Google Ads', 'hotel-in-cloud'); ?></h3>
                             <?php 
                             // Google Ads tracking is handled via GTM and GA4
                             $gtm_enabled = !empty(hic_get_gtm_container_id());
@@ -1652,26 +1670,35 @@ function hic_diagnostics_page() {
                             $ads_enabled = $gtm_enabled || $ga4_enabled;
                             ?>
                             <?php if ($ads_enabled): ?>
-                                <span class="status ok">✓ Attivo</span>
+                                <span class="status ok"><?php echo esc_html__('✓ Attivo', 'hotel-in-cloud'); ?></span>
                             <?php else: ?>
-                                <span class="status error">✗ Inattivo</span>
+                                <span class="status error"><?php echo esc_html__('✗ Inattivo', 'hotel-in-cloud'); ?></span>
                             <?php endif; ?>
                         </div>
                         <div class="hic-integration-details">
-                            <p>Conversion tracking via GA4/GTM</p>
+                            <p><?php esc_html_e('Conversion tracking via GA4/GTM', 'hotel-in-cloud'); ?></p>
                             <?php if ($gtm_enabled): ?>
-                                <small>GTM: <?php echo esc_html(substr(hic_get_gtm_container_id(), 0, 8)); ?>...</small>
+                                <small><?php esc_html_e('GTM:', 'hotel-in-cloud'); ?> <?php echo esc_html(substr(hic_get_gtm_container_id(), 0, 8)); ?>...</small>
                             <?php elseif ($ga4_enabled): ?>
-                                <small>Via GA4 measurement</small>
+                                <small><?php esc_html_e('Via GA4 measurement', 'hotel-in-cloud'); ?></small>
                             <?php endif; ?>
                         </div>
                     </div>
                 </div>
 
                 <p class="description hic-reconciliation-note">
-                    ℹ️ <strong>Riconciliazione:</strong> il controllo giornaliero confronta i dati HIC con i conteggi reali restituiti dalle API di GA4, Meta e Brevo.
-                    Finché le integrazioni non sono collegate (oppure non forniscono dati tramite i filtri <code>hic_reconciliation_*_event_count</code>)
-                    le righe della tabella verranno contrassegnate come <em>in attesa</em> senza inviare avvisi basati su valori casuali.
+                    <?php
+                    printf(
+                        /* translators: %s: reconciliation filters placeholder */
+                        esc_html__(
+                            'ℹ️ %1$s Il controllo giornaliero confronta i dati HIC con i conteggi reali restituiti dalle API di GA4, Meta e Brevo. Finché le integrazioni non sono collegate (oppure non forniscono dati tramite i filtri %2$s) le righe della tabella verranno contrassegnate come %3$s senza inviare avvisi basati su valori casuali.',
+                            'hotel-in-cloud'
+                        ),
+                        '<strong>' . esc_html__('Riconciliazione:', 'hotel-in-cloud') . '</strong>',
+                        '<code>hic_reconciliation_*_event_count</code>',
+                        '<em>' . esc_html__('in attesa', 'hotel-in-cloud') . '</em>'
+                    );
+                    ?>
                 </p>
 
                 <?php
@@ -1680,16 +1707,21 @@ function hic_diagnostics_page() {
                 ?>
                 
                 <div class="hic-integration-actions-section">
-                    <h3>🚀 Azioni Rapide</h3>
+                    <h3><?php echo esc_html__('🚀 Azioni Rapide', 'hotel-in-cloud'); ?></h3>
                     <div class="hic-quick-actions">
                         <button class="hic-button hic-button--primary" id="download-latest-bookings">
                             <span class="dashicons dashicons-upload"></span>
-                            Invia Ultime 5 Prenotazioni
+                            <?php esc_html_e('Invia Ultime 5 Prenotazioni', 'hotel-in-cloud'); ?>
                         </button>
                         <?php if ($downloaded_count > 0): ?>
                             <button class="hic-button hic-button--secondary" id="reset-download-tracking">
                                 <span class="dashicons dashicons-update-alt"></span>
-                                Reset Tracking (<?php echo esc_html($downloaded_count); ?> inviate)
+                                <?php
+                                printf(
+                                    esc_html__('Reset Tracking (%d inviate)', 'hotel-in-cloud'),
+                                    (int) $downloaded_count
+                                );
+                                ?>
                             </button>
                         <?php endif; ?>
                     </div>
@@ -1704,48 +1736,48 @@ function hic_diagnostics_page() {
             
             <!-- Activity Monitor Section -->
             <div class="hic-card hic-activity-card">
-                <h2>📈 Monitor Attività</h2>
+                <h2><?php echo esc_html__('📈 Monitor Attività', 'hotel-in-cloud'); ?></h2>
                 
                 <div class="hic-activity-grid">
                     <div class="hic-activity-section">
-                        <h3>🔄 Statistiche Esecuzione</h3>
+                        <h3><?php echo esc_html__('🔄 Statistiche Esecuzione', 'hotel-in-cloud'); ?></h3>
                         <table class="hic-stats-table">
                             <tr>
-                                <td>Ultimo Polling</td>
-                                <td><?php echo esc_html($execution_stats['last_poll_time'] ? wp_date('Y-m-d H:i:s', $execution_stats['last_poll_time']) : 'Mai'); ?></td>
+                                <td><?php esc_html_e('Ultimo Polling', 'hotel-in-cloud'); ?></td>
+                                <td><?php echo esc_html($execution_stats['last_poll_time'] ? wp_date('Y-m-d H:i:s', $execution_stats['last_poll_time']) : __('Mai', 'hotel-in-cloud')); ?></td>
                             </tr>
                             <tr>
-                                <td>Prenotazioni Elaborate</td>
+                                <td><?php esc_html_e('Prenotazioni Elaborate', 'hotel-in-cloud'); ?></td>
                                 <td><strong><?php echo esc_html(number_format($execution_stats['processed_reservations'])); ?></strong></td>
                             </tr>
                             <tr>
-                                <td>Ultimo Polling - Trovate</td>
+                                <td><?php esc_html_e('Ultimo Polling - Trovate', 'hotel-in-cloud'); ?></td>
                                 <td>
                                     <?php 
                                     $last_count = $execution_stats['last_poll_reservations_found'];
                                     if ($last_count > 0) {
                                         echo '<span class="status ok">' . esc_html(number_format($last_count)) . '</span>';
                                     } else {
-                                        echo '<span class="status warning">0</span>';
+                                        echo '<span class="status warning">' . esc_html__('0', 'hotel-in-cloud') . '</span>';
                                     }
                                     ?>
                                 </td>
                             </tr>
                             <tr>
-                                <td>Durata Ultimo Polling</td>
+                                <td><?php esc_html_e('Durata Ultimo Polling', 'hotel-in-cloud'); ?></td>
                                 <td>
                                     <?php 
                                     $duration = $execution_stats['last_poll_duration'];
                                     if ($duration > 0) {
-                                        echo '<span class="status ' . esc_attr($duration > 10000 ? 'warning' : 'ok') . '">' . esc_html($duration) . ' ms</span>';
+                                        echo '<span class="status ' . esc_attr($duration > 10000 ? 'warning' : 'ok') . '">' . esc_html($duration) . ' ' . esc_html__('ms', 'hotel-in-cloud') . '</span>';
                                     } else {
-                                        echo '<span class="status neutral">N/A</span>';
+                                        echo '<span class="status neutral">' . esc_html__('N/A', 'hotel-in-cloud') . '</span>';
                                     }
                                     ?>
                                 </td>
                             </tr>
                             <tr>
-                                <td>Errori Recenti</td>
+                                <td><?php esc_html_e('Errori Recenti', 'hotel-in-cloud'); ?></td>
                                 <td><span class="status <?php echo esc_attr($error_stats['error_count'] > 0 ? 'error' : 'ok'); ?>">
                                     <?php echo esc_html(number_format($error_stats['error_count'])); ?>
                                 </span></td>
@@ -1755,19 +1787,19 @@ function hic_diagnostics_page() {
                     
                     <?php if (current_user_can('hic_view_logs')): ?>
                     <div class="hic-activity-section">
-                        <h3>📝 Log Recenti</h3>
+                        <h3><?php echo esc_html__('📝 Log Recenti', 'hotel-in-cloud'); ?></h3>
                         <div
                             class="hic-logs-container"
                             id="hic-logs-container"
                             data-display-limit="8"
                             data-fetch-limit="40"
-                            data-empty-message="<?php echo esc_attr(!empty($execution_stats['log_file_exists']) && (int) $execution_stats['log_file_size'] === 0 ? 'File di log presente ma vuoto.' : 'Nessun log recente disponibile.'); ?>"
+                            data-empty-message="<?php echo esc_attr(!empty($execution_stats['log_file_exists']) && (int) $execution_stats['log_file_size'] === 0 ? __('File di log presente ma vuoto.', 'hotel-in-cloud') : __('Nessun log recente disponibile.', 'hotel-in-cloud')); ?>"
                         >
                             <?php if (empty($recent_logs)): ?>
                                 <?php if (!empty($execution_stats['log_file_exists']) && (int) $execution_stats['log_file_size'] === 0): ?>
-                                    <p class="hic-no-logs">File di log presente ma vuoto.</p>
+                                    <p class="hic-no-logs"><?php esc_html_e('File di log presente ma vuoto.', 'hotel-in-cloud'); ?></p>
                                 <?php else: ?>
-                                    <p class="hic-no-logs">Nessun log recente disponibile.</p>
+                                    <p class="hic-no-logs"><?php esc_html_e('Nessun log recente disponibile.', 'hotel-in-cloud'); ?></p>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <?php foreach (array_slice($recent_logs, 0, 8) as $log_entry): ?>
@@ -1783,13 +1815,13 @@ function hic_diagnostics_page() {
                                     <div class="hic-log-entry"><?php echo esc_html($formatted_entry); ?></div>
                                 <?php endforeach; ?>
                                 <?php if (count($recent_logs) > 8): ?>
-                                    <div class="hic-log-more">... e altri <?php echo esc_html(count($recent_logs) - 8); ?> eventi</div>
+                                    <div class="hic-log-more"><?php printf(esc_html__('... e altri %d eventi', 'hotel-in-cloud'), count($recent_logs) - 8); ?></div>
                                 <?php endif; ?>
                             <?php endif; ?>
                         </div>
                         <div class="hic-log-stream-status" id="hic-log-stream-status" role="status" aria-live="polite">
                             <span class="hic-live-dot" aria-hidden="true"></span>
-                            <span class="hic-log-stream-text">In attesa di nuovi eventi...</span>
+                            <span class="hic-log-stream-text"><?php esc_html_e('In attesa di nuovi eventi...', 'hotel-in-cloud'); ?></span>
                         </div>
                     </div>
                     <?php endif; ?>
@@ -1804,37 +1836,37 @@ function hic_diagnostics_page() {
                     <summary>
                         <span class="hic-advanced-summary">
                             <span class="dashicons dashicons-admin-tools"></span>
-                            Mostra Strumenti Avanzati
+                            <?php esc_html_e('Mostra Strumenti Avanzati', 'hotel-in-cloud'); ?>
                         </span>
                     </summary>
-                    
+
                     <div class="hic-advanced-content">
                         <div class="hic-advanced-section">
-                            <h3>📦 Backfill Storico</h3>
-                            <p>Recupera prenotazioni da un intervallo temporale specifico. Il limite deve essere compreso tra 1 e 200 prenotazioni; valori fuori da questo intervallo verranno adattati automaticamente.</p>
-                            
+                            <h3><?php echo esc_html__('📦 Backfill Storico', 'hotel-in-cloud'); ?></h3>
+                            <p><?php esc_html_e('Recupera prenotazioni da un intervallo temporale specifico. Il limite deve essere compreso tra 1 e 200 prenotazioni; valori fuori da questo intervallo verranno adattati automaticamente.', 'hotel-in-cloud'); ?></p>
+
                             <div class="hic-backfill-form">
                                 <div class="hic-form-row">
-                                    <label for="backfill-from-date">Da:</label>
+                                    <label for="backfill-from-date"><?php esc_html_e('Da:', 'hotel-in-cloud'); ?></label>
                                     <input type="date" id="backfill-from-date" value="<?php echo esc_attr(wp_date('Y-m-d', strtotime('-7 days', current_time('timestamp')))); ?>" />
-                                    
-                                    <label for="backfill-to-date">A:</label>
+
+                                    <label for="backfill-to-date"><?php esc_html_e('A:', 'hotel-in-cloud'); ?></label>
                                     <input type="date" id="backfill-to-date" value="<?php echo esc_attr(wp_date('Y-m-d')); ?>" />
-                                    
-                                    <label for="backfill-date-type">Tipo:</label>
+
+                                    <label for="backfill-date-type"><?php esc_html_e('Tipo:', 'hotel-in-cloud'); ?></label>
                                     <select id="backfill-date-type">
-                                        <option value="checkin">Check-in</option>
-                                        <option value="checkout">Check-out</option>
-                                        <option value="presence">Presenza</option>
+                                        <option value="checkin"><?php esc_html_e('Check-in', 'hotel-in-cloud'); ?></option>
+                                        <option value="checkout"><?php esc_html_e('Check-out', 'hotel-in-cloud'); ?></option>
+                                        <option value="presence"><?php esc_html_e('Presenza', 'hotel-in-cloud'); ?></option>
                                     </select>
-                                    
-                                    <input type="number" id="backfill-limit" placeholder="Limite (1-200)" min="1" max="200" />
+
+                                    <input type="number" id="backfill-limit" placeholder="<?php echo esc_attr__('Limite (1-200)', 'hotel-in-cloud'); ?>" min="1" max="200" />
                                 </div>
-                                
+
                                 <div class="hic-form-actions">
                                     <button class="hic-button hic-button--primary" id="start-backfill">
                                         <span class="dashicons dashicons-download"></span>
-                                        Avvia Backfill
+                                        <?php esc_html_e('Avvia Backfill', 'hotel-in-cloud'); ?>
                                     </button>
                                     <span id="backfill-status" class="hic-status-message"></span>
                                 </div>
@@ -1846,22 +1878,22 @@ function hic_diagnostics_page() {
                         </div>
                         
                         <div class="hic-advanced-section">
-                            <h3>⚠️ Strumenti di Emergenza</h3>
+                            <h3><?php echo esc_html__('⚠️ Strumenti di Emergenza', 'hotel-in-cloud'); ?></h3>
                             <p class="hic-warning-text">
                                 <span class="dashicons dashicons-warning"></span>
-                                Usa solo in caso di problemi gravi del sistema.
+                                <?php esc_html_e('Usa solo in caso di problemi gravi del sistema.', 'hotel-in-cloud'); ?>
                             </p>
-                            
+
                             <div class="hic-emergency-tools">
                                 <button class="hic-button hic-button--secondary" id="reset-timestamps-advanced">
                                     <span class="dashicons dashicons-update"></span>
-                                    Reset Timestamp
+                                    <?php esc_html_e('Reset Timestamp', 'hotel-in-cloud'); ?>
                                 </button>
-                                
+
                                 <div class="hic-brevo-test" <?php echo (hic_is_brevo_enabled() && !empty(hic_get_brevo_api_key())) ? '' : 'style="display:none;"'; ?>>
                                     <button class="hic-button hic-button--secondary" id="test-brevo-connectivity">
                                         <span class="dashicons dashicons-cloud"></span>
-                                        Test Brevo API
+                                        <?php esc_html_e('Test Brevo API', 'hotel-in-cloud'); ?>
                                     </button>
                                     <div id="brevo-test-results" class="hic-results-container" style="display: none;"></div>
                                 </div>
@@ -1884,14 +1916,7 @@ function hic_diagnostics_page() {
  * AJAX handler for retrieving recent log entries in real time
  */
 function hic_ajax_get_recent_logs() {
-    if ( ! current_user_can('hic_view_logs') ) {
-        wp_send_json_error(
-            [
-                'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ),
-                'requires_permission' => true,
-            ]
-        );
-    }
+    hic_require_cap('hic_view_logs');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -1930,9 +1955,7 @@ function hic_ajax_get_recent_logs() {
  * AJAX handler for retrieving error log info
  */
 function hic_ajax_get_error_log_info() {
-    if ( ! current_user_can('hic_view_logs') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_view_logs');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -1977,6 +2000,20 @@ function hic_ajax_download_error_logs() {
 
     $log_file = hic_get_log_file();
 
+    if (is_link($log_file)) {
+        hic_log('Download log bloccato: il file è un collegamento simbolico', \HIC_LOG_LEVEL_WARNING);
+        wp_die(__('Accesso ai log non consentito', 'hotel-in-cloud'));
+    }
+
+    $log_directory = hic_get_log_directory();
+    $normalized_directory = trailingslashit(wp_normalize_path($log_directory));
+    $normalized_file_hint = wp_normalize_path($log_file);
+
+    if ($normalized_file_hint === '' || strpos($normalized_file_hint, $normalized_directory) !== 0) {
+        hic_log('Download log bloccato: percorso non valido', \HIC_LOG_LEVEL_WARNING);
+        wp_die(__('Accesso ai log non consentito', 'hotel-in-cloud'));
+    }
+
     if (!file_exists($log_file)) {
         $directory = dirname($log_file);
         if (!is_dir($directory)) {
@@ -1990,6 +2027,17 @@ function hic_ajax_download_error_logs() {
         if (!file_exists($log_file) && false === touch($log_file)) {
             wp_die(__('Impossibile creare il file di log', 'hotel-in-cloud'));
         }
+    }
+
+    $resolved_path = realpath($log_file);
+    if ($resolved_path === false) {
+        wp_die(__('Impossibile determinare il percorso del file di log', 'hotel-in-cloud'));
+    }
+
+    $normalized_resolved = wp_normalize_path($resolved_path);
+    if (strpos($normalized_resolved, $normalized_directory) !== 0) {
+        hic_log('Download log bloccato: percorso reale fuori dalla directory consentita', \HIC_LOG_LEVEL_WARNING);
+        wp_die(__('Accesso ai log non consentito', 'hotel-in-cloud'));
     }
 
     if (!is_readable($log_file)) {
@@ -2018,9 +2066,18 @@ function hic_ajax_download_error_logs() {
         @set_time_limit(0);
     }
 
+    if (function_exists('ignore_user_abort')) {
+        ignore_user_abort(true);
+    }
+
+    if (function_exists('ini_get') && function_exists('ini_set') && ini_get('zlib.output_compression')) {
+        ini_set('zlib.output_compression', 'Off');
+    }
+
     nocache_headers();
     header('Content-Type: text/plain; charset=utf-8');
     header('X-Content-Type-Options: nosniff');
+    header('X-Robots-Tag: noindex, nofollow', true);
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Pragma: no-cache');
     header('Expires: 0');
@@ -2068,9 +2125,7 @@ function hic_ajax_download_error_logs() {
  * AJAX handler for testing Brevo API connectivity
  */
 function hic_ajax_test_brevo_connectivity() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_admin_action', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -2107,9 +2162,7 @@ function hic_ajax_test_brevo_connectivity() {
  * AJAX handler for testing web traffic monitoring
  */
 function hic_ajax_test_web_traffic_monitoring() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_admin_action', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );
@@ -2162,9 +2215,7 @@ function hic_ajax_test_web_traffic_monitoring() {
  * AJAX handler for getting web traffic monitoring statistics
  */
 function hic_ajax_get_web_traffic_stats() {
-    if ( ! current_user_can('hic_manage') ) {
-        wp_send_json_error( [ 'message' => __( 'Permessi insufficienti', 'hotel-in-cloud' ) ] );
-    }
+    hic_require_cap('hic_manage');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_send_json_error( [ 'message' => __( 'Nonce non valido', 'hotel-in-cloud' ) ] );

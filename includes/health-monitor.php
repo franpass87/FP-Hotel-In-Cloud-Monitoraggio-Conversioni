@@ -7,6 +7,8 @@
  */
 
 use FpHic\HIC_Booking_Poller;
+use function FpHic\Helpers\hic_require_cap;
+use function FpHic\Helpers\hic_sanitize_identifier;
 
 if (!defined('ABSPATH')) exit;
 
@@ -320,10 +322,9 @@ class HIC_Health_Monitor {
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'hic_sid_gclid_mapping';
-        $escaped_table_name = esc_sql($table_name);
-        $table_sql = "`{$escaped_table_name}`";
-        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_name)) === $table_name;
-        
+        $sanitized_table = hic_sanitize_identifier($table_name, 'table');
+        $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_name)) === $table_name;
+
         if (!$table_exists) {
             return [
                 'status' => 'fail',
@@ -331,8 +332,8 @@ class HIC_Health_Monitor {
                 'details' => ['table_name' => $table_name, 'exists' => false]
             ];
         }
-        
-        $row_count = $wpdb->get_var("SELECT COUNT(*) FROM {$table_sql}");
+
+        $row_count = $wpdb->get_var("SELECT COUNT(*) FROM `{$sanitized_table}`");
         
         return [
             'status' => 'pass',
@@ -473,9 +474,7 @@ class HIC_Health_Monitor {
             wp_send_json(['error' => 'Invalid nonce'], 403);
         }
 
-        if (!current_user_can('hic_manage')) {
-            wp_send_json(['error' => 'Insufficient permissions'], 403);
-        }
+        hic_require_cap('hic_manage');
 
         $level = sanitize_text_field( wp_unslash( $_GET['level'] ?? HIC_DIAGNOSTIC_BASIC ) );
         $allowed_levels = [

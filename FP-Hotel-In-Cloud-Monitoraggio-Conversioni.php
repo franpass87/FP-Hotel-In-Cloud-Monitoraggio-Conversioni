@@ -17,6 +17,7 @@ namespace FpHic;
 use FpHic\Bootstrap\Lifecycle;
 use FpHic\Bootstrap\ModuleLoader;
 use FpHic\Bootstrap\UpgradeManager;
+use function FpHic\Helpers\hic_should_bootstrap_feature;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -157,14 +158,20 @@ Lifecycle::registerNetworkProvisioningHook();
     }
 });
 
-// Ensure the Enterprise Management Suite hooks are available in every context
-if (!did_action('hic_enterprise_management_suite_loaded')) {
-    $GLOBALS['hic_enterprise_management_suite'] = new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
-    do_action('hic_enterprise_management_suite_loaded', $GLOBALS['hic_enterprise_management_suite']);
+// Ensure the Enterprise Management Suite hooks are available when enabled
+if (hic_should_bootstrap_feature('enterprise_suite') && class_exists('FpHic\\ReconAndSetup\\EnterpriseManagementSuite')) {
+    if (!did_action('hic_enterprise_management_suite_loaded')) {
+        $GLOBALS['hic_enterprise_management_suite'] = new \FpHic\ReconAndSetup\EnterpriseManagementSuite();
+        do_action('hic_enterprise_management_suite_loaded', $GLOBALS['hic_enterprise_management_suite']);
+    }
 }
 
-// Ensure Google Ads Enhanced Conversions hooks are available in all request contexts
-new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
+// Ensure Google Ads Enhanced Conversions hooks are available when enabled
+if (hic_should_bootstrap_feature('google_ads_enhanced') && class_exists('FpHic\\GoogleAdsEnhanced\\GoogleAdsEnhancedConversions')) {
+    if (!isset($GLOBALS['hic_google_ads_enhanced']) || !($GLOBALS['hic_google_ads_enhanced'] instanceof \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions)) {
+        $GLOBALS['hic_google_ads_enhanced'] = new \FpHic\GoogleAdsEnhanced\GoogleAdsEnhancedConversions();
+    }
+}
 
 // Load admin functionality only in dashboard
 if (\is_admin()) {
@@ -176,5 +183,9 @@ if (\is_admin()) {
 
 \FpHic\AutomatedReporting\AutomatedReportingManager::instance();
 
-// Initialize the real-time dashboard in all contexts (admin, frontend, cron)
-new \FpHic\RealtimeDashboard\RealtimeDashboard();
+// Initialize the real-time dashboard only when enabled for the current context
+if (hic_should_bootstrap_feature('realtime_dashboard') && class_exists('FpHic\\RealtimeDashboard\\RealtimeDashboard')) {
+    if (!isset($GLOBALS['hic_realtime_dashboard']) || !($GLOBALS['hic_realtime_dashboard'] instanceof \FpHic\RealtimeDashboard\RealtimeDashboard)) {
+        $GLOBALS['hic_realtime_dashboard'] = new \FpHic\RealtimeDashboard\RealtimeDashboard();
+    }
+}

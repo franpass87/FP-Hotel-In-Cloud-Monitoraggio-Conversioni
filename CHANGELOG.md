@@ -8,11 +8,21 @@ Tutte le modifiche degne di nota del plugin FP HIC Monitor sono documentate qui,
 ### Sicurezza
 - Centralizzate le verifiche di capability amministrative sugli endpoint di ottimizzazione e suite enterprise tramite l'helper `hic_require_cap()` per richiedere il permesso `hic_manage` in modo coerente.【F:includes/functions.php†L21-L57】【F:includes/database-optimizer.php†L28-L36】【F:includes/enterprise-management-suite.php†L5-L6】
 - Introdotta la sanitizzazione rigorosa degli identificatori SQL con `hic_sanitize_identifier()` e applicazione nei processi di indicizzazione, archiviazione e manutenzione del database per evitare injection su nomi di tabelle, colonne e indici dinamici.【F:includes/functions.php†L59-L92】【F:includes/database-optimizer.php†L75-L520】【F:includes/booking-poller.php†L3-L36】
-- Rafforzato il download dei log con sanificazione del filename, streaming a buffer e generazione automatica dei file `.htaccess` e `web.config` per bloccare l'accesso diretto alla directory dei log.【F:includes/admin/diagnostics.php†L1893-L1985】【F:includes/helpers-logging.php†L9-L118】【F:includes/bootstrap/lifecycle.php†L210-L282】
+- Rafforzati gli accessi al database nei flussi privacy, tracking e health monitor adottando identificatori sanificati e query preparate in tutte le letture dirette delle tabelle applicative.【F:includes/privacy.php†L1-L120】【F:includes/helpers-tracking.php†L1-L452】【F:includes/health-monitor.php†L1-L360】【F:includes/booking-metrics.php†L1-L200】【F:includes/database.php†L1-L120】
+- Rafforzato il download dei log con sanificazione del filename, blocco di symlink/percorso reale fuori directory, streaming a buffer e generazione automatica dei file `.htaccess` e `web.config` per impedire l'accesso diretto.【F:includes/admin/diagnostics.php†L1889-L1996】【F:includes/helpers-logging.php†L9-L118】【F:includes/bootstrap/lifecycle.php†L210-L282】
+- Aggiunta la pagina amministrativa "Registro eventi" (permesso `hic_view_logs`) con visualizzazione paginata in sola lettura, verifica automatica della protezione directory e rispetto della rotazione/compressione dei file generati.【F:includes/admin/log-viewer.php†L1-L360】【F:includes/log-manager.php†L320-L408】
 
 ### Performance
-- L'archiviazione manuale dei dati storici ora è gestita da un job AJAX riprendibile con stato persistito, rate limiting e barra di avanzamento nell'admin: ogni step processa batch controllati e consente di fermarsi/riprendere senza bloccare l'interfaccia.【F:includes/database-optimizer.php†L324-L592】【F:includes/admin/admin-settings.php†L609-L683】【F:assets/js/admin-settings.js†L1-L430】
-- Il watchdog del cron verifica lo stato degli eventi al massimo una volta al minuto usando un transient di debounce, riducendo il carico sulle richieste mentre mantiene attivo il polling continuo.【F:includes/booking-poller.php†L18-L132】
+- L'archiviazione manuale dei dati storici ora è gestita da un job AJAX riprendibile con stato persistito e normalizzato, rate limiting e barra di avanzamento nell'admin: ogni step processa batch controllati (batch dinamici esposti all'interfaccia) e consente di fermarsi/riprendere senza bloccare l'interfaccia.【F:includes/database-optimizer.php†L324-L612】【F:includes/admin/admin-settings.php†L609-L683】【F:assets/js/admin-settings.js†L1-L450】
+- Il watchdog del cron verifica lo stato degli eventi al massimo una volta al minuto usando il transient `hic_cron_checked_at` con TTL fisso di 60 secondi, evitando rimbalzi anche durante i riavvii forzati e mantenendo attivo il polling continuo.【F:includes/booking-poller.php†L18-L132】
+- Introdotto un sistema di feature flag lazy-load che evita l'istanza dei moduli enterprise, Google Ads Enhanced Conversions e dashboard realtime nelle richieste frontend quando disabilitati o non necessari, riducendo overhead e memoria caricata per ogni pagina.【F:includes/helpers/options.php†L229-L351】【F:includes/bootstrap/module-loader.php†L23-L124】【F:FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php†L139-L193】
+- Rivista la strategia di indicizzazione delle tabelle principali aggiungendo gli indici `created_at_idx` e `sid_created_at_idx` per `hic_gclids`, riallineando il Database Optimizer alle interrogazioni reali e documentando il perimetro in `docs/DB-INDEXES.md`.【F:includes/database.php†L88-L108】【F:includes/database-optimizer.php†L94-L126】【F:docs/DB-INDEXES.md†L1-L47】
+
+### Tooling
+- Raffinato il workflow GitHub Actions `ci.yml` aggiungendo concurrency control, validazione `composer` preventiva e installazione con cache automatica per mantenere il QA matrix rapido e consistente su PHP 7.4/8.1/8.2, aggiornando il badge nel README.【F:.github/workflows/ci.yml†L1-L51】【F:README.md†L1-L4】
+
+### Localizzazione
+- Internazionalizzate le schermate diagnostiche e gli stati delle integrazioni sostituendo stringhe statiche con le funzioni `__()`/`esc_html__()`, aggiornando la terminologia di stato (es. "Completo"/"Incompleto") e allineando i CTA alla localizzazione del plugin.【F:includes/admin/diagnostics.php†L1356-L1735】【F:includes/google-ads-enhanced.php†L1784-L1792】【F:includes/enterprise-management-suite.php†L540-L553】
 
 ## [3.4.0] - 2025-09-26
 ### Sicurezza
@@ -36,6 +46,7 @@ Tutte le modifiche degne di nota del plugin FP HIC Monitor sono documentate qui,
 - Aggiornato il workflow di rilascio con esempi di tagging e pacchetti coerenti con la versione 3.3.0.
 
 ### Manutenzione
+- Modularizzato il precedente `includes/functions.php` suddividendo le utility in moduli dedicati (`helpers/options.php`, `helpers/strings.php`, `helpers/api.php`, `helpers/booking.php`) e introducendo shim globali deprecati con logging di debug per facilitare la migrazione delle chiamate legacy.【F:includes/helpers/options.php†L1-L279】【F:includes/helpers/strings.php†L1-L294】【F:includes/helpers/api.php†L1-L207】【F:includes/helpers/booking.php†L1-L438】【F:includes/functions.php†L1-L191】
 - Sincronizzate costanti di versione, header del plugin e test CLI per riflettere la release 3.3.0 e prevenire falsi positivi nei controlli di health check.
 
 ## [3.2.0] - 2025-02-14
