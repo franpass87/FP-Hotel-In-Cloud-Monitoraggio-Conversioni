@@ -14,6 +14,65 @@ if (!defined('ABSPATH')) {
 const HIC_PHONE_DEFAULT_COUNTRY = 'IT';
 
 /**
+ * Ensure the current request is executed by a user with the required capability.
+ *
+ * @param string $capability Capability name to validate.
+ */
+function hic_require_cap(string $capability): void
+{
+    $capability = trim($capability);
+
+    if ($capability === '') {
+        $capability = 'hic_manage';
+    }
+
+    if (!\function_exists('current_user_can') || !\current_user_can($capability)) {
+        $message = \function_exists('__')
+            ? \__('Non hai i permessi necessari per completare questa operazione.', 'hotel-in-cloud')
+            : 'You do not have permission to perform this action.';
+        $title = \function_exists('__')
+            ? \__('Accesso negato', 'hotel-in-cloud')
+            : 'Access denied';
+
+        if (\function_exists('wp_die')) {
+            \wp_die($message, $title, 403);
+        }
+
+        throw new \RuntimeException($message);
+    }
+}
+
+/**
+ * Sanitize SQL identifiers (table, column, index names) enforcing a strict whitelist.
+ *
+ * @param string $identifier Raw identifier.
+ * @param string $type       Context for error messages.
+ * @return string            Sanitized identifier.
+ */
+function hic_sanitize_identifier(string $identifier, string $type = 'identifier'): string
+{
+    $identifier = trim($identifier);
+    $type = trim($type) !== '' ? $type : 'identifier';
+
+    if ($identifier === '' || !preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
+        $message = \function_exists('__')
+            ? sprintf(\__('Identificatore SQL non valido per %s.', 'hotel-in-cloud'), $type)
+            : sprintf('Invalid SQL identifier for %s.', $type);
+        $title = \function_exists('__')
+            ? \__('Parametro non valido', 'hotel-in-cloud')
+            : 'Invalid parameter';
+
+        if (\function_exists('wp_die')) {
+            \wp_die($message, $title, 400);
+        }
+
+        throw new \InvalidArgumentException($message);
+    }
+
+    return $identifier;
+}
+
+/**
  * Retrieve the global wpdb instance when available and supporting the required methods.
  *
  * @param string[] $required_methods
@@ -2804,6 +2863,9 @@ function hic_get_processing_statistics() {
 
 // Global wrappers for backward compatibility
 namespace {
+
+    function hic_require_cap($capability) { \FpHic\Helpers\hic_require_cap((string) $capability); }
+    function hic_sanitize_identifier($identifier, $type = 'identifier') { return \FpHic\Helpers\hic_sanitize_identifier((string) $identifier, (string) $type); }
 
     if (!function_exists('rest_get_server')) {
         if (!defined('HIC_REST_API_FALLBACK')) {

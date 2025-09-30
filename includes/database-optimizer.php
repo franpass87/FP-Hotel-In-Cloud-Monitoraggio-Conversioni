@@ -2,6 +2,10 @@
 
 namespace FpHic\DatabaseOptimizer;
 
+use function __;
+use function FpHic\Helpers\hic_require_cap;
+use function FpHic\Helpers\hic_sanitize_identifier;
+
 if (!defined('ABSPATH')) exit;
 
 /**
@@ -17,8 +21,14 @@ class DatabaseOptimizer {
     private const ARCHIVE_MONTHS = 6;
     
     /** @var int Maximum records to process in a single batch */
-    private const BATCH_SIZE = 1000;
-    
+    public const BATCH_SIZE = 1000;
+
+    /** @var string Transient key used to persist archive job state */
+    private const ARCHIVE_STATE_KEY = 'hic_archive_state';
+
+    /** @var int Lifetime (in seconds) for persisted archive job state */
+    private const ARCHIVE_STATE_TTL = DAY_IN_SECONDS;
+
     /** @var int Query cache duration in seconds */
     private const QUERY_CACHE_DURATION = 300; // 5 minutes
     
@@ -31,7 +41,10 @@ class DatabaseOptimizer {
         // AJAX handlers for admin dashboard
         add_action('wp_ajax_hic_get_database_stats', [$this, 'ajax_get_database_stats']);
         add_action('wp_ajax_hic_optimize_database', [$this, 'ajax_optimize_database']);
-        add_action('wp_ajax_hic_archive_old_data', [$this, 'ajax_archive_old_data']);
+        add_action('wp_ajax_hic_archive_old_data', [$this, 'ajax_archive_old_data_start']);
+        add_action('wp_ajax_hic_archive_old_data_start', [$this, 'ajax_archive_old_data_start']);
+        add_action('wp_ajax_hic_archive_old_data_step', [$this, 'ajax_archive_old_data_step']);
+        add_action('wp_ajax_hic_archive_old_data_status', [$this, 'ajax_archive_old_data_status']);
         
         // Schedule optimization tasks
         add_action('wp', [$this, 'schedule_optimization_tasks']);
@@ -72,56 +85,56 @@ class DatabaseOptimizer {
     private function create_optimized_indexes() {
         global $wpdb;
         
-        $main_table = $wpdb->prefix . 'hic_gclids';
-        $sync_table = $wpdb->prefix . 'hic_realtime_sync';
+        $main_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
+        $sync_table = hic_sanitize_identifier($wpdb->prefix . 'hic_realtime_sync', 'table');
         
         // Composite indexes for main table (frequent query patterns)
         $indexes = [
             [
                 'table'   => $main_table,
                 'name'    => 'idx_created_utm_source',
-                'columns' => 'created_at, utm_source',
+                'columns' => ['created_at', 'utm_source'],
             ],
             [
                 'table'   => $main_table,
                 'name'    => 'idx_created_utm_medium',
-                'columns' => 'created_at, utm_medium',
+                'columns' => ['created_at', 'utm_medium'],
             ],
             [
                 'table'   => $main_table,
                 'name'    => 'idx_created_utm_campaign',
-                'columns' => 'created_at, utm_campaign',
+                'columns' => ['created_at', 'utm_campaign'],
             ],
 
             // Index for conversion tracking queries
             [
                 'table'   => $main_table,
                 'name'    => 'idx_sid_created',
-                'columns' => 'sid, created_at',
+                'columns' => ['sid', 'created_at'],
             ],
             [
                 'table'   => $main_table,
                 'name'    => 'idx_gclid_created',
-                'columns' => 'gclid, created_at',
+                'columns' => ['gclid', 'created_at'],
             ],
             [
                 'table'   => $main_table,
                 'name'    => 'idx_fbclid_created',
-                'columns' => 'fbclid, created_at',
+                'columns' => ['fbclid', 'created_at'],
             ],
 
             // Composite index for dashboard queries (source + medium + date)
             [
                 'table'   => $main_table,
                 'name'    => 'idx_source_medium_date',
-                'columns' => 'utm_source, utm_medium, created_at',
+                'columns' => ['utm_source', 'utm_medium', 'created_at'],
             ],
 
             // Index for cleanup and archiving operations
             [
                 'table'   => $main_table,
                 'name'    => 'idx_created_id',
-                'columns' => 'created_at, id',
+                'columns' => ['created_at', 'id'],
             ],
         ];
 
@@ -130,17 +143,17 @@ class DatabaseOptimizer {
             [
                 'table'   => $sync_table,
                 'name'    => 'idx_reservation_status',
-                'columns' => 'reservation_id, sync_status',
+                'columns' => ['reservation_id', 'sync_status'],
             ],
             [
                 'table'   => $sync_table,
                 'name'    => 'idx_status_attempt',
-                'columns' => 'sync_status, last_attempt',
+                'columns' => ['sync_status', 'last_attempt'],
             ],
             [
                 'table'   => $sync_table,
                 'name'    => 'idx_first_seen',
-                'columns' => 'first_seen',
+                'columns' => ['first_seen'],
             ],
         ];
 
@@ -148,19 +161,30 @@ class DatabaseOptimizer {
         $had_errors = false;
 
         foreach ( $indexes as $index ) {
-            $table   = $index['table'];
-            $name    = $index['name'];
-            $columns = $index['columns'];
+            $table   = hic_sanitize_identifier($index['table'], 'table');
+            $index_name = hic_sanitize_identifier($index['name'], 'index');
+            $columns = array_map(
+                static fn($column) => hic_sanitize_identifier((string) $column, 'column'),
+                isset($index['columns']) ? (array) $index['columns'] : []
+            );
+
+            if (empty($columns)) {
+                $had_errors = true;
+                $this->log('Skipping index creation due to missing column definitions for ' . $index_name);
+                continue;
+            }
+
+            $column_list = implode(', ', array_map(static fn($column) => "`{$column}`", $columns));
 
             $index_exists = $wpdb->get_var(
                 $wpdb->prepare(
-                    "SHOW INDEX FROM {$table} WHERE Key_name = %s",
-                    $name
+                    "SHOW INDEX FROM `{$table}` WHERE Key_name = %s",
+                    $index_name
                 )
             );
 
             if ( ! $index_exists ) {
-                $result = $wpdb->query( "CREATE INDEX {$name} ON {$table} ({$columns})" );
+                $result = $wpdb->query( "CREATE INDEX `{$index_name}` ON `{$table}` ({$column_list})" );
                 if ( $result === false ) {
                     $had_errors = true;
                     $this->log( 'Failed to create index: ' . $wpdb->last_error );
@@ -181,10 +205,10 @@ class DatabaseOptimizer {
     private function create_archive_tables() {
         global $wpdb;
         
-        $archive_table = $wpdb->prefix . 'hic_gclids_archive';
+        $archive_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids_archive', 'table');
         $charset = $wpdb->get_charset_collate();
-        
-        $sql = "CREATE TABLE IF NOT EXISTS {$archive_table} (
+
+        $sql = "CREATE TABLE IF NOT EXISTS `{$archive_table}` (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             original_id BIGINT NOT NULL,
             gclid VARCHAR(255),
@@ -222,10 +246,10 @@ class DatabaseOptimizer {
     private function create_query_cache_table() {
         global $wpdb;
         
-        $cache_table = $wpdb->prefix . 'hic_query_cache';
+        $cache_table = hic_sanitize_identifier($wpdb->prefix . 'hic_query_cache', 'table');
         $charset = $wpdb->get_charset_collate();
-        
-        $sql = "CREATE TABLE IF NOT EXISTS {$cache_table} (
+
+        $sql = "CREATE TABLE IF NOT EXISTS `{$cache_table}` (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             query_hash VARCHAR(64) NOT NULL UNIQUE,
             query_result LONGTEXT,
@@ -250,10 +274,10 @@ class DatabaseOptimizer {
     private function initialize_performance_monitoring() {
         global $wpdb;
         
-        $perf_table = $wpdb->prefix . 'hic_performance_metrics';
+        $perf_table = hic_sanitize_identifier($wpdb->prefix . 'hic_performance_metrics', 'table');
         $charset = $wpdb->get_charset_collate();
-        
-        $sql = "CREATE TABLE IF NOT EXISTS {$perf_table} (
+
+        $sql = "CREATE TABLE IF NOT EXISTS `{$perf_table}` (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             metric_type VARCHAR(50) NOT NULL,
             metric_value DECIMAL(10,4) NOT NULL,
@@ -339,80 +363,255 @@ class DatabaseOptimizer {
     }
     
     /**
-     * Archive old data to keep main tables lean
+     * Archive old data to keep main tables lean.
+     *
+     * This synchronous variant is used by automated jobs (cron) and will bail
+     * out early if a manual resumable job is currently running.
      */
-    private function archive_old_data() {
-        global $wpdb;
-        
-        $main_table = $wpdb->prefix . 'hic_gclids';
-        $archive_table = $wpdb->prefix . 'hic_gclids_archive';
-        
-        // Calculate cutoff date (6 months ago)
-        $cutoff_date = date('Y-m-d H:i:s', strtotime('-' . self::ARCHIVE_MONTHS . ' months'));
-        
-        // Get count of records to archive
-        $count_query = $wpdb->prepare(
-            "SELECT COUNT(*) FROM {$main_table} WHERE created_at < %s",
-            $cutoff_date
-        );
-        $total_to_archive = $wpdb->get_var($count_query);
-        
-        if ($total_to_archive == 0) {
+    private function archive_old_data(): int {
+        $active_state = $this->get_archive_state();
+
+        if (is_array($active_state)) {
+            $this->log('Skipping automated archive because a manual job is in progress.');
+            return (int) ($active_state['processed'] ?? 0);
+        }
+
+        $state = $this->prepare_archive_state();
+
+        if ((int) $state['total'] === 0) {
             $this->log('No old data to archive');
             return 0;
         }
-        
-        $this->log("Found {$total_to_archive} records to archive");
-        
-        $archived_count = 0;
-        $batch_count = 0;
-        
-        // Process in batches to avoid memory issues
-        while ($archived_count < $total_to_archive) {
-            $batch_count++;
-            
-            // Insert batch into archive table
-            $insert_query = $wpdb->prepare("
-                INSERT INTO {$archive_table} 
-                (original_id, gclid, fbclid, msclkid, ttclid, gbraid, wbraid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at)
-                SELECT id, gclid, fbclid, msclkid, ttclid, gbraid, wbraid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at
-                FROM {$main_table} 
-                WHERE created_at < %s 
-                LIMIT %d
-            ", $cutoff_date, self::BATCH_SIZE);
-            
-            $inserted = $wpdb->query($insert_query);
-            
-            if ($inserted === false) {
-                $this->log("Archive batch {$batch_count} failed: " . $wpdb->last_error);
+
+        $this->log(sprintf('Found %d records to archive (cron run)', (int) $state['total']));
+
+        $archived = 0;
+
+        while (true) {
+            $result = $this->process_archive_step($state, false);
+            $state  = $result['state'];
+            $archived += (int) $result['moved'];
+
+            if ($result['done']) {
                 break;
-            }
-            
-            // Delete archived records from main table
-            $delete_query = $wpdb->prepare("
-                DELETE FROM {$main_table} 
-                WHERE created_at < %s 
-                LIMIT %d
-            ", $cutoff_date, $inserted);
-            
-            $deleted = $wpdb->query($delete_query);
-            
-            if ($deleted === false) {
-                $this->log("Delete batch {$batch_count} failed: " . $wpdb->last_error);
-                break;
-            }
-            
-            $archived_count += $deleted;
-            
-            $this->log("Batch {$batch_count}: Archived {$deleted} records");
-            
-            // Prevent timeout on large datasets
-            if ($batch_count % 10 === 0) {
-                sleep(1); // Brief pause every 10 batches
             }
         }
-        
-        return $archived_count;
+
+        return $archived;
+    }
+
+    /**
+     * Prepare a fresh archive job state.
+     *
+     * @return array<string, mixed>
+     */
+    private function prepare_archive_state(): array {
+        global $wpdb;
+
+        $main_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
+        $cutoff_date = date('Y-m-d H:i:s', strtotime('-' . self::ARCHIVE_MONTHS . ' months'));
+
+        $count_query = $wpdb->prepare(
+            "SELECT COUNT(*) FROM `{$main_table}` WHERE created_at < %s",
+            $cutoff_date
+        );
+        $total_to_archive = (int) $wpdb->get_var($count_query);
+
+        return [
+            'cutoff' => $cutoff_date,
+            'total' => $total_to_archive,
+            'processed' => 0,
+            'batch' => 0,
+            'last_batch' => 0,
+            'started_at' => time(),
+            'last_activity' => time(),
+        ];
+    }
+
+    /**
+     * Retrieve the persisted archive state if present.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function get_archive_state(): ?array {
+        $state = get_transient(self::ARCHIVE_STATE_KEY);
+
+        return is_array($state) ? $state : null;
+    }
+
+    /**
+     * Persist the current archive state for resumable jobs.
+     *
+     * @param array<string, mixed> $state Archive state to persist.
+     */
+    private function persist_archive_state(array $state): void {
+        set_transient(self::ARCHIVE_STATE_KEY, $state, self::ARCHIVE_STATE_TTL);
+    }
+
+    /**
+     * Remove any persisted archive state.
+     */
+    private function clear_archive_state(): void {
+        delete_transient(self::ARCHIVE_STATE_KEY);
+    }
+
+    /**
+     * Process a single archive batch.
+     *
+     * @param array<string, mixed> $state         Current archive state reference.
+     * @param bool                 $persist_state Whether to persist the updated state.
+     *
+     * @return array{state: array<string, mixed>, moved: int, done: bool}
+     */
+    private function process_archive_step(array $state, bool $persist_state = true): array {
+        global $wpdb;
+
+        $main_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
+        $archive_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids_archive', 'table');
+
+        $batch_ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT id FROM `{$main_table}` WHERE created_at < %s ORDER BY id ASC LIMIT %d",
+                $state['cutoff'],
+                self::BATCH_SIZE
+            )
+        );
+
+        if (empty($batch_ids)) {
+            $state['last_activity'] = time();
+            $state['processed'] = max((int) ($state['processed'] ?? 0), (int) ($state['total'] ?? 0));
+
+            if ($persist_state) {
+                $this->clear_archive_state();
+            }
+
+            return [
+                'state' => $state,
+                'moved' => 0,
+                'done' => true,
+            ];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($batch_ids), '%d'));
+
+        $insert_query = $wpdb->prepare(
+            "
+                INSERT INTO `{$archive_table}`
+                    (original_id, gclid, fbclid, msclkid, ttclid, gbraid, wbraid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at)
+                SELECT id, gclid, fbclid, msclkid, ttclid, gbraid, wbraid, sid, utm_source, utm_medium, utm_campaign, utm_content, utm_term, created_at
+                FROM `{$main_table}`
+                WHERE id IN ({$placeholders})
+            ",
+            ...$batch_ids
+        );
+
+        if ($insert_query === false) {
+            throw new \RuntimeException('Unable to build archive insert query.');
+        }
+
+        $inserted = $wpdb->query($insert_query);
+
+        if ($inserted === false) {
+            throw new \RuntimeException('Archive insert failed: ' . $wpdb->last_error);
+        }
+
+        $delete_query = $wpdb->prepare(
+            "DELETE FROM `{$main_table}` WHERE id IN ({$placeholders})",
+            ...$batch_ids
+        );
+
+        if ($delete_query === false) {
+            throw new \RuntimeException('Unable to build archive delete query.');
+        }
+
+        $deleted = $wpdb->query($delete_query);
+
+        if ($deleted === false) {
+            throw new \RuntimeException('Archive delete failed: ' . $wpdb->last_error);
+        }
+
+        $moved = (int) $deleted;
+
+        $state['processed'] = (int) ($state['processed'] ?? 0) + $moved;
+        $state['batch'] = (int) ($state['batch'] ?? 0) + 1;
+        $state['last_batch'] = $moved;
+        $state['total'] = max((int) ($state['total'] ?? 0), (int) $state['processed']);
+        $state['last_activity'] = time();
+
+        if ($persist_state) {
+            $this->persist_archive_state($state);
+        }
+
+        $this->log(sprintf('Batch %d: Archived %d records', (int) $state['batch'], $moved));
+
+        return [
+            'state' => $state,
+            'moved' => $moved,
+            'done' => false,
+        ];
+    }
+
+    /**
+     * Normalize archive state for JSON responses.
+     *
+     * @param array<string, mixed> $state Archive state to normalize.
+     * @param bool                 $done  Whether the job is complete.
+     *
+     * @return array<string, mixed>
+     */
+    private function format_archive_state(array $state, bool $done = false): array {
+        $total = max(0, (int) ($state['total'] ?? 0));
+        $processed = max(0, (int) ($state['processed'] ?? 0));
+
+        if ($done) {
+            $processed = max($processed, $total);
+        }
+
+        if ($processed > $total) {
+            $total = $processed;
+        }
+
+        $progress = $total > 0 ? min(1, $processed / $total) : 1;
+
+        return [
+            'cutoff' => (string) ($state['cutoff'] ?? ''),
+            'total' => $total,
+            'processed' => $processed,
+            'remaining' => max(0, $total - $processed),
+            'progress' => (float) round($progress, 4),
+            'percentage' => (float) round($progress * 100, 2),
+            'batch' => (int) ($state['batch'] ?? 0),
+            'last_batch' => (int) ($state['last_batch'] ?? 0),
+            'started_at' => (int) ($state['started_at'] ?? time()),
+            'last_activity' => (int) ($state['last_activity'] ?? time()),
+            'done' => $done,
+        ];
+    }
+
+    /**
+     * Attempt to enforce shared AJAX rate limiting helpers when available.
+     */
+    private function maybe_enforce_rate_limit(string $action, int $max_attempts, int $window): bool {
+        if (function_exists('\\hic_enforce_ajax_rate_limit')) {
+            return \hic_enforce_ajax_rate_limit($action, $max_attempts, $window);
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate archive AJAX nonces supporting legacy identifiers.
+     *
+     * @param array<int, string> $actions Accepted nonce action names.
+     */
+    private function verify_archive_nonce(array $actions): bool {
+        foreach ($actions as $action) {
+            if (check_ajax_referer($action, 'nonce', false)) {
+                return true;
+            }
+        }
+
+        return false;
     }
     
     /**
@@ -422,11 +621,11 @@ class DatabaseOptimizer {
         global $wpdb;
         
         $tables = [
-            $wpdb->prefix . 'hic_gclids',
-            $wpdb->prefix . 'hic_realtime_sync',
-            $wpdb->prefix . 'hic_gclids_archive',
-            $wpdb->prefix . 'hic_query_cache',
-            $wpdb->prefix . 'hic_performance_metrics'
+            hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table'),
+            hic_sanitize_identifier($wpdb->prefix . 'hic_realtime_sync', 'table'),
+            hic_sanitize_identifier($wpdb->prefix . 'hic_gclids_archive', 'table'),
+            hic_sanitize_identifier($wpdb->prefix . 'hic_query_cache', 'table'),
+            hic_sanitize_identifier($wpdb->prefix . 'hic_performance_metrics', 'table')
         ];
         
         foreach ($tables as $table) {
@@ -436,9 +635,9 @@ class DatabaseOptimizer {
                 DB_NAME,
                 $table
             ));
-            
+
             if ($table_exists) {
-                $wpdb->query("OPTIMIZE TABLE {$table}");
+                $wpdb->query("OPTIMIZE TABLE `{$table}`");
                 $this->log("Optimized table: {$table}");
             }
         }
@@ -450,9 +649,9 @@ class DatabaseOptimizer {
     private function cleanup_query_cache() {
         global $wpdb;
         
-        $cache_table = $wpdb->prefix . 'hic_query_cache';
-        
-        $deleted = $wpdb->query("DELETE FROM {$cache_table} WHERE expires_at < NOW()");
+        $cache_table = hic_sanitize_identifier($wpdb->prefix . 'hic_query_cache', 'table');
+
+        $deleted = $wpdb->query("DELETE FROM `{$cache_table}` WHERE expires_at < NOW()");
         
         if ($deleted > 0) {
             $this->log("Cleaned up {$deleted} expired cache entries");
@@ -466,12 +665,12 @@ class DatabaseOptimizer {
         global $wpdb;
         
         $tables = [
-            $wpdb->prefix . 'hic_gclids',
-            $wpdb->prefix . 'hic_realtime_sync'
+            hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table'),
+            hic_sanitize_identifier($wpdb->prefix . 'hic_realtime_sync', 'table')
         ];
-        
+
         foreach ($tables as $table) {
-            $wpdb->query("ANALYZE TABLE {$table}");
+            $wpdb->query("ANALYZE TABLE `{$table}`");
         }
         
         $this->log('Updated table statistics');
@@ -483,11 +682,11 @@ class DatabaseOptimizer {
     private function cleanup_old_performance_metrics() {
         global $wpdb;
         
-        $perf_table = $wpdb->prefix . 'hic_performance_metrics';
+        $perf_table = hic_sanitize_identifier($wpdb->prefix . 'hic_performance_metrics', 'table');
         $cutoff_date = date('Y-m-d H:i:s', strtotime('-30 days'));
-        
+
         $deleted = $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$perf_table} WHERE timestamp < %s",
+            "DELETE FROM `{$perf_table}` WHERE timestamp < %s",
             $cutoff_date
         ));
         
@@ -513,22 +712,24 @@ class DatabaseOptimizer {
      * Cache common dashboard queries
      */
     private function cache_dashboard_queries() {
+        $main_table = $this->get_main_table();
+
         // Cache booking counts by source for last 30 days
         $this->get_cached_query('bookings_by_source_30d', "
-            SELECT utm_source, COUNT(*) as count 
-            FROM {$this->get_main_table()} 
+            SELECT utm_source, COUNT(*) as count
+            FROM `{$main_table}`
             WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
             GROUP BY utm_source
         ");
-        
+
         // Cache conversion funnel data
         $this->get_cached_query('conversion_funnel_7d', "
-            SELECT 
+            SELECT
                 DATE(created_at) as date,
                 COUNT(*) as total_bookings,
                 COUNT(DISTINCT gclid) as google_conversions,
                 COUNT(DISTINCT fbclid) as facebook_conversions
-            FROM {$this->get_main_table()} 
+            FROM `{$main_table}`
             WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
             GROUP BY DATE(created_at)
         ");
@@ -540,11 +741,11 @@ class DatabaseOptimizer {
     private function analyze_table_indexes() {
         global $wpdb;
         
-        $main_table = $wpdb->prefix . 'hic_gclids';
-        
+        $main_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
+
         // Get index usage statistics
         $index_stats = $wpdb->get_results($wpdb->prepare("
-            SELECT 
+            SELECT
                 DISTINCT s.table_name,
                 s.index_name,
                 s.cardinality,
@@ -595,23 +796,23 @@ class DatabaseOptimizer {
             $cache_duration = self::QUERY_CACHE_DURATION;
         }
         
-        $cache_table = $wpdb->prefix . 'hic_query_cache';
+        $cache_table = hic_sanitize_identifier($wpdb->prefix . 'hic_query_cache', 'table');
         $query_hash = md5($cache_key . $query);
-        
+
         // Try to get from cache
         $cached_result = $wpdb->get_var($wpdb->prepare(
-            "SELECT query_result FROM {$cache_table} 
+            "SELECT query_result FROM `{$cache_table}`
              WHERE query_hash = %s AND expires_at > NOW()",
             $query_hash
         ));
-        
+
         if ($cached_result !== null) {
             // Update hit count
             $wpdb->query($wpdb->prepare(
-                "UPDATE {$cache_table} SET hit_count = hit_count + 1 WHERE query_hash = %s",
+                "UPDATE `{$cache_table}` SET hit_count = hit_count + 1 WHERE query_hash = %s",
                 $query_hash
             ));
-            
+
             return json_decode($cached_result, true);
         }
         
@@ -642,8 +843,8 @@ class DatabaseOptimizer {
     private function record_performance_metric($metric_type, $value, $query_type = null) {
         global $wpdb;
         
-        $perf_table = $wpdb->prefix . 'hic_performance_metrics';
-        
+        $perf_table = hic_sanitize_identifier($wpdb->prefix . 'hic_performance_metrics', 'table');
+
         $wpdb->insert($perf_table, [
             'metric_type' => $metric_type,
             'metric_value' => $value,
@@ -657,7 +858,7 @@ class DatabaseOptimizer {
      */
     private function get_main_table() {
         global $wpdb;
-        return $wpdb->prefix . 'hic_gclids';
+        return hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
     }
     
     /**
@@ -674,31 +875,31 @@ class DatabaseOptimizer {
         
         global $wpdb;
         
-        $main_table = $wpdb->prefix . 'hic_gclids';
-        $archive_table = $wpdb->prefix . 'hic_gclids_archive';
-        $cache_table = $wpdb->prefix . 'hic_query_cache';
+        $main_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids', 'table');
+        $archive_table = hic_sanitize_identifier($wpdb->prefix . 'hic_gclids_archive', 'table');
+        $cache_table = hic_sanitize_identifier($wpdb->prefix . 'hic_query_cache', 'table');
         
         // Get table sizes and row counts
         $stats = [
             'main_table' => [
-                'rows' => $wpdb->get_var("SELECT COUNT(*) FROM {$main_table}"),
+                'rows' => $wpdb->get_var("SELECT COUNT(*) FROM `{$main_table}`"),
                 'size' => $this->get_table_size($main_table)
             ],
             'archive_table' => [
-                'rows' => $wpdb->get_var("SELECT COUNT(*) FROM {$archive_table}"),
+                'rows' => $wpdb->get_var("SELECT COUNT(*) FROM `{$archive_table}`"),
                 'size' => $this->get_table_size($archive_table)
             ],
             'cache_table' => [
-                'rows' => $wpdb->get_var("SELECT COUNT(*) FROM {$cache_table}"),
+                'rows' => $wpdb->get_var("SELECT COUNT(*) FROM `{$cache_table}`"),
                 'size' => $this->get_table_size($cache_table)
             ]
         ];
-        
+
         // Get recent performance metrics
-        $perf_table = $wpdb->prefix . 'hic_performance_metrics';
+        $perf_table = hic_sanitize_identifier($wpdb->prefix . 'hic_performance_metrics', 'table');
         $recent_metrics = $wpdb->get_results($wpdb->prepare(
             "SELECT metric_type, AVG(metric_value) as avg_value, MAX(metric_value) as max_value
-             FROM {$perf_table} 
+             FROM `{$perf_table}`
              WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
              GROUP BY metric_type",
         ));
@@ -714,12 +915,14 @@ class DatabaseOptimizer {
      */
     private function get_table_size($table_name) {
         global $wpdb;
-        
+
+        $table_name = hic_sanitize_identifier((string) $table_name, 'table');
+
         $size_query = $wpdb->prepare("
-            SELECT 
+            SELECT
                 ROUND(((data_length + index_length) / 1024 / 1024), 2) AS size_mb
-            FROM information_schema.TABLES 
-            WHERE table_schema = %s 
+            FROM information_schema.TABLES
+            WHERE table_schema = %s
             AND table_name = %s
         ", DB_NAME, $table_name);
         
@@ -730,9 +933,7 @@ class DatabaseOptimizer {
      * AJAX: Manual database optimization
      */
     public function ajax_optimize_database() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
         
         // Verify nonce
         if (!check_ajax_referer('hic_optimize_db', 'nonce', false)) {
@@ -759,29 +960,147 @@ class DatabaseOptimizer {
     }
     
     /**
-     * AJAX: Manual data archiving
+     * AJAX: Initialize or resume a resumable archive job.
      */
-    public function ajax_archive_old_data() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
+    public function ajax_archive_old_data_start() {
+        hic_require_cap('hic_manage');
+
+        if (!$this->maybe_enforce_rate_limit('archive_start', 3, MINUTE_IN_SECONDS)) {
+            return;
         }
-        
-        // Verify nonce
-        if (!check_ajax_referer('hic_archive_data', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+
+        if (!$this->verify_archive_nonce(['hic_archive_start', 'hic_archive_data'])) {
+            wp_send_json_error(['message' => __('Nonce non valido per l\'archiviazione.', 'hotel-in-cloud')]);
         }
-        
+
         try {
-            $archived_count = $this->archive_old_data();
-            
+            $existing_state = $this->get_archive_state();
+
+            if (is_array($existing_state)) {
+                wp_send_json_success([
+                    'message' => __('Job di archiviazione ripreso.', 'hotel-in-cloud'),
+                    'state' => $this->format_archive_state($existing_state),
+                    'resumed' => true,
+                    'done' => false,
+                ]);
+            }
+
+            $state = $this->prepare_archive_state();
+
+            if ((int) $state['total'] === 0) {
+                $this->clear_archive_state();
+
+                wp_send_json_success([
+                    'message' => __('Nessun dato da archiviare.', 'hotel-in-cloud'),
+                    'state' => $this->format_archive_state($state, true),
+                    'resumed' => false,
+                    'done' => true,
+                ]);
+            }
+
+            $this->persist_archive_state($state);
+
             wp_send_json_success([
-                'message' => "Archived {$archived_count} old records",
-                'archived_count' => $archived_count
+                'message' => sprintf(
+                    __('Archiviazione avviata: %d record da processare.', 'hotel-in-cloud'),
+                    (int) $state['total']
+                ),
+                'state' => $this->format_archive_state($state),
+                'resumed' => false,
+                'done' => false,
             ]);
-            
-        } catch (\Exception $e) {
-            wp_send_json_error('Archiving failed: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            $this->clear_archive_state();
+
+            wp_send_json_error([
+                'message' => sprintf(
+                    /* translators: %s is the error message returned by the archiver. */
+                    __('Archiviazione non avviata: %s', 'hotel-in-cloud'),
+                    $e->getMessage()
+                ),
+            ]);
         }
+    }
+
+    /**
+     * AJAX: Process a single resumable archive step.
+     */
+    public function ajax_archive_old_data_step() {
+        hic_require_cap('hic_manage');
+
+        if (!$this->maybe_enforce_rate_limit('archive_step', 60, MINUTE_IN_SECONDS)) {
+            return;
+        }
+
+        if (!$this->verify_archive_nonce(['hic_archive_step', 'hic_archive_data'])) {
+            wp_send_json_error(['message' => __('Nonce non valido per il passo di archiviazione.', 'hotel-in-cloud')]);
+        }
+
+        $state = $this->get_archive_state();
+
+        if (!is_array($state)) {
+            wp_send_json_error(['message' => __('Nessun job di archiviazione attivo: avviare nuovamente l\'operazione.', 'hotel-in-cloud')]);
+        }
+
+        try {
+            $result = $this->process_archive_step($state, true);
+
+            $done = (bool) $result['done'];
+
+            wp_send_json_success([
+                'message' => $result['moved'] > 0
+                    ? sprintf(
+                        __('Batch %1$d completato: %2$d record archiviati.', 'hotel-in-cloud'),
+                        (int) $result['state']['batch'],
+                        (int) $result['moved']
+                    )
+                    : __('Archiviazione completata.', 'hotel-in-cloud'),
+                'state' => $this->format_archive_state($result['state'], $done),
+                'moved' => (int) $result['moved'],
+                'done' => $done,
+            ]);
+        } catch (\Throwable $e) {
+            $this->clear_archive_state();
+
+            wp_send_json_error([
+                'message' => sprintf(
+                    /* translators: %s is the error message returned by the archiver. */
+                    __('Errore durante l\'archiviazione: %s', 'hotel-in-cloud'),
+                    $e->getMessage()
+                ),
+            ]);
+        }
+    }
+
+    /**
+     * AJAX: Return the current archive job status (if any).
+     */
+    public function ajax_archive_old_data_status() {
+        hic_require_cap('hic_manage');
+
+        if (!$this->maybe_enforce_rate_limit('archive_status', 30, MINUTE_IN_SECONDS)) {
+            return;
+        }
+
+        if (!$this->verify_archive_nonce(['hic_archive_status', 'hic_archive_data'])) {
+            wp_send_json_error(['message' => __('Nonce non valido per lo stato archiviazione.', 'hotel-in-cloud')]);
+        }
+
+        $state = $this->get_archive_state();
+
+        if (!is_array($state)) {
+            wp_send_json_success([
+                'active' => false,
+                'state' => null,
+                'done' => true,
+            ]);
+        }
+
+        wp_send_json_success([
+            'active' => true,
+            'state' => $this->format_archive_state($state),
+            'done' => false,
+        ]);
     }
     
     /**

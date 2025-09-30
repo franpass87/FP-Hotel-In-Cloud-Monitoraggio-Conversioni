@@ -4,6 +4,16 @@
 
 Tutte le modifiche degne di nota del plugin FP HIC Monitor sono documentate qui, in ordine cronologico inverso.
 
+## [Unreleased]
+### Sicurezza
+- Centralizzate le verifiche di capability amministrative sugli endpoint di ottimizzazione e suite enterprise tramite l'helper `hic_require_cap()` per richiedere il permesso `hic_manage` in modo coerente.【F:includes/functions.php†L21-L57】【F:includes/database-optimizer.php†L28-L36】【F:includes/enterprise-management-suite.php†L5-L6】
+- Introdotta la sanitizzazione rigorosa degli identificatori SQL con `hic_sanitize_identifier()` e applicazione nei processi di indicizzazione, archiviazione e manutenzione del database per evitare injection su nomi di tabelle, colonne e indici dinamici.【F:includes/functions.php†L59-L92】【F:includes/database-optimizer.php†L75-L520】【F:includes/booking-poller.php†L3-L36】
+- Rafforzato il download dei log con sanificazione del filename, streaming a buffer e generazione automatica dei file `.htaccess` e `web.config` per bloccare l'accesso diretto alla directory dei log.【F:includes/admin/diagnostics.php†L1893-L1985】【F:includes/helpers-logging.php†L9-L118】【F:includes/bootstrap/lifecycle.php†L210-L282】
+
+### Performance
+- L'archiviazione manuale dei dati storici ora è gestita da un job AJAX riprendibile con stato persistito, rate limiting e barra di avanzamento nell'admin: ogni step processa batch controllati e consente di fermarsi/riprendere senza bloccare l'interfaccia.【F:includes/database-optimizer.php†L324-L592】【F:includes/admin/admin-settings.php†L609-L683】【F:assets/js/admin-settings.js†L1-L430】
+- Il watchdog del cron verifica lo stato degli eventi al massimo una volta al minuto usando un transient di debounce, riducendo il carico sulle richieste mentre mantiene attivo il polling continuo.【F:includes/booking-poller.php†L18-L132】
+
 ## [3.4.0] - 2025-09-26
 ### Sicurezza
 - Normalizzazione preventiva dei token webhook prima della rate limiting e del confronto costante per evitare bypass delle difese su payload malformati.【F:includes/api/webhook.php†L40-L76】

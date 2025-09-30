@@ -33,6 +33,11 @@
         "analyse": "vendor/bin/phpstan analyse",
         "analyse:baseline": "vendor/bin/phpstan analyse --generate-baseline",
         "mess": "vendor/bin/phpmd includes/,FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php text phpmd.xml",
+        "qa": [
+            "@lint",
+            "@analyse",
+            "@test"
+        ],
         "quality": [
             "@lint:syntax",
             "@lint",

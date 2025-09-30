@@ -482,6 +482,25 @@ function hic_admin_enqueue_scripts($hook) {
                 'email_sending' => __('Invio email di test in corso...', 'hotel-in-cloud'),
                 'token_generating' => __('Generazione token in corso...', 'hotel-in-cloud'),
             ),
+            'archive' => array(
+                'start_nonce' => wp_create_nonce('hic_archive_start'),
+                'step_nonce' => wp_create_nonce('hic_archive_step'),
+                'status_nonce' => wp_create_nonce('hic_archive_status'),
+                'batch_size' => \FpHic\DatabaseOptimizer\DatabaseOptimizer::BATCH_SIZE,
+                'step_interval' => 1500,
+                'i18n' => array(
+                    'start_label' => __('Avvia archiviazione', 'hotel-in-cloud'),
+                    'resume_label' => __('Riprendi archiviazione', 'hotel-in-cloud'),
+                    'running_label' => __('Archiviazione in corso…', 'hotel-in-cloud'),
+                    'restart_label' => __('Riesegui archiviazione', 'hotel-in-cloud'),
+                    'completed_label' => __('Archiviazione completata', 'hotel-in-cloud'),
+                    'error_generic' => __('Si è verificato un errore durante l\'archiviazione.', 'hotel-in-cloud'),
+                    'records_progress' => __('%1$s di %2$s record archiviati', 'hotel-in-cloud'),
+                    'records_remaining' => __('%s record rimanenti', 'hotel-in-cloud'),
+                    'last_batch' => __('Ultimo batch: %s record', 'hotel-in-cloud'),
+                    'resume_hint' => __('Job in pausa: riprendi per completare l\'archiviazione.', 'hotel-in-cloud'),
+                ),
+            ),
         ));
     }
 
@@ -757,6 +776,44 @@ function hic_options_page() {
                 </div>
             </div>
         <?php endif; ?>
+
+        <div class="hic-card hic-archive-card">
+            <div class="hic-card__header">
+                <div>
+                    <h2 class="hic-card__title"><?php esc_html_e('Archiviazione Storica', 'hotel-in-cloud'); ?></h2>
+                    <p class="hic-card__subtitle"><?php esc_html_e('Esegui l\'archiviazione progressiva dei dati più datati senza bloccare l\'interfaccia.', 'hotel-in-cloud'); ?></p>
+                </div>
+                <div class="hic-page-actions">
+                    <button type="button" id="hic-archive-start-btn" class="button hic-button hic-button--secondary">
+                        <span class="dashicons dashicons-database-import"></span>
+                        <span id="hic-archive-button-label"><?php esc_html_e('Avvia archiviazione', 'hotel-in-cloud'); ?></span>
+                    </button>
+                </div>
+            </div>
+            <div class="hic-card__body">
+                <div id="hic-archive-progress" class="hic-wizard__progress" hidden>
+                    <div class="hic-progress-text">
+                        <span id="hic-archive-progress-label">0%</span>
+                        <span id="hic-archive-progress-count">0 / 0</span>
+                    </div>
+                    <div class="hic-progress-bar">
+                        <div id="hic-archive-progress-fill" class="hic-progress-fill" style="width:0%;"></div>
+                    </div>
+                    <p id="hic-archive-status-text" class="hic-inline-status"></p>
+                </div>
+
+                <div id="hic-archive-loader" class="hic-inline-loader" hidden>
+                    <span class="spinner is-active"></span>
+                    <span><?php esc_html_e('Archiviazione in corso...', 'hotel-in-cloud'); ?></span>
+                </div>
+
+                <div id="hic-archive-feedback" class="hic-feedback" hidden></div>
+
+                <p class="hic-secondary-text">
+                    <?php esc_html_e('Ogni passaggio elabora piccoli lotti di record (fino a 1000 per batch) e può essere ripreso in qualsiasi momento.', 'hotel-in-cloud'); ?>
+                </p>
+            </div>
+        </div>
     </div>
     <?php
 }

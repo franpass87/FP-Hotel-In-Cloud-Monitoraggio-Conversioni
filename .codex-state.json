@@ -1,6 +1,79 @@
 {
-  "current_phase": 10,
-  "completed": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-  "last_commit": "release: package version 3.4.0",
-  "notes": "Playbook complete: versione 3.4.0 pacchettizzata in /dist con checksum e documentazione aggiornata."
+    "phase": 5,
+    "tasks": [
+        {
+            "id": 0,
+            "title": "Bootstrap",
+            "status": "done",
+            "notes": "Branch created, dependencies installed, QA baseline captured (PHPUnit shows 4 pre-existing deprecations)."
+        },
+        {
+            "id": 1,
+            "title": "Capability coherence",
+            "status": "done",
+            "notes": "All admin/AJAX flows now rely on the hic_manage capability via hic_require_cap()."
+        },
+        {
+            "id": 2,
+            "title": "SQL safety & identifier sanitization",
+            "status": "done",
+            "notes": "Introduced strict identifier sanitization helper and refactored optimizer/poller queries to rely on sanitized names with prepared statements."
+        },
+        {
+            "id": 3,
+            "title": "Download log hardening",
+            "status": "done",
+            "notes": "Protezione directory log con .htaccess/web.config, sanificazione filename e streaming buffered con wp_die finale."
+        },
+        {
+            "id": 4,
+            "title": "Archiviazione progressiva via AJAX",
+            "status": "done",
+            "notes": "Archivio manuale trasformato in job AJAX riprendibile con stato persistito, rate limiting e nuova UI con barra di avanzamento."
+        },
+        {
+            "id": 5,
+            "title": "Debounce watchdog cron",
+            "status": "done",
+            "notes": "Inserito transient di debounce da 60s in ensure_scheduler_is_active() per limitare i controlli reiterati."
+        },
+        {
+            "id": 6,
+            "title": "Modularizzazione includes/functions.php",
+            "status": "pending",
+            "notes": ""
+        },
+        {
+            "id": 7,
+            "title": "Lazy loading feature flags",
+            "status": "pending",
+            "notes": ""
+        },
+        {
+            "id": 8,
+            "title": "i18n pass & UI coherence",
+            "status": "pending",
+            "notes": ""
+        },
+        {
+            "id": 9,
+            "title": "Logging hardening extra",
+            "status": "pending",
+            "notes": ""
+        },
+        {
+            "id": 10,
+            "title": "Indici & query review",
+            "status": "pending",
+            "notes": ""
+        },
+        {
+            "id": 11,
+            "title": "CI GitHub Actions",
+            "status": "pending",
+            "notes": ""
+        }
+    ],
+    "last_commit": "176125f0ebbb9cd418254a3f37df5dd4f96a5c92",
+    "resume_hint": "Proceed to Phase 6 - Modularizzazione includes/functions.php."
 }

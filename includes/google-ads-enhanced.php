@@ -2174,7 +2174,7 @@ class GoogleAdsEnhancedConversions {
      * Handle Enhanced Conversions form submission
      */
     public function handle_enhanced_conversions_form() {
-        if (!isset($_POST['save_enhanced_settings']) || !current_user_can('manage_options')) {
+        if (!isset($_POST['save_enhanced_settings']) || !current_user_can('hic_manage')) {
             return;
         }
         

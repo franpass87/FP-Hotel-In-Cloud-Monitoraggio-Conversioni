@@ -4,6 +4,8 @@
  */
 
 use FpHic\HIC_Booking_Poller;
+use function FpHic\Helpers\hic_ensure_log_directory_security;
+use function FpHic\Helpers\hic_require_cap;
 use function FpHic\hic_send_to_ga4;
 use function FpHic\hic_send_to_gtm_datalayer;
 use function FpHic\hic_send_to_fb;
@@ -1951,54 +1953,115 @@ function hic_ajax_get_error_log_info() {
  * AJAX handler for downloading error logs
  */
 function hic_ajax_download_error_logs() {
-    if ( ! current_user_can('hic_view_logs') ) {
-        wp_die( __( 'Permessi insufficienti', 'hotel-in-cloud' ) );
-    }
+    hic_require_cap('hic_view_logs');
 
     if ( ! check_ajax_referer( 'hic_diagnostics_nonce', 'nonce', false ) ) {
         wp_die( __( 'Nonce non valido', 'hotel-in-cloud' ) );
     }
 
+    $security_status = hic_ensure_log_directory_security();
+
+    if (isset($security_status['directory']) && $security_status['directory'] === false) {
+        $message = __( 'Impossibile accedere alla cartella dei log. Verifica i permessi.', 'hotel-in-cloud' );
+        hic_log('Download log fallito: directory non disponibile');
+        wp_die($message);
+    }
+
+    if (isset($security_status['htaccess']) && $security_status['htaccess'] === false) {
+        hic_log('Download log avviso: protezione .htaccess non attiva', \HIC_LOG_LEVEL_WARNING);
+    }
+
+    if (isset($security_status['web_config']) && $security_status['web_config'] === false) {
+        hic_log('Download log avviso: protezione web.config non attiva', \HIC_LOG_LEVEL_WARNING);
+    }
+
     $log_file = hic_get_log_file();
 
     if (!file_exists($log_file)) {
-        wp_mkdir_p(dirname($log_file));
-        touch($log_file);
+        $directory = dirname($log_file);
+        if (!is_dir($directory)) {
+            if (function_exists('wp_mkdir_p')) {
+                wp_mkdir_p($directory);
+            } else {
+                mkdir($directory, 0755, true);
+            }
+        }
+
+        if (!file_exists($log_file) && false === touch($log_file)) {
+            wp_die(__('Impossibile creare il file di log', 'hotel-in-cloud'));
+        }
     }
 
     if (!is_readable($log_file)) {
         wp_die(__('File di log non leggibile', 'hotel-in-cloud'));
     }
 
+    clearstatcache(false, $log_file);
     $limit    = 5 * 1024 * 1024; // 5 MB limit
     $size     = filesize($log_file);
+    if ($size === false) {
+        wp_die(__('Impossibile leggere la dimensione del file di log', 'hotel-in-cloud'));
+    }
     $limited  = $size > $limit;
-    $filename = 'hic-error-log-' . wp_date('Y-m-d-H-i-s') . '.txt';
+    $filename = sanitize_file_name('hic-error-log-' . wp_date('Y-m-d-H-i-s') . '.txt');
+    if ($filename === '') {
+        $filename = 'hic-log.txt';
+    }
+
+    if (function_exists('ob_get_level')) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+    }
+
+    if (function_exists('set_time_limit')) {
+        @set_time_limit(0);
+    }
 
     nocache_headers();
-    header('Content-Type: text/plain');
+    header('Content-Type: text/plain; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Pragma: no-cache');
     header('Expires: 0');
 
-    if (!$limited) {
+    if (!$limited && $size !== false) {
         header('Content-Length: ' . $size);
     } else {
         header('X-HIC-Log-Limited: 1');
     }
 
     $handle = fopen($log_file, 'rb');
+    if (!is_resource($handle)) {
+        wp_die(__('Impossibile aprire il file di log', 'hotel-in-cloud'));
+    }
+
     if ($limited) {
-        $offset = $size - $limit;
+        $offset = max(0, $size - $limit);
         if ($offset > 0) {
             fseek($handle, $offset);
         }
         echo "=== LOG TRONCATO A 5MB ===\n";
     }
-    fpassthru($handle);
+
+    $chunkSize = 32 * 1024;
+    while (!feof($handle)) {
+        $buffer = fread($handle, $chunkSize);
+
+        if ($buffer === false) {
+            break;
+        }
+
+        echo $buffer;
+
+        if (function_exists('flush')) {
+            flush();
+        }
+    }
+
     fclose($handle);
 
-    exit; // Stop execution after download
+    wp_die('', '', [ 'response' => 200 ]);
 }
 
 /**

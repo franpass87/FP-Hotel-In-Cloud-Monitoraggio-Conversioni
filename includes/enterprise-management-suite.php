@@ -2,6 +2,8 @@
 
 namespace FpHic\ReconAndSetup;
 
+use function FpHic\Helpers\hic_require_cap;
+
 if (!defined('ABSPATH')) exit;
 
 /**
@@ -1159,7 +1161,7 @@ class EnterpriseManagementSuite {
      * Add health dashboard widget
      */
     public function add_health_dashboard_widget() {
-        if (current_user_can('manage_options')) {
+        if (current_user_can('hic_manage')) {
             wp_add_dashboard_widget(
                 'hic_health_status',
                 'FP HIC Monitor - System Health',
@@ -1318,9 +1320,7 @@ class EnterpriseManagementSuite {
      * AJAX: Setup wizard step
      */
     public function ajax_setup_wizard_step() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
         
         if (!check_ajax_referer('hic_setup_wizard', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
@@ -1448,9 +1448,7 @@ class EnterpriseManagementSuite {
      * AJAX: Run diagnostics
      */
     public function ajax_run_diagnostics() {
-        if (!current_user_can('manage_options')) {
-            wp_die('Insufficient permissions');
-        }
+        hic_require_cap('hic_manage');
         
         if (!check_ajax_referer('hic_health_check', 'nonce', false)) {
             wp_send_json_error('Invalid nonce');
