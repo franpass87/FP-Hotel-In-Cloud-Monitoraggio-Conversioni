@@ -12,6 +12,13 @@ final class BookingIntents
 {
     private const TABLE = 'hic_booking_intents';
 
+    private Logs $logs;
+
+    public function __construct(?Logs $logs = null)
+    {
+        $this->logs = $logs ?? new Logs();
+    }
+
     public function maybeMigrate(): void
     {
         $wpdb = $this->getWpdb();
@@ -47,11 +54,42 @@ final class BookingIntents
             return null;
         }
 
+        $sanitizedIntentId = sanitize_text_field($intentId);
+        $sanitizedSid = sanitize_text_field($sid);
+
+        $filteredUtms = $this->filterEmpty($utmParams);
+        $utmsJson = wp_json_encode($filteredUtms, JSON_UNESCAPED_UNICODE);
+
+        if (!is_string($utmsJson)) {
+            $this->logs->log('booking_intents', 'error', 'Impossibile serializzare i parametri UTM dell\'intent', [
+                'intent_id' => $sanitizedIntentId,
+                'sid' => $sanitizedSid,
+                'field' => 'utms',
+                'preview' => $this->summarizeForLog($filteredUtms),
+            ]);
+
+            return null;
+        }
+
+        $filteredIds = $this->filterEmpty($ids);
+        $idsJson = wp_json_encode($filteredIds, JSON_UNESCAPED_UNICODE);
+
+        if (!is_string($idsJson)) {
+            $this->logs->log('booking_intents', 'error', 'Impossibile serializzare gli identificativi dell\'intent', [
+                'intent_id' => $sanitizedIntentId,
+                'sid' => $sanitizedSid,
+                'field' => 'ids',
+                'preview' => $this->summarizeForLog($filteredIds),
+            ]);
+
+            return null;
+        }
+
         $data = [
-            'intent_id' => sanitize_text_field($intentId),
-            'sid' => sanitize_text_field($sid),
-            'utms' => wp_json_encode($this->filterEmpty($utmParams), JSON_UNESCAPED_UNICODE),
-            'ids' => wp_json_encode($this->filterEmpty($ids), JSON_UNESCAPED_UNICODE),
+            'intent_id' => $sanitizedIntentId,
+            'sid' => $sanitizedSid,
+            'utms' => $utmsJson,
+            'ids' => $idsJson,
         ];
 
         $formats = ['%s', '%s', '%s', '%s'];
@@ -152,5 +190,74 @@ final class BookingIntents
         global $wpdb;
 
         return $wpdb instanceof wpdb ? $wpdb : null;
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function summarizeForLog($value): string
+    {
+        if (is_array($value)) {
+            $pieces = [];
+            $count = 0;
+            foreach ($value as $key => $item) {
+                $count++;
+                if ($count > 5) {
+                    $pieces[] = '…';
+                    break;
+                }
+
+                $pieces[] = sprintf('%s=%s', (string) $key, $this->scalarPreview($item));
+            }
+
+            $summary = implode(', ', $pieces);
+        } elseif (is_object($value)) {
+            $summary = 'object(' . get_class($value) . ')';
+        } else {
+            $summary = (string) $value;
+        }
+
+        $summary = $this->stripNonPrintable($summary);
+
+        if (function_exists('mb_substr')) {
+            $summary = mb_substr($summary, 0, 200);
+        } else {
+            $summary = substr($summary, 0, 200);
+        }
+
+        return $summary;
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function scalarPreview($value): string
+    {
+        if (is_string($value)) {
+            return $this->stripNonPrintable($value);
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_scalar($value) || $value === null) {
+            return (string) $value;
+        }
+
+        if (is_array($value)) {
+            return 'array(' . count($value) . ')';
+        }
+
+        if (is_object($value)) {
+            return 'object(' . get_class($value) . ')';
+        }
+
+        return gettype($value);
+    }
+
+    private function stripNonPrintable(string $value): string
+    {
+        return preg_replace('/[\x00-\x1F\x7F]/', '', $value) ?? '';
     }
 }

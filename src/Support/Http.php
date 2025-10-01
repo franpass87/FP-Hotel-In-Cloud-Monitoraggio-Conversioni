@@ -8,6 +8,8 @@ if (!defined('ABSPATH')) {
 
 final class Http
 {
+    private const MAX_RETRY_AFTER = 300;
+
     /**
      * @param callable():array{url:string,args?:array<string,mixed>} $requestFactory
      * @return array{success:bool,code:int|null,attempts:int,response:mixed,error:mixed}
@@ -35,14 +37,19 @@ final class Http
 
             if (is_wp_error($response)) {
                 $lastError = $response;
+                if ($attempt < $maxAttempts) {
+                    self::pause(self::calculateDelay($attempt, $initialDelay, null));
+                    continue;
+                }
                 break;
             }
 
             $code = \wp_remote_retrieve_response_code($response);
+            $retryAfterHeader = self::extractRetryAfter($response);
 
-            if ($code >= 500 && $code < 600 && $attempt < $maxAttempts) {
+            if ($attempt < $maxAttempts && ($code === 429 || ($code >= 500 && $code < 600))) {
                 $lastResponse = $response;
-                \sleep($initialDelay * $attempt);
+                self::pause(self::calculateDelay($attempt, $initialDelay, $retryAfterHeader));
                 continue;
             }
 
@@ -64,5 +71,71 @@ final class Http
             'response' => $lastResponse,
             'error' => $lastError,
         ];
+    }
+
+    private static function pause(int $seconds): void
+    {
+        if ($seconds <= 0) {
+            return;
+        }
+
+        if (function_exists('wp_sleep')) {
+            wp_sleep($seconds);
+
+            return;
+        }
+
+        usleep($seconds * 1_000_000);
+    }
+
+    private static function calculateDelay(int $attempt, int $initialDelay, ?int $retryAfter): int
+    {
+        if ($retryAfter !== null) {
+            $delay = min($retryAfter, self::MAX_RETRY_AFTER);
+
+            return max(1, $delay);
+        }
+
+        $computed = $initialDelay * $attempt;
+
+        if ($computed > self::MAX_RETRY_AFTER) {
+            return self::MAX_RETRY_AFTER;
+        }
+
+        return max(1, $computed);
+    }
+
+    /**
+     * @param mixed $response
+     */
+    private static function extractRetryAfter($response): ?int
+    {
+        if (!is_array($response)) {
+            return null;
+        }
+
+        $header = wp_remote_retrieve_header($response, 'retry-after');
+
+        if (!is_string($header) || trim($header) === '') {
+            return null;
+        }
+
+        $header = trim($header);
+
+        if (ctype_digit($header)) {
+            $seconds = (int) $header;
+
+            return $seconds > 0 ? $seconds : null;
+        }
+
+        $timestamp = strtotime($header);
+
+        if ($timestamp === false) {
+            return null;
+        }
+
+        $seconds = $timestamp - time();
+
+        return $seconds > 0 ? $seconds : null;
     }
 }

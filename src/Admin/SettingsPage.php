@@ -6,6 +6,7 @@ use FpHic\HicS2S\Repository\Logs;
 use FpHic\HicS2S\Services\Ga4Service;
 use FpHic\HicS2S\Services\MetaCapiService;
 use FpHic\HicS2S\ValueObjects\BookingPayload;
+use FpHic\HicS2S\Support\ServiceContainer;
 use WP_REST_Request;
 
 if (!defined('ABSPATH')) {
@@ -15,6 +16,12 @@ if (!defined('ABSPATH')) {
 final class SettingsPage
 {
     private const OPTION_NAME = 'hic_s2s_settings';
+
+    /** @var array<string,mixed>|null */
+    private static ?array $settingsCache = null;
+
+    /** @var array<string,mixed>|null */
+    private static ?array $defaultSettings = null;
 
     public static function bootstrap(): void
     {
@@ -28,6 +35,9 @@ final class SettingsPage
         \add_action('admin_post_hic_s2s_ping_ga4', [self::class, 'handlePingGa4']);
         \add_action('admin_post_hic_s2s_ping_meta', [self::class, 'handlePingMeta']);
         \add_action('admin_post_hic_s2s_export_logs', [self::class, 'handleExportLogs']);
+        \add_action('update_option_' . self::OPTION_NAME, [self::class, 'clearCache']);
+        \add_action('add_option_' . self::OPTION_NAME, [self::class, 'clearCache']);
+        \add_action('delete_option_' . self::OPTION_NAME, [self::class, 'clearCache']);
     }
 
     public static function registerMenu(): void
@@ -65,12 +75,21 @@ final class SettingsPage
 
     public static function sanitizeSettings($value): array
     {
+        self::clearCache();
+
         $value = is_array($value) ? $value : [];
 
         $redirectorEnabled = !empty($value['redirector_enabled']);
 
+        $token = sanitize_text_field($value['token'] ?? '');
+
+        if ($token === '') {
+            $token = self::generateSecureToken();
+        }
+
         return [
-            'token' => sanitize_text_field($value['token'] ?? ''),
+            'token' => $token,
+            'webhook_secret' => sanitize_text_field($value['webhook_secret'] ?? ''),
             'ga4_measurement_id' => sanitize_text_field($value['ga4_measurement_id'] ?? ''),
             'ga4_api_secret' => sanitize_text_field($value['ga4_api_secret'] ?? ''),
             'meta_pixel_id' => sanitize_text_field($value['meta_pixel_id'] ?? ''),
@@ -82,13 +101,27 @@ final class SettingsPage
 
     public static function getSettings(): array
     {
-        $settings = \get_option(self::OPTION_NAME, self::getDefaultSettings());
-
-        if (!is_array($settings)) {
-            $settings = self::getDefaultSettings();
+        if (self::$settingsCache !== null) {
+            return self::$settingsCache;
         }
 
-        return wp_parse_args($settings, self::getDefaultSettings());
+        $defaults = self::getDefaultSettings();
+        $settings = \get_option(self::OPTION_NAME, $defaults);
+
+        if (!is_array($settings)) {
+            $settings = [];
+        }
+
+        $settings = wp_parse_args($settings, $defaults);
+
+        if (!isset($settings['token']) || !is_string($settings['token']) || $settings['token'] === '') {
+            $settings['token'] = $defaults['token'];
+            \update_option(self::OPTION_NAME, $settings);
+        }
+
+        self::$settingsCache = $settings;
+
+        return self::$settingsCache;
     }
 
     public static function renderPage(): void
@@ -129,6 +162,15 @@ final class SettingsPage
                     </tr>
                     <tr>
                         <th scope="row">
+                            <label for="hic_s2s_webhook_secret"><?php esc_html_e('Webhook Secret HMAC', 'hotel-in-cloud'); ?></label>
+                        </th>
+                        <td>
+                            <input type="password" class="regular-text" id="hic_s2s_webhook_secret" name="<?php echo esc_attr(self::OPTION_NAME); ?>[webhook_secret]" value="<?php echo esc_attr($settings['webhook_secret']); ?>" autocomplete="off" />
+                            <p class="description"><?php esc_html_e('Chiave condivisa per verificare la firma HMAC inviata nell\'header X-HIC-Signature.', 'hotel-in-cloud'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
                             <label for="hic_s2s_ga4_measurement_id"><?php esc_html_e('GA4 Measurement ID', 'hotel-in-cloud'); ?></label>
                         </th>
                         <td>
@@ -140,7 +182,7 @@ final class SettingsPage
                             <label for="hic_s2s_ga4_api_secret"><?php esc_html_e('GA4 API Secret', 'hotel-in-cloud'); ?></label>
                         </th>
                         <td>
-                            <input type="text" class="regular-text" id="hic_s2s_ga4_api_secret" name="<?php echo esc_attr(self::OPTION_NAME); ?>[ga4_api_secret]" value="<?php echo esc_attr($settings['ga4_api_secret']); ?>" />
+                            <input type="password" class="regular-text" id="hic_s2s_ga4_api_secret" name="<?php echo esc_attr(self::OPTION_NAME); ?>[ga4_api_secret]" value="<?php echo esc_attr($settings['ga4_api_secret']); ?>" autocomplete="off" />
                         </td>
                     </tr>
                     <tr>
@@ -156,7 +198,7 @@ final class SettingsPage
                             <label for="hic_s2s_meta_access_token"><?php esc_html_e('Meta Access Token', 'hotel-in-cloud'); ?></label>
                         </th>
                         <td>
-                            <input type="text" class="regular-text" id="hic_s2s_meta_access_token" name="<?php echo esc_attr(self::OPTION_NAME); ?>[meta_access_token]" value="<?php echo esc_attr($settings['meta_access_token']); ?>" />
+                            <input type="password" class="regular-text" id="hic_s2s_meta_access_token" name="<?php echo esc_attr(self::OPTION_NAME); ?>[meta_access_token]" value="<?php echo esc_attr($settings['meta_access_token']); ?>" autocomplete="off" />
                         </td>
                     </tr>
                     <tr>
@@ -277,8 +319,7 @@ final class SettingsPage
         $settings = self::getSettings();
         $token = $settings['token'] ?? '';
 
-        $request = new WP_REST_Request('POST', '/hic/v1/conversion');
-        $request->set_body_params([
+        $payload = [
             'token' => $token,
             'booking_code' => 'TEST-' . wp_generate_uuid4(),
             'status' => 'confirmed',
@@ -288,8 +329,30 @@ final class SettingsPage
             'amount' => 1,
             'guest_email' => 'qa@example.com',
             'guest_phone' => '+3900000000',
-        ]);
+        ];
+
+        $body = wp_json_encode($payload, JSON_UNESCAPED_UNICODE);
+        if (!is_string($body)) {
+            $body = '{}';
+        }
+
+        $request = new WP_REST_Request('POST', '/hic/v1/conversion');
+        $request->set_body($body);
+        $request->set_json_params($payload);
         $request->set_param('token', $token);
+
+        $request->set_header('Content-Type', 'application/json');
+
+        $webhookSecret = isset($settings['webhook_secret']) ? trim((string) $settings['webhook_secret']) : '';
+
+        if ($webhookSecret !== '') {
+            $timestamp = time();
+            $canonical = sprintf('%d.%s', $timestamp, $body);
+            $signature = hash_hmac('sha256', $canonical, $webhookSecret);
+
+            $request->set_header('X-HIC-Timestamp', (string) $timestamp);
+            $request->set_header('X-HIC-Signature', 'sha256=' . $signature);
+        }
 
         $response = rest_do_request($request);
 
@@ -342,8 +405,38 @@ final class SettingsPage
 
         $code = $result['code'] ?? null;
         $message = __('Ping GA4 fallito.', 'hotel-in-cloud');
+        $details = [];
+
         if ($code !== null) {
-            $message .= ' HTTP ' . (int) $code;
+            $details[] = 'HTTP ' . (int) $code;
+        }
+
+        if (!empty($result['reason'])) {
+            $details[] = 'reason: ' . sanitize_text_field((string) $result['reason']);
+        }
+
+        if (isset($result['body']) && is_string($result['body']) && trim($result['body']) !== '') {
+            $body = wp_strip_all_tags($result['body']);
+            if (function_exists('mb_substr')) {
+                $body = mb_substr($body, 0, 200);
+            } else {
+                $body = substr($body, 0, 200);
+            }
+            if ($body !== '') {
+                $details[] = 'body: ' . $body;
+            }
+        }
+
+        if (!empty($result['retry_after'])) {
+            $details[] = 'retry-after: ' . (int) $result['retry_after'] . 's';
+        }
+
+        if (isset($result['error']) && $result['error'] instanceof \WP_Error) {
+            $details[] = 'error: ' . sanitize_text_field($result['error']->get_error_message());
+        }
+
+        if ($details !== []) {
+            $message .= ' ' . implode(' | ', $details);
         }
 
         self::redirectWithMessage($message, 'error');
@@ -377,8 +470,38 @@ final class SettingsPage
 
         $code = $result['code'] ?? null;
         $message = __('Ping Meta fallito.', 'hotel-in-cloud');
+        $details = [];
+
         if ($code !== null) {
-            $message .= ' HTTP ' . (int) $code;
+            $details[] = 'HTTP ' . (int) $code;
+        }
+
+        if (!empty($result['reason'])) {
+            $details[] = 'reason: ' . sanitize_text_field((string) $result['reason']);
+        }
+
+        if (isset($result['body']) && is_string($result['body']) && trim($result['body']) !== '') {
+            $body = wp_strip_all_tags($result['body']);
+            if (function_exists('mb_substr')) {
+                $body = mb_substr($body, 0, 200);
+            } else {
+                $body = substr($body, 0, 200);
+            }
+            if ($body !== '') {
+                $details[] = 'body: ' . $body;
+            }
+        }
+
+        if (!empty($result['retry_after'])) {
+            $details[] = 'retry-after: ' . (int) $result['retry_after'] . 's';
+        }
+
+        if (isset($result['error']) && $result['error'] instanceof \WP_Error) {
+            $details[] = 'error: ' . sanitize_text_field($result['error']->get_error_message());
+        }
+
+        if ($details !== []) {
+            $message .= ' ' . implode(' | ', $details);
         }
 
         self::redirectWithMessage($message, 'error');
@@ -420,8 +543,13 @@ final class SettingsPage
 
     private static function getDefaultSettings(): array
     {
-        return [
-            'token' => 'hic2025ga4',
+        if (self::$defaultSettings !== null) {
+            return self::$defaultSettings;
+        }
+
+        self::$defaultSettings = [
+            'token' => self::generateSecureToken(),
+            'webhook_secret' => '',
             'ga4_measurement_id' => '',
             'ga4_api_secret' => '',
             'meta_pixel_id' => '',
@@ -429,6 +557,29 @@ final class SettingsPage
             'redirector_enabled' => false,
             'redirector_engine_url' => '',
         ];
+
+        return self::$defaultSettings;
+    }
+
+    public static function clearCache(): void
+    {
+        self::$settingsCache = null;
+        self::$defaultSettings = null;
+        ServiceContainer::flush();
+    }
+
+    private static function generateSecureToken(): string
+    {
+        if (function_exists('wp_generate_password')) {
+            return wp_generate_password(32, false, false);
+        }
+
+        try {
+            return bin2hex(random_bytes(16));
+        } catch (\Exception $exception) {
+            // Fallback pseudo-random generation if random_bytes is unavailable.
+            return substr(hash('sha256', (string) microtime(true) . $exception->getMessage()), 0, 32);
+        }
     }
 
     private static function requireCapability(): void

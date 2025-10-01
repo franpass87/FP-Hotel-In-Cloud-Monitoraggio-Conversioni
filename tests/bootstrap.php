@@ -322,6 +322,10 @@ if (!function_exists('wp_remote_get')) {
 
 if (!function_exists('wp_remote_post')) {
     function wp_remote_post($url, $args = array()) {
+        if (isset($GLOBALS['hic_test_wp_remote_post']) && is_callable($GLOBALS['hic_test_wp_remote_post'])) {
+            return call_user_func($GLOBALS['hic_test_wp_remote_post'], $url, $args);
+        }
+
         return array('body' => '{}', 'response' => array('code' => 200));
     }
 }

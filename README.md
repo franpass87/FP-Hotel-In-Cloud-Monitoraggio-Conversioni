@@ -38,13 +38,24 @@ Il tutto avviene **automaticamente** tramite un **sistema interno di scheduling*
 
 ### Modalità di Funzionamento
 
+## Sviluppo e Test
+
+Per contribuire allo sviluppo del plugin è consigliato installare le dipendenze di test tramite Composer prima di eseguire la suite PHPUnit.
+
+```bash
+composer install
+composer test
+```
+
+L'ambiente di test utilizza lo script `tests/preload.php` per inizializzare gli helper di WordPress; assicurati quindi di eseguire i comandi dalla root del progetto.
+
 - **API Polling**: WordPress controlla HIC ogni 1-5 minuti per nuove prenotazioni
 - **Webhook**: HIC invia immediatamente le prenotazioni a WordPress (richiede configurazione su HIC). Il payload è limitato a 1 MB (valore predefinito modificabile tramite la costante `HIC_WEBHOOK_MAX_PAYLOAD_SIZE`).
 - **Hybrid (Consigliato)**: Combina webhook in tempo reale con API polling di backup per massima affidabilità
 
 #### Esempio payload Webhook
 
-L'endpoint REST `GET|POST /wp-json/hic/v1/conversion?token=IL_TUO_TOKEN` accetta sia parametri in query string sia un corpo JSON. Un esempio completo:
+L'endpoint REST `POST /wp-json/hic/v1/conversion?token=IL_TUO_TOKEN` accetta sia parametri in query string sia un corpo JSON. Un esempio completo:
 
 ```json
 {
@@ -80,8 +91,11 @@ Campi riconosciuti dal plugin:
 #### Sicurezza del Webhook
 
 - Configura un **Webhook Token** e un **Webhook Secret** dalle impostazioni del plugin. Il token protegge l'URL, mentre il secret viene utilizzato per firmare il payload.
-- Ogni chiamata deve includere l'header `X-HIC-Signature` con la firma HMAC-SHA256 del corpo raw (`sha256=<firma_esadecimale>` oppure la versione Base64 della firma).
+- Ogni chiamata deve includere:
+  - l'header `X-HIC-Timestamp` con un timestamp UNIX (secondi) generato al momento dell'invio;
+  - l'header `X-HIC-Signature` con la firma HMAC-SHA256 della stringa canonica `"<timestamp>.<payload_raw>"` (`sha256=<firma_esadecimale>` oppure la versione Base64 della firma).
 - Le richieste senza firma o con firma non valida vengono rifiutate con HTTP 401 e registrate nei log di sicurezza del plugin.
+- Le firme accettate vengono memorizzate temporaneamente: un secondo invio con lo stesso corpo e timestamp, anche se firmato correttamente, riceverà un errore 409 per prevenire replay entro la finestra di 5 minuti.
 
 #### 🎯 Webhook: La Soluzione per il Tracciamento Senza Redirect
 

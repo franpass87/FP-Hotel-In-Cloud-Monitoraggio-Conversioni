@@ -12,6 +12,8 @@ final class Logs
 {
     private const TABLE = 'hic_logs';
 
+    private bool $handlingEncodingFailure = false;
+
     public function maybeMigrate(): void
     {
         $wpdb = $this->getWpdb();
@@ -46,13 +48,35 @@ final class Logs
             return null;
         }
 
+        $contextJson = wp_json_encode($context, JSON_UNESCAPED_UNICODE);
+
+        if (!is_string($contextJson)) {
+            $contextJson = null;
+
+            if (!$this->handlingEncodingFailure) {
+                $this->handlingEncodingFailure = true;
+
+                $preview = $this->createContextPreview($context);
+                $jsonError = function_exists('json_last_error_msg') ? json_last_error_msg() : null;
+
+                $this->log('logger', 'error', 'Impossibile serializzare il contesto di un log', [
+                    'original_channel' => $channel,
+                    'original_level' => $level,
+                    'json_error' => $jsonError,
+                    'preview' => $preview,
+                ]);
+
+                $this->handlingEncodingFailure = false;
+            }
+        }
+
         $result = $wpdb->insert(
             $this->getTableName(),
             [
                 'channel' => sanitize_key($channel),
                 'level' => sanitize_text_field($level),
                 'message' => wp_kses_post($message),
-                'context' => wp_json_encode($context, JSON_UNESCAPED_UNICODE),
+                'context' => $contextJson,
             ],
             ['%s', '%s', '%s', '%s']
         );
@@ -95,6 +119,26 @@ final class Logs
         return is_array($rows) ? $rows : [];
     }
 
+    public function pruneOlderThan(int $days): int
+    {
+        $wpdb = $this->getWpdb();
+
+        if (!$wpdb) {
+            return 0;
+        }
+
+        $days = max(1, $days);
+        $dayInSeconds = defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400;
+        $cutoff = gmdate('Y-m-d H:i:s', time() - ($days * $dayInSeconds));
+        $table = $this->getTableName();
+
+        $query = $wpdb->prepare("DELETE FROM {$table} WHERE ts < %s", $cutoff);
+
+        $deleted = $wpdb->query($query);
+
+        return is_int($deleted) ? $deleted : 0;
+    }
+
     private function getTableName(): string
     {
         $wpdb = $this->getWpdb();
@@ -128,5 +172,20 @@ final class Logs
         global $wpdb;
 
         return $wpdb instanceof wpdb ? $wpdb : null;
+    }
+
+    private function createContextPreview(array $context): string
+    {
+        $preview = wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+
+        if (!is_string($preview)) {
+            $preview = print_r($context, true);
+        }
+
+        if (function_exists('wp_check_invalid_utf8')) {
+            $preview = wp_check_invalid_utf8($preview, true);
+        }
+
+        return substr($preview, 0, 5000);
     }
 }
