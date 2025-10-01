@@ -38,6 +38,14 @@ final class Routes
             ]
         );
 
+        if (\function_exists('\\FpHic\\Helpers\\hic_register_rest_route_fallback')) {
+            \FpHic\Helpers\hic_register_rest_route_fallback('hic/v1', '/conversion', [
+                'methods'             => 'POST',
+                'callback'            => [$controller, 'handleConversion'],
+                'permission_callback' => [self::class, 'conversionPermissions'],
+            ]);
+        }
+
         \register_rest_route(
             'hic/v1',
             '/health',
@@ -47,6 +55,14 @@ final class Routes
                 'permission_callback' => [$controller, 'healthPermissions'],
             ]
         );
+
+        if (\function_exists('\\FpHic\\Helpers\\hic_register_rest_route_fallback')) {
+            \FpHic\Helpers\hic_register_rest_route_fallback('hic/v1', '/health', [
+                'methods'             => ['GET'],
+                'callback'            => [$controller, 'health'],
+                'permission_callback' => [$controller, 'healthPermissions'],
+            ]);
+        }
     }
 
     /**

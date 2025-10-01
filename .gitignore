@@ -9,6 +9,7 @@ vendor/
 # Tests / Coverage / CI temp
 coverage/
 .phpunit.result.cache
+.phpunit.cache/
 
 # IDE files
 .vscode/

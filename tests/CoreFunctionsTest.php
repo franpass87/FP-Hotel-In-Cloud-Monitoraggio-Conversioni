@@ -50,10 +50,10 @@ final class CoreFunctionsTest extends TestCase
 
     public function testPriceNormalization(): void
     {
-        self::assertEquals(1234.56, Helpers\hic_normalize_price('1.234,56'), '', 0.001);
-        self::assertEquals(1234.56, Helpers\hic_normalize_price('1,234.56'), '', 0.001);
-        self::assertEquals(1234.0, Helpers\hic_normalize_price('1234'), '', 0.001);
-        self::assertEquals(1234.0, Helpers\hic_normalize_price('1234.00'), '', 0.001);
+        self::assertEqualsWithDelta(1234.56, Helpers\hic_normalize_price('1.234,56'), 0.001);
+        self::assertEqualsWithDelta(1234.56, Helpers\hic_normalize_price('1,234.56'), 0.001);
+        self::assertEqualsWithDelta(1234.0, Helpers\hic_normalize_price('1234'), 0.001);
+        self::assertEqualsWithDelta(1234.0, Helpers\hic_normalize_price('1234.00'), 0.001);
         self::assertSame(0.0, Helpers\hic_normalize_price('-10'));
     }
 

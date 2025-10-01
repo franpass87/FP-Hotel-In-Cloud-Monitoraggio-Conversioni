@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="tests/bootstrap.php" colors="true" verbose="true">
+<phpunit
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.5/phpunit.xsd"
+    bootstrap="tests/bootstrap.php"
+    colors="true"
+    cacheDirectory=".phpunit.cache"
+    executionOrder="default"
+    beStrictAboutTestsThatDoNotTestAnything="false"
+    failOnRisky="false"
+    failOnWarning="false"
+>
     <testsuites>
         <testsuite name="HIC Plugin Tests">
             <directory>tests</directory>

@@ -137,9 +137,7 @@ class WebhookConversionTrackingTest extends WP_UnitTestCase {
         $this->assertEquals('NO_REDIRECT_123', $reservation_id);
     }
 
-    /**
-     * @dataProvider extendedIsoCurrencyProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('extendedIsoCurrencyProvider')]
     public function test_webhook_payload_accepts_extended_iso_currencies(string $currency) {
         $booking_data = [
             'email' => 'extended@example.com',
