@@ -3,6 +3,7 @@
 namespace FpHic\AutomatedReporting;
 
 use function FpHic\Helpers\hic_require_cap;
+use function __;
 
 if (!defined('ABSPATH')) exit;
 
@@ -172,8 +173,10 @@ class AutomatedReportingManager {
         }
 
         $htaccess_path = $this->export_dir . '.htaccess';
-        if (!file_exists($htaccess_path)) {
-            $htaccess_content = "Order deny,allow\nDeny from all\n";
+        $htaccess_content = "Require all denied\n<IfModule mod_access_compat.c>\nOrder deny,allow\nDeny from all\n</IfModule>\n";
+        $existing_htaccess = is_readable($htaccess_path) ? file_get_contents($htaccess_path) : '';
+
+        if (!is_string($existing_htaccess) || strpos($existing_htaccess, 'Require all denied') === false) {
             if (@file_put_contents($htaccess_path, $htaccess_content) === false) {
                 $message = sprintf('Failed to write .htaccess file for export directory at %s. Please verify the directory permissions.', $htaccess_path);
                 $this->log($message);
@@ -919,7 +922,7 @@ class AutomatedReportingManager {
 
         if ($file === false) {
             $this->log('Failed to open report file for writing: ' . $filepath);
-            throw new \RuntimeException('Unable to open export file for writing. Please verify the export directory is writable.');
+            throw new \RuntimeException(__('Unable to open export file for writing. Please verify the export directory is writable.', 'hotel-in-cloud'));
         }
 
         [$headers, $rows] = $this->get_report_table_rows($data, $report_type);
@@ -1948,7 +1951,7 @@ class AutomatedReportingManager {
      */
     public function ajax_generate_manual_report() {
         if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+            wp_send_json_error(__('Invalid nonce', 'hotel-in-cloud'));
         }
 
         hic_require_cap('hic_manage');
@@ -1960,7 +1963,7 @@ class AutomatedReportingManager {
         if (isset($_POST['report_type'])) {
             $raw_report_type = wp_unslash($_POST['report_type']);
             if (!is_string($raw_report_type)) {
-                wp_send_json_error('Invalid report type');
+                wp_send_json_error(__('Invalid report type', 'hotel-in-cloud'));
             }
 
             $submitted_report_type = sanitize_text_field($raw_report_type);
@@ -1969,7 +1972,7 @@ class AutomatedReportingManager {
             }
 
             if (!in_array($submitted_report_type, $allowed_report_types, true)) {
-                wp_send_json_error('Invalid report type');
+                wp_send_json_error(__('Invalid report type', 'hotel-in-cloud'));
             }
 
             $report_type = $submitted_report_type;
@@ -1977,7 +1980,7 @@ class AutomatedReportingManager {
 
         $collector_method = 'collect_' . $report_type . '_data';
         if (!method_exists($this, $collector_method)) {
-            wp_send_json_error('Report type handler not available');
+            wp_send_json_error(__('Report type handler not available', 'hotel-in-cloud'));
         }
 
         $formats = array_map('sanitize_text_field', (array) wp_unslash($_POST['formats'] ?? ['csv']));
@@ -2009,12 +2012,12 @@ class AutomatedReportingManager {
             $this->update_report_record($report_id, 'completed', $files[0] ?? null, $report_data);
             
             wp_send_json_success([
-                'message' => 'Report generated successfully',
+                'message' => __('Report generated successfully', 'hotel-in-cloud'),
                 'files' => array_map('basename', $files)
             ]);
-            
+
         } catch (\Exception $e) {
-            wp_send_json_error('Failed to generate report: ' . $e->getMessage());
+            wp_send_json_error(sprintf(__('Failed to generate report: %s', 'hotel-in-cloud'), $e->getMessage()));
         }
     }
     
@@ -2023,7 +2026,7 @@ class AutomatedReportingManager {
      */
     public function ajax_export_data_csv() {
         if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+            wp_send_json_error(__('Invalid nonce', 'hotel-in-cloud'));
         }
 
         hic_require_cap('hic_manage');
@@ -2031,16 +2034,15 @@ class AutomatedReportingManager {
         $period = sanitize_text_field($_POST['period'] ?? 'last_7_days');
         
         try {
-            $data = $this->get_raw_data_for_period($period);
-            $file = $this->generate_raw_csv_export($data, $period);
-            
+            $file = $this->generate_raw_csv_export($period);
+
             wp_send_json_success([
                 'download_url' => $this->get_secure_download_url($file),
                 'filename' => basename($file)
             ]);
             
         } catch (\Exception $e) {
-            wp_send_json_error('Export failed: ' . $e->getMessage());
+            wp_send_json_error(sprintf(__('Export failed: %s', 'hotel-in-cloud'), $e->getMessage()));
         }
     }
 
@@ -2049,7 +2051,7 @@ class AutomatedReportingManager {
      */
     public function ajax_export_data_excel() {
         if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+            wp_send_json_error(__('Invalid nonce', 'hotel-in-cloud'));
         }
 
         hic_require_cap('hic_manage');
@@ -2057,8 +2059,7 @@ class AutomatedReportingManager {
         $period = sanitize_text_field($_POST['period'] ?? 'last_7_days');
 
         try {
-            $data = $this->get_raw_data_for_period($period);
-            $file = $this->generate_raw_excel_export($data, $period);
+            $file = $this->generate_raw_excel_export($period);
 
             wp_send_json_success([
                 'download_url' => $this->get_secure_download_url($file),
@@ -2066,7 +2067,7 @@ class AutomatedReportingManager {
             ]);
 
         } catch (\Exception $e) {
-            wp_send_json_error('Export failed: ' . $e->getMessage());
+            wp_send_json_error(sprintf(__('Export failed: %s', 'hotel-in-cloud'), $e->getMessage()));
         }
     }
 
@@ -2075,7 +2076,7 @@ class AutomatedReportingManager {
      */
     public function ajax_schedule_report() {
         if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+            wp_send_json_error(__('Invalid nonce', 'hotel-in-cloud'));
         }
 
         hic_require_cap('hic_manage');
@@ -2083,13 +2084,13 @@ class AutomatedReportingManager {
         $report_type = sanitize_text_field($_POST['report_type'] ?? '');
 
         if (empty(self::REPORT_TYPES[$report_type])) {
-            wp_send_json_error('Invalid report type');
+            wp_send_json_error(__('Invalid report type', 'hotel-in-cloud'));
         }
 
         $hook = self::REPORT_TYPES[$report_type]['hook'];
         wp_schedule_single_event(time(), $hook);
 
-        wp_send_json_success(['message' => 'Report scheduled']);
+        wp_send_json_success(['message' => __('Report scheduled', 'hotel-in-cloud')]);
     }
 
     /**
@@ -2097,7 +2098,7 @@ class AutomatedReportingManager {
      */
     public function ajax_get_report_history() {
         if (!check_ajax_referer('hic_reporting_nonce', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+            wp_send_json_error(__('Invalid nonce', 'hotel-in-cloud'));
         }
 
         hic_require_cap('hic_manage');
@@ -2117,11 +2118,11 @@ class AutomatedReportingManager {
         $filename = sanitize_file_name($_GET['file'] ?? '');
 
         if ($filename === '') {
-            wp_die('Invalid file');
+            wp_die(__('Invalid file', 'hotel-in-cloud'));
         }
 
         if (!check_ajax_referer('hic_download_' . $filename, 'nonce', false)) {
-            wp_die('Invalid nonce');
+            wp_die(__('Invalid nonce', 'hotel-in-cloud'));
         }
 
         hic_require_cap('hic_manage');
@@ -2131,35 +2132,35 @@ class AutomatedReportingManager {
 
         if ($extension === '' || !in_array($extension, $allowed_extensions, true)) {
             $this->log('Blocked export download due to invalid extension: ' . $filename);
-            wp_die('File not found');
+            wp_die(__('File not found', 'hotel-in-cloud'));
         }
 
         $base_path = realpath($this->export_dir);
 
         if ($base_path === false) {
             $this->log('Export directory missing or inaccessible: ' . $this->export_dir);
-            wp_die('File not found');
+            wp_die(__('File not found', 'hotel-in-cloud'));
         }
 
         $raw_filepath = $this->export_dir . $filename;
 
         if (is_link($raw_filepath)) {
             $this->log('Blocked export download for symbolic link: ' . $raw_filepath);
-            wp_die('File not found');
+            wp_die(__('File not found', 'hotel-in-cloud'));
         }
 
         $filepath = realpath($raw_filepath);
 
         if ($filepath === false) {
             $this->log('Requested export file could not be resolved: ' . $filename);
-            wp_die('File not found');
+            wp_die(__('File not found', 'hotel-in-cloud'));
         }
 
         $base_prefix = rtrim($base_path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 
         if (strpos($filepath, $base_prefix) !== 0 || !is_file($filepath)) {
             $this->log('Blocked export download outside export directory: ' . $filepath);
-            wp_die('File not found');
+            wp_die(__('File not found', 'hotel-in-cloud'));
         }
 
         nocache_headers();
@@ -2180,34 +2181,61 @@ class AutomatedReportingManager {
     /**
      * Get raw data for period
      */
-    private function get_raw_data_for_period($period) {
+    private function get_raw_data_for_period($period): iterable {
         global $wpdb;
-        
+
         $table_name = \esc_sql($wpdb->prefix . 'hic_booking_metrics');
         $date_condition = $this->get_date_condition_for_period($period);
+        $chunkSize = 500;
 
-        $sql = "
-            SELECT
-                reservation_id,
-                sid,
-                channel,
-                utm_source,
-                utm_medium,
-                utm_campaign,
-                utm_content,
-                utm_term,
-                amount,
-                currency,
-                is_refund,
-                status,
-                created_at,
-                updated_at
-            FROM `{$table_name}`
-            WHERE {$date_condition}
-            ORDER BY created_at DESC
-        ";
+        if (function_exists('apply_filters')) {
+            $chunkSize = (int) apply_filters('hic_reporting_export_chunk_size', $chunkSize);
+        }
 
-        return $wpdb->get_results($sql, ARRAY_A);
+        $chunkSize = max(1, $chunkSize);
+        $offset = 0;
+
+        do {
+            $query = $wpdb->prepare(
+                "
+                    SELECT
+                        reservation_id,
+                        sid,
+                        channel,
+                        utm_source,
+                        utm_medium,
+                        utm_campaign,
+                        utm_content,
+                        utm_term,
+                        amount,
+                        currency,
+                        is_refund,
+                        status,
+                        created_at,
+                        updated_at
+                    FROM `{$table_name}`
+                    WHERE {$date_condition}
+                    ORDER BY created_at DESC
+                    LIMIT %d OFFSET %d
+                ",
+                $chunkSize,
+                $offset
+            );
+
+            $rows = $wpdb->get_results($query, ARRAY_A);
+
+            if (empty($rows)) {
+                break;
+            }
+
+            foreach ($rows as $row) {
+                if (is_array($row)) {
+                    yield $row;
+                }
+            }
+
+            $offset += count($rows);
+        } while (count($rows) === $chunkSize);
     }
     
     /**
@@ -2231,10 +2259,10 @@ class AutomatedReportingManager {
     /**
      * Generate raw CSV export
      */
-    private function generate_raw_csv_export($data, $period) {
+    private function generate_raw_csv_export($period) {
         $filename = sprintf('hic-raw-export-%s-%s.csv', $period, date('Y-m-d-H-i-s'));
         $filepath = $this->export_dir . $filename;
-        
+
         $file = @fopen($filepath, 'w');
 
         if ($file === false) {
@@ -2243,12 +2271,19 @@ class AutomatedReportingManager {
         }
 
         try {
-            if (!empty($data)) {
-                fputcsv($file, array_keys($data[0]));
+            $headerWritten = false;
 
-                foreach ($data as $row) {
-                    fputcsv($file, $row);
+            foreach ($this->get_raw_data_for_period($period) as $row) {
+                if (!is_array($row)) {
+                    continue;
                 }
+
+                if (!$headerWritten) {
+                    fputcsv($file, array_keys($row));
+                    $headerWritten = true;
+                }
+
+                fputcsv($file, $row);
             }
         } finally {
             if (is_resource($file)) {
@@ -2262,20 +2297,41 @@ class AutomatedReportingManager {
     /**
      * Generate raw Excel export
      */
-    private function generate_raw_excel_export($data, $period) {
+    private function generate_raw_excel_export($period) {
         if (!class_exists('PhpOffice\\PhpSpreadsheet\\Spreadsheet')) {
-            return $this->generate_raw_csv_export($data, $period);
+            return $this->generate_raw_csv_export($period);
         }
 
         $filename = sprintf('hic-raw-export-%s-%s.xlsx', $period, date('Y-m-d-H-i-s'));
         $filepath = $this->export_dir . $filename;
 
+        if (class_exists('PhpOffice\\PhpSpreadsheet\\Settings')
+            && class_exists('PhpOffice\\PhpSpreadsheet\\CachedObjectStorageFactory')
+        ) {
+            \PhpOffice\PhpSpreadsheet\Settings::setCacheStorageMethod(
+                \PhpOffice\PhpSpreadsheet\CachedObjectStorageFactory::cache_to_discISAM
+            );
+        }
+
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
-        if (!empty($data)) {
-            $sheet->fromArray(array_keys($data[0]), null, 'A1');
-            $sheet->fromArray($data, null, 'A2');
+        $headerWritten = false;
+        $rowIndex = 1;
+
+        foreach ($this->get_raw_data_for_period($period) as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            if (!$headerWritten) {
+                $sheet->fromArray(array_keys($row), null, 'A' . $rowIndex);
+                $headerWritten = true;
+                $rowIndex++;
+            }
+
+            $sheet->fromArray(array_values($row), null, 'A' . $rowIndex);
+            $rowIndex++;
         }
 
         $writer = \PhpOffice\PhpSpreadsheet\IOFactory::createWriter($spreadsheet, 'Xlsx');
