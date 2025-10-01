@@ -3,6 +3,8 @@
 namespace FpHic\ReconAndSetup;
 
 use function FpHic\Helpers\hic_require_cap;
+use function __;
+use function esc_js;
 
 if (!defined('ABSPATH')) exit;
 
@@ -1284,20 +1286,27 @@ class EnterpriseManagementSuite {
         wp_enqueue_script('jquery');
 
         // Add inline script for wizard functionality
-        wp_add_inline_script('jquery', '
+        wp_add_inline_script(
+            'jquery',
+            sprintf(
+                '
             function saveStepAndContinue(currentStep, nextStep) {
                 var formData = jQuery("#hic-wizard-step-" + currentStep).serialize();
-                formData += "&action=hic_setup_wizard_step&step=" + currentStep + "&nonce=' . wp_create_nonce('hic_setup_wizard') . '";
+                formData += "&action=hic_setup_wizard_step&step=" + currentStep + "&nonce=%1$s";
 
                 jQuery.post(ajaxurl, formData, function(response) {
                     if (response.success) {
                         window.location.href = "?page=hic-setup-wizard&step=" + nextStep;
                     } else {
-                        alert("Error saving configuration: " + response.data);
+                        alert("%2$s" + response.data);
                     }
                 });
             }
-        ');
+        ',
+                esc_js(wp_create_nonce('hic_setup_wizard')),
+                esc_js(__('Error saving configuration: ', 'hotel-in-cloud'))
+            )
+        );
     }
 
     private function is_setup_wizard_hook($hook): bool
@@ -1323,7 +1332,7 @@ class EnterpriseManagementSuite {
         hic_require_cap('hic_manage');
         
         if (!check_ajax_referer('hic_setup_wizard', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+            wp_send_json_error(__('Invalid nonce', 'hotel-in-cloud'));
         }
         
         $step = sanitize_text_field($_POST['step'] ?? '');
@@ -1340,11 +1349,11 @@ class EnterpriseManagementSuite {
                 break;
             case 'complete':
                 update_option('hic_setup_wizard_completed', true);
-                wp_send_json_success(['message' => 'Setup completed successfully']);
+                wp_send_json_success(['message' => __('Setup completed successfully', 'hotel-in-cloud')]);
                 break;
         }
-        
-        wp_send_json_success(['message' => 'Step saved successfully']);
+
+        wp_send_json_success(['message' => __('Step saved successfully', 'hotel-in-cloud')]);
     }
     
     /**

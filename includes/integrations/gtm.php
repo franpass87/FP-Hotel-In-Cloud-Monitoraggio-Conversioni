@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 namespace FpHic;
+
+use function __;
 /**
  * Google Tag Manager Integration
  */
@@ -331,7 +333,7 @@ function hic_handle_gtm_events_request(\WP_REST_Request $request) {
 
     $sid = $request->get_param('sid');
     if (empty($sid)) {
-        return new \WP_Error('missing_sid', 'SID mancante', ['status' => 400]);
+        return new \WP_Error('missing_sid', __('SID mancante', 'hotel-in-cloud'), ['status' => 400]);
     }
 
     $validated_sid = HIC_Input_Validator::validate_sid($sid);

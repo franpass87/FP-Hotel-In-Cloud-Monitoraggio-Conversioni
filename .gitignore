@@ -5,6 +5,8 @@ dist/
 # Node / Composer
 node_modules/
 vendor/
+!assets/vendor/
+!assets/vendor/**
 
 # Tests / Coverage / CI temp
 coverage/

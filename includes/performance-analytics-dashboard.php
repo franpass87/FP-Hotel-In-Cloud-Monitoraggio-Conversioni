@@ -37,21 +37,19 @@ final class PerformanceDashboard
 
         \wp_enqueue_script('jquery');
 
-        if (!\wp_script_is('chart-js', 'enqueued')) {
-            if (!\wp_script_is('chart-js', 'registered')) {
-                \wp_register_script(
-                    'chart-js',
-                    'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js',
-                    [],
-                    '3.9.1',
-                    true
-                );
-            }
+        $base_url = \plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php');
 
-            \wp_enqueue_script('chart-js');
+        if (!\wp_script_is('chart-js', 'registered')) {
+            \wp_register_script(
+                'chart-js',
+                $base_url . 'assets/vendor/chartjs/chart.min.js',
+                [],
+                '3.9.1',
+                true
+            );
         }
 
-        $base_url = \plugin_dir_url(dirname(__DIR__) . '/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php');
+        \wp_enqueue_script('chart-js');
 
         \wp_enqueue_style(
             'hic-admin-base',

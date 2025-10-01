@@ -1,0 +1,60 @@
+[
+  {
+    "id": "ISS-0001",
+    "area": "build",
+    "title": "demo-without-enhanced CLI script fatals because namespace is not first statement",
+    "severity": "medium",
+    "cwe": "CWE-710",
+    "files": [
+      "demo-without-enhanced.php:1-142"
+    ],
+    "detected_via": [
+      "php -l",
+      "static review"
+    ],
+    "explanation": "The CLI demonstration script declares a namespace after executable code and function definitions. PHP requires the namespace declaration to be the first statement, so invoking the script triggers a fatal error instead of running the demo.",
+    "repro": "Execute `php demo-without-enhanced.php`; PHP terminates with `Namespace declaration statement has to be the very first statement`.",
+    "suggested_fix": "Move the `namespace FpHic\\Helpers` / `namespace FpHic` declarations ahead of all other code (or wrap the helpers in functions without namespaces) so the file satisfies PHP's namespace rules.",
+    "dependencies": [],
+    "confidence": 0.7
+  },
+  {
+    "id": "ISS-0002",
+    "area": "frontend",
+    "title": "Performance dashboard loads Chart.js from external CDN",
+    "severity": "high",
+    "cwe": "CWE-829",
+    "files": [
+      "includes/performance-analytics-dashboard.php:32-75"
+    ],
+    "detected_via": [
+      "static review"
+    ],
+    "explanation": "The admin performance dashboard registers the `chart-js` script directly from jsDelivr. WordPress.org guidelines prohibit bundling required assets via third-party CDNs, and relying on a remote host hurts availability (blocked networks/offline) and CSP compliance.",
+    "repro": "Open the Performance dashboard in wp-admin; browser DevTools show a network request to `https://cdn.jsdelivr.net/npm/chart.js...` instead of a bundled script.",
+    "suggested_fix": "Ship a local copy of Chart.js (or load it through WordPress packages) and enqueue it from the plugin directory rather than a remote CDN URL.",
+    "dependencies": [],
+    "confidence": 0.8
+  },
+  {
+    "id": "ISS-0003",
+    "area": "i18n",
+    "title": "Multiple admin responses and notices bypass translation APIs",
+    "severity": "medium",
+    "cwe": "N/A",
+    "files": [
+      "includes/admin/admin-settings.php:168-267",
+      "includes/google-ads-enhanced.php:2002-2191",
+      "includes/enterprise-management-suite.php:1287-1347",
+      "includes/integrations/gtm.php:332-346"
+    ],
+    "detected_via": [
+      "static review"
+    ],
+    "explanation": "Several admin AJAX handlers and notices echo hard-coded Italian/English strings (e.g. nonce errors, success messages, alert dialogs, REST errors) without wrapping them in `__()`/`_e()` or using the plugin text domain. This prevents translators from localizing key UI copy and responses, violating WordPress i18n expectations.",
+    "repro": "Trigger any affected action (e.g. run the API test button, toggle Enhanced Conversions, or hit the GTM events REST route) and note the untranslated messages returned to the UI.",
+    "suggested_fix": "Pass all human-facing strings through the appropriate translation helpers with the `hotel-in-cloud` text domain before returning/printing them (including JSON payloads and JavaScript alerts).",
+    "dependencies": [],
+    "confidence": 0.6
+  }
+]

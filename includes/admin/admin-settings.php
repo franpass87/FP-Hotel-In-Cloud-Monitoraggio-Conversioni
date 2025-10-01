@@ -169,7 +169,7 @@ function hic_ajax_test_email() {
     // Verify nonce for security
     if (!check_ajax_referer('hic_test_email', 'nonce', false)) {
         wp_send_json_error(array(
-            'message' => 'Nonce di sicurezza non valido.'
+            'message' => __('Nonce di sicurezza non valido.', 'hotel-in-cloud')
         ));
     }
     
@@ -184,7 +184,7 @@ function hic_ajax_test_email() {
     
     if (empty($test_email) || !is_email($test_email)) {
         wp_send_json_error(array(
-            'message' => 'Indirizzo email non valido.'
+            'message' => __('Indirizzo email non valido.', 'hotel-in-cloud')
         ));
     }
     
@@ -205,7 +205,7 @@ function hic_ajax_test_api_connection() {
     // Verify nonce for security
     if (!check_ajax_referer('hic_test_api_nonce', 'nonce', false)) {
         wp_send_json_error(array(
-            'message' => 'Nonce di sicurezza non valido.'
+            'message' => __('Nonce di sicurezza non valido.', 'hotel-in-cloud')
         ));
     }
     
@@ -240,7 +240,7 @@ function hic_ajax_test_api_connection() {
 function hic_ajax_generate_health_token() {
     if (!check_ajax_referer('hic_generate_health_token', 'nonce', false)) {
         wp_send_json_error(array(
-            'message' => 'Nonce di sicurezza non valido.'
+            'message' => __('Nonce di sicurezza non valido.', 'hotel-in-cloud')
         ));
     }
 
@@ -254,7 +254,7 @@ function hic_ajax_generate_health_token() {
 
     if ($token === '') {
         wp_send_json_error(array(
-            'message' => 'Impossibile generare un token sicuro.'
+            'message' => __('Impossibile generare un token sicuro.', 'hotel-in-cloud')
         ));
     }
 

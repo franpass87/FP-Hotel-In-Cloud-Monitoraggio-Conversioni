@@ -3,6 +3,7 @@
 namespace FpHic\GoogleAdsEnhanced;
 
 use function FpHic\Helpers\hic_require_cap;
+use function __;
 
 if (!defined('ABSPATH')) exit;
 
@@ -2024,20 +2025,25 @@ class GoogleAdsEnhancedConversions {
         hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_enhanced_conversions_nonce', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+            wp_send_json_error(__('Invalid nonce', 'hotel-in-cloud'));
         }
         
         try {
             $access_token = $this->get_google_ads_access_token();
             
             if ($access_token) {
-                wp_send_json_success(['message' => 'Google Ads connection successful']);
+                wp_send_json_success(['message' => __('Google Ads connection successful', 'hotel-in-cloud')]);
             } else {
-                wp_send_json_error(['message' => 'Failed to obtain access token']);
+                wp_send_json_error(['message' => __('Failed to obtain access token', 'hotel-in-cloud')]);
             }
-            
+
         } catch (\Exception $e) {
-            wp_send_json_error(['message' => 'Connection test failed: ' . $e->getMessage()]);
+            wp_send_json_error([
+                'message' => sprintf(
+                    __('Connection test failed: %s', 'hotel-in-cloud'),
+                    $e->getMessage()
+                ),
+            ]);
         }
     }
     
@@ -2048,7 +2054,7 @@ class GoogleAdsEnhancedConversions {
         hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_enhanced_conversions_nonce', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+            wp_send_json_error(__('Invalid nonce', 'hotel-in-cloud'));
         }
 
         global $wpdb;
@@ -2075,17 +2081,22 @@ class GoogleAdsEnhancedConversions {
         hic_require_cap('hic_manage');
 
         if (!check_ajax_referer('hic_enhanced_conversions_nonce', 'nonce', false)) {
-            wp_send_json_error('Invalid nonce');
+            wp_send_json_error(__('Invalid nonce', 'hotel-in-cloud'));
         }
         
         try {
             // Trigger immediate batch upload
             $this->batch_upload_enhanced_conversions();
             
-            wp_send_json_success(['message' => 'Enhanced conversions upload initiated']);
-            
+            wp_send_json_success(['message' => __('Enhanced conversions upload initiated', 'hotel-in-cloud')]);
+
         } catch (\Exception $e) {
-            wp_send_json_error(['message' => 'Upload failed: ' . $e->getMessage()]);
+            wp_send_json_error([
+                'message' => sprintf(
+                    __('Upload failed: %s', 'hotel-in-cloud'),
+                    $e->getMessage()
+                ),
+            ]);
         }
     }
 
