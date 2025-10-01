@@ -2,7 +2,7 @@
 
 [![QA matrix](https://github.com/francescopasseri/FP-Hotel-In-Cloud-Monitoraggio-Conversioni/actions/workflows/ci.yml/badge.svg)](https://github.com/francescopasseri/FP-Hotel-In-Cloud-Monitoraggio-Conversioni/actions/workflows/ci.yml)
 
-> **Versione plugin:** 3.4.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+> **Versione plugin:** 3.4.1 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
 
 
 Plugin WordPress per il monitoraggio avanzato delle conversioni da Hotel in Cloud verso GA4, Facebook Meta e Brevo con sistema di sicurezza enterprise-grade.
@@ -17,7 +17,7 @@ Plugin WordPress per il monitoraggio avanzato delle conversioni da Hotel in Clou
 
 Le tappe principali dello sviluppo sono riepilogate nel [CHANGELOG.md](CHANGELOG.md). Ogni voce collega le funzionalità alle rispettive implementazioni nel codice per agevolare audit, debug e onboarding.
 
-## Novità della versione 3.4.0
+## Novità della versione 3.4.x
 
 - 🔐 **Hardening sicurezza webhook** con normalizzazione dei token prima di rate limiting e confronto costante, per ridurre vettori di attacco sui payload remoti.
 - 🚀 **Cache e ottimizzazioni tracking** che riutilizzano l'object cache WordPress per SID, UTM e controlli di esistenza tabelle, abbattendo query ripetute.
@@ -702,8 +702,9 @@ composer lint
 ```
 
 
-## Build & Release (CI)
-- Gli artefatti di build (zip) **non** sono versionati nel repo.
-- La CI su **Pull Request** crea lo zip e lo pubblica come **artifact**.
-- Il push di un tag `v*` crea una **GitHub Release** e allega lo zip + checksum.
-- Build locale: `bash scripts/build-plugin-zip.sh` → output in `dist/`.
+## Release process
+
+1. Esegui il bump della versione e genera lo zip locale con `bash build.sh --bump=patch` (oppure `--set-version=1.2.3`).
+2. Verifica lo zip in `build/` e testa il pacchetto su un ambiente di staging.
+3. Crea il tag `vX.Y.Z` e pubblicalo su GitHub (`git tag vX.Y.Z && git push origin vX.Y.Z`). La workflow **Build Plugin Zip** allega lo zip come artifact.
+4. Consulta [README-BUILD.md](README-BUILD.md) per dettagli e prerequisiti completi.
