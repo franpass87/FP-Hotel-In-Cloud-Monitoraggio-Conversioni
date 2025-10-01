@@ -11,6 +11,10 @@ if (!defined('WP_CONTENT_DIR')) {
     define('WP_CONTENT_DIR', sys_get_temp_dir());
 }
 
+if (!defined('HIC_S2S_DISABLE_LEGACY_WEBHOOK_ROUTE')) {
+    define('HIC_S2S_DISABLE_LEGACY_WEBHOOK_ROUTE', true);
+}
+
 // Include WordPress test functions if available
 if (file_exists('/tmp/wordpress-tests-lib/includes/functions.php')) {
     require_once '/tmp/wordpress-tests-lib/includes/functions.php';
@@ -501,7 +505,61 @@ if (!function_exists('wp_clear_scheduled_hook')) {
 
 if (!function_exists('register_rest_route')) {
     function register_rest_route($namespace, $route, $args = array()) {
+        $normalized_route = '/' . trim($namespace, '/') . '/' . ltrim($route, '/');
+        $normalized_route = preg_replace('#/+#', '/', $normalized_route ?? '');
+
+        if (!isset($GLOBALS['hic_registered_rest_routes_store']) || !is_array($GLOBALS['hic_registered_rest_routes_store'])) {
+            $GLOBALS['hic_registered_rest_routes_store'] = [];
+        }
+
+        $GLOBALS['hic_registered_rest_routes_store'][$normalized_route] = $args;
+
+        if (function_exists('\\FpHic\\Helpers\\hic_register_rest_route_fallback')) {
+            \FpHic\Helpers\hic_register_rest_route_fallback($namespace, $route, is_array($args) ? $args : []);
+        }
+
         return true;
+    }
+}
+
+if (!function_exists('rest_do_request')) {
+    function rest_do_request($request)
+    {
+        if ($request instanceof WP_REST_Request) {
+            $route = $request->get_route();
+            $method = strtoupper($request->get_method());
+        } elseif (is_string($request)) {
+            $route = $request;
+            $method = 'GET';
+        } else {
+            return new WP_Error('rest_invalid_request', 'Invalid REST request.');
+        }
+
+        $route = '/' . ltrim($route, '/');
+        $route = preg_replace('#/+#', '/', $route ?? '');
+
+        $routes = $GLOBALS['hic_registered_rest_routes_store'] ?? [];
+
+        if (!isset($routes[$route])) {
+            return new WP_Error('rest_no_route', 'No route found.', array('status' => 404));
+        }
+
+        $args = $routes[$route];
+        $methods = $args['methods'] ?? 'GET';
+        $methods = is_array($methods) ? $methods : array($methods);
+        $methods = array_map('strtoupper', $methods);
+
+        if (!in_array($method, $methods, true)) {
+            return new WP_Error('rest_no_route', 'No route found for method.', array('status' => 404));
+        }
+
+        $callback = $args['callback'] ?? null;
+
+        if (!is_callable($callback)) {
+            return new WP_Error('rest_invalid_handler', 'Invalid route callback.', array('status' => 500));
+        }
+
+        return call_user_func($callback, $request);
     }
 }
 

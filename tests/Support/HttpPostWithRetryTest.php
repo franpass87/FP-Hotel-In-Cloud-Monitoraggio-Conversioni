@@ -90,6 +90,38 @@ final class HttpPostWithRetryTest extends TestCase
         $this->assertSame(204, $result['code']);
         $this->assertSame([7], self::$pauses);
     }
+
+    public function testWpErrorResetsResponseMetadata(): void
+    {
+        $attempts = 0;
+
+        $GLOBALS['hic_test_wp_remote_post'] = function () use (&$attempts) {
+            $attempts++;
+
+            if ($attempts === 1) {
+                return [
+                    'response' => ['code' => 503],
+                    'body' => '',
+                ];
+            }
+
+            return new WP_Error('timeout', 'Timeout');
+        };
+
+        $result = Http::postWithRetry(static function (): array {
+            return [
+                'url' => 'https://example.com/unreliable',
+                'args' => [],
+            ];
+        }, 2, 1);
+
+        $this->assertFalse($result['success']);
+        $this->assertNull($result['code']);
+        $this->assertNull($result['response']);
+        $this->assertInstanceOf(WP_Error::class, $result['error']);
+        $this->assertSame(2, $result['attempts']);
+        $this->assertSame([1], self::$pauses);
+    }
 }
 
 if (!function_exists('wp_sleep')) {

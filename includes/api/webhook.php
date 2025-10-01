@@ -281,7 +281,7 @@ function hic_get_raw_webhook_body($request)
   if (is_object($request)) {
     if (method_exists($request, 'get_body')) {
       $body = $request->get_body();
-      if (is_string($body)) {
+      if (is_string($body) && $body !== '') {
         return $body;
       }
     }
@@ -289,7 +289,7 @@ function hic_get_raw_webhook_body($request)
     // Support tests or custom requests providing a pre-parsed body.
     if (method_exists($request, 'get_content')) {
       $body = $request->get_content();
-      if (is_string($body)) {
+      if (is_string($body) && $body !== '') {
         return $body;
       }
     }
@@ -343,20 +343,22 @@ function hic_get_raw_webhook_body($request)
   return $raw;
 }
 
-$hic_register_webhook_route = static function (): void {
-  if (!in_array(hic_get_connection_type(), ['webhook', 'hybrid'], true)) {
-    return;
+if (!defined('HIC_S2S_DISABLE_LEGACY_WEBHOOK_ROUTE') || !HIC_S2S_DISABLE_LEGACY_WEBHOOK_ROUTE) {
+  $hic_register_webhook_route = static function (): void {
+    if (!in_array(hic_get_connection_type(), ['webhook', 'hybrid'], true)) {
+      return;
+    }
+
+    $route_args = hic_get_webhook_route_args();
+    register_rest_route('hic/v1', '/conversion', $route_args);
+    \FpHic\Helpers\hic_register_rest_route_fallback('hic/v1', '/conversion', $route_args);
+  };
+
+  add_action('rest_api_init', $hic_register_webhook_route);
+
+  if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK && function_exists('get_option')) {
+    $hic_register_webhook_route();
   }
-
-  $route_args = hic_get_webhook_route_args();
-  register_rest_route('hic/v1', '/conversion', $route_args);
-  \FpHic\Helpers\hic_register_rest_route_fallback('hic/v1', '/conversion', $route_args);
-};
-
-add_action('rest_api_init', $hic_register_webhook_route);
-
-if (defined('HIC_REST_API_FALLBACK') && HIC_REST_API_FALLBACK && function_exists('get_option')) {
-  $hic_register_webhook_route();
 }
 
 function hic_webhook_handler(WP_REST_Request $request) {

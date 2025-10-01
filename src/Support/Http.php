@@ -37,6 +37,8 @@ final class Http
 
             if (is_wp_error($response)) {
                 $lastError = $response;
+                $lastResponse = null;
+                $code = null;
                 if ($attempt < $maxAttempts) {
                     self::pause(self::calculateDelay($attempt, $initialDelay, null));
                     continue;
@@ -110,11 +112,7 @@ final class Http
      */
     private static function extractRetryAfter($response): ?int
     {
-        if (!is_array($response)) {
-            return null;
-        }
-
-        $header = wp_remote_retrieve_header($response, 'retry-after');
+        $header = WpHttp::retrieveHeader($response, 'retry-after');
 
         if (!is_string($header) || trim($header) === '') {
             return null;

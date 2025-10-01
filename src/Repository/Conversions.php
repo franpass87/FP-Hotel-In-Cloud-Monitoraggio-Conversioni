@@ -115,31 +115,58 @@ final class Conversions
             }
         }
 
+        $data = [
+            'booking_code' => $bookingCode,
+            'status' => sanitize_text_field((string) $payload['status']),
+            'checkin' => $this->sanitizeDate($payload['checkin']),
+            'checkout' => $this->sanitizeDate($payload['checkout']),
+            'currency' => strtoupper(sanitize_text_field((string) $payload['currency'])),
+            'amount' => (float) $payload['amount'],
+            'guest_email_hash' => sanitize_text_field((string) $payload['guest_email_hash']),
+            'guest_phone_hash' => sanitize_text_field((string) $payload['guest_phone_hash']),
+            'booking_intent_id' => $this->sanitizeNullableString($payload['booking_intent_id']),
+            'sid' => sanitize_text_field((string) ($payload['sid'] ?? '')),
+            'client_ip' => $this->sanitizeIp($payload['client_ip'] ?? ''),
+            'client_user_agent' => $this->sanitizeUserAgent($payload['client_user_agent'] ?? ''),
+            'event_timestamp' => isset($payload['event_timestamp']) && $payload['event_timestamp'] !== null ? (int) $payload['event_timestamp'] : null,
+            'event_id' => $this->sanitizeNullableString($payload['event_id']),
+            'bucket' => sanitize_text_field((string) $payload['bucket']),
+            'ga4_sent' => (int) $payload['ga4_sent'],
+            'meta_sent' => (int) $payload['meta_sent'],
+            'raw_json' => $rawJson,
+        ];
+
+        $formats = [
+            'booking_code' => '%s',
+            'status' => '%s',
+            'checkin' => '%s',
+            'checkout' => '%s',
+            'currency' => '%s',
+            'amount' => '%f',
+            'guest_email_hash' => '%s',
+            'guest_phone_hash' => '%s',
+            'booking_intent_id' => '%s',
+            'sid' => '%s',
+            'client_ip' => '%s',
+            'client_user_agent' => '%s',
+            'event_timestamp' => '%d',
+            'event_id' => '%s',
+            'bucket' => '%s',
+            'ga4_sent' => '%d',
+            'meta_sent' => '%d',
+            'raw_json' => '%s',
+        ];
+
+        foreach ($data as $column => $value) {
+            if ($value === null) {
+                unset($data[$column], $formats[$column]);
+            }
+        }
+
         $inserted = $wpdb->insert(
             $this->getTableName(),
-            [
-                'booking_code' => $bookingCode,
-                'status' => sanitize_text_field((string) $payload['status']),
-                'checkin' => $this->sanitizeDate($payload['checkin']),
-                'checkout' => $this->sanitizeDate($payload['checkout']),
-                'currency' => strtoupper(sanitize_text_field((string) $payload['currency'])),
-                'amount' => (float) $payload['amount'],
-                'guest_email_hash' => sanitize_text_field((string) $payload['guest_email_hash']),
-                'guest_phone_hash' => sanitize_text_field((string) $payload['guest_phone_hash']),
-                'booking_intent_id' => $this->sanitizeNullableString($payload['booking_intent_id']),
-                'sid' => sanitize_text_field((string) ($payload['sid'] ?? '')),
-                'client_ip' => $this->sanitizeIp($payload['client_ip'] ?? ''),
-                'client_user_agent' => $this->sanitizeUserAgent($payload['client_user_agent'] ?? ''),
-                'event_timestamp' => isset($payload['event_timestamp']) && $payload['event_timestamp'] !== null ? (int) $payload['event_timestamp'] : null,
-                'event_id' => $this->sanitizeNullableString($payload['event_id']),
-                'bucket' => sanitize_text_field((string) $payload['bucket']),
-                'ga4_sent' => (int) $payload['ga4_sent'],
-                'meta_sent' => (int) $payload['meta_sent'],
-                'raw_json' => $rawJson,
-            ],
-            [
-                '%s', '%s', '%s', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%d', '%d', '%s',
-            ]
+            $data,
+            array_values($formats)
         );
 
         if ($inserted === false) {
@@ -529,11 +556,16 @@ final class Conversions
             return null;
         }
 
-        if (!is_string($value)) {
+        if ($value instanceof \Stringable) {
+            $value = (string) $value;
+        } elseif (is_int($value) || is_float($value)) {
+            $value = (string) $value;
+        } elseif (!is_string($value)) {
             return null;
         }
 
         $sanitized = sanitize_text_field($value);
+        $sanitized = trim($sanitized);
 
         return $sanitized === '' ? null : $sanitized;
     }
@@ -607,10 +639,29 @@ final class Conversions
         return $date->format('Y-m-d');
     }
 
-    private function getWpdb(): ?wpdb
+    /**
+     * @return wpdb|object|null
+     */
+    private function getWpdb()
     {
         global $wpdb;
 
-        return $wpdb instanceof wpdb ? $wpdb : null;
+        if (!is_object($wpdb)) {
+            return null;
+        }
+
+        if ($wpdb instanceof wpdb) {
+            return $wpdb;
+        }
+
+        $requiredMethods = ['insert', 'get_var', 'get_row', 'get_results', 'prepare', 'get_charset_collate'];
+
+        foreach ($requiredMethods as $method) {
+            if (!method_exists($wpdb, $method)) {
+                return null;
+            }
+        }
+
+        return $wpdb;
     }
 }

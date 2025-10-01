@@ -5,6 +5,155 @@ if (!defined('ABSPATH')) {
 if (!defined('WP_CONTENT_DIR')) {
     define('WP_CONTENT_DIR', sys_get_temp_dir());
 }
+
+if (!function_exists('wp_parse_args')) {
+    function wp_parse_args($args, $defaults = [])
+    {
+        if (\is_object($args)) {
+            $args = get_object_vars($args);
+        } elseif (\is_string($args)) {
+            parse_str($args, $parsed);
+            $args = $parsed;
+        }
+
+        if (!\is_array($args)) {
+            $args = [];
+        }
+
+        if (!\is_array($defaults)) {
+            $defaults = [];
+        }
+
+        return array_merge($defaults, $args);
+    }
+}
+
+if (!class_exists('WP_REST_Request')) {
+    class WP_REST_Request
+    {
+        /** @var array<string,mixed> */
+        private array $params = [];
+
+        /** @var array<string,string> */
+        private array $headers = [];
+
+        private ?string $body = null;
+
+        private string $method = 'GET';
+
+        private string $route = '';
+
+        public function __construct($method = 'GET', $route = '', $attributes = [])
+        {
+            if (\is_array($method)) {
+                $this->params = $method;
+                $this->method = 'POST';
+                $this->route = '';
+
+                if (\is_array($route)) {
+                    foreach ($route as $name => $value) {
+                        $this->set_header((string) $name, (string) $value);
+                    }
+                }
+
+                return;
+            }
+
+            if (\is_string($method) && $method !== '') {
+                $this->method = strtoupper($method);
+            }
+
+            if (\is_string($route)) {
+                $this->route = $route;
+            }
+
+            if (\is_array($attributes)) {
+                $this->params = $attributes;
+            }
+        }
+
+        public function set_param($key, $value): void
+        {
+            $this->params[(string) $key] = $value;
+        }
+
+        public function get_param($key)
+        {
+            $key = (string) $key;
+
+            return $this->params[$key] ?? null;
+        }
+
+        /** @return array<string,mixed> */
+        public function get_params(): array
+        {
+            return $this->params;
+        }
+
+        /** @return array<string,mixed> */
+        public function get_query_params(): array
+        {
+            return $this->params;
+        }
+
+        public function set_header($key, $value): void
+        {
+            $this->headers[strtolower((string) $key)] = (string) $value;
+        }
+
+        public function get_header($key): string
+        {
+            $key = strtolower((string) $key);
+
+            return $this->headers[$key] ?? '';
+        }
+
+        /** @return array<string,string> */
+        public function get_headers(): array
+        {
+            return $this->headers;
+        }
+
+        public function set_body($body): void
+        {
+            $this->body = (string) $body;
+        }
+
+        public function get_body()
+        {
+            return $this->body;
+        }
+
+        public function get_content(): string
+        {
+            return $this->body ?? '';
+        }
+
+        /** @return array<string,mixed> */
+        public function get_json_params(): array
+        {
+            $decoded = json_decode($this->body ?? '', true);
+
+            return \is_array($decoded) ? $decoded : [];
+        }
+
+        /** @return array<string,mixed> */
+        public function get_body_params(): array
+        {
+            return $this->get_json_params();
+        }
+
+        public function get_method(): string
+        {
+            return $this->method;
+        }
+
+        public function get_route(): string
+        {
+            return $this->route;
+        }
+    }
+}
 // Basic WordPress stubs for autoloaded files
 if (!function_exists('add_action')) {
     function add_action($hook, $callback, $priority = 10, $accepted_args = 1) {

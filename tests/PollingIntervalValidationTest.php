@@ -1,4 +1,5 @@
 <?php
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/bootstrap.php';
@@ -7,9 +8,7 @@ require_once __DIR__ . '/../includes/config-validator.php';
 
 final class PollingIntervalValidationTest extends TestCase
 {
-    /**
-     * @dataProvider validIntervalsProvider
-     */
+    #[DataProvider('validIntervalsProvider')]
     public function test_valid_intervals_do_not_trigger_warning(string $interval): void
     {
         update_option('hic_property_id', '123');

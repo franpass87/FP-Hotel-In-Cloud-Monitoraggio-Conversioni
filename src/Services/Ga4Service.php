@@ -5,6 +5,7 @@ namespace FpHic\HicS2S\Services;
 use FpHic\HicS2S\Admin\SettingsPage;
 use FpHic\HicS2S\Repository\Logs;
 use FpHic\HicS2S\Support\Http;
+use FpHic\HicS2S\Support\WpHttp;
 use FpHic\HicS2S\ValueObjects\BookingPayload;
 
 if (!defined('ABSPATH')) {
@@ -219,15 +220,11 @@ final class Ga4Service
      */
     private function extractRetryAfter($response, ?int $code): ?int
     {
-        if (!is_array($response)) {
-            return null;
-        }
-
         if ($code !== 429 && ($code === null || $code < 500 || $code >= 600)) {
             return null;
         }
 
-        $header = wp_remote_retrieve_header($response, 'retry-after');
+        $header = WpHttp::retrieveHeader($response, 'retry-after');
 
         if (!is_string($header) || trim($header) === '') {
             return null;

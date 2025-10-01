@@ -27,6 +27,10 @@ if (!defined('HIC_PLUGIN_BASENAME')) {
     define('HIC_PLUGIN_BASENAME', \plugin_basename(__FILE__));
 }
 
+if (!defined('HIC_S2S_DISABLE_LEGACY_WEBHOOK_ROUTE')) {
+    define('HIC_S2S_DISABLE_LEGACY_WEBHOOK_ROUTE', true);
+}
+
 \add_action('plugins_loaded', function () {
     \load_plugin_textdomain('hotel-in-cloud', false, \dirname(\plugin_basename(__FILE__)) . '/languages');
 });
