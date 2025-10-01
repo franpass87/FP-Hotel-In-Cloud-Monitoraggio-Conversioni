@@ -286,6 +286,20 @@ if (!function_exists('wp_unschedule_event')) { function wp_unschedule_event(...$
 if (!function_exists('wp_clear_scheduled_hook')) { function wp_clear_scheduled_hook(...$args) { return true; } }
 if (!function_exists('wp_schedule_single_event')) {
     function wp_schedule_single_event(...$args) {
+        if (!isset($GLOBALS['wp_scheduled_events'])) {
+            $GLOBALS['wp_scheduled_events'] = [];
+        }
+
+        if (array_key_exists('hic_test_schedule_single_event_return', $GLOBALS)) {
+            $forced = $GLOBALS['hic_test_schedule_single_event_return'];
+
+            if ($forced) {
+                $GLOBALS['wp_scheduled_events'][] = $args;
+            }
+
+            return $forced;
+        }
+
         $GLOBALS['wp_scheduled_events'][] = $args;
         return true;
     }

@@ -157,7 +157,7 @@ Lifecycle::registerNetworkProvisioningHook();
 
         \wp_localize_script('hic-frontend', 'hicFrontend', [
             'gtmEnabled'        => Helpers\hic_is_gtm_enabled(),
-            'gtmEventsEndpoint' => esc_url_raw(rest_url('hic/v1/gtm-events')),
+            'gtmEventsEndpoint' => \esc_url_raw(\rest_url('hic/v1/gtm-events')),
         ]);
     }
 });

@@ -330,12 +330,25 @@ class HIC_Booking_Poller {
     }
     
     /**
+     * Determine if WP-Cron is disabled.
+     */
+    private function is_wp_cron_disabled() {
+        $disabled = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
+
+        if (function_exists('apply_filters')) {
+            $disabled = (bool) apply_filters('hic_is_wp_cron_disabled', $disabled);
+        }
+
+        return $disabled;
+    }
+
+    /**
      * Check if WP-Cron is working
      */
     public function is_wp_cron_working() {
         // Check if WP-Cron is disabled
-        if (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) {
-            hic_log('WP-Cron is disabled via DISABLE_WP_CRON constant');
+        if ($this->is_wp_cron_disabled()) {
+            hic_log('WP-Cron reported as disabled');
             return false;
         }
         
@@ -387,7 +400,7 @@ class HIC_Booking_Poller {
             $cleanup_next ? wp_date('Y-m-d H:i:s', $cleanup_next) : 'NOT_SCHEDULED',
             $booking_cleanup_next ? wp_date('Y-m-d H:i:s', $booking_cleanup_next) : 'NOT_SCHEDULED',
             $brevo_retry_next ? wp_date('Y-m-d H:i:s', $brevo_retry_next) : 'NOT_SCHEDULED',
-            (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) ? 'YES' : 'NO',
+            $this->is_wp_cron_disabled() ? 'YES' : 'NO',
             $should_poll ? 'YES' : 'NO',
             $reliable_polling ? 'YES' : 'NO',
             $connection_type ?: 'NONE',
@@ -691,11 +704,39 @@ class HIC_Booking_Poller {
                 $this->ensure_scheduler_is_active();
                 
                 // Then schedule immediate fallback polling
-                wp_schedule_single_event(time() + 5, 'hic_fallback_poll_event');
-                add_action('hic_fallback_poll_event', array($this, 'execute_fallback_polling'));
-                
-                hic_log("Fallback: Restarted scheduler and scheduled immediate fallback polling via {$context['type']} traffic");
-                
+                $scheduled = false;
+
+                if (function_exists('wp_schedule_single_event')) {
+                    $schedule_result = wp_schedule_single_event(time() + 5, 'hic_fallback_poll_event');
+
+                    if (is_wp_error($schedule_result)) {
+                        hic_log(
+                            'Fallback: Failed to schedule fallback polling event - ' . $schedule_result->get_error_message(),
+                            HIC_LOG_LEVEL_ERROR
+                        );
+                    } else {
+                        $scheduled = (bool) $schedule_result;
+                    }
+                }
+
+                if ($scheduled && function_exists('add_action')) {
+                    $callback = array($this, 'execute_fallback_polling');
+
+                    if (!function_exists('has_action') || false === has_action('hic_fallback_poll_event', $callback)) {
+                        add_action('hic_fallback_poll_event', $callback);
+                    }
+                }
+
+                $cron_disabled = $this->is_wp_cron_disabled();
+
+                if ($cron_disabled || !$scheduled) {
+                    $reason = $cron_disabled ? 'WP-Cron disabled' : 'scheduling failure';
+                    hic_log("Fallback: {$reason} - executing fallback polling immediately via {$context['type']} traffic");
+                    $this->execute_fallback_polling();
+                } else {
+                    hic_log("Fallback: Restarted scheduler and scheduled immediate fallback polling via {$context['type']} traffic");
+                }
+
                 // Update recovery statistics
                 $this->update_web_traffic_recovery_stats($context, $polling_lag);
             } else {
@@ -1385,7 +1426,7 @@ class HIC_Booking_Poller {
         // Add WP-Cron specific info (always show for debugging)
         $stats['next_continuous_scheduled'] = \FpHic\Helpers\hic_safe_wp_next_scheduled('hic_continuous_poll_event');
         $stats['deep_check_disabled'] = false;
-        $stats['wp_cron_disabled'] = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
+        $stats['wp_cron_disabled'] = $this->is_wp_cron_disabled();
 
         return $stats;
     }

@@ -45,11 +45,25 @@ namespace {
     use FpHic\HIC_Booking_Poller;
     use PHPUnit\Framework\TestCase;
 
+    function hic_force_wp_cron_disabled_filter($disabled)
+    {
+        return true;
+    }
+
     require_once __DIR__ . '/../includes/booking-poller.php';
 
     class BookingPollerSchedulerTest extends TestCase {
         protected function setUp(): void {
             $GLOBALS['poll_calls'] = [];
+            if (!isset($GLOBALS['hic_test_hooks'])) {
+                $GLOBALS['hic_test_hooks'] = [];
+            }
+            if (!isset($GLOBALS['hic_test_filters'])) {
+                $GLOBALS['hic_test_filters'] = [];
+            }
+            if (!isset($GLOBALS['wp_scheduled_events'])) {
+                $GLOBALS['wp_scheduled_events'] = [];
+            }
             update_option('hic_last_successful_poll', 0);
             update_option('hic_last_deep_check', 0);
         }
@@ -219,6 +233,84 @@ namespace {
             $poller->run_watchdog_check();
 
             $this->assertSame($sentinel, get_option('hic_last_updates_since'));
+        }
+
+        public function test_fallback_polling_runs_immediately_when_wp_cron_disabled(): void {
+            $poller = new HIC_Booking_Poller();
+
+            update_option('hic_reliable_polling_enabled', '1');
+            update_option('hic_connection_type', 'api');
+            update_option('hic_api_url', 'https://api.example.com');
+            update_option('hic_property_id', 'prop_123');
+            update_option('hic_api_email', 'user@example.com');
+            update_option('hic_api_password', 'secret');
+            update_option('hic_last_continuous_poll', time() - 7200);
+            update_option('hic_last_successful_poll', time() - 7200);
+
+            delete_transient('hic_fallback_polling_lock');
+
+            add_filter('hic_is_wp_cron_disabled', '\\hic_force_wp_cron_disabled_filter');
+
+            $poller->fallback_polling_check();
+
+            remove_filter('hic_is_wp_cron_disabled', '\\hic_force_wp_cron_disabled_filter');
+
+            $this->assertContains('continuous', $GLOBALS['poll_calls']);
+        }
+
+        public function test_fallback_polling_runs_immediately_when_single_event_errors(): void
+        {
+            $poller = new HIC_Booking_Poller();
+
+            update_option('hic_reliable_polling_enabled', '1');
+            update_option('hic_connection_type', 'api');
+            update_option('hic_api_url', 'https://api.example.com');
+            update_option('hic_property_id', 'prop_123');
+            update_option('hic_api_email', 'user@example.com');
+            update_option('hic_api_password', 'secret');
+            update_option('hic_last_continuous_poll', time() - 7200);
+            update_option('hic_last_successful_poll', time() - 7200);
+
+            delete_transient('hic_fallback_polling_lock');
+
+            $GLOBALS['hic_test_schedule_single_event_return'] = new \WP_Error('schedule_failed', 'Forced failure');
+
+            $poller->fallback_polling_check();
+
+            unset($GLOBALS['hic_test_schedule_single_event_return']);
+
+            $this->assertContains('continuous', $GLOBALS['poll_calls']);
+        }
+
+        public function test_fallback_event_handler_not_registered_multiple_times(): void
+        {
+            $poller = new HIC_Booking_Poller();
+
+            $initial_count = $this->get_hook_registration_count('hic_fallback_poll_event');
+
+            update_option('hic_reliable_polling_enabled', '1');
+            update_option('hic_connection_type', 'api');
+            update_option('hic_api_url', 'https://api.example.com');
+            update_option('hic_property_id', 'prop_123');
+            update_option('hic_api_email', 'user@example.com');
+            update_option('hic_api_password', 'secret');
+            update_option('hic_last_continuous_poll', time() - 7200);
+            update_option('hic_last_successful_poll', time() - 7200);
+
+            delete_transient('hic_fallback_polling_lock');
+
+            $poller->fallback_polling_check();
+
+            $this->assertSame($initial_count, $this->get_hook_registration_count('hic_fallback_poll_event'));
+        }
+
+        private function get_hook_registration_count(string $hook, int $priority = 10): int
+        {
+            if (empty($GLOBALS['hic_test_hooks'][$hook][$priority])) {
+                return 0;
+            }
+
+            return \count($GLOBALS['hic_test_hooks'][$hook][$priority]);
         }
     }
 }
