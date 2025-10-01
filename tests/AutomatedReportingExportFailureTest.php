@@ -143,7 +143,7 @@ final class AutomatedReportingExportFailureTest extends TestCase
         $this->expectExceptionMessage('Unable to open export file for writing. Please verify the export directory is writable.');
 
         try {
-            $method->invoke($manager, [['id' => 1]], 'last_7_days');
+            $method->invoke($manager, 'last_7_days');
         } finally {
             $GLOBALS['hic_test_fail_fopen_directory'] = null;
         }

@@ -1,0 +1,135 @@
+{
+  "meta": {
+    "plugin": "FP HIC Monitor",
+    "date": "2025-01-16",
+    "wp_min": "6.6",
+    "php_targets": [
+      "8.2",
+      "8.3"
+    ]
+  },
+  "summary": {
+    "files_scanned": 176,
+    "files_total": 176,
+    "issues_total": 3,
+    "by_severity": {
+      "critical": 0,
+      "high": 1,
+      "medium": 1,
+      "low": 1
+    }
+  },
+  "issues": [
+    {
+      "id": "ISSUE-001",
+      "severity": "high",
+      "category": [
+        "security",
+        "files"
+      ],
+      "file": "includes/helpers-logging.php",
+      "line": 80,
+      "snippet": "$desiredHtaccess = \"Order allow,deny\\nDeny from all\\n\";",
+      "diagnosis": "Log and export directories rely only on legacy .htaccess directives; on Apache 2.4 without mod_access_compat or servers that ignore .htaccess (Nginx/LiteSpeed) the protection fails and PII becomes downloadable.",
+      "impact": "Attackers can fetch hic-log.txt or exported CSV/XLSX files directly, leaking customer data.",
+      "repro": [
+        "Install on a host without .htaccess support (e.g. Nginx).",
+        "Trigger a log/export file generation.",
+        "Request /wp-content/uploads/hic-logs/hic-log.txt to see the contents served."
+      ],
+      "proposed_fix": "Add Require all denied to the generated .htaccess files, drop index.php placeholders, and register a runtime template_redirect guard (or move storage outside webroot) so file access is blocked even without .htaccess support.",
+      "effort": "M",
+      "tags": [
+        "security",
+        "privacy",
+        "nginx",
+        "apache"
+      ]
+    },
+    {
+      "id": "ISSUE-002",
+      "severity": "medium",
+      "category": [
+        "performance",
+        "export"
+      ],
+      "file": "includes/automated-reporting.php",
+      "line": 2183,
+      "snippet": "return $wpdb->get_results($sql, ARRAY_A);",
+      "diagnosis": "get_raw_data_for_period() loads the entire hic_booking_metrics table slice into memory before writing CSV/XLSX, which does not scale for high-volume hotels.",
+      "impact": "Large exports can exhaust memory or hit timeouts, breaking manual and scheduled reports on shared hosting.",
+      "repro": [
+        "Populate hic_booking_metrics with tens of thousands of rows.",
+        "Run the \"Export CSV\" action in Automated Reporting.",
+        "Observe PHP memory spike or fatal error before completion."
+      ],
+      "proposed_fix": "Switch to chunked iteration (LIMIT/OFFSET or primary-key pagination) and stream each batch to the file handle so only a small slice is in memory at any time.",
+      "effort": "M",
+      "tags": [
+        "performance",
+        "wpdb",
+        "export"
+      ]
+    },
+    {
+      "id": "ISSUE-003",
+      "severity": "low",
+      "category": [
+        "i18n",
+        "ux"
+      ],
+      "file": "includes/automated-reporting.php",
+      "line": 1951,
+      "snippet": "wp_send_json_error('Invalid nonce');",
+      "diagnosis": "Automated reporting AJAX endpoints respond with hard-coded English strings, bypassing the plugin text domain.",
+      "impact": "Localized dashboards show untranslated error/success messages, degrading UX consistency.",
+      "repro": [
+        "Switch site language to Italian.",
+        "Submit the manual report form with an invalid nonce.",
+        "Notice the English error returned."
+      ],
+      "proposed_fix": "Wrap all AJAX response strings in __()/esc_html__() with the 'hotel-in-cloud' text-domain.",
+      "effort": "S",
+      "tags": [
+        "i18n",
+        "admin-ajax"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "paths": [
+        "includes/api/webhook.php",
+        "src/Http/Controllers/WebhookController.php"
+      ],
+      "detail": "Both files register a conversion webhook; the legacy include is disabled via HIC_S2S_DISABLE_LEGACY_WEBHOOK_ROUTE but still duplicates logic."
+    }
+  ],
+  "compat": {
+    "deprecated": [
+      "Augment .htaccess files with 'Require all denied' for Apache 2.4+ compatibility."
+    ],
+    "php_warnings": []
+  },
+  "perf": {
+    "hotspots": [
+      "includes/automated-reporting.php:2183-2210 loads full booking metrics set into memory before writing exports."
+    ],
+    "autoload_options": [],
+    "cron": []
+  },
+  "i18n": {
+    "domain_issues": [
+      "Automated reporting AJAX responses bypass translation helpers (ISSUE-003)."
+    ],
+    "missing": []
+  },
+  "tests": {
+    "gaps": [
+      "No automated coverage for export streaming or file-access guards."
+    ],
+    "suggestions": [
+      "Add integration tests ensuring exports stream in batches without exhausting memory once refactored."
+    ]
+  }
+}

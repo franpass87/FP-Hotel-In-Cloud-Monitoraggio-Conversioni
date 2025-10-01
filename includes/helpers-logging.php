@@ -78,10 +78,12 @@ function hic_ensure_log_directory_security(): array
     }
 
     $htaccessPath = $logDir . DIRECTORY_SEPARATOR . '.htaccess';
-    $desiredHtaccess = "Order allow,deny\nDeny from all\n";
+    $desiredHtaccess = "Require all denied\n<IfModule mod_access_compat.c>\nOrder allow,deny\nDeny from all\n</IfModule>\n";
     $existingHtaccess = is_readable($htaccessPath) ? file_get_contents($htaccessPath) : '';
+    $htaccessIsHardened = is_string($existingHtaccess)
+        && strpos($existingHtaccess, 'Require all denied') !== false;
 
-    if (is_string($existingHtaccess) && strpos($existingHtaccess, 'Deny from all') !== false) {
+    if ($htaccessIsHardened) {
         $status['htaccess'] = true;
     } elseif ($directoryWritable) {
         if (function_exists('error_clear_last')) {
@@ -138,6 +140,115 @@ XML;
     }
 
     return $status;
+}
+
+/**
+ * Derive the relative request prefixes that must be blocked when static files are exposed.
+ *
+ * @return array<int,string>
+ */
+function hic_get_protected_upload_request_paths(): array
+{
+    if (!function_exists('wp_get_upload_dir')) {
+        return [];
+    }
+
+    $uploads = wp_get_upload_dir();
+
+    if (empty($uploads['basedir']) || empty($uploads['baseurl'])) {
+        return [];
+    }
+
+    $protectedDirectories = [];
+
+    $logDirectory = hic_get_log_directory();
+    if (is_string($logDirectory) && $logDirectory !== '') {
+        $protectedDirectories[] = $logDirectory;
+    }
+
+    $protectedDirectories[] = rtrim($uploads['basedir'], '/\\') . '/hic-exports';
+
+    $baseDir = wp_normalize_path($uploads['basedir']);
+    $baseDir = rtrim($baseDir, '/');
+
+    $paths = [];
+
+    foreach ($protectedDirectories as $directory) {
+        if (!is_string($directory) || $directory === '') {
+            continue;
+        }
+
+        $normalizedDirectory = wp_normalize_path($directory);
+
+        if ($normalizedDirectory === '' || strpos($normalizedDirectory, $baseDir) !== 0) {
+            continue;
+        }
+
+        $relative = ltrim(substr($normalizedDirectory, strlen($baseDir)), '/');
+
+        if ($relative === '') {
+            continue;
+        }
+
+        $relativeUrl = wp_make_link_relative(trailingslashit($uploads['baseurl']) . $relative . '/');
+        $relativeUrl = '/' . ltrim($relativeUrl, '/');
+
+        if (substr($relativeUrl, -1) !== '/') {
+            $relativeUrl .= '/';
+        }
+
+        $paths[] = $relativeUrl;
+    }
+
+    return array_values(array_unique($paths));
+}
+
+/**
+ * Block direct web requests to sensitive upload directories when WordPress handles the request.
+ */
+function hic_block_sensitive_upload_access(): void
+{
+    if (is_admin() || wp_doing_ajax() || wp_doing_cron()) {
+        return;
+    }
+
+    if (defined('REST_REQUEST') && REST_REQUEST) {
+        return;
+    }
+
+    $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+
+    if ($requestUri === '') {
+        return;
+    }
+
+    $requestPath = wp_parse_url($requestUri, PHP_URL_PATH);
+
+    if (!is_string($requestPath) || $requestPath === '') {
+        return;
+    }
+
+    $normalizedRequest = '/' . ltrim($requestPath, '/');
+
+    foreach (hic_get_protected_upload_request_paths() as $protectedPrefix) {
+        if ($protectedPrefix !== '' && strpos($normalizedRequest, $protectedPrefix) === 0) {
+            status_header(404);
+            nocache_headers();
+            exit;
+        }
+    }
+}
+
+/**
+ * Register guards that deny unauthenticated access to sensitive upload directories.
+ */
+function hic_register_sensitive_upload_guards(): void
+{
+    if (!function_exists('add_action')) {
+        return;
+    }
+
+    add_action('template_redirect', __NAMESPACE__ . '\\hic_block_sensitive_upload_access', 0);
 }
 
 function hic_validate_log_path($path) {

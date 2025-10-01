@@ -58,6 +58,7 @@ if (!$vendor_available) {
 
 // Initialize helper hooks immediately after loading core files
 Helpers\hic_init_helper_hooks();
+Helpers\hic_register_sensitive_upload_guards();
 
 if (\function_exists('register_uninstall_hook')) {
     \register_uninstall_hook(__FILE__, __NAMESPACE__ . '\\hic_uninstall_plugin');
