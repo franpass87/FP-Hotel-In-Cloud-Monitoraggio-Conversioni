@@ -1,0 +1,69 @@
+name: Build Plugin Zip
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+      - name: Optimize autoloader
+        run: composer dump-autoload -o --classmap-authoritative
+
+      - name: Prepare build directory
+        run: |
+          SLUG="fp-hotel-in-cloud-monitoraggio-conversioni"
+          BUILD_DIR="build/$SLUG"
+          rm -rf "$BUILD_DIR"
+          mkdir -p "$BUILD_DIR"
+          rsync -a \
+            --exclude=.git \
+            --exclude=.github \
+            --exclude=tests \
+            --exclude=docs \
+            --exclude=node_modules \
+            --exclude='*.md' \
+            --exclude=.idea \
+            --exclude=.vscode \
+            --exclude=build \
+            --exclude=.gitattributes \
+            --exclude=.gitignore \
+            --exclude=.codex-state.json \
+            --exclude=.phpunit.result.cache \
+            --exclude=build.sh \
+            --exclude=README-BUILD.md \
+            --exclude=build-plugin.sh \
+            --exclude=scripts \
+            --exclude='demo-*' \
+            --exclude=qa-runner.php \
+            --exclude='validate-*.php' \
+            ./ "$BUILD_DIR/"
+
+      - name: Create zip
+        run: |
+          SLUG="fp-hotel-in-cloud-monitoraggio-conversioni"
+          VERSION_LINE=$(grep -m1 -E '^\s*\*\s*Version:' FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php)
+          VERSION=${VERSION_LINE##*: }
+          ZIP_NAME="$SLUG-$VERSION.zip"
+          cd build
+          zip -r "$ZIP_NAME" "$SLUG"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-zip
+          path: build/*.zip

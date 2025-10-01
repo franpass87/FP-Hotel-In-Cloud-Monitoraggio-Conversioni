@@ -3,6 +3,9 @@
     "description": "FP HIC Monitor - Plugin per monitoraggio conversioni Hotel in Cloud",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.0"
+    },
     "autoload": {
         "psr-4": {
             "FpHic\\": "includes/",
@@ -49,7 +52,12 @@
         "quality:fix": [
             "@lint:fix"
         ],
-        "i18n:pot": "php tools/make-pot.php"
+        "i18n:pot": "php tools/make-pot.php",
+        "build": [
+            "rm -rf vendor",
+            "@composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader",
+            "composer dump-autoload -o --classmap-authoritative"
+        ]
     },
     "archive": {
         "exclude": [
@@ -59,6 +67,11 @@
     "config": {
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true
-        }
+        },
+        "platform": {
+            "php": "8.2.0"
+        },
+        "optimize-autoloader": true,
+        "sort-packages": true
     }
 }
