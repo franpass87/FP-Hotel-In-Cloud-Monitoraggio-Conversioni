@@ -397,10 +397,15 @@ class AutomatedReportingManager {
      */
     private function collect_daily_data() {
         global $wpdb;
-        
-        $main_table = $wpdb->prefix . 'hic_gclids';
-        $today = current_time('Y-m-d');
-        
+
+        $main_table = $wpdb->prefix . 'hic_booking_metrics';
+        $current_day = current_time('mysql');
+        if (!is_string($current_day) || $current_day === '') {
+            $today = gmdate('Y-m-d');
+        } else {
+            $today = substr($current_day, 0, 10);
+        }
+
         $data = [
             'period' => 'daily',
             'date_range' => $today,
@@ -410,48 +415,152 @@ class AutomatedReportingManager {
             'by_medium' => [],
             'conversions' => []
         ];
-        
-        // Summary statistics
+
+        // Summary statistics based on actual booking metrics.
         $data['summary'] = $wpdb->get_row($wpdb->prepare("
-            SELECT 
-                COUNT(*) as total_bookings,
-                COUNT(DISTINCT gclid) as google_conversions,
-                COUNT(DISTINCT fbclid) as facebook_conversions,
-                COUNT(DISTINCT CASE WHEN utm_source = '' OR utm_source IS NULL THEN sid END) as direct_conversions,
-                COUNT(*) * 150 as estimated_revenue
-            FROM {$main_table} 
+            SELECT
+                SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as total_bookings,
+                SUM(CASE WHEN COALESCE(is_refund, 0) = 0 AND LOWER(COALESCE(NULLIF(utm_source, ''), 'direct')) = 'google' THEN 1 ELSE 0 END) as google_conversions,
+                SUM(CASE WHEN COALESCE(is_refund, 0) = 0 AND LOWER(COALESCE(NULLIF(utm_source, ''), 'direct')) = 'facebook' THEN 1 ELSE 0 END) as facebook_conversions,
+                SUM(CASE WHEN COALESCE(is_refund, 0) = 0 AND LOWER(COALESCE(NULLIF(utm_source, ''), 'direct')) = 'direct' THEN 1 ELSE 0 END) as direct_conversions,
+                COALESCE(SUM(amount), 0) as estimated_revenue
+            FROM {$main_table}
             WHERE DATE(created_at) = %s
         ", $today), ARRAY_A);
-        
-        // Hourly breakdown
+
+        // Hourly breakdown with real revenue totals.
         $data['by_hour'] = $wpdb->get_results($wpdb->prepare("
-            SELECT 
+            SELECT
                 HOUR(created_at) as hour,
-                COUNT(*) as bookings,
-                COUNT(*) * 150 as revenue
-            FROM {$main_table} 
+                SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as bookings,
+                COALESCE(SUM(amount), 0) as revenue
+            FROM {$main_table}
             WHERE DATE(created_at) = %s
             GROUP BY HOUR(created_at)
             ORDER BY hour
         ", $today), ARRAY_A);
-        
-        // By source
-        $data['by_source'] = $wpdb->get_results($wpdb->prepare("
-            SELECT 
-                CASE 
-                    WHEN utm_source = 'google' THEN 'Google'
-                    WHEN utm_source = 'facebook' THEN 'Facebook'
-                    WHEN utm_source = '' OR utm_source IS NULL THEN 'Direct'
-                    ELSE CONCAT(UPPER(SUBSTRING(utm_source, 1, 1)), SUBSTRING(utm_source, 2))
-                END as source,
-                COUNT(*) as bookings,
-                COUNT(*) * 150 as revenue
-            FROM {$main_table} 
+
+        if (is_array($data['by_hour'])) {
+            foreach ($data['by_hour'] as &$hour_data) {
+                $hour_data['bookings'] = isset($hour_data['bookings']) ? (int) $hour_data['bookings'] : 0;
+                $hour_data['revenue'] = isset($hour_data['revenue']) ? (float) $hour_data['revenue'] : 0.0;
+            }
+            unset($hour_data);
+        }
+
+        // Attribution by source with friendly labels.
+        $sources = $wpdb->get_results($wpdb->prepare("
+            SELECT
+                COALESCE(NULLIF(utm_source, ''), 'direct') as source_key,
+                SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as bookings,
+                COALESCE(SUM(amount), 0) as revenue
+            FROM {$main_table}
             WHERE DATE(created_at) = %s
-            GROUP BY source
+            GROUP BY source_key
             ORDER BY bookings DESC
         ", $today), ARRAY_A);
-        
+
+        foreach ($sources as $row) {
+            $data['by_source'][] = [
+                'source' => $this->normalize_source_label($row['source_key'] ?? ''),
+                'bookings' => isset($row['bookings']) ? (int) $row['bookings'] : 0,
+                'revenue' => isset($row['revenue']) ? (float) $row['revenue'] : 0.0,
+            ];
+        }
+
+        // Determine top-performing sources and campaigns for each hour to enrich exports.
+        $hourly_sources = $wpdb->get_results($wpdb->prepare("
+            SELECT
+                HOUR(created_at) AS hour,
+                utm_source AS source_key,
+                SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) AS bookings
+            FROM {$main_table}
+            WHERE DATE(created_at) = %s
+            GROUP BY HOUR(created_at), utm_source
+            ORDER BY HOUR(created_at), bookings DESC
+        ", $today), ARRAY_A);
+
+        $top_sources_by_hour = [];
+        foreach ($hourly_sources as $row) {
+            $hour = isset($row['hour']) ? (int) $row['hour'] : null;
+            if ($hour === null) {
+                continue;
+            }
+
+            $bookings = (int) ($row['bookings'] ?? 0);
+            if ($bookings <= 0) {
+                continue;
+            }
+
+            if (!isset($top_sources_by_hour[$hour]) || $bookings > $top_sources_by_hour[$hour]['bookings']) {
+                $top_sources_by_hour[$hour] = [
+                    'label' => $this->normalize_source_label($row['source_key'] ?? ''),
+                    'bookings' => $bookings,
+                ];
+            }
+        }
+
+        $hourly_campaigns = $wpdb->get_results($wpdb->prepare("
+            SELECT
+                HOUR(created_at) AS hour,
+                utm_campaign AS campaign_key,
+                SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) AS bookings
+            FROM {$main_table}
+            WHERE DATE(created_at) = %s
+            GROUP BY HOUR(created_at), utm_campaign
+            ORDER BY HOUR(created_at), bookings DESC
+        ", $today), ARRAY_A);
+
+        $top_campaigns_by_hour = [];
+        foreach ($hourly_campaigns as $row) {
+            $hour = isset($row['hour']) ? (int) $row['hour'] : null;
+            if ($hour === null) {
+                continue;
+            }
+
+            $bookings = (int) ($row['bookings'] ?? 0);
+            if ($bookings <= 0) {
+                continue;
+            }
+
+            if (!isset($top_campaigns_by_hour[$hour]) || $bookings > $top_campaigns_by_hour[$hour]['bookings']) {
+                $top_campaigns_by_hour[$hour] = [
+                    'label' => $this->normalize_campaign_label($row['campaign_key'] ?? ''),
+                    'bookings' => $bookings,
+                ];
+            }
+        }
+
+        if (is_array($data['by_hour'])) {
+            foreach ($data['by_hour'] as &$hour_data) {
+                $hour = isset($hour_data['hour']) ? (int) $hour_data['hour'] : null;
+                if ($hour === null) {
+                    continue;
+                }
+
+                $total_bookings = (int) ($hour_data['bookings'] ?? 0);
+
+                if (isset($top_sources_by_hour[$hour])) {
+                    $best_source = $top_sources_by_hour[$hour];
+                    $hour_data['top_source_label'] = $best_source['label'];
+                    $hour_data['top_source_count'] = $best_source['bookings'];
+                    $hour_data['top_source_share'] = $total_bookings > 0
+                        ? round(($best_source['bookings'] / $total_bookings) * 100, 1)
+                        : null;
+                }
+
+                if (isset($top_campaigns_by_hour[$hour])) {
+                    $best_campaign = $top_campaigns_by_hour[$hour];
+                    $hour_data['top_campaign_label'] = $best_campaign['label'];
+                    $hour_data['top_campaign_count'] = $best_campaign['bookings'];
+                    $hour_data['top_campaign_share'] = $total_bookings > 0
+                        ? round(($best_campaign['bookings'] / $total_bookings) * 100, 1)
+                        : null;
+                }
+            }
+            unset($hour_data);
+        }
+
         return $data;
     }
     
@@ -460,8 +569,8 @@ class AutomatedReportingManager {
      */
     private function collect_weekly_data() {
         global $wpdb;
-        
-        $main_table = $wpdb->prefix . 'hic_gclids';
+
+        $main_table = $wpdb->prefix . 'hic_booking_metrics';
 
         $current_timestamp = function_exists('current_time')
             ? (int) current_time('timestamp')
@@ -478,8 +587,8 @@ class AutomatedReportingManager {
             'by_campaign' => [],
             'performance_metrics' => []
         ];
-        
-        // Weekly summary
+
+        // Weekly summary aggregated from real bookings.
         $weekly_summary_sql = $wpdb->prepare(
             "
             SELECT
@@ -491,18 +600,18 @@ class AutomatedReportingManager {
                 ROUND(IFNULL(avg_stats.avg_bookings, 0), 2) as avg_daily_bookings
             FROM (
                 SELECT
-                    COUNT(*) as total_bookings,
-                    COUNT(DISTINCT gclid) as google_conversions,
-                    COUNT(DISTINCT fbclid) as facebook_conversions,
-                    COUNT(DISTINCT CASE WHEN utm_source = '' OR utm_source IS NULL THEN sid END) as direct_conversions,
-                    COUNT(*) * 150 as estimated_revenue
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as total_bookings,
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 AND LOWER(COALESCE(NULLIF(utm_source, ''), 'direct')) = 'google' THEN 1 ELSE 0 END) as google_conversions,
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 AND LOWER(COALESCE(NULLIF(utm_source, ''), 'direct')) = 'facebook' THEN 1 ELSE 0 END) as facebook_conversions,
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 AND LOWER(COALESCE(NULLIF(utm_source, ''), 'direct')) = 'direct' THEN 1 ELSE 0 END) as direct_conversions,
+                    COALESCE(SUM(amount), 0) as estimated_revenue
                 FROM {$main_table}
                 WHERE created_at >= %s
             ) as totals
             CROSS JOIN (
                 SELECT AVG(day_bookings) AS avg_bookings
                 FROM (
-                    SELECT COUNT(*) AS day_bookings
+                    SELECT SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) AS day_bookings
                     FROM {$main_table}
                     WHERE created_at >= %s
                     GROUP BY DATE(created_at)
@@ -513,16 +622,16 @@ class AutomatedReportingManager {
             $weekly_start
         );
         $data['summary'] = $wpdb->get_row($weekly_summary_sql, ARRAY_A);
-        
-        // Daily breakdown for the week
+
+        // Daily breakdown for the week with revenue totals.
         $data['daily_breakdown'] = $wpdb->get_results(
             $wpdb->prepare(
                 "
                 SELECT
                     DATE(created_at) as date,
                     DAYNAME(created_at) as day_name,
-                    COUNT(*) as bookings,
-                    COUNT(*) * 150 as revenue
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as bookings,
+                    COALESCE(SUM(amount), 0) as revenue
                 FROM {$main_table}
                 WHERE created_at >= %s
                 GROUP BY DATE(created_at)
@@ -532,30 +641,67 @@ class AutomatedReportingManager {
             ),
             ARRAY_A
         );
-        
-        // Top performing campaigns
+
+        $previous_bookings = null;
+        foreach ($data['daily_breakdown'] as &$day_data) {
+            $day_data['bookings'] = isset($day_data['bookings']) ? (int) $day_data['bookings'] : 0;
+            $day_data['revenue'] = isset($day_data['revenue']) ? (float) $day_data['revenue'] : 0.0;
+
+            $growth = $this->calculate_percentage_change((float) $day_data['bookings'], $previous_bookings);
+            $day_data['growth_percent'] = $growth !== null ? round($growth, 2) : null;
+            $previous_bookings = (float) $day_data['bookings'];
+        }
+        unset($day_data);
+
+        // Attribution aggregated for the week.
+        $source_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "
+                SELECT
+                    COALESCE(NULLIF(utm_source, ''), 'direct') as source_key,
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as bookings,
+                    COALESCE(SUM(amount), 0) as revenue
+                FROM {$main_table}
+                WHERE created_at >= %s
+                GROUP BY source_key
+                ORDER BY bookings DESC
+            ",
+                $weekly_start
+            ),
+            ARRAY_A
+        );
+
+        foreach ($source_rows as $row) {
+            $data['by_source'][] = [
+                'source' => $this->normalize_source_label($row['source_key'] ?? ''),
+                'bookings' => isset($row['bookings']) ? (int) $row['bookings'] : 0,
+                'revenue' => isset($row['revenue']) ? (float) $row['revenue'] : 0.0,
+            ];
+        }
+
+        // Top performing campaigns with actual booking counts.
         $data['by_campaign'] = $wpdb->get_results(
             $wpdb->prepare(
                 "
                 SELECT
                     utm_campaign as campaign,
-                    utm_source as source,
-                    COUNT(*) as bookings,
-                    COUNT(*) * 150 as revenue,
+                    COALESCE(NULLIF(utm_source, ''), 'direct') as source,
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as bookings,
+                    COALESCE(SUM(amount), 0) as revenue,
                     CASE
-                        WHEN totals.total_bookings > 0 THEN ROUND((COUNT(*) * 100.0) / totals.total_bookings, 2)
+                        WHEN totals.total_bookings > 0 THEN ROUND((SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) * 100.0) / totals.total_bookings, 2)
                         ELSE 0
                     END as percentage
                 FROM {$main_table}
                 CROSS JOIN (
-                    SELECT COUNT(*) as total_bookings
+                    SELECT SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as total_bookings
                     FROM {$main_table}
                     WHERE created_at >= %s
                     AND utm_campaign IS NOT NULL AND utm_campaign != ''
                 ) as totals
                 WHERE created_at >= %s
                 AND utm_campaign IS NOT NULL AND utm_campaign != ''
-                GROUP BY utm_campaign, utm_source
+                GROUP BY utm_campaign, source
                 ORDER BY bookings DESC
                 LIMIT 10
             ",
@@ -564,7 +710,14 @@ class AutomatedReportingManager {
             ),
             ARRAY_A
         );
-        
+
+        foreach ($data['by_campaign'] as &$campaign_row) {
+            $campaign_row['source'] = $this->normalize_source_label($campaign_row['source'] ?? '');
+            $campaign_row['bookings'] = isset($campaign_row['bookings']) ? (int) $campaign_row['bookings'] : 0;
+            $campaign_row['revenue'] = isset($campaign_row['revenue']) ? (float) $campaign_row['revenue'] : 0.0;
+        }
+        unset($campaign_row);
+
         return $data;
     }
     
@@ -573,8 +726,8 @@ class AutomatedReportingManager {
      */
     private function collect_monthly_data() {
         global $wpdb;
-        
-        $main_table = $wpdb->prefix . 'hic_gclids';
+
+        $main_table = $wpdb->prefix . 'hic_booking_metrics';
 
         $current_timestamp = function_exists('current_time')
             ? (int) current_time('timestamp')
@@ -590,8 +743,8 @@ class AutomatedReportingManager {
             'top_campaigns' => [],
             'channel_analysis' => []
         ];
-        
-        // Monthly summary with growth rates
+
+        // Monthly summary with real revenue.
         $monthly_summary_sql = $wpdb->prepare(
             "
             SELECT
@@ -602,17 +755,17 @@ class AutomatedReportingManager {
                 ROUND(IFNULL(avg_stats.avg_bookings, 0), 2) as avg_daily_bookings
             FROM (
                 SELECT
-                    COUNT(*) as total_bookings,
-                    COUNT(DISTINCT gclid) as google_conversions,
-                    COUNT(DISTINCT fbclid) as facebook_conversions,
-                    COUNT(*) * 150 as estimated_revenue
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as total_bookings,
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 AND LOWER(COALESCE(NULLIF(utm_source, ''), 'direct')) = 'google' THEN 1 ELSE 0 END) as google_conversions,
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 AND LOWER(COALESCE(NULLIF(utm_source, ''), 'direct')) = 'facebook' THEN 1 ELSE 0 END) as facebook_conversions,
+                    COALESCE(SUM(amount), 0) as estimated_revenue
                 FROM {$main_table}
                 WHERE created_at >= %s
             ) as totals
             CROSS JOIN (
                 SELECT AVG(day_bookings) AS avg_bookings
                 FROM (
-                    SELECT COUNT(*) AS day_bookings
+                    SELECT SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) AS day_bookings
                     FROM {$main_table}
                     WHERE created_at >= %s
                     GROUP BY DATE(created_at)
@@ -623,27 +776,62 @@ class AutomatedReportingManager {
             $monthly_start
         );
         $data['summary'] = $wpdb->get_row($monthly_summary_sql, ARRAY_A);
-        
-        // Weekly breakdown for trend analysis
+
+        // Weekly breakdown for trend analysis with real revenue.
         $data['weekly_breakdown'] = $wpdb->get_results(
             $wpdb->prepare(
                 "
                 SELECT
                     WEEK(created_at, 1) as week_number,
                     CONCAT('Week ', WEEK(created_at, 1)) as week_label,
-                    COUNT(*) as bookings,
-                    COUNT(*) * 150 as revenue
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as bookings,
+                    COALESCE(SUM(amount), 0) as revenue,
+                    MIN(DATE(created_at)) as week_start
                 FROM {$main_table}
                 WHERE created_at >= %s
                 GROUP BY WEEK(created_at, 1)
-                ORDER BY week_number
+                ORDER BY week_start
             ",
                 $monthly_start
             ),
             ARRAY_A
         );
-        
+
+        $previous_revenue = null;
+        foreach ($data['weekly_breakdown'] as &$week_data) {
+            $week_data['bookings'] = isset($week_data['bookings']) ? (int) $week_data['bookings'] : 0;
+            $week_data['revenue'] = isset($week_data['revenue']) ? (float) $week_data['revenue'] : 0.0;
+
+            $trend = $this->calculate_percentage_change($week_data['revenue'], $previous_revenue);
+            $week_data['trend_percent'] = $trend !== null ? round($trend, 2) : null;
+            $previous_revenue = $week_data['revenue'];
+        }
+        unset($week_data);
+
         return $data;
+    }
+
+    /**
+     * Calculate the percentage change between two numeric values.
+     */
+    private function calculate_percentage_change($current, $previous) {
+        $current_value = $current !== null ? (float) $current : 0.0;
+
+        if ($previous === null) {
+            return null;
+        }
+
+        $previous_value = (float) $previous;
+
+        if ($previous_value === 0.0) {
+            if ($current_value === 0.0) {
+                return 0.0;
+            }
+
+            return 100.0;
+        }
+
+        return (($current_value - $previous_value) / $previous_value) * 100.0;
     }
     
     /**
@@ -651,48 +839,71 @@ class AutomatedReportingManager {
      */
     private function get_period_comparison($period_type) {
         global $wpdb;
-        
-        $main_table = $wpdb->prefix . 'hic_gclids';
-        $intervals = [
-            'daily' => ['current' => 'CURDATE()', 'previous' => 'DATE_SUB(CURDATE(), INTERVAL 1 DAY)'],
-            'weekly' => ['current' => 'INTERVAL 7 DAY', 'previous' => 'INTERVAL 14 DAY'],
-            'monthly' => ['current' => 'INTERVAL 30 DAY', 'previous' => 'INTERVAL 60 DAY']
-        ];
-        
-        $interval = $intervals[$period_type] ?? $intervals['weekly'];
-        
-        // Get current period data
-        $current = $wpdb->get_row($wpdb->prepare("
-            SELECT 
-                COUNT(*) as bookings,
-                COUNT(*) * 150 as revenue
-            FROM {$main_table} 
-            WHERE created_at >= DATE_SUB(NOW(), %s)
-        ", $interval['current']), ARRAY_A);
-        
-        // Get previous period data
-        $previous = $wpdb->get_row($wpdb->prepare("
-            SELECT 
-                COUNT(*) as bookings,
-                COUNT(*) * 150 as revenue
-            FROM {$main_table} 
-            WHERE created_at >= DATE_SUB(NOW(), %s)
-            AND created_at < DATE_SUB(NOW(), %s)
-        ", $interval['previous'], $interval['current']), ARRAY_A);
-        
-        // Calculate growth rates
-        $booking_growth = $previous['bookings'] > 0 ? 
-            round((($current['bookings'] - $previous['bookings']) / $previous['bookings']) * 100, 2) : 0;
-            
-        $revenue_growth = $previous['revenue'] > 0 ? 
-            round((($current['revenue'] - $previous['revenue']) / $previous['revenue']) * 100, 2) : 0;
-        
+
+        $main_table = $wpdb->prefix . 'hic_booking_metrics';
+
+        $current_timestamp = function_exists('current_time')
+            ? (int) current_time('timestamp')
+            : time();
+        $seconds_per_day = defined('DAY_IN_SECONDS') ? (int) DAY_IN_SECONDS : 86400;
+
+        $range_days = 7;
+        if ($period_type === 'daily') {
+            $range_days = 1;
+        } elseif ($period_type === 'monthly') {
+            $range_days = 30;
+        }
+
+        $current_start = date('Y-m-d H:i:s', $current_timestamp - ($range_days * $seconds_per_day));
+        $previous_start = date('Y-m-d H:i:s', $current_timestamp - ($range_days * 2 * $seconds_per_day));
+
+        $current = $wpdb->get_row(
+            $wpdb->prepare(
+                "
+                SELECT
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as bookings,
+                    COALESCE(SUM(amount), 0) as revenue
+                FROM {$main_table}
+                WHERE created_at >= %s
+            ",
+                $current_start
+            ),
+            ARRAY_A
+        );
+
+        $previous = $wpdb->get_row(
+            $wpdb->prepare(
+                "
+                SELECT
+                    SUM(CASE WHEN COALESCE(is_refund, 0) = 0 THEN 1 ELSE 0 END) as bookings,
+                    COALESCE(SUM(amount), 0) as revenue
+                FROM {$main_table}
+                WHERE created_at >= %s
+                  AND created_at < %s
+            ",
+                $previous_start,
+                $current_start
+            ),
+            ARRAY_A
+        );
+
+        $current = is_array($current) ? $current : ['bookings' => 0, 'revenue' => 0.0];
+        $previous = is_array($previous) ? $previous : ['bookings' => 0, 'revenue' => 0.0];
+
+        $current['bookings'] = isset($current['bookings']) ? (int) $current['bookings'] : 0;
+        $current['revenue'] = isset($current['revenue']) ? (float) $current['revenue'] : 0.0;
+        $previous['bookings'] = isset($previous['bookings']) ? (int) $previous['bookings'] : 0;
+        $previous['revenue'] = isset($previous['revenue']) ? (float) $previous['revenue'] : 0.0;
+
+        $booking_growth = $this->calculate_percentage_change((float) $current['bookings'], (float) $previous['bookings']);
+        $revenue_growth = $this->calculate_percentage_change($current['revenue'], $previous['revenue']);
+
         return [
             'current' => $current,
             'previous' => $previous,
             'growth' => [
-                'bookings' => $booking_growth,
-                'revenue' => $revenue_growth
+                'bookings' => $booking_growth !== null ? round($booking_growth, 2) : 0.0,
+                'revenue' => $revenue_growth !== null ? round($revenue_growth, 2) : 0.0,
             ]
         ];
     }
@@ -774,15 +985,18 @@ class AutomatedReportingManager {
     private function generate_pdf_report($data, $report_type) {
         $filename = sprintf('hic-%s-report-%s.pdf', $report_type, date('Y-m-d-H-i-s'));
         $filepath = $this->export_dir . $filename;
-        
-        // Generate HTML content
-        $html_content = $this->generate_report_html($data, $report_type);
-        
-        // Convert to PDF (would use library like mPDF or TCPDF)
-        // For now, save as HTML
-        file_put_contents(str_replace('.pdf', '.html', $filepath), $html_content);
-        
-        return str_replace('.pdf', '.html', $filepath);
+
+        $report_data = is_array($data) ? $data : (array) $data;
+        $lines = $this->build_pdf_text_lines($report_data, (string) $report_type);
+        $pdf_binary = $this->render_pdf_document($lines);
+
+        if (@file_put_contents($filepath, $pdf_binary) === false) {
+            throw new \RuntimeException('Failed to write PDF report to ' . $filepath);
+        }
+
+        $this->log("PDF report generated: {$filename}");
+
+        return $filepath;
     }
     
     /**
@@ -846,8 +1060,16 @@ class AutomatedReportingManager {
                             isset($hour_data['hour']) ? $hour_data['hour'] . ':00' : '',
                             $hour_data['bookings'] ?? 0,
                             '€' . number_format((float)($hour_data['revenue'] ?? 0), 2),
-                            '', // Source placeholder
-                            '' // Campaign placeholder
+                            $this->format_share_label(
+                                $hour_data['top_source_label'] ?? null,
+                                $hour_data['top_source_share'] ?? null,
+                                $hour_data['top_source_count'] ?? null
+                            ),
+                            $this->format_share_label(
+                                $hour_data['top_campaign_label'] ?? null,
+                                $hour_data['top_campaign_share'] ?? null,
+                                $hour_data['top_campaign_count'] ?? null
+                            )
                         ];
                     }
                 }
@@ -863,7 +1085,7 @@ class AutomatedReportingManager {
                             $day_data['day_name'] ?? '',
                             $day_data['bookings'] ?? 0,
                             '€' . number_format((float)($day_data['revenue'] ?? 0), 2),
-                            '' // Growth placeholder
+                            $this->format_percentage($day_data['growth_percent'] ?? null)
                         ];
                     }
                 }
@@ -878,7 +1100,7 @@ class AutomatedReportingManager {
                             $week_data['week_label'] ?? '',
                             $week_data['bookings'] ?? 0,
                             '€' . number_format((float)($week_data['revenue'] ?? 0), 2),
-                            '' // Trend placeholder
+                            $this->format_trend_label($week_data['trend_percent'] ?? null)
                         ];
                     }
                 }
@@ -887,6 +1109,392 @@ class AutomatedReportingManager {
         }
 
         return [$headers, $rows];
+    }
+
+    /**
+     * Build plain-text lines for PDF rendering using booking metrics data.
+     *
+     * @param array<string, mixed> $data
+     * @param string $report_type
+     * @return array<int, string>
+     */
+    private function build_pdf_text_lines(array $data, string $report_type): array
+    {
+        $lines = [];
+
+        $lines[] = 'FP HIC Monitor - ' . ucfirst($report_type) . ' report';
+        $lines[] = 'Generated on ' . date('Y-m-d H:i');
+
+        if (!empty($data['date_range'])) {
+            $lines[] = 'Period: ' . (is_array($data['date_range']) ? implode(' to ', $data['date_range']) : (string) $data['date_range']);
+        }
+
+        $lines[] = '';
+
+        if (!empty($data['summary']) && is_array($data['summary'])) {
+            $summary = $data['summary'];
+            $lines[] = 'Summary';
+            $lines[] = '- Total bookings: ' . $this->format_number_value($summary['total_bookings'] ?? 0);
+            if (array_key_exists('estimated_revenue', $summary)) {
+                $lines[] = '- Estimated revenue: ' . $this->format_currency_value($summary['estimated_revenue']);
+            }
+            if (array_key_exists('google_conversions', $summary)) {
+                $lines[] = '- Google conversions: ' . $this->format_number_value($summary['google_conversions']);
+            }
+            if (array_key_exists('facebook_conversions', $summary)) {
+                $lines[] = '- Facebook conversions: ' . $this->format_number_value($summary['facebook_conversions']);
+            }
+            if (array_key_exists('direct_conversions', $summary)) {
+                $lines[] = '- Direct conversions: ' . $this->format_number_value($summary['direct_conversions']);
+            }
+            if (array_key_exists('avg_daily_bookings', $summary)) {
+                $lines[] = '- Average daily bookings: ' . $this->format_number_value($summary['avg_daily_bookings'], 2);
+            }
+        }
+
+        if (!empty($data['comparison']['growth'])) {
+            $growth = $data['comparison']['growth'];
+            $lines[] = '';
+            $lines[] = 'Period comparison';
+            $lines[] = '- Booking growth: ' . $this->format_percentage_ascii($growth['bookings'] ?? null, 2);
+            $lines[] = '- Revenue growth: ' . $this->format_percentage_ascii($growth['revenue'] ?? null, 2);
+        }
+
+        if (!empty($data['by_source']) && is_array($data['by_source'])) {
+            $lines[] = '';
+            $lines[] = 'Top sources';
+            foreach (array_slice($data['by_source'], 0, 5) as $row) {
+                $source_label = isset($row['source']) ? (string) $row['source'] : 'n/a';
+                $lines[] = sprintf(
+                    '- %s: %s bookings, %s revenue',
+                    $source_label,
+                    $this->format_number_value($row['bookings'] ?? 0),
+                    $this->format_currency_value($row['revenue'] ?? 0)
+                );
+            }
+        }
+
+        if ($report_type === 'daily' && !empty($data['by_hour']) && is_array($data['by_hour'])) {
+            $lines[] = '';
+            $lines[] = 'Hourly performance';
+            foreach (array_slice($data['by_hour'], 0, 12) as $hour_data) {
+                $hour = isset($hour_data['hour']) ? sprintf('%02d:00', (int) $hour_data['hour']) : '--:--';
+                $top_source = $this->describe_share(
+                    $hour_data['top_source_label'] ?? null,
+                    isset($hour_data['top_source_share']) ? (float) $hour_data['top_source_share'] : null,
+                    isset($hour_data['top_source_count']) ? (int) $hour_data['top_source_count'] : null
+                );
+                $top_campaign = $this->describe_share(
+                    $hour_data['top_campaign_label'] ?? null,
+                    isset($hour_data['top_campaign_share']) ? (float) $hour_data['top_campaign_share'] : null,
+                    isset($hour_data['top_campaign_count']) ? (int) $hour_data['top_campaign_count'] : null
+                );
+
+                $lines[] = sprintf(
+                    '- %s | bookings: %s | revenue: %s | top source: %s | top campaign: %s',
+                    $hour,
+                    $this->format_number_value($hour_data['bookings'] ?? 0),
+                    $this->format_currency_value($hour_data['revenue'] ?? 0),
+                    $top_source,
+                    $top_campaign
+                );
+            }
+        }
+
+        if ($report_type === 'weekly' && !empty($data['daily_breakdown']) && is_array($data['daily_breakdown'])) {
+            $lines[] = '';
+            $lines[] = 'Daily breakdown';
+            foreach (array_slice($data['daily_breakdown'], 0, 10) as $day) {
+                $lines[] = sprintf(
+                    '- %s (%s): %s bookings, %s revenue, growth %s',
+                    $day['date'] ?? 'N/A',
+                    $day['day_name'] ?? 'Day',
+                    $this->format_number_value($day['bookings'] ?? 0),
+                    $this->format_currency_value($day['revenue'] ?? 0),
+                    $this->format_percentage_ascii($day['growth_percent'] ?? null)
+                );
+            }
+        }
+
+        if ($report_type === 'monthly' && !empty($data['weekly_breakdown']) && is_array($data['weekly_breakdown'])) {
+            $lines[] = '';
+            $lines[] = 'Weekly breakdown';
+            foreach (array_slice($data['weekly_breakdown'], 0, 12) as $week) {
+                $lines[] = sprintf(
+                    '- %s: %s bookings, %s revenue, trend %s',
+                    $week['week_label'] ?? 'Week',
+                    $this->format_number_value($week['bookings'] ?? 0),
+                    $this->format_currency_value($week['revenue'] ?? 0),
+                    $this->format_trend_ascii($week['trend_percent'] ?? null)
+                );
+            }
+        }
+
+        if (!empty($data['by_campaign']) && is_array($data['by_campaign'])) {
+            $lines[] = '';
+            $lines[] = 'Top campaigns';
+            foreach (array_slice($data['by_campaign'], 0, 5) as $campaign) {
+                $lines[] = sprintf(
+                    '- %s via %s: %s bookings, %s revenue',
+                    $campaign['campaign'] ?? 'N/A',
+                    $campaign['source'] ?? 'n/a',
+                    $this->format_number_value($campaign['bookings'] ?? 0),
+                    $this->format_currency_value($campaign['revenue'] ?? 0)
+                );
+            }
+        }
+
+        if (!empty($data['top_campaigns']) && is_array($data['top_campaigns'])) {
+            $lines[] = '';
+            $lines[] = 'Monthly top campaigns';
+            foreach (array_slice($data['top_campaigns'], 0, 5) as $campaign) {
+                $lines[] = sprintf(
+                    '- %s: %s bookings, %s revenue',
+                    $campaign['campaign'] ?? 'N/A',
+                    $this->format_number_value($campaign['bookings'] ?? 0),
+                    $this->format_currency_value($campaign['revenue'] ?? 0)
+                );
+            }
+        }
+
+        if (empty(array_filter($lines, static fn($line) => trim((string) $line) !== ''))) {
+            $lines[] = 'No metrics available for the selected period.';
+        }
+
+        return $lines;
+    }
+
+    private function describe_share(?string $label, ?float $share, ?int $count): string
+    {
+        $clean_label = trim((string) $label);
+
+        if ($clean_label === '') {
+            $clean_label = 'n/a';
+        }
+
+        if ($share !== null) {
+            return sprintf('%s (%s%%)', $clean_label, $this->format_number_value($share, 1));
+        }
+
+        if ($count !== null) {
+            return sprintf('%s (%d)', $clean_label, (int) $count);
+        }
+
+        return $clean_label;
+    }
+
+    private function format_percentage_ascii(?float $value, int $decimals = 1): string
+    {
+        if ($value === null) {
+            return 'n/a';
+        }
+
+        return $this->format_number_value($value, $decimals) . '%';
+    }
+
+    private function format_trend_ascii(?float $percent): string
+    {
+        if ($percent === null) {
+            return 'n/a';
+        }
+
+        if ($percent > 0.01) {
+            return 'up ' . $this->format_number_value($percent, 2) . '%';
+        }
+
+        if ($percent < -0.01) {
+            return 'down ' . $this->format_number_value(abs($percent), 2) . '%';
+        }
+
+        return 'flat 0.00%';
+    }
+
+    private function format_currency_value($value): string
+    {
+        return 'EUR ' . $this->format_number_value($value, 2);
+    }
+
+    private function format_number_value($value, int $decimals = 0): string
+    {
+        $numeric = is_numeric($value) ? (float) $value : 0.0;
+
+        return number_format($numeric, $decimals, '.', ',');
+    }
+
+    /**
+     * Render the prepared text lines as a minimal PDF document.
+     *
+     * @param array<int, string> $lines
+     */
+    private function render_pdf_document(array $lines): string
+    {
+        if (empty($lines)) {
+            $lines = ['FP HIC Monitor report'];
+        }
+
+        $normalized_lines = [];
+        foreach ($lines as $line) {
+            $sanitized = $this->sanitize_pdf_line((string) $line);
+            $normalized_lines[] = $sanitized === '' ? ' ' : $sanitized;
+        }
+
+        $content_lines = [
+            'BT',
+            '/F1 12 Tf',
+            '40 760 Td',
+        ];
+
+        foreach ($normalized_lines as $index => $line) {
+            if ($index > 0) {
+                $content_lines[] = '0 -16 Td';
+            }
+
+            $content_lines[] = '(' . $this->escape_pdf_text($line) . ') Tj';
+        }
+
+        $content_lines[] = 'ET';
+
+        $text_stream = implode("\n", $content_lines) . "\n";
+        $stream_length = strlen($text_stream);
+
+        $pdf = "%PDF-1.4\n";
+        $objects = [
+            "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+            "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
+            "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj\n",
+            "4 0 obj << /Length {$stream_length} >> stream\n{$text_stream}endstream\nendobj\n",
+            "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n",
+        ];
+
+        $offsets = [];
+        foreach ($objects as $object) {
+            $offsets[] = strlen($pdf);
+            $pdf .= $object;
+        }
+
+        $xref_position = strlen($pdf);
+        $pdf .= 'xref' . "\n";
+        $pdf .= '0 ' . (count($objects) + 1) . "\n";
+        $pdf .= "0000000000 65535 f \n";
+
+        foreach ($offsets as $offset) {
+            $pdf .= sprintf('%010d 00000 n ', $offset) . "\n";
+        }
+
+        $pdf .= 'trailer << /Size ' . (count($objects) + 1) . ' /Root 1 0 R >>' . "\n";
+        $pdf .= 'startxref' . "\n";
+        $pdf .= $xref_position . "\n";
+        $pdf .= '%%EOF';
+
+        return $pdf;
+    }
+
+    private function sanitize_pdf_line(string $line): string
+    {
+        $trimmed = trim(preg_replace('/\s+/u', ' ', $line) ?? '');
+
+        return preg_replace('/[^\x20-\x7E]/', '', $trimmed) ?? '';
+    }
+
+    private function escape_pdf_text(string $text): string
+    {
+        $escaped = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $text);
+
+        return $escaped;
+    }
+
+    /**
+     * Normalise the attribution source label for reporting.
+     */
+    private function normalize_source_label(?string $source): string
+    {
+        $value = trim((string) $source);
+
+        if ($value === '') {
+            return 'Direct';
+        }
+
+        $lower = strtolower($value);
+
+        if ($lower === 'google') {
+            return 'Google';
+        }
+
+        if ($lower === 'facebook') {
+            return 'Facebook';
+        }
+
+        $normalized = str_replace(['-', '_'], ' ', $lower);
+
+        return ucwords($normalized);
+    }
+
+    /**
+     * Normalise campaign labels, providing a fallback for missing data.
+     */
+    private function normalize_campaign_label(?string $campaign): string
+    {
+        $value = trim((string) $campaign);
+
+        if ($value === '') {
+            return 'N/A';
+        }
+
+        return $value;
+    }
+
+    /**
+     * Format attribution details with percentage share or booking counts.
+     */
+    private function format_share_label(?string $label, ?float $share, ?int $count): string
+    {
+        if ($label === null || $label === '') {
+            return '—';
+        }
+
+        if ($share !== null) {
+            return sprintf('%s (%s%%)', $label, number_format($share, 1));
+        }
+
+        if ($count !== null) {
+            return sprintf('%s (%d)', $label, $count);
+        }
+
+        return $label;
+    }
+
+    /**
+     * Format percentage values with a unified fallback for missing data.
+     */
+    private function format_percentage(?float $value, int $decimals = 2): string
+    {
+        if ($value === null) {
+            return '—';
+        }
+
+        return number_format((float) $value, $decimals) . '%';
+    }
+
+    /**
+     * Format trend information with directional arrows.
+     */
+    private function format_trend_label(?float $percent): string
+    {
+        if ($percent === null) {
+            return '—';
+        }
+
+        $rounded = (float) $percent;
+
+        if ($rounded > 0.01) {
+            return sprintf('▲ +%s%%', number_format($rounded, 2));
+        }
+
+        if ($rounded < -0.01) {
+            return sprintf('▼ -%s%%', number_format(abs($rounded), 2));
+        }
+
+        return '▬ 0.00%';
     }
     
     /**
@@ -1575,25 +2183,25 @@ class AutomatedReportingManager {
     private function get_raw_data_for_period($period) {
         global $wpdb;
         
-        $table_name = \esc_sql($wpdb->prefix . 'hic_gclids');
+        $table_name = \esc_sql($wpdb->prefix . 'hic_booking_metrics');
         $date_condition = $this->get_date_condition_for_period($period);
 
         $sql = "
             SELECT
-                id,
-                gclid,
-                fbclid,
-                msclkid,
-                ttclid,
-                gbraid,
-                wbraid,
+                reservation_id,
                 sid,
+                channel,
                 utm_source,
                 utm_medium,
                 utm_campaign,
                 utm_content,
                 utm_term,
-                created_at
+                amount,
+                currency,
+                is_refund,
+                status,
+                created_at,
+                updated_at
             FROM `{$table_name}`
             WHERE {$date_condition}
             ORDER BY created_at DESC
