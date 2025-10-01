@@ -241,6 +241,7 @@ function hic_store_failed_request($url, $args, $error)
     $attempt = 0;
     $table_recreation_attempted = false;
     $table_recreation_succeeded = false;
+    $insert_result = false;
 
     do {
         $attempt++;
@@ -323,5 +324,9 @@ function hic_store_failed_request($url, $args, $error)
 
         break;
     } while ($attempt < $max_attempts);
+
+    if ($insert_result !== false) {
+        hic_schedule_failed_request_retry();
+    }
 }
 
