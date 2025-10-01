@@ -2,42 +2,43 @@
 <?php
 /**
  * Demonstration: System works without Google Ads Enhanced
- * 
+ *
  * This script simulates a booking being processed to show that
  * the system works without Enhanced Conversions.
  */
 
-// Define constants and mocks first
-define('COLOR_GREEN', "\033[32m");
-define('COLOR_BLUE', "\033[34m");
-define('COLOR_YELLOW', "\033[33m");
-define('COLOR_RESET', "\033[0m");
+namespace {
+    // Define constants and mocks first
+    define('COLOR_GREEN', "\033[32m");
+    define('COLOR_BLUE', "\033[34m");
+    define('COLOR_YELLOW', "\033[33m");
+    define('COLOR_RESET', "\033[0m");
 
-// Mock WordPress functions for standalone testing
-if (!function_exists('sanitize_text_field')) {
-    function sanitize_text_field($str) { return trim(strip_tags($str)); }
-}
-if (!function_exists('apply_filters')) {
-    function apply_filters($hook, $value, ...$args) { return $value; }
-}
-if (!function_exists('get_option')) {
-    function get_option($option, $default = '') { 
-        $mock_options = [
-            'hic_tracking_mode' => 'ga4_only',
-            'hic_measurement_id' => 'G-MOCK123',
-            'hic_api_secret' => 'mock_secret',
-            'hic_google_ads_enhanced_enabled' => false
-        ];
-        return $mock_options[$option] ?? $default; 
+    // Mock WordPress functions for standalone testing
+    if (!function_exists('sanitize_text_field')) {
+        function sanitize_text_field($str) { return trim(strip_tags($str)); }
+    }
+    if (!function_exists('apply_filters')) {
+        function apply_filters($hook, $value, ...$args) { return $value; }
+    }
+    if (!function_exists('get_option')) {
+        function get_option($option, $default = '') {
+            $mock_options = [
+                'hic_tracking_mode' => 'ga4_only',
+                'hic_measurement_id' => 'G-MOCK123',
+                'hic_api_secret' => 'mock_secret',
+                'hic_google_ads_enhanced_enabled' => false,
+            ];
+            return $mock_options[$option] ?? $default;
+        }
+    }
+
+    // Mock logging function
+    function hic_log($message, $level = 'INFO') {
+        echo "[MOCK LOG - $level] $message\n";
     }
 }
 
-// Mock logging function
-function hic_log($message, $level = 'INFO') {
-    echo "[MOCK LOG - $level] $message\n";
-}
-
-// Mock the helper functions we need
 namespace FpHic\Helpers {
     function hic_get_tracking_mode() { return \get_option('hic_tracking_mode', 'ga4_only'); }
     function hic_is_valid_email($email) { return filter_var($email, FILTER_VALIDATE_EMAIL) !== false; }
@@ -91,52 +92,54 @@ namespace FpHic {
     }
 }
 
-// Mock integration functions
-function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid) {
-    echo "✅ GA4: Sending purchase event for {$data['email']} (€{$data['amount']})\n";
-    return true;
+namespace {
+    // Mock integration functions
+    function hic_send_to_ga4($data, $gclid, $fbclid, $msclkid, $ttclid, $gbraid, $wbraid, $sid) {
+        echo "✅ GA4: Sending purchase event for {$data['email']} (€{$data['amount']})\n";
+        return true;
+    }
+
+    echo COLOR_BLUE . "=== Demonstration: System Works Without Enhanced Conversions ===" . COLOR_RESET . "\n\n";
+
+    echo COLOR_YELLOW . "📋 Configuration:" . COLOR_RESET . "\n";
+    echo "   Enhanced Conversions: " . (get_option('hic_google_ads_enhanced_enabled') ? 'ENABLED' : 'DISABLED') . "\n";
+    echo "   Tracking Mode: " . \FpHic\Helpers\hic_get_tracking_mode() . "\n";
+    echo "   GA4 Configured: " . (get_option('hic_measurement_id') ? 'YES' : 'NO') . "\n\n";
+
+    echo COLOR_YELLOW . "🔄 Processing test booking..." . COLOR_RESET . "\n\n";
+
+    // Test booking data
+    $booking_data = [
+        'email' => 'test@example.com',
+        'reservation_id' => 'DEMO_' . time(),
+        'amount' => 150.75,
+        'currency' => 'EUR',
+        'guest_first_name' => 'Mario',
+        'guest_last_name' => 'Rossi',
+        'checkin' => '2025-06-01',
+        'checkout' => '2025-06-07',
+        'room' => 'Camera Deluxe',
+        'guests' => 2,
+    ];
+
+    echo "Processing booking for: {$booking_data['email']}\n";
+    echo "Amount: €{$booking_data['amount']}\n";
+    echo "Reservation ID: {$booking_data['reservation_id']}\n\n";
+
+    // Process the booking
+    $result = \FpHic\hic_process_booking_data($booking_data);
+
+    echo "\n" . COLOR_GREEN . "🎯 RESULT: " . ($result ? 'SUCCESS' : 'FAILED') . COLOR_RESET . "\n\n";
+
+    echo COLOR_BLUE . "✅ DEMONSTRATION COMPLETE" . COLOR_RESET . "\n";
+    echo "   The system processed the booking successfully WITHOUT Enhanced Conversions.\n";
+    echo "   All core integrations (GA4, Facebook, Brevo) would receive the conversion data.\n\n";
+
+    echo COLOR_YELLOW . "📝 KEY POINTS:" . COLOR_RESET . "\n";
+    echo "   • Enhanced Conversions is OPTIONAL\n";
+    echo "   • Core system works independently\n";
+    echo "   • All integrations function normally\n";
+    echo "   • No errors or failures occur\n\n";
+
+    echo "For full documentation, see: SISTEMA_SENZA_ENHANCED.md\n";
 }
-
-echo COLOR_BLUE . "=== Demonstration: System Works Without Enhanced Conversions ===" . COLOR_RESET . "\n\n";
-
-echo COLOR_YELLOW . "📋 Configuration:" . COLOR_RESET . "\n";
-echo "   Enhanced Conversions: " . (get_option('hic_google_ads_enhanced_enabled') ? 'ENABLED' : 'DISABLED') . "\n";
-echo "   Tracking Mode: " . \FpHic\Helpers\hic_get_tracking_mode() . "\n";
-echo "   GA4 Configured: " . (get_option('hic_measurement_id') ? 'YES' : 'NO') . "\n\n";
-
-echo COLOR_YELLOW . "🔄 Processing test booking..." . COLOR_RESET . "\n\n";
-
-// Test booking data
-$booking_data = [
-    'email' => 'test@example.com',
-    'reservation_id' => 'DEMO_' . time(),
-    'amount' => 150.75,
-    'currency' => 'EUR',
-    'guest_first_name' => 'Mario',
-    'guest_last_name' => 'Rossi',
-    'checkin' => '2025-06-01',
-    'checkout' => '2025-06-07',
-    'room' => 'Camera Deluxe',
-    'guests' => 2
-];
-
-echo "Processing booking for: {$booking_data['email']}\n";
-echo "Amount: €{$booking_data['amount']}\n";
-echo "Reservation ID: {$booking_data['reservation_id']}\n\n";
-
-// Process the booking
-$result = \FpHic\hic_process_booking_data($booking_data);
-
-echo "\n" . COLOR_GREEN . "🎯 RESULT: " . ($result ? 'SUCCESS' : 'FAILED') . COLOR_RESET . "\n\n";
-
-echo COLOR_BLUE . "✅ DEMONSTRATION COMPLETE" . COLOR_RESET . "\n";
-echo "   The system processed the booking successfully WITHOUT Enhanced Conversions.\n";
-echo "   All core integrations (GA4, Facebook, Brevo) would receive the conversion data.\n\n";
-
-echo COLOR_YELLOW . "📝 KEY POINTS:" . COLOR_RESET . "\n";
-echo "   • Enhanced Conversions is OPTIONAL\n";
-echo "   • Core system works independently\n";
-echo "   • All integrations function normally\n";
-echo "   • No errors or failures occur\n\n";
-
-echo "For full documentation, see: SISTEMA_SENZA_ENHANCED.md\n";
