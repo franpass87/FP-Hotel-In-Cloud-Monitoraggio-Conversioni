@@ -15,13 +15,13 @@ final class Ga4Service
 {
     private Logs $logs;
 
-    public function __construct()
+    public function __construct(?Logs $logs = null)
     {
-        $this->logs = new Logs();
+        $this->logs = $logs ?? new Logs();
     }
 
     /**
-     * @return array{sent:bool,code:int|null,body:string|null,attempts:int,reason?:string}
+     * @return array{sent:bool,code:int|null,body:string|null,attempts:int,reason?:string,retry_after?:int|null}
      */
     public function sendPurchase(BookingPayload $payload, bool $includeUserData = true): array
     {
@@ -67,9 +67,14 @@ final class Ga4Service
             ],
         ];
 
+        $timestampMicros = $payload->getEventTimestampMicros();
+        if ($timestampMicros === null) {
+            $timestampMicros = (int) round(microtime(true) * 1_000_000);
+        }
+
         $body = [
             'client_id' => $this->determineClientId($payload),
-            'timestamp_micros' => (int) round(microtime(true) * 1000000),
+            'timestamp_micros' => $timestampMicros,
             'events' => [$event],
         ];
 
@@ -92,14 +97,31 @@ final class Ga4Service
         /** @var array<string,mixed> $body */
         $body = apply_filters('hic_s2s_ga4_payload', $body, $payload);
 
-        $result = Http::postWithRetry(static function () use ($endpoint, $body): array {
+        $encodedBody = wp_json_encode($body, JSON_UNESCAPED_UNICODE);
+
+        if (!is_string($encodedBody)) {
+            $this->logs->log('ga4', 'error', 'Impossibile serializzare il payload GA4', [
+                'payload' => $body,
+                'json_error' => function_exists('json_last_error_msg') ? json_last_error_msg() : null,
+            ]);
+
+            return [
+                'sent' => false,
+                'code' => null,
+                'body' => null,
+                'attempts' => 0,
+                'reason' => 'json_encode_failed',
+            ];
+        }
+
+        $result = Http::postWithRetry(static function () use ($endpoint, $encodedBody): array {
             return [
                 'url' => $endpoint,
                 'args' => [
                     'headers' => [
                         'Content-Type' => 'application/json',
                     ],
-                    'body' => wp_json_encode($body, JSON_UNESCAPED_UNICODE),
+                    'body' => $encodedBody,
                     'timeout' => 10,
                 ],
             ];
@@ -110,19 +132,39 @@ final class Ga4Service
             $responseBody = wp_remote_retrieve_body($result['response']);
         }
 
+        $retryAfter = $this->extractRetryAfter($result['response'] ?? null, $result['code']);
+
+        $errorCode = null;
+        $errorMessage = null;
+        if ($result['error'] instanceof \WP_Error) {
+            $errorCode = $result['error']->get_error_code();
+            $errorMessage = $result['error']->get_error_message();
+        }
+
+        $loggedEndpoint = $this->redactEndpointSecret($endpoint, 'api_secret');
+
         $this->logs->log($result['success'] ? 'ga4' : 'error', $result['success'] ? 'info' : 'error', 'Richiesta GA4 eseguita', [
-            'endpoint' => $endpoint,
+            'endpoint' => $loggedEndpoint,
             'code' => $result['code'],
             'attempts' => $result['attempts'],
             'response' => $responseBody,
             'payload' => $body,
+            'retry_after' => $retryAfter,
+            'error_code' => $errorCode,
+            'error_message' => $errorMessage,
         ]);
+
+        $reason = $result['success'] ? 'ok' : $this->resolveFailureReason($result['code'], $result['error'] ?? null);
 
         return [
             'sent' => $result['success'],
             'code' => $result['code'],
             'body' => $responseBody,
             'attempts' => $result['attempts'],
+            'reason' => $reason,
+            'retry_after' => $retryAfter,
+            'error_code' => $errorCode,
+            'error_message' => $errorMessage,
         ];
     }
 
@@ -136,9 +178,94 @@ final class Ga4Service
 
         $hash = hash('sha256', $payload->getBookingCode());
 
-        $part1 = substr($hash, 0, 10);
-        $part2 = substr($hash, 10, 10);
+        $first = substr($hash, 0, 16);
+        $second = substr($hash, 16, 16);
+
+        $part1 = sprintf('%010u', self::unsignedCrc32($first));
+        $part2 = sprintf('%010u', self::unsignedCrc32($second));
 
         return sprintf('%s.%s', $part1, $part2);
+    }
+
+    /**
+     * @param int|null $code
+     * @param mixed $error
+     */
+    private function resolveFailureReason($code, $error): string
+    {
+        if ($code === 429) {
+            return 'rate_limited';
+        }
+
+        if (is_int($code)) {
+            if ($code >= 500) {
+                return 'http_5xx';
+            }
+
+            if ($code >= 400) {
+                return 'http_4xx';
+            }
+        }
+
+        if ($error instanceof \WP_Error) {
+            return 'network_error';
+        }
+
+        return 'unknown_error';
+    }
+
+    /**
+     * @param mixed $response
+     */
+    private function extractRetryAfter($response, ?int $code): ?int
+    {
+        if (!is_array($response)) {
+            return null;
+        }
+
+        if ($code !== 429 && ($code === null || $code < 500 || $code >= 600)) {
+            return null;
+        }
+
+        $header = wp_remote_retrieve_header($response, 'retry-after');
+
+        if (!is_string($header) || trim($header) === '') {
+            return null;
+        }
+
+        $header = trim($header);
+
+        if (ctype_digit($header)) {
+            $seconds = (int) $header;
+            return $seconds > 0 ? $seconds : null;
+        }
+
+        $timestamp = strtotime($header);
+
+        if ($timestamp === false) {
+            return null;
+        }
+
+        $seconds = $timestamp - time();
+
+        return $seconds > 0 ? $seconds : null;
+    }
+
+    private function redactEndpointSecret(string $endpoint, string $parameter): string
+    {
+        if (function_exists('remove_query_arg') && function_exists('add_query_arg')) {
+            $stripped = remove_query_arg($parameter, $endpoint);
+
+            return add_query_arg($parameter, '[redacted]', $stripped);
+        }
+
+        $pattern = sprintf('/(%s=)[^&]+/i', preg_quote($parameter, '/'));
+
+        return preg_replace($pattern, '$1[redacted]', $endpoint) ?? $endpoint;
+    }
+
+    private static function unsignedCrc32(string $value): int
+    {
+        return (int) sprintf('%u', crc32($value));
     }
 }

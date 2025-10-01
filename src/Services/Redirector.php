@@ -77,11 +77,43 @@ final class Redirector
 
         if ($sid === '') {
             $sid = wp_generate_uuid4();
-            $secure = isset($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) === 'on';
+            $secure = false;
+
+            if (function_exists('is_ssl')) {
+                $secure = (bool) is_ssl();
+            }
+
+            if (!$secure) {
+                $forwardedProto = isset($_SERVER['HTTP_X_FORWARDED_PROTO']) ? (string) $_SERVER['HTTP_X_FORWARDED_PROTO'] : '';
+
+                if ($forwardedProto !== '') {
+                    $secure = stripos($forwardedProto, 'https') !== false;
+                }
+            }
+
+            if (!$secure && isset($_SERVER['HTTP_X_FORWARDED_SSL'])) {
+                $secure = strtolower((string) $_SERVER['HTTP_X_FORWARDED_SSL']) === 'on';
+            }
             $path = defined('COOKIEPATH') ? COOKIEPATH : '/';
             $domain = defined('COOKIE_DOMAIN') ? COOKIE_DOMAIN : '';
-            setcookie(self::COOKIE_NAME, $sid, time() + YEAR_IN_SECONDS, $path, $domain, $secure, true);
-            $_COOKIE[self::COOKIE_NAME] = $sid;
+            $options = [
+                'expires' => time() + YEAR_IN_SECONDS,
+                'path' => $path,
+                'domain' => $domain,
+                'secure' => $secure,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ];
+
+            if (headers_sent($file, $line)) {
+                (new Logs())->log('webhook', 'warning', 'Impossibile impostare il cookie SID: headers già inviati', [
+                    'file' => $file,
+                    'line' => $line,
+                ]);
+            } else {
+                setcookie(self::COOKIE_NAME, $sid, $options);
+                $_COOKIE[self::COOKIE_NAME] = $sid;
+            }
         }
 
         return $sid;
