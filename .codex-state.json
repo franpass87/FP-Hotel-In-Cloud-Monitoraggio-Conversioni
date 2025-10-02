@@ -1,10 +1,18 @@
 {
-  "phase": "remediate",
-  "progress_pct": 100,
-  "last_batch": "Batch 5",
-  "completed_issue_ids": [
-    "ISS-0001",
-    "ISS-0002",
-    "ISS-0003"
-  ]
+  "task": "sync-author-and-docs",
+  "version": 1,
+  "progress_percent": 100,
+  "steps_completed": [
+    "scan-repo",
+    "extract-context",
+    "generate-description",
+    "sync-author-metadata",
+    "sync-readmes",
+    "sync-changelog",
+    "sync-docs",
+    "lint-attempted",
+    "report-ready"
+  ],
+  "dry_run": false,
+  "last_run": "2025-10-02T09:25:25+00:00"
 }

@@ -1,9 +1,11 @@
 <?php declare(strict_types=1);
 /**
  * Plugin Name: FP HIC Monitor
- * Description: Monitoraggio conversioni Hotel in Cloud con tracciamento avanzato verso GA4, Meta CAPI e Brevo. Sistema sicuro enterprise-grade con cache intelligente e validazione input.
+ * Plugin URI: https://francescopasseri.com
+ * Description: Sincronizza prenotazioni Hotel in Cloud con GA4, Meta e Brevo via webhook e polling sicuro per un tracciamento server-to-server affidabile.
  * Version: 3.4.1
  * Author: Francesco Passeri
+ * Author URI: https://francescopasseri.com
  * Requires at least: 5.8
  * Requires PHP: 7.4
  * Text Domain: hotel-in-cloud
@@ -13,6 +15,11 @@
  */
 
 namespace FpHic;
+
+/**
+ * @author Francesco Passeri
+ * @link https://francescopasseri.com
+ */
 
 use FpHic\Bootstrap\Lifecycle;
 use FpHic\Bootstrap\ModuleLoader;
