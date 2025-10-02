@@ -277,8 +277,9 @@ if (includeDocs) {
   docTargets.forEach((file) => {
     updateFile(file, (input) => {
       if (!input.includes(metadata.description)) {
+        // Replace the first non-empty line ending with a period (assumed to be the description) with the current metadata.description
         const content = input.replace(
-          /(Sincronizza prenotazioni Hotel in Cloud[^\n]*\.)/,
+          /^([^\n]*\.)/m,
           metadata.description
         );
         if (content !== input) {
