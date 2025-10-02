@@ -3,6 +3,18 @@
     "description": "FP HIC Monitor - Plugin per monitoraggio conversioni Hotel in Cloud",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
+    "homepage": "https://francescopasseri.com",
+    "support": {
+        "issues": "https://github.com/francescopasseri/FP-Hotel-In-Cloud-Monitoraggio-Conversioni/issues"
+    },
+    "authors": [
+        {
+            "name": "Francesco Passeri",
+            "email": "info@francescopasseri.com",
+            "homepage": "https://francescopasseri.com",
+            "role": "Developer"
+        }
+    ],
     "require": {
         "php": ">=7.4"
     },
@@ -51,6 +63,15 @@
         ],
         "quality:fix": [
             "@lint:fix"
+        ],
+        "sync:author": [
+            "sh -lc 'node tools/sync-author-metadata.js --apply=\"${APPLY:-false}\"'"
+        ],
+        "sync:docs": [
+            "sh -lc 'node tools/sync-author-metadata.js --docs --apply=\"${APPLY:-false}\"'"
+        ],
+        "changelog:from-git": [
+            "sh -lc 'conventional-changelog -p angular -i CHANGELOG.md -s || true'"
         ],
         "i18n:pot": "php tools/make-pot.php",
         "build": [
