@@ -17,7 +17,14 @@ const metadata = {
 
 const args = process.argv.slice(2);
 const applyArg = args.find((arg) => arg.startsWith('--apply'));
-const apply = applyArg ? String(applyArg.split('=')[1]).toLowerCase() === 'true' : false;
+const apply = applyArg
+  ? (() => {
+      const parts = applyArg.split('=');
+      return parts.length > 1 && typeof parts[1] === 'string'
+        ? parts[1].toLowerCase() === 'true'
+        : false;
+    })()
+  : false;
 const includeDocs = args.includes('--docs');
 
 const repoRoot = path.resolve(__dirname, '..');
