@@ -2,6 +2,8 @@
 
 Sincronizza prenotazioni Hotel in Cloud con GA4, Meta e Brevo via webhook e polling sicuro per un tracciamento server-to-server affidabile.
 
+> 📚 **[Indice Completo Documentazione](DOCUMENTAZIONE.md)** | 💬 **[FAQ](FAQ.md)** | 📝 **[Changelog](CHANGELOG.md)** | 🐛 **[Issues](https://github.com/francescopasseri/FP-Hotel-In-Cloud-Monitoraggio-Conversioni/issues)**
+
 ## Plugin information
 
 | Campo | Valore |
@@ -18,7 +20,25 @@ Sincronizza prenotazioni Hotel in Cloud con GA4, Meta e Brevo via webhook e poll
 | Text Domain | `hotel-in-cloud` (Domain Path: `/languages`) |
 
 ## What it does
+
 FP HIC Monitor collega il gestionale Hotel in Cloud con l'ecosistema marketing del tuo sito WordPress, orchestrando webhook autenticati, polling intelligente e invii server-to-server per sincronizzare eventi di prenotazione, rimborsi e intenti marketing verso GA4, Meta/Facebook CAPI e Brevo.
+
+### Il Problema che Risolve
+
+Quando utilizzi Hotel in Cloud come booking engine esterno, **gli utenti prenotano su un dominio diverso** dal tuo sito WordPress. Questo significa:
+- ❌ **Nessuna thank you page** sul tuo dominio per tracciare conversioni
+- ❌ **Perdita di dati di attribuzione** (UTM, gclid, fbclid)
+- ❌ **Impossibilità di usare pixel client-side** tradizionali
+- ❌ **Tracciamento incompleto** delle conversioni per Google Ads e Facebook
+
+### La Soluzione
+
+FP HIC Monitor risolve questi problemi con un approccio **server-to-server (S2S)**:
+- ✅ **Webhook in tempo reale** o **polling automatico** per catturare ogni prenotazione
+- ✅ **Recupero automatico** dei dati di attribuzione (gclid, fbclid, UTM)
+- ✅ **Invio server-to-server** a GA4, Meta CAPI e Brevo
+- ✅ **Tracciamento completo** senza dipendere da cookie o JavaScript
+- ✅ **Deduplicazione intelligente** e gestione errori automatica
 
 ## About
 Il plugin nasce per le strutture ricettive che non possono contare su una thank you page nel dominio principale. Combina un endpoint REST protetto, scheduler resilienti e strumenti di diagnostica per garantire che ogni prenotazione venga tracciata, deduplicata e inoltrata alle piattaforme pubblicitarie con i corretti attributi UTM e SID. Funziona in ambienti single e multisito, include provisioning automatico delle capability e mette a disposizione dashboard amministrative per monitorare log, salute dell'integrazione e performance.
@@ -32,11 +52,41 @@ Il plugin nasce per le strutture ricettive che non possono contare su una thank 
 - **Provisioning multisito** con `Lifecycle` e `ModuleLoader` per assicurare capability e hook su ogni sito (`includes/bootstrap/lifecycle.php`, `includes/bootstrap/module-loader.php`).
 
 ## Installation
-1. Scarica il pacchetto del plugin o clona la repository in `wp-content/plugins/fp-hic-monitor`.
-2. Installa le dipendenze PHP (opzionale per sviluppo) con `composer install`.
-3. Attiva **FP HIC Monitor** da **Plugin → Plugin installati**.
-4. Accedi a **HIC Monitor → Impostazioni** per configurare token webhook, credenziali GA4/Meta/Brevo e le preferenze del polling.
-5. (Facoltativo) Esegui `composer run qa` per assicurarti che il codice rispetti gli standard WPCS quando lavori in sviluppo.
+
+### Requisiti di Sistema
+- **WordPress**: 5.8 o superiore
+- **PHP**: 7.4, 8.0, 8.1 o 8.2
+- **MySQL**: 5.6 o superiore (o MariaDB equivalente)
+- **Hosting**: Supporto WP-Cron o cron server
+
+### Installazione Standard
+1. **Scarica** il pacchetto del plugin dalla [release page](https://github.com/francescopasseri/FP-Hotel-In-Cloud-Monitoraggio-Conversioni/releases)
+2. **Carica** il file ZIP tramite **WordPress Admin → Plugin → Aggiungi nuovo → Carica plugin**
+3. **Attiva** il plugin dalla pagina Plugin installati
+4. Vai su **HIC Monitor → Impostazioni** per la configurazione iniziale
+
+### Installazione da Repository (Sviluppatori)
+```bash
+cd wp-content/plugins/
+git clone https://github.com/francescopasseri/FP-Hotel-In-Cloud-Monitoraggio-Conversioni.git fp-hic-monitor
+cd fp-hic-monitor
+composer install  # Per ambiente di sviluppo
+```
+
+### Prima Configurazione
+1. Accedi a **HIC Monitor → Impostazioni**
+2. Configura le **Credenziali Hotel in Cloud** (email, password, Property ID)
+3. Scegli la modalità di tracciamento (Webhook o API Polling)
+4. Configura le integrazioni desiderate:
+   - **GA4**: Measurement ID + API Secret
+   - **Meta/Facebook**: Pixel ID + Access Token
+   - **Brevo**: API Key + Liste contatti
+5. Testa la configurazione con il pulsante **Test Connessione**
+
+Per guide dettagliate consulta:
+- **[Guida Configurazione Completa](GUIDA_CONFIGURAZIONE.md)**
+- **[Setup Webhook](GUIDA_WEBHOOK_CONVERSIONI.md)**
+- **[FAQ](FAQ.md)**
 
 ## Usage
 ### Configurare il webhook

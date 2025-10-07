@@ -1,6 +1,6 @@
 # FAQ - Domande Frequenti
 
-> **Versione plugin:** 3.4.0 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
+> **Versione plugin:** 3.4.1 · **Autore:** Francesco Passeri — [francescopasseri.com](https://francescopasseri.com) — [info@francescopasseri.com](mailto:info@francescopasseri.com)
 
 
 ## ℹ️ Contatti e Supporto

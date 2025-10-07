@@ -1,6 +1,10 @@
 # Panoramica FP HIC Monitor
 
+> **Versione**: 3.4.1 · **Ultimo aggiornamento**: 2025-10-07
+
 Sincronizza prenotazioni Hotel in Cloud con GA4, Meta e Brevo via webhook e polling sicuro per un tracciamento server-to-server affidabile.
+
+**Documentazione Completa**: [DOCUMENTAZIONE.md](../DOCUMENTAZIONE.md)
 
 ## Obiettivo del plugin
 FP HIC Monitor colma il gap tra il gestionale Hotel in Cloud e WordPress quando non è possibile usare una thank you page sul dominio principale. Il plugin riceve prenotazioni e rimborsi tramite webhook autenticati o polling API, li normalizza e li distribuisce ai canali marketing server-to-server mantenendo un audit completo delle operazioni.
