@@ -1,6 +1,12 @@
 # Architettura FP HIC Monitor
 
+> **Versione**: 3.4.1 · **Ultimo aggiornamento**: 2025-10-07
+
 Sincronizza prenotazioni Hotel in Cloud con GA4, Meta e Brevo via webhook e polling sicuro per un tracciamento server-to-server affidabile.
+
+## Panoramica
+
+FP HIC Monitor è un plugin WordPress enterprise-grade che risolve il problema del tracciamento conversioni quando il booking engine è su un dominio esterno. Utilizza un'architettura modulare basata su PSR-4, feature flags, circuit breaker e pattern repository per garantire affidabilità e scalabilità.
 
 ## Struttura dei moduli
 - **Bootstrap** (`includes/bootstrap/module-loader.php`, `includes/bootstrap/lifecycle.php`, `includes/bootstrap/upgrade-manager.php`): carica i moduli core (`CORE_MODULES`), opzionali e admin; gestisce attivazione multisito, capability (`hic_ensure_admin_capabilities`) e migrazioni con gli hook `hic_plugin_fresh_install` e `hic_plugin_upgraded`.

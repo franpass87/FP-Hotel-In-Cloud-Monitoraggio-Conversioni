@@ -1,4 +1,6 @@
-# FAQ FP HIC Monitor
+# FAQ Tecnica FP HIC Monitor
+
+> **Versione**: 3.4.1 · **Per FAQ utente**: vedi [../FAQ.md](../FAQ.md)
 
 ## Che cosa fa FP HIC Monitor?
 Sincronizza prenotazioni Hotel in Cloud con GA4, Meta e Brevo via webhook e polling sicuro per un tracciamento server-to-server affidabile. Normalizza i payload, gestisce SID/UTM e inoltra gli eventi marketing in modo resilienti.

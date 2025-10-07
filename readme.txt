@@ -12,9 +12,16 @@ Author: Francesco Passeri
 Author URI: https://francescopasseri.com
 
 == Description ==
+
 Sincronizza prenotazioni Hotel in Cloud con GA4, Meta e Brevo via webhook e polling sicuro per un tracciamento server-to-server affidabile.
 
-FP HIC Monitor offre un flusso di tracciamento completo per le strutture ricettive che usano Hotel in Cloud, combinando webhook autenticati, polling intelligente e validazioni dei payload per mantenere consistenti i dati di marketing.
+**Il Problema che Risolve**
+
+Quando utilizzi Hotel in Cloud come booking engine esterno, gli utenti prenotano su un dominio diverso dal tuo sito WordPress. Questo significa perdita di dati di attribuzione (UTM, gclid, fbclid) e tracciamento incompleto delle conversioni.
+
+**La Soluzione**
+
+FP HIC Monitor offre un flusso di tracciamento completo con approccio server-to-server (S2S) che cattura ogni prenotazione tramite webhook in tempo reale o polling automatico, recupera automaticamente i dati di attribuzione e li invia a GA4, Meta CAPI e Brevo senza dipendere da cookie o JavaScript.
 
 = Funzionalità principali =
 * Endpoint REST autenticato per ricevere webhook di prenotazioni e rimborsi da Hotel in Cloud, con firma HMAC e rate limiting.

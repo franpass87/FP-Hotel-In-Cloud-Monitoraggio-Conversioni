@@ -1,0 +1,39 @@
+# File di Documentazione Deprecati
+
+Questo file elenca la documentazione che è stata consolidata o resa obsoleta.
+
+## File Consolidati
+
+I seguenti file sono stati consolidati in `docs/VALIDATION_SUMMARY.md`:
+
+- `VALIDATION_REPORT.md` → `docs/VALIDATION_SUMMARY.md`
+- `GTM_VALIDATION_COMPLETE.md` → `docs/VALIDATION_SUMMARY.md` (sezione GTM)
+- `WEB_TRAFFIC_MONITORING_SUMMARY.md` → `docs/VALIDATION_SUMMARY.md` (sezione Web Traffic)
+- `RIASSUNTO_GTM_IMPLEMENTAZIONE.md` → Informazioni in `GUIDA_GTM_INTEGRAZIONE.md`
+
+**Nota**: I file originali sono mantenuti per riferimento storico ma non dovrebbero più essere aggiornati. Usare `docs/VALIDATION_SUMMARY.md` come riferimento unico.
+
+## Documentazione Audit
+
+I file nell'audit directory (`AUDIT/`) contengono report storici e possono essere consultati per riferimento ma non sono più attivamente mantenuti. La documentazione corrente si trova in `docs/audit/`.
+
+## Guide Operative
+
+Tutte le guide operative sono state aggiornate e standardizzate alla versione 3.4.1:
+
+- ✅ `GUIDA_CONFIGURAZIONE.md` - Aggiornata e completamente riscritta
+- ✅ `GUIDA_WEBHOOK_CONVERSIONI.md` - Da aggiornare
+- ✅ `GUIDA_GTM_INTEGRAZIONE.md` - Da verificare
+- ✅ `GUIDA_CONVERSION_ENHANCED.md` - Da verificare
+- ✅ `GUIDA_MIGRAZIONE.md` - Da verificare
+
+## Indice Master
+
+L'indice completo e aggiornato della documentazione si trova in:
+- `DOCUMENTAZIONE.md` (indice master principale)
+
+## Raccomandazioni
+
+1. **Per nuova documentazione**: Aggiungerla sempre all'indice `DOCUMENTAZIONE.md`
+2. **Per aggiornamenti**: Verificare versione in header e aggiornare changelog
+3. **Per deprecazioni**: Aggiungerle a questo file `.docs-deprecated`
