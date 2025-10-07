@@ -1,0 +1,27 @@
+/* HIC utility classes (additive, safe to include after base) */
+
+/* Spacing */
+.hic-m-0 { margin: 0 !important; }
+.hic-mt-8 { margin-top: 8px !important; }
+.hic-mb-8 { margin-bottom: 8px !important; }
+.hic-mt-16 { margin-top: 16px !important; }
+.hic-mb-16 { margin-bottom: 16px !important; }
+
+/* Text helpers */
+.hic-text-muted { color: #6b7280 !important; }
+.hic-text-success { color: #46b450 !important; }
+.hic-text-danger { color: #dc3232 !important; }
+
+/* Layout */
+.hic-flex { display: flex !important; }
+.hic-align-center { align-items: center !important; }
+.hic-justify-between { justify-content: space-between !important; }
+
+/* Feedback states */
+.hic-feedback.is-success { border-left: 4px solid #46b450; }
+.hic-feedback.is-error { border-left: 4px solid #dc3232; }
+.hic-feedback.is-info { border-left: 4px solid #2271b1; }
+
+/* Progress */
+.hic-progress-bar { background: #f1f5f9; border-radius: 4px; height: 8px; overflow: hidden; }
+.hic-progress-fill { background: #2271b1; height: 100%; width: 0; transition: width .25s ease; }

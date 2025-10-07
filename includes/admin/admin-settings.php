@@ -445,10 +445,53 @@ function hic_admin_enqueue_scripts($hook) {
             array('hic-admin-base'),
             HIC_PLUGIN_VERSION
         );
+        // Utilities CSS (additivo) per piccoli miglioramenti UI
+        wp_enqueue_style(
+            'hic-utilities',
+            plugin_dir_url(__FILE__) . '../../assets/css/hic-utilities.css',
+            array('hic-admin-base'),
+            HIC_PLUGIN_VERSION
+        );
         wp_enqueue_script(
             'hic-admin-settings',
             plugin_dir_url(__FILE__) . '../../assets/js/admin-settings.js',
             array('jquery'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        // Modular JS (loaded dopo l'entry per sicurezza, ma senza rompere l'esistente)
+        wp_enqueue_script(
+            'hic-admin-settings-tabs',
+            plugin_dir_url(__FILE__) . '../../assets/js/admin-settings/modules/tabs.js',
+            array('jquery', 'hic-admin-settings'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-admin-settings-api-test',
+            plugin_dir_url(__FILE__) . '../../assets/js/admin-settings/modules/api-test.js',
+            array('jquery', 'hic-admin-settings'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-admin-settings-email-test',
+            plugin_dir_url(__FILE__) . '../../assets/js/admin-settings/modules/email-test.js',
+            array('jquery', 'hic-admin-settings'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-admin-settings-token',
+            plugin_dir_url(__FILE__) . '../../assets/js/admin-settings/modules/token.js',
+            array('jquery', 'hic-admin-settings'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-admin-settings-archive',
+            plugin_dir_url(__FILE__) . '../../assets/js/admin-settings/modules/archive.js',
+            array('jquery', 'hic-admin-settings'),
             HIC_PLUGIN_VERSION,
             true
         );
@@ -503,6 +546,28 @@ function hic_admin_enqueue_scripts($hook) {
             'hic-diagnostics',
             plugin_dir_url(__FILE__) . '../../assets/js/diagnostics.js',
             array('jquery'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        // Moduli diagnostici (additivi, caricati dopo lo script principale)
+        wp_enqueue_script(
+            'hic-diagnostics-ui-toast',
+            plugin_dir_url(__FILE__) . '../../assets/js/diagnostics/modules/ui-toast.js',
+            array('jquery', 'hic-diagnostics'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-diagnostics-services',
+            plugin_dir_url(__FILE__) . '../../assets/js/diagnostics/modules/services.js',
+            array('jquery', 'hic-diagnostics'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-diagnostics-log-stream',
+            plugin_dir_url(__FILE__) . '../../assets/js/diagnostics/modules/log-stream.js',
+            array('jquery', 'hic-diagnostics'),
             HIC_PLUGIN_VERSION,
             true
         );

@@ -52,8 +52,9 @@ $results = [];
 $tools = [];
 
 // 1. PHP Syntax Check (always available)
+// Implement cross-platform PHP syntax check without external 'find'
 $tools['syntax'] = [
-    'command' => 'find includes/ FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php -name "*.php" -exec php -l {} \;',
+    'command' => '__internal_php_syntax_check__',
     'description' => 'PHP Syntax Check'
 ];
 
@@ -102,7 +103,56 @@ $passed = 0;
 $failed = 0;
 
 foreach ($tools as $toolName => $tool) {
-    $result = runCommand($tool['command'], $tool['description']);
+    if ($tool['command'] === '__internal_php_syntax_check__') {
+        output("🔍 Running: {$tool['description']}", 'blue');
+
+        $paths = ['includes', 'FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php'];
+        $files = [];
+
+        $collect = function (string $path) use (&$collect, &$files, $baseDir): void {
+            $full = $path;
+            if (!preg_match('/^([A-Za-z]:\\\\|\\\\|\.|\/)/', $path)) {
+                $full = $baseDir . DIRECTORY_SEPARATOR . $path;
+            }
+            if (is_dir($full)) {
+                $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($full));
+                foreach ($it as $f) {
+                    if ($f->isFile() && substr(strtolower($f->getFilename()), -4) === '.php') {
+                        $files[] = $f->getPathname();
+                    }
+                }
+            } elseif (is_file($full) && substr(strtolower($full), -4) === '.php') {
+                $files[] = $full;
+            }
+        };
+
+        foreach ($paths as $p) { $collect($p); }
+
+        $failedFiles = [];
+        foreach ($files as $file) {
+            $cmd = escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg($file);
+            $out = [];
+            $code = 0;
+            exec($cmd . ' 2>&1', $out, $code);
+            if ($code !== 0) {
+                $failedFiles[] = [$file, $out];
+            }
+        }
+
+        if (count($failedFiles) === 0) {
+            output("✅ {$tool['description']}: PASSED", 'green');
+            $result = true;
+        } else {
+            output("❌ {$tool['description']}: FAILED", 'red');
+            foreach ($failedFiles as [$ff, $lines]) {
+                echo '  ' . $ff . PHP_EOL;
+                foreach ($lines as $ln) { echo '    ' . $ln . PHP_EOL; }
+            }
+            $result = false;
+        }
+    } else {
+        $result = runCommand($tool['command'], $tool['description']);
+    }
     $results[$toolName] = $result;
     
     if ($result) {

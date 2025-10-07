@@ -167,6 +167,36 @@ Lifecycle::registerNetworkProvisioningHook();
             'gtmEnabled'        => Helpers\hic_is_gtm_enabled(),
             'gtmEventsEndpoint' => \esc_url_raw(\rest_url('hic/v1/gtm-events')),
         ]);
+
+        // Moduli frontend additivi (cookies, sid, link, iframe)
+        \wp_enqueue_script(
+            'hic-frontend-cookies',
+            \plugin_dir_url(__FILE__) . 'assets/js/frontend/modules/cookies.js',
+            array('hic-frontend'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        \wp_enqueue_script(
+            'hic-frontend-sid',
+            \plugin_dir_url(__FILE__) . 'assets/js/frontend/modules/sid.js',
+            array('hic-frontend', 'hic-frontend-cookies'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        \wp_enqueue_script(
+            'hic-frontend-link-augmentation',
+            \plugin_dir_url(__FILE__) . 'assets/js/frontend/modules/link-augmentation.js',
+            array('hic-frontend', 'hic-frontend-cookies', 'hic-frontend-sid'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        \wp_enqueue_script(
+            'hic-frontend-iframe-sync',
+            \plugin_dir_url(__FILE__) . 'assets/js/frontend/modules/iframe-sync.js',
+            array('hic-frontend', 'hic-frontend-cookies', 'hic-frontend-sid'),
+            HIC_PLUGIN_VERSION,
+            true
+        );
     }
 });
 

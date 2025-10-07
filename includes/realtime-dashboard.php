@@ -222,6 +222,57 @@ class RealtimeDashboard {
             true
         );
 
+        // Modular JS (caricati dopo lo script principale, non distruttivi)
+        wp_enqueue_script(
+            'hic-realtime-api',
+            $plugin_base_url . 'assets/js/realtime-dashboard/modules/api.js',
+            ['jquery', 'hic-realtime-dashboard'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-realtime-ui',
+            $plugin_base_url . 'assets/js/realtime-dashboard/modules/ui.js',
+            ['jquery', 'hic-realtime-dashboard'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-realtime-charts-realtime',
+            $plugin_base_url . 'assets/js/realtime-dashboard/modules/charts-realtime.js',
+            ['jquery', 'hic-realtime-dashboard', 'chart-js'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-realtime-charts-revenue',
+            $plugin_base_url . 'assets/js/realtime-dashboard/modules/charts-revenue.js',
+            ['jquery', 'hic-realtime-dashboard', 'chart-js'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-realtime-charts-heatmap',
+            $plugin_base_url . 'assets/js/realtime-dashboard/modules/charts-heatmap.js',
+            ['jquery', 'hic-realtime-dashboard', 'chart-js'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-realtime-charts-funnel',
+            $plugin_base_url . 'assets/js/realtime-dashboard/modules/charts-funnel.js',
+            ['jquery', 'hic-realtime-dashboard', 'chart-js'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        wp_enqueue_script(
+            'hic-realtime-charts-timeline',
+            $plugin_base_url . 'assets/js/realtime-dashboard/modules/charts-timeline.js',
+            ['jquery', 'hic-realtime-dashboard', 'chart-js'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+
         // Enqueue dashboard CSS
         wp_enqueue_style(
             'hic-admin-base',
@@ -233,6 +284,13 @@ class RealtimeDashboard {
         wp_enqueue_style(
             'hic-realtime-dashboard',
             $plugin_base_url . 'assets/css/realtime-dashboard.css',
+            ['hic-admin-base'],
+            HIC_PLUGIN_VERSION
+        );
+        // Utilities CSS (additivo)
+        wp_enqueue_style(
+            'hic-utilities',
+            $plugin_base_url . 'assets/css/hic-utilities.css',
             ['hic-admin-base'],
             HIC_PLUGIN_VERSION
         );

@@ -64,11 +64,41 @@ final class PerformanceDashboard
             ['hic-admin-base'],
             HIC_PLUGIN_VERSION
         );
+        // Utilities CSS (additivo)
+        \wp_enqueue_style(
+            'hic-utilities',
+            $base_url . 'assets/css/hic-utilities.css',
+            ['hic-admin-base'],
+            HIC_PLUGIN_VERSION
+        );
 
         \wp_enqueue_script(
             'hic-performance-dashboard',
             $base_url . 'assets/js/performance-dashboard.js',
             ['jquery', 'chart-js'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+
+        // Moduli additivi per dashboard performance
+        \wp_enqueue_script(
+            'hic-performance-fetch',
+            $base_url . 'assets/js/performance-dashboard/modules/fetch.js',
+            ['jquery', 'hic-performance-dashboard'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        \wp_enqueue_script(
+            'hic-performance-formatting',
+            $base_url . 'assets/js/performance-dashboard/modules/formatting.js',
+            ['hic-performance-dashboard'],
+            HIC_PLUGIN_VERSION,
+            true
+        );
+        \wp_enqueue_script(
+            'hic-performance-charts',
+            $base_url . 'assets/js/performance-dashboard/modules/charts.js',
+            ['hic-performance-dashboard', 'chart-js'],
             HIC_PLUGIN_VERSION,
             true
         );
