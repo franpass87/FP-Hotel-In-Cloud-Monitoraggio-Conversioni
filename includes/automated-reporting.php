@@ -1800,6 +1800,7 @@ class AutomatedReportingManager {
                     <div class="hic-page-header__content">
                         <h1 class="hic-page-header__title">📈 <?php esc_html_e('FP HIC Monitor - Reports &amp; Analytics', 'hotel-in-cloud'); ?></h1>
                         <p class="hic-page-header__subtitle"><?php esc_html_e('Genera report personalizzati e consulta lo storico con la stessa UI della dashboard di monitoraggio.', 'hotel-in-cloud'); ?></p>
+                        <span class="hic-page-header-badge">v<?php echo esc_html(HIC_PLUGIN_VERSION); ?></span>
                     </div>
                     <div class="hic-page-actions">
                         <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-monitoring')); ?>">

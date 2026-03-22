@@ -1825,6 +1825,7 @@ class GoogleAdsEnhancedConversions {
                     <div class="hic-page-header__content">
                         <h1 class="hic-page-header__title">⚡ Google Ads Enhanced Conversions</h1>
                         <p class="hic-page-header__subtitle"><?php esc_html_e('Ottimizza il tracciamento importando in Google Ads i dati raccolti da Hotel in Cloud, mantenendo coerenza con la nuova interfaccia del monitoraggio.', 'hotel-in-cloud'); ?></p>
+                        <span class="hic-page-header-badge">v<?php echo esc_html(HIC_PLUGIN_VERSION); ?></span>
                     </div>
                     <div class="hic-page-actions">
                         <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-reports')); ?>">

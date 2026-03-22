@@ -421,6 +421,7 @@ class RealtimeDashboard {
                     <div class="hic-page-header__content">
                         <h1 class="hic-page-header__title"><span>📈</span><?php esc_html_e('Dashboard Real-Time', 'hotel-in-cloud'); ?></h1>
                         <p class="hic-page-header__subtitle"><?php esc_html_e('Monitora conversioni, revenue e salute delle integrazioni con lo stesso linguaggio visivo delle altre aree del plugin.', 'hotel-in-cloud'); ?></p>
+                        <span class="hic-page-header-badge">v<?php echo esc_html(HIC_PLUGIN_VERSION); ?></span>
                     </div>
                     <div class="hic-page-actions">
                         <span class="hic-inline-status">

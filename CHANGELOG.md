@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [3.4.2] - 2025-03-22
+### Changed
+- Grafica unificata: gradiente viola FP su `.hic-page-hero` e badge versione su tutte le pagine admin (dashboard, impostazioni, Google Ads, Circuit Breaker, Reports, Diagnostica, Setup guidato)
+
 ## [3.4.1] - 2025-10-02
 ### Security
 - Centralizzate le verifiche di capability amministrative sugli endpoint di ottimizzazione e suite enterprise tramite l'helper `hic_require_cap()` per richiedere il permesso `hic_manage` in modo coerente.【F:includes/functions.php†L21-L57】【F:includes/database-optimizer.php†L28-L36】【F:includes/enterprise-management-suite.php†L5-L6】

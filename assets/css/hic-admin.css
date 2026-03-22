@@ -83,12 +83,24 @@ body.wp-admin[class*="hic-monitoring"] #wpbody-content .wrap {
     max-width: 720px;
 }
 
+.hic-page-header-badge {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 999px;
+    color: #fff;
+}
+
 .hic-page-hero {
     position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--hic-spacing-lg);
-    background: linear-gradient(135deg, rgba(28, 126, 214, 0.95), rgba(51, 154, 240, 0.95));
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: var(--hic-radius-lg);
     padding: var(--hic-spacing-xl);
     margin-bottom: var(--hic-spacing-xl);

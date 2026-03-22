@@ -4,7 +4,7 @@ Tags: analytics, ga4, meta conversions api, brevo, hotel booking
 Requires at least: 5.8
 Tested up to: 6.6
 Requires PHP: 7.4
-Stable tag: 3.4.1
+Stable tag: 3.4.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Plugin URI: https://francescopasseri.com
@@ -56,9 +56,16 @@ Sì. Durante l'attivazione il plugin sincronizza le capability richieste, regist
 Non sono disponibili screenshot in questa distribuzione.
 
 == Changelog ==
+
+= 3.4.2 =
+* Changed: Grafica unificata FP (gradiente viola, badge versione) su tutte le pagine admin
+
 Consulta [CHANGELOG.md](CHANGELOG.md) per la cronologia completa in formato Keep a Changelog.
 
 == Upgrade Notice ==
+= 3.4.2 =
+Grafica unificata: banner viola FP e badge versione su tutte le pagine admin.
+
 = 3.4.1 =
 Aggiornamento consigliato: include miglioramenti alla sicurezza del webhook, ottimizzazioni delle dashboard e nuove utility di logging.
 

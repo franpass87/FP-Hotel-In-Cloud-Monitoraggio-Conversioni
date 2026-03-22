@@ -1344,6 +1344,7 @@ function hic_diagnostics_page() {
                 <div class="hic-page-header__content">
                     <h1 class="hic-page-header__title">🏨 <?php esc_html_e('Diagnostica e Performance', 'hotel-in-cloud'); ?></h1>
                     <p class="hic-page-header__subtitle"><?php esc_html_e('Monitora lo stato del sistema con la stessa identità visiva della Dashboard Real-Time, tra controlli API, sincronizzazioni e log.', 'hotel-in-cloud'); ?></p>
+                    <span class="hic-page-header-badge">v<?php echo esc_html(HIC_PLUGIN_VERSION); ?></span>
                 </div>
                 <div class="hic-page-actions">
                     <a class="hic-button hic-button--ghost hic-button--inverted" href="<?php echo esc_url(admin_url('admin.php?page=hic-monitoring-settings')); ?>">

@@ -9,7 +9,7 @@ Sincronizza prenotazioni Hotel in Cloud con GA4, Meta e Brevo via webhook e poll
 | Campo | Valore |
 | --- | --- |
 | Nome | FP HIC Monitor |
-| Versione | 3.4.1 |
+| Versione | 3.4.2 |
 | Autore | [Francesco Passeri](https://francescopasseri.com) ([info@francescopasseri.com](mailto:info@francescopasseri.com)) |
 | Autore URI | https://francescopasseri.com |
 | Plugin URI | https://francescopasseri.com |

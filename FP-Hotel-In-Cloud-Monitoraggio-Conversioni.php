@@ -3,7 +3,7 @@
  * Plugin Name: FP HIC Monitor
  * Plugin URI: https://francescopasseri.com
  * Description: Sincronizza prenotazioni Hotel in Cloud con GA4, Meta e Brevo via webhook e polling sicuro per un tracciamento server-to-server affidabile.
- * Version: 3.4.1
+ * Version: 3.4.2
  * Author: Francesco Passeri
  * Author URI: https://francescopasseri.com
  * Requires at least: 5.8
