@@ -4,7 +4,7 @@ Tags: brevo, hotel booking, webhook, marketing automation
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.0
-Stable tag: 3.6.0
+Stable tag: 3.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Plugin URI: https://francescopasseri.com
@@ -48,6 +48,9 @@ Non sono disponibili screenshot in questa distribuzione.
 
 == Changelog ==
 
+= 3.6.1 =
+* Changed: note legacy uniformate in `docs/audit/*` con riferimento esplicito alla documentazione Brevo-only attuale
+
 = 3.6.0 =
 * Added: plugin semplificato solo HIC -> Brevo
 * Added: validazione live Brevo con storico ultimi 20 test
@@ -57,6 +60,9 @@ Non sono disponibili screenshot in questa distribuzione.
 Consulta [CHANGELOG.md](CHANGELOG.md) per la cronologia completa in formato Keep a Changelog.
 
 == Upgrade Notice ==
+= 3.6.1 =
+Aggiornamento documentazione: file audit marcati come storici pre-3.6.0.
+
 = 3.6.0 =
 Release consigliata: architettura semplificata, focus Brevo e strumenti di validazione live.
 

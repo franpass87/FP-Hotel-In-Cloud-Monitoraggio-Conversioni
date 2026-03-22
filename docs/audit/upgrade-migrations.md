@@ -1,5 +1,8 @@
 # Phase 9 · Upgrade & Migrations Audit
 
+> Nota legacy: documento storico riferito al perimetro pre-3.6.0.  
+> Per l'architettura attuale Brevo-only vedi `docs/overview.md` e `docs/architecture.md`.
+
 ## Objectives
 - Persist the active plugin version per site to support deterministic upgrade flows.
 - Ensure database and capability installers rerun automatically when upgrading from legacy releases.

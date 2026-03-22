@@ -1,5 +1,8 @@
 # Phase 7 – Refactoring Audit
 
+> Nota legacy: documento storico riferito al perimetro pre-3.6.0.  
+> Per l'architettura attuale Brevo-only vedi `docs/overview.md` e `docs/architecture.md`.
+
 ## Overview
 - Introduced a dedicated bootstrap layer under `includes/bootstrap/` with a `ModuleLoader` to centralise the plugin file loading strategy and a `Lifecycle` helper that encapsulates multisite-aware activation and capability management logic.
 - Simplified `FP-Hotel-In-Cloud-Monitoraggio-Conversioni.php` so it delegates lifecycle work to the new helpers, reducing duplicate `require` statements and ensuring init/admin modules are loaded predictably.

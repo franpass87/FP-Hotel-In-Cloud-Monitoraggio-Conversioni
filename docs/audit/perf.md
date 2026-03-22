@@ -1,5 +1,8 @@
 # Performance Audit — Phase 5
 
+> Nota legacy: documento storico riferito al perimetro pre-3.6.0.  
+> Per l'architettura attuale Brevo-only vedi `docs/overview.md` e `docs/architecture.md`.
+
 ## Bottlenecks Identified
 - Ripetute query `SHOW TABLES` e `SHOW COLUMNS` durante il recupero degli identificativi di tracciamento e delle UTM generavano round-trip aggiuntivi ad ogni evento.
 - I lookup per SID non sfruttavano cache persistenti, costringendo il plugin a interrogare il database anche quando i dati non cambiavano.

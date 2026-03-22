@@ -1,5 +1,8 @@
 # Security Hardening Report
 
+> Nota legacy: documento storico riferito al perimetro pre-3.6.0.  
+> Per l'architettura attuale Brevo-only vedi `docs/overview.md` e `docs/architecture.md`.
+
 ## Overview
 - Hardened the webhook authentication pipeline by normalizing inbound tokens, enforcing WordPress sanitization, and using constant-time comparisons to prevent subtle bypasses.
 - Ensured rate-limiting keys use the sanitized token fingerprint to avoid accidental cache misses across differently encoded inputs.

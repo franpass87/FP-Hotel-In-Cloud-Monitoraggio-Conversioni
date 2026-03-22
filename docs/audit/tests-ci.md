@@ -1,5 +1,8 @@
 # Phase 8 – Test & CI Report
 
+> Nota legacy: documento storico riferito al perimetro pre-3.6.0.  
+> Per l'architettura attuale Brevo-only vedi `docs/overview.md` e `docs/architecture.md`.
+
 ## Test Automation
 - Executed `composer test` locally to ensure the full unit test suite passes under the lightweight WordPress stubs shipped with the repository.
 - Added defensive guards to `hic_tracking_table_exists()` so WordPress database doubles used in the suite satisfy the relaxed contract without requiring inheritance from the core `wpdb` class.

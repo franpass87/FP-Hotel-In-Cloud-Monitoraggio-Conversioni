@@ -1,5 +1,8 @@
 # Phase 1 — Discovery Report
 
+> Nota legacy: documento storico riferito al perimetro pre-3.6.0.  
+> Per l'architettura attuale Brevo-only vedi `docs/overview.md` e `docs/architecture.md`.
+
 ## Summary
 The FP HIC Monitor plugin is a feature-rich automation suite that orchestrates booking ingestion, multi-channel tracking, diagnostics, and reporting. The codebase spans 40+ PHP modules with extensive background processing (81 WordPress actions, 25 filters), adaptive cron schedules, and a sizeable admin UI footprint. Documentation produced in this phase (`docs/code-map.md`) maps the architecture, hooks, and storage model to support further remediation.
 

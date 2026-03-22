@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-03-22
+### Changed
+- Uniformate le note di contesto nei documenti `docs/audit/*` per marcare esplicitamente tali report come storici pre-3.6.0.
+- Aggiunti riferimenti diretti alla documentazione corrente Brevo-only (`docs/overview.md`, `docs/architecture.md`) in ogni report audit.
+
 ## [3.6.0] - 2026-03-22
 ### Added
 - Nuova architettura minimale focalizzata su sync HIC -> Brevo, con bootstrap unico tramite `includes/simple-brevo-sync.php`.

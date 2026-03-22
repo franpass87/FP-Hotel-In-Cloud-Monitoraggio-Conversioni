@@ -7,7 +7,7 @@ Plugin WordPress minimale che riceve nuove prenotazioni da Hotel in Cloud e sinc
 | Campo | Valore |
 | --- | --- |
 | Nome | FP HIC Monitor |
-| Versione | 3.6.0 |
+| Versione | 3.6.1 |
 | Autore | [Francesco Passeri](https://francescopasseri.com) ([info@francescopasseri.com](mailto:info@francescopasseri.com)) |
 | Autore URI | https://francescopasseri.com |
 | Plugin URI | https://francescopasseri.com |

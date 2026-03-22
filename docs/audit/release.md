@@ -1,5 +1,8 @@
 # Phase 10 — Documentation & Release
 
+> Nota legacy: documento storico riferito al perimetro pre-3.6.0.  
+> Per l'architettura attuale Brevo-only vedi `docs/overview.md` e `docs/architecture.md`.
+
 ## Summary
 La fase finale ha completato il pacchetto di rilascio della versione **3.4.0**, allineando codice, documentazione e artefatti distribuiti.
 

@@ -1,5 +1,8 @@
 # Compatibility Audit — Phase 6
 
+> Nota legacy: documento storico riferito al perimetro pre-3.6.0.  
+> Per l'architettura attuale Brevo-only vedi `docs/overview.md` e `docs/architecture.md`.
+
 ## Summary
 - Added a reusable `hic_for_each_site()` helper that safely switches blog context with `try/finally` to guarantee `restore_current_blog()` runs on PHP 7+ and iterates multisite networks efficiently using ID queries.
 - Unified activation bootstrap across single-site and multisite installs so database upgrades, table installation, capability grants, cron cleanup, and log directory provisioning run within each blog's context.
