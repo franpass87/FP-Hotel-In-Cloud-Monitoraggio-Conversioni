@@ -3,6 +3,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-03-22
+### Added
+- Nuova architettura minimale focalizzata su sync HIC -> Brevo, con bootstrap unico tramite `includes/simple-brevo-sync.php`.
+- Validazione live Brevo in admin con test reale di connessione account, contatto ed evento.
+- Storico ultimi 20 test connessione Brevo e azione admin per pulizia storico.
+- Pannello admin "Ultimo payload HIC ricevuto" con payload raw + payload normalizzato in formato mascherato.
+
+### Changed
+- Allineati gli eventi `fp_tracking_event` ai nomi canonici cross-plugin (`booking_confirmed`, `purchase`) mantenendo i legacy `hic_booking_created` e `hic_brevo_booking_synced`.
+- Aggiornati endpoint e impostazioni Brevo alle specifiche correnti (`/v3/contacts`, `/v3/events` con fallback legacy configurabile).
+- Aggiornati requisiti plugin a WordPress 6.0+ e PHP 8.0+.
+
+### Removed
+- Rimossi moduli legacy non piu necessari (polling, dashboard, integrazioni GA4/Meta/GTM e suite enterprise) per ridurre complessita e superficie di errore.
+
 ## [3.4.2] - 2025-03-22
 ### Changed
 - Grafica unificata: gradiente viola FP su `.hic-page-hero` e badge versione su tutte le pagine admin (dashboard, impostazioni, Google Ads, Circuit Breaker, Reports, Diagnostica, Setup guidato)
